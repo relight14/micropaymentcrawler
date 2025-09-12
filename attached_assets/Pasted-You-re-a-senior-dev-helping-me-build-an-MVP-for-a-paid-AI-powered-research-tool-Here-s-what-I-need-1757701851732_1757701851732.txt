@@ -1,0 +1,171 @@
+You're a senior dev helping me build an MVP for a paid, AI-powered research tool. Here's what I need you to build:
+
+
+🧠 App concept
+
+
+It's a clean search interface that lets users research complex topics (e.g. “write a PhD thesis on cold fusion”).
+
+
+The app previews 3 tiers of response before fetching any sources:
+
+
+Basic = $1 for 10 sources
+
+
+Research = $2 for 20 sources + outline
+
+
+Pro = $4 for 40 sources + outline + insight
+
+
+After selecting a tier and clicking “Pay Now”, the app:
+
+
+Deducts the cost from the user’s LedeWire wallet via API (I’ll provide the wallet API).
+
+
+Displays a research packet with:
+
+
+Summary
+
+
+Locked source cards (title + excerpt, not clickable yet)
+
+
+Optional deep link buttons (e.g., “🔓 Read Full Source – $0.10”) that trigger future wallet calls.
+
+
+⚠️ Important: Do not fetch live content yet. Simulate all source material and pricing for now.
+Cloudflare's Pay-Per-Crawl API will be integrated later — assume it's not available during MVP.
+Treat all sources as “locked” with simulated pricing, links, and quotes.
+
+
+📦 App architecture (see file tree)
+backend/
+├── main.py               # FastAPI app entry
+├── models.py             # Pydantic request/response schemas
+├── crawler_stub.py       # Simulates priced content retrieval (no Cloudflare yet)
+├── ledger.py             # Tracks what was shown or paid for
+├── packet_builder.py     # Composes final research packet output
+frontend/
+└── index.html            # Clean UI: input, tier cards, Pay Now, result packet
+
+
+✅ MVP Goals
+
+
+Simulate /tiers endpoint → returns estimated cost for 3 response levels
+
+
+Simulate /purchase endpoint → generates a mock packet
+
+
+Stub wallet call (I’ll plug in LedeWire’s API later — just call /wallet/deduct)
+
+
+Display packet with:
+
+
+Summary
+
+
+Locked source cards
+
+
+“🔓 Unlock” button next to each source (UI only for now)
+
+
+🔧 Stack Notes
+
+
+Use:
+
+
+Python 3.11+
+
+
+FastAPI for backend
+
+
+Simple HTML/JS frontend (React optional but not required for MVP)
+
+
+If needed, use SQLite or in-memory for logging tier selections or fake ledger
+
+
+LLM output and embedding logic should be simulated for now (LLM will be added later)
+
+
+Here’s what a test user will be able to do:
+
+
+User Experience Flow:
+
+
+Land on a clean search page (like Google or Perplexity)
+
+
+Enter a topic (e.g. “write a PhD thesis on cold fusion”)
+
+
+See pricing tiers auto-populate:
+
+
+“Basic: $1 — 10 sources”
+
+
+“Research: $2 — 20 sources + outline”
+
+
+“Pro: $4 — 40 sources + insights”
+
+
+Click “Pay Now” using their LedeWire wallet
+
+
+This simulates a wallet deduction (which you can already support via your existing backend)
+
+
+View their custom packet:
+
+
+Auto-generated summary
+
+
+10/20/40 locked source cards (title, preview, "🔓 unlock for $0.10")
+
+
+Wallet-driven unlock buttons (not functional yet, but illustrate future flow)
+
+
+What it demonstrates:
+
+
+💰 Pricing transparency & tier-based control
+
+
+📦 What a research packet feels like — structure, depth, sourcing
+
+
+🔒 Locked source system + unlock UX
+
+
+🧾 Wallet-based monetization — no ads, no scraping, all fair & user-controlled
+
+
+This is **enough to:
+
+
+show partners what the product experience will be
+
+
+onboard test users
+
+
+collect feedback
+
+
+and validate your pricing/packaging model**
+
