@@ -2,6 +2,7 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 import uvicorn
 
 from models import (
@@ -35,7 +36,7 @@ packet_builder = PacketBuilder()
 @app.get("/")
 async def root():
     """Root endpoint - redirect to frontend."""
-    return {"message": "AI Research Tool MVP API", "frontend": "/static/index.html"}
+    return RedirectResponse(url="/static/index.html")
 
 @app.post("/tiers", response_model=TiersResponse)
 async def get_tiers(request: TiersRequest):
