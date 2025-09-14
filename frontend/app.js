@@ -18,6 +18,17 @@ class ResearchApp {
         const closeModal = document.querySelector('.close');
         const cancelPayment = document.getElementById('cancelPayment');
         const confirmPayment = document.getElementById('confirmPayment');
+        
+        // Check if modal elements exist before binding listeners
+        if (!walletModal || !closeModal || !cancelPayment || !confirmPayment) {
+            console.error('Modal elements not found:', {
+                walletModal: !!walletModal,
+                closeModal: !!closeModal,
+                cancelPayment: !!cancelPayment,
+                confirmPayment: !!confirmPayment
+            });
+            return;
+        }
 
         // Search functionality
         searchButton.addEventListener('click', () => this.handleSearch());
@@ -28,7 +39,11 @@ class ResearchApp {
         });
 
         // Purchase functionality
-        purchaseButton.addEventListener('click', () => this.showWalletModal('tier'));
+        purchaseButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Purchase button clicked - showing wallet modal');
+            this.showWalletModal('tier');
+        });
 
         // Modal functionality
         closeModal.addEventListener('click', () => this.hideWalletModal());
@@ -154,7 +169,9 @@ class ResearchApp {
     }
 
     showWalletModal(type, itemDetails = null) {
+        console.log('showWalletModal called with type:', type);
         const modal = document.getElementById('walletModal');
+        console.log('Modal element found:', modal);
         const balanceElement = document.getElementById('walletBalance');
         const itemElement = document.getElementById('transactionItem');
         const amountElement = document.getElementById('transactionAmount');
@@ -200,6 +217,7 @@ class ResearchApp {
         }
 
         modal.style.display = 'block';
+        console.log('Modal display set to block, style:', modal.style.display);
     }
 
     hideWalletModal() {
@@ -391,10 +409,23 @@ class ResearchApp {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing app...');
     window.app = new ResearchApp();
-});
-
-// Initialize search button state
-document.addEventListener('DOMContentLoaded', () => {
+    // Initialize search button state
     document.getElementById('searchButton').disabled = true;
+    
+    // Test modal availability
+    const modal = document.getElementById('walletModal');
+    console.log('Modal element found on init:', !!modal);
+    
+    // Simple test function to show modal
+    window.testModal = function() {
+        const modal = document.getElementById('walletModal');
+        if (modal) {
+            modal.style.display = 'block';
+            console.log('Test modal shown');
+        } else {
+            console.log('Modal not found');
+        }
+    };
 });
