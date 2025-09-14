@@ -331,6 +331,154 @@
             margin: 20px 0;
         }
 
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 450px;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        .wallet-balance {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .balance-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .balance-amount {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .transaction-details {
+            background: #fff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .transaction-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .transaction-row:last-child {
+            margin-bottom: 0;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            font-weight: bold;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-button.primary {
+            background: #28a745;
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            background: #218838;
+        }
+
+        .modal-button.secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-button.secondary:hover {
+            background: #545b62;
+        }
+
+        .modal-footer {
+            text-align: center;
+            padding: 15px;
+            color: #666;
+            font-size: 0.8rem;
+            border-top: 1px solid #eee;
+        }
+
+        .close {
+            color: rgba(255,255,255,0.8);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: white;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -342,6 +490,11 @@
             
             .tiers-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                margin: 5% auto;
+                width: 95%;
             }
         }
     </style>
@@ -403,6 +556,41 @@
                         <!-- Source cards will be populated here -->
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LedeWire Wallet Modal -->
+    <div id="walletModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close">&times;</span>
+                <h3>LedeWire Wallet</h3>
+            </div>
+            <div class="modal-body">
+                <div class="wallet-balance">
+                    <div class="balance-label">Available Balance</div>
+                    <div class="balance-amount" id="walletBalance">$100.00</div>
+                </div>
+                
+                <div class="transaction-details">
+                    <div class="transaction-row">
+                        <span id="transactionItem">Research Package</span>
+                        <span id="transactionAmount">$0.00</span>
+                    </div>
+                    <div class="transaction-row">
+                        <span>Total</span>
+                        <span id="transactionTotal">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="modal-button secondary" id="cancelPayment">Cancel</button>
+                    <button class="modal-button primary" id="confirmPayment">Confirm Payment</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                Powered by LedeWire
             </div>
         </div>
     </div>

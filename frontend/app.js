@@ -3,6 +3,8 @@ class ResearchApp {
         this.selectedTier = null;
         this.currentQuery = '';
         this.apiBase = window.location.origin;
+        this.walletBalance = 100.00; // Mock wallet balance
+        this.pendingTransaction = null; // Store pending transaction details
         this.initializeEventListeners();
     }
 
@@ -10,6 +12,12 @@ class ResearchApp {
         const queryInput = document.getElementById('queryInput');
         const searchButton = document.getElementById('searchButton');
         const purchaseButton = document.getElementById('purchaseButton');
+
+        // Modal elements
+        const walletModal = document.getElementById('walletModal');
+        const closeModal = document.querySelector('.close');
+        const cancelPayment = document.getElementById('cancelPayment');
+        const confirmPayment = document.getElementById('confirmPayment');
 
         // Search functionality
         searchButton.addEventListener('click', () => this.handleSearch());
@@ -20,7 +28,19 @@ class ResearchApp {
         });
 
         // Purchase functionality
-        purchaseButton.addEventListener('click', () => this.handlePurchase());
+        purchaseButton.addEventListener('click', () => this.showWalletModal('tier'));
+
+        // Modal functionality
+        closeModal.addEventListener('click', () => this.hideWalletModal());
+        cancelPayment.addEventListener('click', () => this.hideWalletModal());
+        confirmPayment.addEventListener('click', () => this.confirmPayment());
+
+        // Close modal when clicking outside
+        walletModal.addEventListener('click', (e) => {
+            if (e.target === walletModal) {
+                this.hideWalletModal();
+            }
+        });
 
         // Enable search button when query is entered
         queryInput.addEventListener('input', (e) => {
@@ -133,7 +153,82 @@ class ResearchApp {
         }
     }
 
-    async handlePurchase() {
+    showWalletModal(type, itemDetails = null) {
+        const modal = document.getElementById('walletModal');
+        const balanceElement = document.getElementById('walletBalance');
+        const itemElement = document.getElementById('transactionItem');
+        const amountElement = document.getElementById('transactionAmount');
+        const totalElement = document.getElementById('transactionTotal');
+
+        // Update balance display
+        balanceElement.textContent = `$${this.walletBalance.toFixed(2)}`;
+
+        let price, description;
+        
+        if (type === 'tier') {
+            const tierPrices = { basic: 1.00, research: 2.00, pro: 4.00 };
+            price = tierPrices[this.selectedTier];
+            description = `${this.formatTierName(this.selectedTier)} Research Package`;
+        } else if (type === 'source') {
+            price = itemDetails.price;
+            description = `Unlock: ${itemDetails.title}`;
+        }
+
+        // Store pending transaction
+        this.pendingTransaction = {
+            type: type,
+            price: price,
+            description: description,
+            itemDetails: itemDetails
+        };
+
+        // Update modal content
+        itemElement.textContent = description;
+        amountElement.textContent = `$${price.toFixed(2)}`;
+        totalElement.textContent = `$${price.toFixed(2)}`;
+
+        // Check if user has sufficient balance
+        const confirmButton = document.getElementById('confirmPayment');
+        if (this.walletBalance < price) {
+            confirmButton.disabled = true;
+            confirmButton.textContent = 'Insufficient Balance';
+            confirmButton.style.background = '#dc3545';
+        } else {
+            confirmButton.disabled = false;
+            confirmButton.textContent = 'Confirm Payment';
+            confirmButton.style.background = '#28a745';
+        }
+
+        modal.style.display = 'block';
+    }
+
+    hideWalletModal() {
+        const modal = document.getElementById('walletModal');
+        modal.style.display = 'none';
+        this.pendingTransaction = null;
+    }
+
+    async confirmPayment() {
+        if (!this.pendingTransaction) return;
+
+        const { type, price, itemDetails } = this.pendingTransaction;
+
+        // Check balance
+        if (this.walletBalance < price) {
+            this.showError('Insufficient wallet balance');
+            return;
+        }
+
+        this.hideWalletModal();
+        
+        if (type === 'tier') {
+            await this.processTierPurchase();
+        } else if (type === 'source') {
+            await this.processSourceUnlock(itemDetails);
+        }
+    }
+
+    async processTierPurchase() {
         if (!this.selectedTier || !this.currentQuery) return;
 
         this.showLoading(true);
@@ -159,6 +254,8 @@ class ResearchApp {
             const data = await response.json();
             
             if (data.success) {
+                // Update wallet balance
+                this.walletBalance -= data.wallet_deduction;
                 this.displayResearchPacket(data.packet);
                 this.showSuccess(`Payment processed successfully! $${data.wallet_deduction} deducted from wallet.`);
             } else {
@@ -170,6 +267,15 @@ class ResearchApp {
         } finally {
             this.showLoading(false);
         }
+    }
+
+    async processSourceUnlock(itemDetails) {
+        // For MVP, just show success message since we don't have actual unlock functionality
+        this.walletBalance -= itemDetails.price;
+        this.showSuccess(`Source unlocked successfully! $${itemDetails.price.toFixed(2)} deducted from wallet.`);
+        
+        // In a real implementation, this would make an API call to unlock the source
+        // and update the UI to show the unlocked content
     }
 
     displayResearchPacket(packet) {
@@ -232,7 +338,7 @@ class ResearchApp {
                 </div>
             </div>
             <div class="source-excerpt">${source.excerpt}</div>
-            <button class="unlock-button" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price})">
+            <button class="unlock-button" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
                 🔓 Unlock Full Source - $${source.unlock_price.toFixed(2)}
             </button>
         `;
@@ -240,9 +346,12 @@ class ResearchApp {
         return card;
     }
 
-    handleSourceUnlock(sourceId, price) {
-        // For MVP, this is just UI demonstration
-        alert(`Source unlock feature coming soon!\n\nThis would unlock the full source for $${price.toFixed(2)} from your wallet.\n\nSource ID: ${sourceId}`);
+    handleSourceUnlock(sourceId, price, title) {
+        this.showWalletModal('source', {
+            id: sourceId,
+            price: price,
+            title: title
+        });
     }
 
     formatText(text) {
