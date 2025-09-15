@@ -1,22 +1,26 @@
 import random
 import uuid
+import os
 from typing import List
+from tavily import TavilyClient
 from models import SourceCard
 
 class ContentCrawlerStub:
     """
-    Simulates content crawling with dynamic pricing.
-    In production, this will interface with Cloudflare's Pay-Per-Crawl API.
+    AI-powered content crawler using Tavily search API.
+    Provides real-time research results with dynamic pricing.
     """
     
     def __init__(self):
-        # Sample domains and content types for simulation
-        self.sample_domains = [
-            "arxiv.org", "nature.com", "science.org", "ieee.org", "acm.org",
-            "researchgate.net", "jstor.org", "springer.com", "wiley.com",
-            "sciencedirect.com", "plos.org", "biorxiv.org", "ssrn.com",
-            "scholar.google.com", "pubmed.ncbi.nlm.nih.gov"
-        ]
+        # Initialize Tavily client
+        api_key = os.environ.get("TAVILY_API_KEY")
+        if api_key:
+            self.tavily_client = TavilyClient(api_key=api_key)
+            self.use_real_search = True
+        else:
+            self.tavily_client = None
+            self.use_real_search = False
+            print("Warning: TAVILY_API_KEY not found, falling back to mock data")
         
         # Content quality factors that influence pricing
         self.quality_factors = {
@@ -26,9 +30,77 @@ class ContentCrawlerStub:
             "full_text": 1.3,
             "premium_journal": 1.6
         }
+        
+        # Fallback domains for mock data
+        self.sample_domains = [
+            "arxiv.org", "nature.com", "science.org", "ieee.org", "acm.org",
+            "researchgate.net", "jstor.org", "springer.com", "wiley.com",
+            "sciencedirect.com", "plos.org", "biorxiv.org", "ssrn.com",
+            "scholar.google.com", "pubmed.ncbi.nlm.nih.gov"
+        ]
 
     def generate_sources(self, query: str, count: int) -> List[SourceCard]:
-        """Generate simulated source cards with dynamic pricing."""
+        """Generate source cards using Tavily AI search or fallback to mock data."""
+        if self.use_real_search:
+            return self._generate_tavily_sources(query, count)
+        else:
+            return self._generate_mock_sources(query, count)
+    
+    def _generate_tavily_sources(self, query: str, count: int) -> List[SourceCard]:
+        """Generate source cards using Tavily AI search."""
+        if not self.tavily_client:
+            return self._generate_mock_sources(query, count)
+            
+        try:
+            # Call Tavily API for real search results
+            response = self.tavily_client.search(
+                query=query,
+                search_depth="advanced",
+                max_results=min(count, 20),  # Tavily has limits
+                include_answer=False,
+                include_images=False,
+                include_raw_content=False
+            )
+            
+            sources = []
+            results = response.get('results', [])
+            
+            for i, result in enumerate(results[:count]):
+                source_id = str(uuid.uuid4())
+                
+                # Extract domain from URL
+                try:
+                    domain = result['url'].split('/')[2]
+                except:
+                    domain = "unknown.com"
+                
+                # Create source card from Tavily result
+                source = SourceCard(
+                    id=source_id,
+                    title=result.get('title', f'Research Source {i+1}'),
+                    excerpt=self._truncate_content(result.get('content', 'No preview available')),
+                    domain=domain,
+                    unlock_price=self._calculate_tavily_price(result, domain),
+                    is_unlocked=False
+                )
+                
+                sources.append(source)
+            
+            # If we have fewer results than requested, fill with mock data
+            if len(sources) < count:
+                remaining = count - len(sources)
+                mock_sources = self._generate_mock_sources(query, remaining)
+                sources.extend(mock_sources)
+            
+            return sources
+            
+        except Exception as e:
+            print(f"Tavily API error: {e}")
+            # Fallback to mock data on error
+            return self._generate_mock_sources(query, count)
+    
+    def _generate_mock_sources(self, query: str, count: int) -> List[SourceCard]:
+        """Generate mock source cards (original logic)."""
         sources = []
         
         for i in range(count):
@@ -54,6 +126,45 @@ class ContentCrawlerStub:
             sources.append(source)
         
         return sources
+    
+    def _truncate_content(self, content: str, max_length: int = 200) -> str:
+        """Truncate content to excerpt length."""
+        if len(content) <= max_length:
+            return content
+        return content[:max_length].rsplit(' ', 1)[0] + "..."
+    
+    def _calculate_tavily_price(self, result: dict, domain: str) -> float:
+        """Calculate dynamic pricing for Tavily results based on content quality."""
+        base_price = 0.10
+        multiplier = 1.0
+        
+        # Quality factors based on content
+        content = result.get('content', '').lower()
+        title = result.get('title', '').lower()
+        
+        # Academic/research domains get higher pricing
+        academic_domains = ['arxiv.org', 'nature.com', 'science.org', 'ieee.org', 'pubmed']
+        if any(domain_part in domain for domain_part in academic_domains):
+            multiplier *= 1.5
+        
+        # Longer, more detailed content
+        if len(content) > 1000:
+            multiplier *= 1.3
+        
+        # Research keywords in title
+        research_keywords = ['study', 'research', 'analysis', 'findings', 'methodology']
+        if any(keyword in title for keyword in research_keywords):
+            multiplier *= 1.2
+        
+        # Calculate final price
+        final_price = base_price * multiplier
+        
+        # Random variation for realism
+        variation = random.uniform(0.8, 1.2)
+        final_price *= variation
+        
+        # Ensure within bounds
+        return round(max(0.10, min(2.00, final_price)), 2)
     
     def _generate_title(self, query: str, index: int) -> str:
         """Generate realistic academic titles."""

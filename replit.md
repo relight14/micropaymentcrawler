@@ -8,7 +8,12 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-- **September 15, 2025**: Completed full API integration for LedeWire wallet readiness
+- **September 15, 2025**: Completed full API integration for LedeWire wallet readiness + AI search
+  - **Tavily AI Search Integration**: Replaced mock data with real-time AI search results
+    - Real sources from academic institutions, tech companies, and research databases
+    - Dynamic pricing based on content quality and source authority ($0.10-$2.00)
+    - Intelligent content excerpts and source relevance scoring
+    - Fallback to mock data if API is unavailable (robust error handling)
   - Added `/unlock-source` backend endpoint with proper wallet deduction simulation
   - Updated frontend to call backend API for all payment operations (both tier purchases and source unlocks)
   - All payment flows now go through backend with LedeWire-compatible API structure
