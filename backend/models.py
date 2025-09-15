@@ -59,3 +59,15 @@ class WalletDeductResponse(BaseModel):
     success: bool
     remaining_balance: float
     transaction_id: str
+
+class SourceUnlockRequest(BaseModel):
+    source_id: str
+    price: float
+    title: str
+    user_wallet_id: Optional[str] = None
+
+class SourceUnlockResponse(BaseModel):
+    success: bool
+    message: str
+    wallet_deduction: float
+    unlocked_content: Optional[str] = None

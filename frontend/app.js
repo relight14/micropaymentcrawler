@@ -274,12 +274,53 @@ class ResearchApp {
     }
 
     async processSourceUnlock(itemDetails) {
-        // For MVP, just show success message since we don't have actual unlock functionality
-        this.walletBalance -= itemDetails.price;
-        this.showSuccess(`Source unlocked successfully! $${itemDetails.price.toFixed(2)} deducted from wallet.`);
-        
-        // In a real implementation, this would make an API call to unlock the source
-        // and update the UI to show the unlocked content
+        try {
+            const response = await fetch(`${this.apiBase}/unlock-source`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    source_id: itemDetails.id,
+                    price: itemDetails.price,
+                    title: itemDetails.title,
+                    user_wallet_id: 'demo_wallet_' + Date.now()
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update wallet balance
+                this.walletBalance -= data.wallet_deduction;
+                
+                // Find and update the source card to show unlocked content
+                const sourceCard = document.querySelector(`[data-source-id="${itemDetails.id}"]`);
+                if (sourceCard) {
+                    const contentDiv = sourceCard.querySelector('.source-content');
+                    if (contentDiv) {
+                        contentDiv.innerHTML = `<div class="unlocked-content">${data.unlocked_content.replace(/\n/g, '<br>')}</div>`;
+                    }
+                    
+                    // Hide the unlock button
+                    const unlockBtn = sourceCard.querySelector('.unlock-source-btn');
+                    if (unlockBtn) {
+                        unlockBtn.style.display = 'none';
+                    }
+                }
+                
+                this.showSuccess(`Source unlocked successfully! $${data.wallet_deduction.toFixed(2)} deducted from wallet.`);
+            } else {
+                throw new Error(data.message || 'Source unlock failed');
+            }
+        } catch (error) {
+            console.error('Source unlock error:', error);
+            this.showError('Source unlock failed. Please check your wallet balance and try again.');
+        }
     }
 
     displayResearchPacket(packet) {
@@ -333,6 +374,7 @@ class ResearchApp {
     createSourceCard(source) {
         const card = document.createElement('div');
         card.className = 'source-card';
+        card.setAttribute('data-source-id', source.id);
 
         card.innerHTML = `
             <div class="source-header">
@@ -341,8 +383,10 @@ class ResearchApp {
                     <div class="source-domain">${source.domain}</div>
                 </div>
             </div>
-            <div class="source-excerpt">${source.excerpt}</div>
-            <button class="unlock-button" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
+            <div class="source-content">
+                <div class="source-excerpt">${source.excerpt}</div>
+            </div>
+            <button class="unlock-button unlock-source-btn" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
                 🔓 Unlock Full Source - $${source.unlock_price.toFixed(2)}
             </button>
         `;

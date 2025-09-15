@@ -8,7 +8,8 @@ import uvicorn
 from models import (
     TiersRequest, TiersResponse, TierInfo, TierType,
     PurchaseRequest, PurchaseResponse, 
-    WalletDeductRequest, WalletDeductResponse
+    WalletDeductRequest, WalletDeductResponse,
+    SourceUnlockRequest, SourceUnlockResponse
 )
 from crawler_stub import ContentCrawlerStub
 from ledger import ResearchLedger
@@ -164,6 +165,49 @@ async def get_stats():
         return {"success": True, "stats": stats}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.post("/unlock-source", response_model=SourceUnlockResponse)
+async def unlock_source(request: SourceUnlockRequest):
+    """
+    Process a source unlock request.
+    Simulates wallet deduction and unlocks source content.
+    """
+    try:
+        # Simulate wallet deduction
+        wallet_response = await simulate_wallet_deduction(
+            wallet_id=request.user_wallet_id or "demo_wallet",
+            amount=request.price,
+            description=f"Unlock source: {request.title}"
+        )
+        
+        if not wallet_response.success:
+            return SourceUnlockResponse(
+                success=False,
+                message="Insufficient wallet balance or wallet error",
+                wallet_deduction=0.0
+            )
+        
+        # Simulate generating unlocked content
+        unlocked_content = f"""**Full Content for: {request.title}**
+
+This is the complete content that was previously locked. In a real implementation, this would be fetched from the content crawling service.
+
+Key insights from this source:
+• Detailed analysis and findings
+• Supporting evidence and data
+• Expert commentary and conclusions
+
+[Content unlocked for ${request.price:.2f}]"""
+        
+        return SourceUnlockResponse(
+            success=True,
+            message=f"Source unlocked successfully",
+            wallet_deduction=request.price,
+            unlocked_content=unlocked_content
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Source unlock failed: {str(e)}")
 
 @app.get("/health")
 async def health_check():

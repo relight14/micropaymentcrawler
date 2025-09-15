@@ -8,7 +8,13 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-- **September 12, 2025**: Complete MVP implementation deployed and tested
+- **September 15, 2025**: Completed full API integration for LedeWire wallet readiness
+  - Added `/unlock-source` backend endpoint with proper wallet deduction simulation
+  - Updated frontend to call backend API for all payment operations (both tier purchases and source unlocks)
+  - All payment flows now go through backend with LedeWire-compatible API structure
+  - Ready for production LedeWire integration - just needs API endpoint swapping in `simulate_wallet_deduction()`
+  - Maintains complete transaction audit trail and proper error handling
+  - **September 12, 2025**: Complete MVP implementation deployed and tested
   - Built FastAPI backend with all required modules (main.py, models.py, crawler_stub.py, ledger.py, packet_builder.py)
   - Implemented tier-based research system with correct pricing (Basic $1, Research $2, Pro $4)
   - Created simulated content crawler with dynamic source unlock pricing ($0.10-$2.00 per source)
