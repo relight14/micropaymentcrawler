@@ -3,7 +3,8 @@ class ResearchApp {
         this.selectedTier = null;
         this.currentQuery = '';
         this.apiBase = window.location.origin;
-        this.walletBalance = 100.00; // Mock wallet balance
+        this.walletBalance = 0.00; // Will be loaded from API after auth
+        this.authToken = null; // User authentication token
         this.pendingTransaction = null; // Store pending transaction details
         this.initializeEventListeners();
     }
@@ -31,7 +32,7 @@ class ResearchApp {
         // Purchase functionality
         purchaseButton.addEventListener('click', (e) => {
             e.preventDefault();
-            this.showWalletModal('tier');
+            this.handlePurchaseFlow();
         });
 
         // Modal functionality
@@ -434,6 +435,153 @@ class ResearchApp {
 
     clearMessages() {
         document.querySelectorAll('.error, .success').forEach(el => el.remove());
+    }
+
+    // Authentication Flow Methods
+    
+    handlePurchaseFlow() {
+        if (!this.authToken) {
+            // No authentication - show login modal
+            this.showAuthModal();
+        } else {
+            // Already authenticated - get wallet balance and show payment modal
+            this.checkWalletAndShowModal('tier');
+        }
+    }
+
+    showAuthModal() {
+        // Create authentication modal if it doesn't exist
+        let authModal = document.getElementById('authModal');
+        if (!authModal) {
+            authModal = this.createAuthModal();
+            document.body.appendChild(authModal);
+        }
+        authModal.style.display = 'block';
+    }
+
+    createAuthModal() {
+        const modal = document.createElement('div');
+        modal.id = 'authModal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content auth-modal">
+                <span class="close" onclick="this.parentElement.parentElement.style.display='none'">&times;</span>
+                <h2>🔐 LedeWire Authentication Required</h2>
+                <p>Please sign in to access your wallet and make purchases.</p>
+                
+                <div class="auth-form">
+                    <input type="email" id="authEmail" placeholder="Email address" required>
+                    <input type="password" id="authPassword" placeholder="Password" required>
+                    <input type="text" id="authName" placeholder="Full name (for signup)" style="display:none;">
+                    
+                    <button id="loginBtn" class="auth-btn primary">Sign In</button>
+                    <button id="signupBtn" class="auth-btn secondary">Create Account</button>
+                    
+                    <div class="auth-toggle">
+                        <a href="#" id="toggleAuth">Need an account? Sign up</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        modal.querySelector('#loginBtn').addEventListener('click', () => this.handleAuth('login'));
+        modal.querySelector('#signupBtn').addEventListener('click', () => this.handleAuth('signup'));
+        modal.querySelector('#toggleAuth').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggleAuthMode();
+        });
+
+        return modal;
+    }
+
+    toggleAuthMode() {
+        const nameField = document.getElementById('authName');
+        const loginBtn = document.getElementById('loginBtn');
+        const signupBtn = document.getElementById('signupBtn');
+        const toggleLink = document.getElementById('toggleAuth');
+
+        if (nameField.style.display === 'none') {
+            // Switch to signup mode
+            nameField.style.display = 'block';
+            loginBtn.style.display = 'none';
+            signupBtn.style.display = 'block';
+            toggleLink.textContent = 'Already have an account? Sign in';
+        } else {
+            // Switch to login mode
+            nameField.style.display = 'none';
+            loginBtn.style.display = 'block';
+            signupBtn.style.display = 'none';
+            toggleLink.textContent = 'Need an account? Sign up';
+        }
+    }
+
+    async handleAuth(type) {
+        const email = document.getElementById('authEmail').value;
+        const password = document.getElementById('authPassword').value;
+        const name = document.getElementById('authName').value;
+
+        if (!email || !password || (type === 'signup' && !name)) {
+            this.showError('Please fill in all required fields');
+            return;
+        }
+
+        try {
+            const endpoint = type === 'login' ? '/auth/login' : '/auth/signup';
+            const body = type === 'login' 
+                ? { email, password }
+                : { email, password, name };
+
+            const response = await fetch(`${this.apiBase}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.access_token) {
+                this.authToken = data.access_token;
+                document.getElementById('authModal').style.display = 'none';
+                this.showSuccess(`Welcome! Successfully ${type === 'login' ? 'signed in' : 'created account'}.`);
+                
+                // Now proceed with the original purchase flow
+                this.checkWalletAndShowModal('tier');
+            } else {
+                throw new Error(data.message || `${type} failed`);
+            }
+
+        } catch (error) {
+            console.error(`${type} error:`, error);
+            this.showError(`${type} failed: ${error.message}`);
+        }
+    }
+
+    async checkWalletAndShowModal(type, itemDetails = null) {
+        try {
+            // Get real wallet balance from backend
+            const response = await fetch(`${this.apiBase}/wallet/balance`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.walletBalance = data.balance_cents / 100; // Convert cents to dollars
+                
+                // Now show wallet modal with real balance
+                this.showWalletModal(type, itemDetails);
+            } else {
+                throw new Error('Failed to get wallet balance');
+            }
+
+        } catch (error) {
+            console.error('Wallet balance error:', error);
+            this.showError('Could not load wallet balance. Please try again.');
+        }
     }
 }
 

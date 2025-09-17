@@ -1,5 +1,5 @@
 import uuid
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -9,7 +9,8 @@ from models import (
     TiersRequest, TiersResponse, TierInfo, TierType,
     PurchaseRequest, PurchaseResponse, 
     WalletDeductRequest, WalletDeductResponse,
-    SourceUnlockRequest, SourceUnlockResponse
+    SourceUnlockRequest, SourceUnlockResponse,
+    LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
 )
 from crawler_stub import ContentCrawlerStub
 from ledger import ResearchLedger
@@ -36,6 +37,50 @@ crawler = ContentCrawlerStub()
 ledger = ResearchLedger()
 packet_builder = PacketBuilder()
 ledewire = LedeWireAPI()  # Mock implementation - ready for real API keys
+
+# Authentication Helper Functions
+
+def extract_bearer_token(authorization: str) -> str:
+    """
+    Extract and validate Bearer token from Authorization header.
+    Returns the JWT token string or raises HTTPException if invalid.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
+    
+    access_token = authorization.split(" ", 1)[1].strip()
+    
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
+    
+    return access_token
+
+def validate_user_token(access_token: str):
+    """
+    Validate JWT token with LedeWire API.
+    Raises HTTPException if token is invalid or expired.
+    """
+    try:
+        # Verify token is valid by checking wallet balance
+        # This also confirms the user exists and token is not expired
+        balance_result = ledewire.get_wallet_balance(access_token)
+        
+        # Check for API errors
+        if "error" in balance_result:
+            error_message = ledewire.handle_api_error(balance_result)
+            raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
+            
+        return True
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (auth failures)
+        raise
+    except Exception as e:
+        # Any other error means token validation failed
+        raise HTTPException(status_code=401, detail="Token validation failed")
 
 @app.get("/")
 async def root():
@@ -83,12 +128,18 @@ async def get_tiers(request: TiersRequest):
         raise HTTPException(status_code=500, detail=f"Error generating tiers: {str(e)}")
 
 @app.post("/purchase", response_model=PurchaseResponse)
-async def purchase_research(request: PurchaseRequest):
+async def purchase_research(request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """
     Process a research purchase request using LedeWire API.
-    Handles authentication, balance check, and research packet generation.
+    Requires valid Bearer token authentication for all purchases.
     """
     try:
+        # SECURITY: Extract and validate Bearer token from Authorization header
+        access_token = extract_bearer_token(authorization)
+        
+        # SECURITY: Validate JWT token with LedeWire API
+        validate_user_token(access_token)
+        
         # Get tier pricing in cents (LedeWire uses cents)
         tier_prices = {
             TierType.BASIC: 100,    # $1.00
@@ -101,9 +152,6 @@ async def purchase_research(request: PurchaseRequest):
         
         # Generate unique content ID for this research packet
         content_id = f"research_{uuid.uuid4().hex[:12]}"
-        
-        # Use LedeWire API for purchase (mock implementation for now)
-        access_token = request.user_wallet_id or "mock_token"  # Will be real JWT in production
         
         # Create purchase through LedeWire
         purchase_result = ledewire.create_purchase(
@@ -142,6 +190,9 @@ async def purchase_research(request: PurchaseRequest):
             packet=packet
         )
     
+    except HTTPException:
+        # Re-raise HTTP exceptions (including 401 auth failures) with original status
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Purchase failed: {str(e)}")
 
@@ -180,15 +231,20 @@ async def get_stats():
         return {"success": False, "error": str(e)}
 
 @app.post("/unlock-source", response_model=SourceUnlockResponse)
-async def unlock_source(request: SourceUnlockRequest):
+async def unlock_source(request: SourceUnlockRequest, authorization: str = Header(None, alias="Authorization")):
     """
     Process a source unlock request using LedeWire API.
-    Handles authentication and individual source purchasing.
+    Requires valid Bearer token authentication for all source purchases.
     """
     try:
+        # SECURITY: Extract and validate Bearer token from Authorization header
+        access_token = extract_bearer_token(authorization)
+        
+        # SECURITY: Validate JWT token with LedeWire API
+        validate_user_token(access_token)
+        
         # Convert price to cents for LedeWire API
         price_cents = int(request.price * 100)
-        access_token = request.user_wallet_id or "mock_token"  # Will be real JWT in production
         
         # Generate content ID for this source
         source_content_id = f"source_{request.source_id}"
@@ -228,8 +284,85 @@ Key insights from this source:
             unlocked_content=unlocked_content
         )
     
+    except HTTPException:
+        # Re-raise HTTP exceptions (including 401 auth failures) with original status
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Source unlock failed: {str(e)}")
+
+# Authentication Endpoints
+
+@app.post("/auth/login", response_model=AuthResponse)
+async def login_user(request: LoginRequest):
+    """
+    Authenticate user with email and password.
+    Returns JWT access token for wallet access.
+    """
+    try:
+        # Use LedeWire API to authenticate user
+        auth_result = ledewire.authenticate_user(request.email, request.password)
+        
+        if "access_token" in auth_result:
+            return AuthResponse(
+                access_token=auth_result["access_token"],
+                refresh_token=auth_result.get("refresh_token", ""),
+                expires_at=auth_result.get("expires_at", "")
+            )
+        else:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+    except Exception as e:
+        print(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
+
+@app.post("/auth/signup", response_model=AuthResponse) 
+async def signup_user(request: SignupRequest):
+    """
+    Create new user account and return JWT token.
+    """
+    try:
+        # Use LedeWire API to create user account
+        auth_result = ledewire.signup_user(request.email, request.password, request.name)
+        
+        if "access_token" in auth_result:
+            return AuthResponse(
+                access_token=auth_result["access_token"],
+                refresh_token=auth_result.get("refresh_token", ""),
+                expires_at=auth_result.get("expires_at", "")
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Account creation failed")
+            
+    except Exception as e:
+        print(f"Signup error: {e}")
+        raise HTTPException(status_code=500, detail="Account creation failed")
+
+@app.get("/wallet/balance", response_model=WalletBalanceResponse)
+async def get_wallet_balance(authorization: str = Header(None, alias="Authorization")):
+    """
+    Get user's current wallet balance.
+    Requires Bearer token in Authorization header.
+    """
+    try:
+        # Extract bearer token from headers
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Authorization token required")
+            
+        access_token = authorization.split(" ")[1]
+        
+        # Get wallet balance from LedeWire API
+        balance_result = ledewire.get_wallet_balance(access_token)
+        
+        if "balance_cents" in balance_result:
+            return WalletBalanceResponse(balance_cents=balance_result["balance_cents"])
+        else:
+            raise HTTPException(status_code=400, detail="Could not retrieve balance")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Wallet balance error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get wallet balance")
 
 @app.get("/health")
 async def health_check():

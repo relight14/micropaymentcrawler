@@ -72,3 +72,21 @@ class SourceUnlockResponse(BaseModel):
     message: str
     wallet_deduction: float
     unlocked_content: Optional[str] = None
+
+# Authentication Models
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
+class AuthResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    expires_at: str
+
+class WalletBalanceResponse(BaseModel):
+    balance_cents: int
