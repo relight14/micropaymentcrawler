@@ -6,15 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
 import uvicorn
 
-# Load environment variables for development
-if os.path.exists('.env'):
-    with open('.env', 'r') as f:
-        for line in f:
-            if line.strip() and not line.startswith('#'):
-                key, value = line.strip().split('=', 1)
-                os.environ[key] = value
-                
-# Force mock mode for development
+# TEMPORARY: Force mock mode in Replit environment due to TLS/SNI issues
 os.environ['LEDEWIRE_USE_MOCK'] = 'true'
 
 from models import (

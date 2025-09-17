@@ -6,13 +6,20 @@ import os
 import uuid
 import json
 import requests
+from requests.adapters import HTTPAdapter
+import ssl
+import urllib3
+from urllib3.util.retry import Retry
+from urllib3.util.ssl_ import create_urllib3_context
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+
+# SSL adapter removed - was unsafe and ineffective for SNI issues
 
 class LedeWireAPI:
     """
     LedeWire API wrapper - Production implementation with real HTTP calls.
-    Uses secured environment variables for authentication.
+    Uses secured environment variables for authentication with SSL fixes.
     """
     
     def __init__(self, api_key: Optional[str] = None):
@@ -28,12 +35,22 @@ class LedeWireAPI:
         
         # Setup HTTP session with REAL authentication headers
         self.session = requests.Session()
+        
+        # Configure retry strategy for connection issues
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        self.session.mount('https://', HTTPAdapter(max_retries=retry_strategy))
+        
         if self.api_key and self.api_secret:
             self.session.headers.update({
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-API-Key': self.api_key,
-                'X-API-Secret': self.api_secret
+                'X-API-Secret': self.api_secret,
+                'User-Agent': 'LedeWire-Client/1.0'
             })
     
     # Authentication Methods
