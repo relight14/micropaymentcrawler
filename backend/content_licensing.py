@@ -108,8 +108,12 @@ class RSLProtocolHandler(ProtocolHandler):
                     amount_elem = payment.find('.//{https://rslstandard.org/rsl}amount')
                     if amount_elem is not None:
                         try:
-                            price = float(amount_elem.text)
-                            currency = amount_elem.get('currency', 'USD')
+                            price_text = amount_elem.text
+                            if price_text is not None:
+                                price = float(price_text)
+                                currency = amount_elem.get('currency', 'USD')
+                            else:
+                                continue
                             
                             # Determine price type based on payment type
                             payment_type = payment.get('type', 'purchase')

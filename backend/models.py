@@ -34,6 +34,14 @@ class SourceCard(BaseModel):
     domain: str
     unlock_price: float
     is_unlocked: bool = False
+    
+    # Multi-protocol licensing support
+    licensing_protocol: Optional[str] = None  # "rsl", "tollbit", "cloudflare"
+    license_cost: Optional[float] = None  # Cost for ai-include license
+    publisher_name: Optional[str] = None  # Publisher name from license terms
+    license_type: Optional[str] = None  # Type of license available
+    protocol_badge: Optional[str] = None  # UI badge text
+    requires_attribution: bool = False  # Whether attribution is required
 
 class ResearchPacket(BaseModel):
     query: str
