@@ -4,6 +4,7 @@ import os
 from typing import List
 from tavily import TavilyClient
 from models import SourceCard
+from content_licensing import ContentLicenseService
 
 class ContentCrawlerStub:
     """
@@ -21,6 +22,9 @@ class ContentCrawlerStub:
             self.tavily_client = None
             self.use_real_search = False
             print("Warning: TAVILY_API_KEY not found, falling back to mock data")
+        
+        # Initialize content licensing service
+        self.license_service = ContentLicenseService()
         
         # Content quality factors that influence pricing
         self.quality_factors = {
@@ -84,6 +88,11 @@ class ContentCrawlerStub:
                     is_unlocked=False
                 )
                 
+                # Check for content licensing
+                license_info = self._discover_licensing(result.get('url', ''))
+                if license_info:
+                    self._apply_licensing_info(source, license_info)
+                
                 sources.append(source)
             
             # If we have fewer results than requested, fill with mock data
@@ -122,6 +131,12 @@ class ContentCrawlerStub:
                 unlock_price=unlock_price,
                 is_unlocked=False
             )
+            
+            # For mock sources, occasionally simulate licensing (20% chance for demo)
+            if random.random() < 0.2:
+                mock_license_info = self._generate_mock_licensing(domain)
+                if mock_license_info:
+                    self._apply_licensing_info(source, mock_license_info)
             
             sources.append(source)
         
@@ -228,6 +243,70 @@ class ContentCrawlerStub:
         # Ensure price is within bounds and rounded to cents
         final_price = min(max_price, max(base_price, final_price))
         return round(final_price, 2)
+    
+    def _discover_licensing(self, url: str) -> dict:
+        """Discover content licensing for a given URL"""
+        try:
+            return self.license_service.discover_licensing(url)
+        except Exception as e:
+            print(f"License discovery failed for {url}: {e}")
+            return None
+    
+    def _apply_licensing_info(self, source: SourceCard, license_info: dict):
+        """Apply licensing information to a source card"""
+        if not license_info:
+            return
+            
+        terms = license_info['terms']
+        protocol = terms.protocol
+        
+        source.licensing_protocol = protocol
+        source.license_cost = terms.ai_include_price
+        source.publisher_name = terms.publisher
+        source.license_type = "ai-include"
+        source.requires_attribution = terms.requires_attribution
+        
+        # Set protocol badge for UI
+        protocol_badges = {
+            'rsl': '🔒 RSL Licensed',
+            'tollbit': '⚡ Tollbit Access',
+            'cloudflare': '☁️ CF Licensed'
+        }
+        source.protocol_badge = protocol_badges.get(protocol, f'📋 {protocol.upper()} Licensed')
+        
+        # Update unlock price to include license cost if applicable
+        if source.license_cost:
+            source.unlock_price += source.license_cost
+    
+    def _generate_mock_licensing(self, domain: str) -> dict:
+        """Generate mock licensing info for demonstration"""
+        protocols = ['rsl', 'tollbit', 'cloudflare']
+        protocol = random.choice(protocols)
+        
+        # Mock license terms based on protocol
+        from content_licensing import LicenseTerms
+        
+        price_ranges = {
+            'rsl': (0.03, 0.08),
+            'tollbit': (0.02, 0.05), 
+            'cloudflare': (0.05, 0.12)
+        }
+        
+        min_price, max_price = price_ranges[protocol]
+        license_price = round(random.uniform(min_price, max_price), 2)
+        
+        terms = LicenseTerms(
+            protocol=protocol,
+            ai_include_price=license_price,
+            publisher=f"{domain} Publisher",
+            permits_ai_include=True,
+            requires_attribution=random.choice([True, False])
+        )
+        
+        return {
+            'protocol': protocol,
+            'terms': terms
+        }
     
     def get_estimated_cost(self, query: str, source_count: int) -> float:
         """Estimate total unlock cost for sources (for tier pricing)."""
