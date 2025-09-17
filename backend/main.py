@@ -1,9 +1,21 @@
 import uuid
+import os
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
 import uvicorn
+
+# Load environment variables for development
+if os.path.exists('.env'):
+    with open('.env', 'r') as f:
+        for line in f:
+            if line.strip() and not line.startswith('#'):
+                key, value = line.strip().split('=', 1)
+                os.environ[key] = value
+                
+# Force mock mode for development
+os.environ['LEDEWIRE_USE_MOCK'] = 'true'
 
 from models import (
     TiersRequest, TiersResponse, TierInfo, TierType,

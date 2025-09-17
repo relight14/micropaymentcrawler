@@ -440,22 +440,28 @@ class ResearchApp {
     // Authentication Flow Methods
     
     handlePurchaseFlow() {
+        console.log('🔍 DEBUG: handlePurchaseFlow called, authToken:', this.authToken);
         if (!this.authToken) {
+            console.log('🔍 DEBUG: No auth token, showing auth modal');
             // No authentication - show login modal
             this.showAuthModal();
         } else {
+            console.log('🔍 DEBUG: Auth token exists, checking wallet and showing modal');
             // Already authenticated - get wallet balance and show payment modal
             this.checkWalletAndShowModal('tier');
         }
     }
 
     showAuthModal() {
+        console.log('🔍 DEBUG: showAuthModal called');
         // Create authentication modal if it doesn't exist
         let authModal = document.getElementById('authModal');
         if (!authModal) {
+            console.log('🔍 DEBUG: Creating new auth modal');
             authModal = this.createAuthModal();
             document.body.appendChild(authModal);
         }
+        console.log('🔍 DEBUG: Showing auth modal', authModal);
         authModal.style.display = 'block';
     }
 
