@@ -244,7 +244,7 @@ class ContentCrawlerStub:
         final_price = min(max_price, max(base_price, final_price))
         return round(final_price, 2)
     
-    def _discover_licensing(self, url: str) -> dict:
+    def _discover_licensing(self, url: str):
         """Discover content licensing for a given URL"""
         try:
             return self.license_service.discover_licensing(url)
@@ -278,7 +278,7 @@ class ContentCrawlerStub:
         if source.license_cost:
             source.unlock_price += source.license_cost
     
-    def _generate_mock_licensing(self, domain: str) -> dict:
+    def _generate_mock_licensing(self, domain: str):
         """Generate mock licensing info for demonstration"""
         protocols = ['rsl', 'tollbit', 'cloudflare']
         protocol = random.choice(protocols)

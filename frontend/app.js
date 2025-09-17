@@ -377,15 +377,23 @@ class ResearchApp {
         card.className = 'source-card';
         card.setAttribute('data-source-id', source.id);
 
+        // Generate licensing badge if available
+        const licensingBadge = this.createLicensingBadge(source);
+        
+        // Generate pricing breakdown
+        const pricingInfo = this.createPricingBreakdown(source);
+
         card.innerHTML = `
             <div class="source-header">
                 <div style="flex-grow: 1;">
                     <div class="source-title">${source.title}</div>
                     <div class="source-domain">${source.domain}</div>
+                    ${licensingBadge}
                 </div>
             </div>
             <div class="source-content">
                 <div class="source-excerpt">${source.excerpt}</div>
+                ${pricingInfo}
             </div>
             <button class="unlock-button unlock-source-btn" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
                 🔓 Unlock Full Source - $${source.unlock_price.toFixed(2)}
@@ -393,6 +401,46 @@ class ResearchApp {
         `;
 
         return card;
+    }
+
+    createLicensingBadge(source) {
+        if (!source.licensing_protocol || !source.protocol_badge) {
+            return '';
+        }
+        
+        const protocolClass = `protocol-${source.licensing_protocol}`;
+        const attribution = source.requires_attribution ? ' (Attribution Required)' : '';
+        
+        return `
+            <div class="licensing-info">
+                <span class="protocol-badge ${protocolClass}" title="${source.publisher_name || 'Licensed Content'}">${source.protocol_badge}${attribution}</span>
+            </div>
+        `;
+    }
+
+    createPricingBreakdown(source) {
+        if (!source.license_cost) {
+            return '';
+        }
+        
+        const baseCost = source.unlock_price - source.license_cost;
+        return `
+            <div class="pricing-breakdown">
+                <div class="pricing-item">
+                    <span class="pricing-label">Base Access:</span>
+                    <span class="pricing-value">$${baseCost.toFixed(2)}</span>
+                </div>
+                <div class="pricing-item">
+                    <span class="pricing-label">License Fee:</span>
+                    <span class="pricing-value">$${source.license_cost.toFixed(2)}</span>
+                </div>
+                <div class="pricing-divider"></div>
+                <div class="pricing-total">
+                    <span class="pricing-label">Total:</span>
+                    <span class="pricing-value">$${source.unlock_price.toFixed(2)}</span>
+                </div>
+            </div>
+        `;
     }
 
     handleSourceUnlock(sourceId, price, title) {
