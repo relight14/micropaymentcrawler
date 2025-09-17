@@ -43,6 +43,7 @@ class ResearchPacket(BaseModel):
     insights: Optional[str] = None
     sources: List[SourceCard]
     total_sources: int
+    content_id: Optional[str] = None  # LedeWire content identifier
 
 class PurchaseResponse(BaseModel):
     success: bool

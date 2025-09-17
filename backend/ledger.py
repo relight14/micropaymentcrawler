@@ -136,3 +136,27 @@ class ResearchLedger:
                 "total_revenue": overall[1],
                 "average_purchase": overall[2]
             }
+    
+    def get_packet_by_content_id(self, content_id: str) -> Optional[ResearchPacket]:
+        """
+        Retrieve research packet by content_id.
+        For demo purposes - in production this would verify via LedeWire API.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Search for packet with matching content_id in JSON data
+            cursor.execute("SELECT packet_data FROM purchases ORDER BY timestamp DESC")
+            results = cursor.fetchall()
+            
+            for (packet_json,) in results:
+                if packet_json:
+                    try:
+                        packet_data = json.loads(packet_json)
+                        if packet_data.get("content_id") == content_id:
+                            # Reconstruct ResearchPacket from stored data
+                            return ResearchPacket(**packet_data)
+                    except (json.JSONDecodeError, Exception):
+                        continue
+            
+            return None

@@ -1,0 +1,2205 @@
+---
+openapi: 3.1.0
+info:
+  title: LedeWire API
+  version: 1.0.0
+  description: 'LedeWire API for buyer/seller authentication, wallet funding, content
+    purchases, and seller content management.
+
+    '
+servers:
+- url: https://api.ledewire.com/v1
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ContentAccessInfo:
+      type: object
+      properties:
+        user_id:
+          type:
+          - string
+          -
+        has_purchased:
+          type: boolean
+        has_sufficient_funds:
+          type: boolean
+        wallet_balance_cents:
+          type: integer
+        next_required_action:
+          type: string
+          enum:
+          - authenticate
+          - fund_wallet
+          - purchase
+          - none
+    AuthenticationResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwOTM1N2MyMi0zODlhLTRmYWItYjE2Ni04MjJlNTJhNWJmNWUiLCJyb2xlIjoiYnV5ZXIiLCJidXllcl9jbGFpbXMiOnsidXNlcl9pZCI6IjA5MzU3YzIyLTM4OWEtNGZhYi1iMTY2LTgyMmU1MmE1YmY1ZSIsImVtYWlsIjoidGVzdC0xM0BleGFtcGxlLmNvbSJ9LCJpc3MiOiJMZWRlV2lyZSBBUEkiLCJhdWQiOiJ3ZWIiLCJleHAiOjE3NDc0OTk5NzMsImlhdCI6MTc0NzQ5ODE3MywibmJmIjoxNzQ3NDk4MTczLCJqdGkiOiIwZTMyYzNkNi02OWQwLTRmNTItYTczNS1hZTJiOGNlMmY1MmQiLCJ0b2tlbl9tZXRhZGF0YSI6eyJjcmVhdGVkX2F0IjoiMjAyNS0wNS0xN1QxNjowOTozM1oiLCJleHBpcmVzX2F0IjoiMjAyNS0wNS0xN1QxNjozOTozM1oiLCJ0b2tlbl9pZCI6IjBlMzJjM2Q2LTY5ZDAtNGY1Mi1hNzM1LWFlMmI4Y2UyZjUyZCJ9fQ.VSFsm5ysjtZLheVfhv6DWwH1A9zn_WA6rnGOlPR1R3U
+        refresh_token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+          description: When the Access Token expires
+    JWTClaims:
+      type: object
+      properties:
+        sub:
+          type: string
+          description: Buyer or Seller identifier
+        role:
+          type: string
+          enum:
+          - buyer
+          - seller
+        seller_claims:
+          type: object
+          properties:
+            seller_id:
+              type: string
+        buyer_claims:
+          type: object
+          properties:
+            user_id:
+              type: string
+            email:
+              type: string
+        iat:
+          type: integer
+        exp:
+          type: integer
+        nbf:
+          type: integer
+        iss:
+          type: string
+        aud:
+          type: string
+        token_metadata:
+          type: object
+          properties:
+            created_at:
+              type: string
+              format: date-time
+            expires_at:
+              type: string
+              format: date-time
+            token_id:
+              type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: integer
+            message:
+              type: string
+    AuthSignupRequest:
+      type: object
+      required:
+      - email
+      - password
+      - name
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+    AuthLoginEmailRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    AuthLoginOAuthRequest:
+      type: object
+      properties:
+        id_token:
+          type: string
+    AuthLoginApiKeyRequest:
+      type: object
+      required:
+      - key
+      properties:
+        key:
+          type: string
+        secret:
+          type: string
+    AuthTokenRefreshRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+    WalletPaymentSessionRequest:
+      type: object
+      required:
+      - amount_cents
+      properties:
+        amount_cents:
+          type: integer
+          description: Amount to fund the wallet in cents
+        currency:
+          type: string
+          default: usd
+          description: Currency code (defaults to USD)
+        metadata:
+          type: object
+          description: Additional metadata to include with the payment session
+    WalletPaymentSessionResponse:
+      type: object
+      properties:
+        client_secret:
+          type: string
+          description: The client secret used by the payment widget to confirm the
+            payment
+        session_id:
+          type: string
+          description: The ID of the created payment session
+        public_key:
+          type: string
+          description: The payment public key to be used during the payment processing
+    PaymentWebhookEvent:
+      type: object
+      description: A payment provider webhook event object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the event
+        type:
+          type: string
+          description: Type of event (e.g., payment_intent.succeeded, payment_intent.payment_failed)
+        data:
+          type: object
+          description: Event data containing the object that triggered the event
+    WalletFundResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        balance_cents:
+          type: integer
+    WalletBalanceResponse:
+      type: object
+      properties:
+        balance_cents:
+          type: integer
+    WalletTransaction:
+      type: object
+      properties:
+        type:
+          type: string
+        amount_cents:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+    PurchaseCreateRequest:
+      type: object
+      properties:
+        content_id:
+          type: string
+        price_cents:
+          type: integer
+    PurchaseVerifyResponse:
+      type: object
+      properties:
+        has_purchased:
+          type: boolean
+        purchase_details:
+          type: object
+          properties:
+            purchase_id:
+              type: string
+            purchase_date:
+              type: string
+              format: date-time
+        checkout_readiness:
+          type: object
+          properties:
+            is_authenticated:
+              type: boolean
+            has_sufficient_funds:
+              type: boolean
+    ContentUpdateRequest:
+      type: object
+      additionalProperties: true
+    SalesStatisticsItem:
+      type: object
+      properties:
+        content_id:
+          type: string
+        title:
+          type: string
+        total_sales:
+          type: integer
+        total_revenue_cents:
+          type: integer
+    BuyerStatisticsItem:
+      type: object
+      properties:
+        buyer_id:
+          type: string
+        purchases:
+          type: integer
+        total_spent_cents:
+          type: integer
+    AhoyEvent:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the event being tracked
+        properties:
+          type: object
+          description: Additional properties for the event
+          additionalProperties: true
+        time:
+          type: string
+          format: date-time
+          description: When the event occurred
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user associated with the event
+        visit_id:
+          type: string
+          format: uuid
+          description: ID of the visit associated with the event
+    AhoyVisit:
+      type: object
+      properties:
+        visit_token:
+          type: string
+          description: Unique token for this visit
+        visitor_token:
+          type: string
+          description: Token identifying the visitor
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user associated with the visit
+        ip:
+          type: string
+          description: IP address of the visitor
+        user_agent:
+          type: string
+          description: User agent string
+        referrer:
+          type: string
+          description: Referrer URL
+        referring_domain:
+          type: string
+          description: Domain of the referrer
+        landing_page:
+          type: string
+          description: Landing page URL
+        browser:
+          type: string
+          description: Browser name
+        os:
+          type: string
+          description: Operating system
+        device_type:
+          type: string
+          description: Type of device
+        country:
+          type: string
+          description: Country of the visitor
+        region:
+          type: string
+          description: Region of the visitor
+        city:
+          type: string
+          description: City of the visitor
+        latitude:
+          type: number
+          format: float
+          description: Latitude coordinate
+        longitude:
+          type: number
+          format: float
+          description: Longitude coordinate
+        utm_source:
+          type: string
+          description: UTM source parameter
+        utm_medium:
+          type: string
+          description: UTM medium parameter
+        utm_term:
+          type: string
+          description: UTM term parameter
+        utm_content:
+          type: string
+          description: UTM content parameter
+        utm_campaign:
+          type: string
+          description: UTM campaign parameter
+        app_version:
+          type: string
+          description: App version (for native apps)
+        os_version:
+          type: string
+          description: OS version (for native apps)
+        platform:
+          type: string
+          description: Platform (for native apps)
+        started_at:
+          type: string
+          format: date-time
+          description: When the visit started
+    AhoyEventRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: Name of the event being tracked
+        properties:
+          type: object
+          description: Additional properties for the event
+          additionalProperties: true
+        time:
+          type: string
+          format: date-time
+          description: When the event occurred (defaults to current time)
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user associated with the event
+        visit_id:
+          type: string
+          format: uuid
+          description: ID of the visit associated with the event
+    AhoyVisitRequest:
+      type: object
+      properties:
+        visit_token:
+          type: string
+          description: Unique token for this visit
+        visitor_token:
+          type: string
+          description: Token identifying the visitor
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user associated with the visit
+        ip:
+          type: string
+          description: IP address of the visitor
+        user_agent:
+          type: string
+          description: User agent string
+        referrer:
+          type: string
+          description: Referrer URL
+        referring_domain:
+          type: string
+          description: Domain of the referrer
+        landing_page:
+          type: string
+          description: Landing page URL
+        browser:
+          type: string
+          description: Browser name
+        os:
+          type: string
+          description: Operating system
+        device_type:
+          type: string
+          description: Type of device
+        country:
+          type: string
+          description: Country of the visitor
+        region:
+          type: string
+          description: Region of the visitor
+        city:
+          type: string
+          description: City of the visitor
+        latitude:
+          type: number
+          format: float
+          description: Latitude coordinate
+        longitude:
+          type: number
+          format: float
+          description: Longitude coordinate
+        utm_source:
+          type: string
+          description: UTM source parameter
+        utm_medium:
+          type: string
+          description: UTM medium parameter
+        utm_term:
+          type: string
+          description: UTM term parameter
+        utm_content:
+          type: string
+          description: UTM content parameter
+        utm_campaign:
+          type: string
+          description: UTM campaign parameter
+        app_version:
+          type: string
+          description: App version (for native apps)
+        os_version:
+          type: string
+          description: OS version (for native apps)
+        platform:
+          type: string
+          description: Platform (for native apps)
+        started_at:
+          type: string
+          format: date-time
+          description: When the visit started (defaults to current time)
+    Content:
+      type: object
+      required:
+      - content_type
+      - title
+      - price_cents
+      - content_body
+      properties:
+        content_type:
+          type: string
+          enum:
+          - markdown
+          description: The type of content being uploaded
+        title:
+          type: string
+          description: Content title
+        content_body:
+          type: string
+          format: byte
+          description: "(Optional) Full article content, written in markdown and base64
+            encoded."
+        teaser:
+          type: string
+          format: byte
+          description: "(Optional) Article teaser, written in markdown and base64
+            encoded."
+        price_cents:
+          type: integer
+          description: Price for the content in cents.
+        visibility:
+          type: string
+          enum:
+          - public
+          - unlisted
+          default: public
+        metadata:
+          type: object
+          description: Flexible metadata for additional context
+          additionalProperties: true
+          properties:
+            author:
+              type: string
+            publication_date:
+              type: string
+              format: date-time
+            reading_time:
+              type: string
+    ContentResponse:
+      type: object
+      required:
+      - content_type
+      - title
+      - price_cents
+      - visibility
+      properties:
+        id:
+          type: string
+        content_type:
+          type: string
+          enum:
+          - markdown
+          description: The type of content being uploaded
+        title:
+          type: string
+          description: Content title
+        content_body:
+          type: string
+          format: byte
+          description: "(Optional) Full article content, written in markdown and base64
+            encoded."
+        teaser:
+          type: string
+          format: byte
+          description: "(Optional) Article teaser, written in markdown and base64
+            encoded."
+        price_cents:
+          type: integer
+          description: Price for the content in cents.
+        visibility:
+          type: string
+          enum:
+          - public
+          - unlisted
+          - private
+          default: public
+        metadata:
+          type: object
+          description: Flexible metadata for additional context
+          additionalProperties: true
+          properties:
+            author:
+              type: string
+            publication_date:
+              type: string
+              format: date-time
+            reading_time:
+              type: string
+            tags:
+              type: array
+              format: string
+            paywall:
+              type: object
+              description: flexible data for managing paywall location
+              properties:
+                position:
+                  type: integer
+                  description: Character position of the paywall
+                positioning_type:
+                  type: string
+                  enum:
+                  - character
+                  - paragraph
+                  description: The mechanism for determining how positioning is calculated
+                anchor:
+                  type: string
+                  description: Hash anchor of nearby text
+        access_info:
+          "$ref": "#/components/schemas/ContentAccessInfo"
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+          - buyer
+          - seller
+    PurchaseStatus:
+      type: string
+      enum:
+      - completed
+      - refunded
+    Purchase:
+      type: object
+      properties:
+        id:
+          type: string
+        content_id:
+          type: string
+        buyer_id:
+          type: string
+        seller_id:
+          type: string
+        amount_cents:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          "$ref": "#/components/schemas/PurchaseStatus"
+    MonthlyData:
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+          properties:
+            cents:
+              type: integer
+            currency_iso:
+              type: string
+    SalesSummaryResponse:
+      type: object
+      properties:
+        total_revenue_cents:
+          type: integer
+          description: Amount in cents
+        total_sales:
+          type: integer
+          description: Total number of sales
+        monthly_revenue_cents:
+          type: object
+          description: Monthly revenue data grouped by year and month. First level
+            key is year (string), second level key is month number (string, 1-12)
+          additionalProperties:
+            type: object
+            description: Monthly data for a specific year
+            additionalProperties:
+              type: integer
+              description: Revenue data for a specific month
+        monthly_sales:
+          type: object
+          description: Monthly sales count data grouped by year and month. First level
+            key is year (string), second level key is month number (string, 1-12)
+          additionalProperties:
+            type: object
+            description: Monthly data for a specific year
+            additionalProperties:
+              type: integer
+              description: Number of sales for a specific month
+security:
+- BearerAuth: []
+paths:
+  "/v1/auth/signup":
+    post:
+      summary: Register a new user with email and password
+      tags:
+      - Authentication
+      - Implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthSignupRequest"
+      responses:
+        '200':
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthenticationResponse"
+              examples:
+                success:
+                  summary: Successful registration
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwOTM1N2MyMi0zODlhLTRmYWItYjE2Ni04MjJlNTJhNWJmNWUiLCJyb2xlIjoiYnV5ZXIiLCJidXllcl9jbGFpbXMiOnsidXNlcl9pZCI6IjA5MzU3YzIyLTM4OWEtNGZhYi1iMTY2LTgyMmU1MmE1YmY1ZSIsImVtYWlsIjoidXNlckBleGFtcGxlLmNvbSJ9LCJpc3MiOiJMZWRlV2lyZSBBUEkiLCJhdWQiOiJ3ZWIiLCJleHAiOjE3NDc0OTk5NzMsImlhdCI6MTc0NzQ5ODE3M30
+                    refresh_token: c2a0e1f8a7e53c9d63b1d2f8e4z5x6c7v8b9n0m1a2s3d4f5g6h7j8k9l0
+                    expires_at: '2025-05-17T16:39:33Z'
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                validation_error:
+                  summary: Validation error
+                  value:
+                    error: Email is invalid
+                account_exists:
+                  summary: Account already exists
+                  value:
+                    error: Account with this email already exists
+  "/v1/auth/login/email":
+    post:
+      summary: Log in using email and password
+      tags:
+      - Authentication
+      - Implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthLoginEmailRequest"
+      responses:
+        '200':
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthenticationResponse"
+              examples:
+                success:
+                  summary: Successful login
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwOTM1N2MyMi0zODlhLTRmYWItYjE2Ni04MjJlNTJhNWJmNWUiLCJyb2xlIjoiYnV5ZXIiLCJpc3MiOiJMZWRlV2lyZSBBUEkiLCJhdWQiOiJ3ZWIiLCJleHAiOjE3NDc0OTk5NzMsImlhdCI6MTc0NzQ5ODE3M30
+                    refresh_token: 45a67890cd1ef2gh3ij4kl5mn6op7qr8st9uvwxyz123456789abcdef01
+                    expires_at: '2025-05-17T16:39:33Z'
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_credentials:
+                  summary: Invalid credentials
+                  value:
+                    error: Invalid email or password
+  "/v1/auth/login/google":
+    post:
+      summary: Log in using Google OAuth
+      tags:
+      - Authentication
+      - Implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthLoginOAuthRequest"
+            examples:
+              google_login:
+                summary: Google OAuth login
+                value:
+                  id_token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJhY2NvdW50cy5nb29nbGUuY29tIiwiYXVkIjoiY2xpZW50LWlkIiwiZXhwIjoxNzQ3NDk5OTczLCJpYXQiOjE3NDc0OTgxNzMsInN1YiI6IjEyMzQ1Njc4OTAiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJuYW1lIjoiVGVzdCBVc2VyIiwicGljdHVyZSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vYXZhdGFyLmpwZyJ9.signature
+      responses:
+        '200':
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthenticationResponse"
+              examples:
+                success:
+                  summary: Successful Google OAuth login
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIwOTM1N2MyMi0zODlhLTRmYWItYjE2Ni04MjJlNTJhNWJmNWUiLCJyb2xlIjoiYnV5ZXIiLCJidXllcl9jbGFpbXMiOnsidXNlcl9pZCI6IjA5MzU3YzIyLTM4OWEtNGZhYi1iMTY2LTgyMmU1MmE1YmY1ZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSJ9LCJpc3MiOiJMZWRlV2lyZSBBUEkiLCJhdWQiOiJ3ZWIiLCJleHAiOjE3NDc0OTk5NzMsImlhdCI6MTc0NzQ5ODE3M30
+                    refresh_token: google_oauth_refresh_token_123
+                    expires_at: '2025-05-17T16:39:33Z'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                missing_token:
+                  summary: Missing ID token
+                  value:
+                    error: id_token is missing
+                invalid_token:
+                  summary: Invalid token format
+                  value:
+                    error: id_token must be a valid JWT token
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_token:
+                  summary: Invalid Google ID token
+                  value:
+                    error: Invalid or expired token
+        '503':
+          description: Google service unavailable
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                service_unavailable:
+                  summary: Google OAuth service unavailable
+                  value:
+                    error: Unable to verify token
+  "/v1/auth/login/microsoft":
+    post:
+      summary: Log in using Microsoft OAuth
+      tags:
+      - Authentication
+      - Pending
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthLoginOAuthRequest"
+      responses:
+        '200':
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthenticationResponse"
+  "/v1/auth/login/api-key":
+    post:
+      summary: Log in using API key and secret
+      tags:
+      - Authentication
+      - Implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthLoginApiKeyRequest"
+      responses:
+        '200':
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthenticationResponse"
+              examples:
+                success:
+                  summary: Successful API key authentication
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4NzY1NDMyMS1kY2JhLTRmZWQtYmE5OC03NjU0MzIxMGZlZGMiLCJyb2xlIjoic2VsbGVyIiwic2VsbGVyX2NsYWltcyI6eyJzZWxsZXJfaWQiOiI4NzY1NDMyMS1kY2JhLTRmZWQtYmE5OC03NjU0MzIxMGZlZGMifSwiaXNzIjoiTGVkZVdpcmUgQVBJIiwiYXVkIjoid2ViIiwiZXhwIjoxNzQ3NTU5OTczLCJpYXQiOjE3NDc1NTgxNzN9
+                    refresh_token: 3ef21098a76b5c4d32e1f0g9h8i7j6k5l4m3n2o1p0q9r8s7t6u5v4w3x2y1z
+                    expires_at: '2025-05-18T10:39:33Z'
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_api_key:
+                  summary: Invalid API credentials
+                  value:
+                    error: Invalid API key or secret
+  "/v1/auth/token/refresh":
+    post:
+      summary: Refresh an access token
+      tags:
+      - Authentication
+      - Pending
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthTokenRefreshRequest"
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthenticationResponse"
+  "/v1/wallet/payment-session":
+    post:
+      summary: Initialize a wallet funding payment session
+      description: 'Creates a payment session for wallet funding and returns the necessary
+        details for client-side payment processing. Currently implemented using Stripe
+        payment intents. The client should use the returned client_secret with the
+        payment provider''s client library to collect payment details and process
+        the payment. After payment is processed, the provider will send a webhook
+        notification to confirm the payment status.
+
+        '
+      tags:
+      - Wallet
+      - Implemented
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WalletPaymentSessionRequest"
+      responses:
+        '200':
+          description: Payment session created successfully
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WalletPaymentSessionResponse"
+              examples:
+                success:
+                  summary: Payment session created
+                  value:
+                    client_secret: pi_3MkLpgHxoRklNe0j1W96LQcG_secret_pCFpWjPDDVtT9YPtqtjvBQrXV
+                    session_id: pi_3MkLpgHxoRklNe0j1W96LQcG
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Invalid amount
+                  value:
+                    error: Invalid amount_cents value.  Amount must be a positive
+                      integer
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Invalid token
+                  value:
+                    error: Invalid authentication token
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                forbidden:
+                  summary: Insufficient permissions
+                  value:
+                    error: Insufficient permissions to access this resource
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                provider_error:
+                  summary: Provider error
+                  value:
+                    error: Unable to create payment intent with provider
+  "/v1/wallet/payment-status/{session_id}":
+    get:
+      summary: Check the status of a wallet payment
+      description: 'Allows clients to check the current status of a payment session.
+        This endpoint can be polled after payment submission to determine when a webhook
+        has been processed.
+
+        '
+      tags:
+      - Wallet
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Payment status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - pending
+                    - succeeded
+                    - completed
+                    - failed
+                    - canceled
+                  updated_at:
+                    type: string
+                    format: date-time
+                  balance_cents:
+                    type: integer
+                    description: Current wallet balance if payment succeeded
+  "/v1/wallet/payment-webhook":
+    post:
+      summary: Webhook handler for wallet funding completion
+      description: 'Receives webhook notifications from payment providers for payment
+        events. When a payment success event is received for a wallet funding transaction,
+        the system will automatically update the transaction status and fund the user''s
+        wallet. Currently implemented for Stripe webhook events.
+
+        '
+      tags:
+      - Wallet
+      - Implemented
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payment provider event object
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Invalid token
+                  value:
+                    error: Invalid authentication token
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                forbidden:
+                  summary: Insufficient permissions
+                  value:
+                    error: Insufficient permissions to access this resource
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                provider_error:
+                  summary: Provider error
+                  value:
+                    error: Unable to verify transaction with provider
+  "/v1/webhooks/payment":
+    post:
+      summary: Generic payment provider webhook endpoint
+      description: 'Receives webhook notifications from payment providers for all
+        types of events. This endpoint handles all payment provider events and routes
+        them to the appropriate handlers. Currently implemented for Stripe webhook
+        events.
+
+        '
+      tags:
+      - Webhooks
+      - Implemented
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payment provider event object
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid webhook payload
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '401':
+          description: Invalid webhook signature
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+  "/v1/wallet/balance":
+    get:
+      summary: Get wallet balance
+      tags:
+      - Wallet
+      - Implemented
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Current balance
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WalletBalanceResponse"
+              examples:
+                balance:
+                  summary: Current wallet balance
+                  value:
+                    balance_cents: 12500
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Missing authentication
+                  value:
+                    error: Authentication required
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                forbidden:
+                  summary: Incorrect account
+                  value:
+                    error: Cannot access wallet for another user
+  "/v1/wallet/history":
+    get:
+      summary: Wallet transaction history
+      tags:
+      - Wallet
+      - Pending
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/WalletTransaction"
+              examples:
+                transactions:
+                  summary: Wallet transaction history
+                  value:
+                  - type: deposit
+                    amount_cents: 10000
+                    timestamp: '2025-05-15T09:30:00Z'
+                  - type: purchase
+                    amount_cents: -500
+                    timestamp: '2025-05-16T14:25:35Z'
+                  - type: deposit
+                    amount_cents: 3000
+                    timestamp: '2025-05-17T11:10:22Z'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Token expired
+                  value:
+                    error: Authentication token has expired
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+  "/v1/content/{id}/with-access":
+    get:
+      summary: Get content with access control information
+      tags:
+      - Content
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Optional user ID to check specific user's access status. If not
+          provided, returns generic access info.
+      responses:
+        '200':
+          description: Content with access information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    "$ref": "#/components/schemas/ContentResponse"
+                  access:
+                    type: object
+                    properties:
+                      has_full_access:
+                        type: boolean
+                      next_required_action:
+                        type: string
+                        enum:
+                        - authenticate
+                        - fund_wallet
+                        - purchase
+                        - none
+                      paywall_position:
+                        type: integer
+  "/v1/checkout/state/{content_id}":
+    get:
+      summary: Get user's current checkout state for specific content
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: content_id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: User's current checkout state
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content_id:
+                  type: string
+                checkout_state:
+                  type: object
+                  properties:
+                    is_authenticated:
+                      type: boolean
+                    has_sufficient_funds:
+                      type: boolean
+                    has_purchased:
+                      type: boolean
+                    next_required_action:
+                      type: string
+                      enum:
+                      - authenticate
+                      - fund_wallet
+                      - purchase
+                      - view_content
+  "/v1/purchases":
+    get:
+      summary: List user purchases
+      tags:
+      - Purchases
+      - Implemented
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: List of purchases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/Purchase"
+              examples:
+                purchase_list:
+                  summary: List of user purchases
+                  value:
+                  - id: 3f7b9a8c-1d2e-3f4a-5b6c-7d8e9f0a1b2c
+                    content_id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    buyer_id: '09357c22-389a-4fab-b166-822e52a5bf5e'
+                    seller_id: 87654321-dcba-4fed-ba98-76543210fedc
+                    amount_cents: 1200
+                    timestamp: '2025-05-18T13:27:45Z'
+                    status: completed
+                  - id: 4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d
+                    content_id: c2d3e4f5-a6b7-8c9d-0e1f-2a3b4c5d6e7f
+                    buyer_id: '09357c22-389a-4fab-b166-822e52a5bf5e'
+                    seller_id: 87654321-dcba-4fed-ba98-76543210fedc
+                    amount_cents: 1500
+                    timestamp: '2025-05-17T09:15:30Z'
+                    status: completed
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+    post:
+      summary: Complete a content purchase
+      tags:
+      - Purchases
+      - Implemented
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PurchaseCreateRequest"
+      responses:
+        '200':
+          description: Purchase completed
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Purchase"
+              examples:
+                purchase_completed:
+                  summary: Successfully purchased content
+                  value:
+                    id: 3f7b9a8c-1d2e-3f4a-5b6c-7d8e9f0a1b2c
+                    content_id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    buyer_id: '09357c22-389a-4fab-b166-822e52a5bf5e'
+                    seller_id: 87654321-dcba-4fed-ba98-76543210fedc
+                    amount_cents: 1200
+                    timestamp: '2025-05-18T13:27:45Z'
+                    status: completed
+        '400':
+          description: Invalid purchase request
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                insufficient_funds:
+                  summary: Insufficient funds
+                  value:
+                    error: Insufficient funds to complete purchase
+                already_purchased:
+                  summary: Already purchased
+                  value:
+                    error: User has already purchased this content
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '404':
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: Content not found
+                  value:
+                    error: Content with specified ID not found
+  "/v1/purchases/{id}":
+    get:
+      summary: Get purchase by ID
+      tags:
+      - Purchases
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+        description: Purchase ID
+      responses:
+        '200':
+          description: Purchase object
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Purchase"
+              examples:
+                purchase:
+                  summary: Purchase details
+                  value:
+                    id: 3f7b9a8c-1d2e-3f4a-5b6c-7d8e9f0a1b2c
+                    content_id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    buyer_id: '09357c22-389a-4fab-b166-822e52a5bf5e'
+                    seller_id: 87654321-dcba-4fed-ba98-76543210fedc
+                    amount_cents: 1200
+                    timestamp: '2025-05-18T13:27:45Z'
+                    status: completed
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                forbidden:
+                  summary: Not purchase owner
+                  value:
+                    error: User does not have permission to view this purchase
+        '404':
+          description: Purchase not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: Purchase not found
+                  value:
+                    error: Purchase with specified ID not found
+  "/v1/purchase/verify":
+    get:
+      summary: Verify purchase
+      tags:
+      - Purchases
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - in: query
+        name: content_id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PurchaseVerifyResponse"
+              examples:
+                verified:
+                  summary: Content has been purchased
+                  value:
+                    purchased: true
+                not_purchased:
+                  summary: Content has not been purchased
+                  value:
+                    purchased: false
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '403':
+          description: Forbidden - User lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '404':
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: Content not found
+                  value:
+                    error: Content with specified ID not found
+  "/v1/seller/content":
+    post:
+      summary: Create a new piece of content
+      tags:
+      - Content
+      - Implemented
+      description: 'Currently only offers support for the following content type:
+        - Markdown
+
+        '
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/Content"
+            examples:
+              markdownContent:
+                value:
+                  content_type: markdown
+                  title: Sample Blog Post
+                  content_body: IyBUZXN0IFBvc3RcblxuVGhpcyBpcyBhIGRldGFpbGVkIGJsb2cgcG9zdCBhYm91dCB0ZWNobm9sb2d5IHRyZW5kcy4=
+                  price_cents: 500
+                  visibility: public
+                  metadata:
+                    author: Jane Doe
+                    reading_time: 5 min
+              richMediaContent:
+                value:
+                  type: rich_media
+                  title: Comprehensive Tech Guide
+                  content: base64_encoded_content_or_file_reference
+                  external_references:
+                  - type: video
+                    url: https://example.com/intro-video
+                    description: Introduction to the guide
+      responses:
+        '201':
+          description: Content created successfully
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ContentResponse"
+              examples:
+                created_content:
+                  summary: Successfully created content
+                  value:
+                    id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    content_type: markdown
+                    title: Sample Blog Post
+                    content_body: IyBUZXN0IFBvc3RcblxuVGhpcyBpcyBhIGRldGFpbGVkIGJsb2cgcG9zdCBhYm91dCB0ZWNobm9sb2d5IHRyZW5kcy4=
+                    teaser: IyBUZXN0IFBvc3RcblxuVGhpcyBpcyBhIHByZXZpZXcgb2YgdGhlIGJsb2cgcG9zdC4=
+                    price_cents: 500
+                    visibility: public
+                    metadata:
+                      author: Jane Doe
+                      publication_date: '2025-05-18T10:00:00Z'
+                      reading_time: 5 min
+        '400':
+          description: Invalid content parameters
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                error:
+                  summary: Content validation error
+                  value:
+                    code: 400
+                    message: 'Content validation failed: Title is required, Price
+                      must be greater than 0'
+    get:
+      summary: List user content
+      tags:
+      - Content
+      - Implemented
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: List of content
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/ContentResponse"
+              examples:
+                content_list:
+                  summary: List of seller's content
+                  value:
+                  - id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    content_type: markdown
+                    title: Sample Blog Post
+                    teaser: IyBUZXN0IFBvc3RcblxuVGhpcyBpcyBhIHByZXZpZXcgb2YgdGhlIGJsb2cgcG9zdC4=
+                    price_cents: 500
+                    visibility: public
+                    metadata:
+                      author: Jane Doe
+                      publication_date: '2025-05-18T10:00:00Z'
+                      reading_time: 5 min
+                  - id: c2d3e4f5-a6b7-8c9d-0e1f-2a3b4c5d6e7f
+                    content_type: markdown
+                    title: Advanced Technology Guide
+                    teaser: IyBBZHZhbmNlZCBUZWNobm9sb2d5IEd1aWRlXG5cbkEgY29tcHJlaGVuc2l2ZSBndWlkZSB0byBlbWVyZ2luZyB0ZWNoLg==
+                    price_cents: 1200
+                    visibility: public
+                    metadata:
+                      author: Jane Doe
+                      publication_date: '2025-05-10T14:30:00Z'
+                      reading_time: 12 min
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Invalid or missing token
+                  value:
+                    error: Invalid authentication token
+  "/v1/seller/content/{id}":
+    get:
+      summary: Get content by ID
+      tags:
+      - Content
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Content ID
+      responses:
+        '200':
+          description: Content retrieved successfully
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ContentResponse"
+              examples:
+                content:
+                  summary: Retrieved content
+                  value:
+                    id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    content_type: markdown
+                    title: Sample Blog Post
+                    content_body: IyBUZXN0IFBvc3RcblxuVGhpcyBpcyBhIGRldGFpbGVkIGJsb2cgcG9zdCBhYm91dCB0ZWNobm9sb2d5IHRyZW5kcy4=
+                    teaser: IyBUZXN0IFBvc3RcblxuVGhpcyBpcyBhIHByZXZpZXcgb2YgdGhlIGJsb2cgcG9zdC4=
+                    price_cents: 500
+                    visibility: public
+                    metadata:
+                      author: Jane Doe
+                      publication_date: '2025-05-18T10:00:00Z'
+                      reading_time: 5 min
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Invalid or missing token
+                  value:
+                    error: Invalid authentication token
+        '404':
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: Content not found
+                  value:
+                    error: requested content was not found
+    patch:
+      summary: Update content item
+      tags:
+      - Content
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Content ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ContentUpdateRequest"
+      responses:
+        '200':
+          description: Content updated
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ContentResponse"
+              examples:
+                updated_content:
+                  summary: Successfully updated content
+                  value:
+                    id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    content_type: markdown
+                    title: Updated Blog Post Title
+                    price_cents: 750
+                    visibility: public
+                    metadata:
+                      author: Jane Doe
+                      publication_date: '2025-05-18T10:00:00Z'
+                      reading_time: 7 min
+        '400':
+          description: Invalid content parameters
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                error:
+                  summary: Content validation error
+                  value:
+                    code: 400
+                    message: 'Content validation failed: Title is required, Price
+                      must be greater than 0'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  summary: Invalid or missing token
+                  value:
+                    error: Invalid authentication token
+        '404':
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: Content not found
+                  value:
+                    error: requested content was not found
+    delete:
+      summary: Delete content item
+      tags:
+      - Content
+      - Implemented
+      security:
+      - BearerAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Content ID
+      responses:
+        '204':
+          description: Content deleted
+          content:
+            application/json:
+              examples:
+                deleted:
+                  summary: Content successfully deleted
+                  value: {}
+  "/v1/seller/sales":
+    get:
+      summary: Get sales data
+      tags:
+      - Sales
+      - Implemented
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Sales list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/SalesStatisticsItem"
+              examples:
+                sales_data:
+                  summary: Sales statistics by content
+                  value:
+                  - content_id: b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e
+                    title: Sample Blog Post
+                    total_sales: 15
+                    total_revenue_cents: 7500
+                  - content_id: c2d3e4f5-a6b7-8c9d-0e1f-2a3b4c5d6e7f
+                    title: Advanced Technology Guide
+                    total_sales: 8
+                    total_revenue_cents: 9600
+  "/v1/seller/sales/summary":
+    get:
+      summary: Get sales summary with revenue and sales data
+      tags:
+      - Sales
+      - Implemented
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Sales summary data
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SalesSummaryResponse"
+              examples:
+                sales_summary:
+                  summary: Sales summary with monthly breakdown
+                  value:
+                    total_revenue_cents: 4389
+                    total_sales: 48
+                    monthly_revenue_cents:
+                      '2025':
+                        '5': 204
+                        '6': 2210
+                        '7': 785
+                        '8': 1190
+                    monthly_sales:
+                      '2025':
+                        '5': 2
+                        '6': 26
+                        '7': 6
+                        '8': 14
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '403':
+          description: Forbidden - Seller access required
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+  "/v1/seller/buyers":
+    get:
+      summary: Get buyer info
+      tags:
+      - Sales
+      - Pending
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Buyer data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/BuyerStatisticsItem"
+              examples:
+                buyer_statistics:
+                  summary: Buyer purchase statistics
+                  value:
+                  - buyer_id: '09357c22-389a-4fab-b166-822e52a5bf5e'
+                    purchases: 3
+                    total_spent_cents: 2200
+                  - buyer_id: 12345678-abcd-4321-efgh-87654321abcd
+                    purchases: 1
+                    total_spent_cents: 500
+  "/v1/seller/config":
+    get:
+      summary: Get Store Configuration
+      tags:
+      - Config
+      - Implemented
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Client configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  google_client_id:
+                    type: string
+  "/v1/auth/password/reset-request":
+    post:
+      summary: Request a password reset code
+      tags:
+      - Authentication
+      - Implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset code sent (if account exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: If an account with this email exists, a reset code
+                          has been sent.
+        '429':
+          description: Too many requests (rate limit exceeded)
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                rate_limit:
+                  summary: Rate limit exceeded
+                  value:
+                    error:
+                      code: 429
+                      message: Too many reset attempts. Please try again later.
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_email:
+                  summary: Invalid email format
+                  value:
+                    error:
+                      code: 400
+                      message: email must be a valid email address
+  "/v1/auth/password/reset":
+    post:
+      summary: Reset password using code
+      tags:
+      - Authentication
+      - Implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - reset_code
+              - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                reset_code:
+                  type: string
+                  description: 6-digit numeric code
+                  example: '123456'
+                password:
+                  type: string
+                  description: New password (min 6 chars)
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Password has been successfully reset.
+        '400':
+          description: Invalid request or code
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_code:
+                  summary: Invalid or expired code
+                  value:
+                    error:
+                      code: 400
+                      message: Invalid or expired reset code
+                invalid_password:
+                  summary: Password too short
+                  value:
+                    error:
+                      code: 400
+                      message: 'Failed to update password: Password is too short (minimum
+                        is 6 characters)'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: User not found
+                  value:
+                    error:
+                      code: 404
+                      message: User not found
+  "/ahoy/events":
+    post:
+      summary: Track an analytics event
+      description: 'Track custom events for analytics purposes. This endpoint is provided
+        by the Ahoy gem and allows clients to send event data for tracking user behavior
+        and interactions.
+
+        '
+      tags:
+      - Analytics
+      - Implemented
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AhoyEventRequest"
+            examples:
+              page_view:
+                summary: Track a page view
+                value:
+                  name: Page View
+                  properties:
+                    page: "/content/123"
+                    title: Sample Blog Post
+                  time: '2025-01-20T10:30:00Z'
+              button_click:
+                summary: Track a button click
+                value:
+                  name: Button Click
+                  properties:
+                    button_id: purchase_button
+                    content_id: '123'
+                    location: content_page
+                  time: '2025-01-20T10:35:00Z'
+      responses:
+        '200':
+          description: Event tracked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+              examples:
+                success:
+                  summary: Event tracked
+                  value:
+                    success: true
+        '400':
+          description: Invalid event data
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_event:
+                  summary: Invalid event data
+                  value:
+                    error: Event name is required
+  "/ahoy/visits":
+    post:
+      summary: Track a visit
+      description: 'Track visit data for analytics purposes. This endpoint is provided
+        by the Ahoy gem and allows clients to send visit data for tracking user sessions
+        and behavior.
+
+        '
+      tags:
+      - Analytics
+      - Implemented
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AhoyVisitRequest"
+            examples:
+              web_visit:
+                summary: Track a web visit
+                value:
+                  visit_token: visit_123456
+                  visitor_token: visitor_789012
+                  ip: 192.168.1.1
+                  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
+                  referrer: https://google.com
+                  referring_domain: google.com
+                  landing_page: https://ledewire.com/content/123
+                  browser: Chrome
+                  os: macOS
+                  device_type: desktop
+                  country: US
+                  region: CA
+                  city: San Francisco
+                  latitude: 37.7749
+                  longitude: -122.4194
+                  utm_source: google
+                  utm_medium: cpc
+                  utm_campaign: content_marketing
+                  started_at: '2025-01-20T10:30:00Z'
+              mobile_visit:
+                summary: Track a mobile visit
+                value:
+                  visit_token: visit_789012
+                  visitor_token: visitor_345678
+                  ip: 192.168.1.2
+                  user_agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS
+                    X) AppleWebKit/605.1.15
+                  landing_page: https://ledewire.com/content/456
+                  browser: Safari
+                  os: iOS
+                  device_type: mobile
+                  country: US
+                  region: NY
+                  city: New York
+                  latitude: 40.7128
+                  longitude: -74.006
+                  app_version: 1.2.3
+                  os_version: 14.7.1
+                  platform: ios
+                  started_at: '2025-01-20T11:00:00Z'
+      responses:
+        '200':
+          description: Visit tracked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+              examples:
+                success:
+                  summary: Visit tracked
+                  value:
+                    success: true
+        '400':
+          description: Invalid visit data
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_visit:
+                  summary: Invalid visit data
+                  value:
+                    error: Visit token is required

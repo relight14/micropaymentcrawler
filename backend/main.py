@@ -2,7 +2,7 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 import uvicorn
 
 from models import (
@@ -14,6 +14,8 @@ from models import (
 from crawler_stub import ContentCrawlerStub
 from ledger import ResearchLedger
 from packet_builder import PacketBuilder
+from ledewire_api import LedeWireAPI
+from html_generator import generate_html_packet
 
 app = FastAPI(title="AI Research Tool MVP", version="1.0.0")
 
@@ -33,6 +35,7 @@ app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 crawler = ContentCrawlerStub()
 ledger = ResearchLedger()
 packet_builder = PacketBuilder()
+ledewire = LedeWireAPI()  # Mock implementation - ready for real API keys
 
 @app.get("/")
 async def root():
@@ -82,50 +85,60 @@ async def get_tiers(request: TiersRequest):
 @app.post("/purchase", response_model=PurchaseResponse)
 async def purchase_research(request: PurchaseRequest):
     """
-    Process a research purchase request.
-    Simulates wallet deduction and generates research packet.
+    Process a research purchase request using LedeWire API.
+    Handles authentication, balance check, and research packet generation.
     """
     try:
-        # Get tier pricing
+        # Get tier pricing in cents (LedeWire uses cents)
         tier_prices = {
-            TierType.BASIC: 1.00,
-            TierType.RESEARCH: 2.00,
-            TierType.PRO: 4.00
+            TierType.BASIC: 100,    # $1.00
+            TierType.RESEARCH: 200, # $2.00  
+            TierType.PRO: 400       # $4.00
         }
         
-        price = tier_prices[request.tier]
+        price_cents = tier_prices[request.tier]
+        price_dollars = price_cents / 100
         
-        # Simulate wallet deduction
-        wallet_response = await simulate_wallet_deduction(
-            wallet_id=request.user_wallet_id or "demo_wallet",
-            amount=price,
-            description=f"Research: {request.query} ({request.tier.value} tier)"
+        # Generate unique content ID for this research packet
+        content_id = f"research_{uuid.uuid4().hex[:12]}"
+        
+        # Use LedeWire API for purchase (mock implementation for now)
+        access_token = request.user_wallet_id or "mock_token"  # Will be real JWT in production
+        
+        # Create purchase through LedeWire
+        purchase_result = ledewire.create_purchase(
+            access_token=access_token,
+            content_id=content_id,
+            price_cents=price_cents
         )
         
-        if not wallet_response.success:
+        # Check for purchase errors
+        if "error" in purchase_result:
+            error_message = ledewire.handle_api_error(purchase_result)
             return PurchaseResponse(
                 success=False,
-                message="Insufficient wallet balance or wallet error",
+                message=error_message,
                 wallet_deduction=0.0
             )
         
-        # Generate research packet
+        # Generate research packet with content ID
         packet = packet_builder.build_packet(request.query, request.tier)
+        packet.content_id = content_id  # Add LedeWire content ID
         
         # Record the purchase in ledger
         purchase_id = ledger.record_purchase(
             query=request.query,
             tier=request.tier,
-            price=price,
-            wallet_id=request.user_wallet_id,
-            transaction_id=wallet_response.transaction_id,
+            price=price_dollars,
+            wallet_id=access_token,
+            transaction_id=purchase_result["id"],
             packet=packet
         )
         
         return PurchaseResponse(
             success=True,
             message=f"Research packet generated successfully (ID: {purchase_id})",
-            wallet_deduction=price,
+            wallet_deduction=price_dollars,
             packet=packet
         )
     
@@ -169,21 +182,30 @@ async def get_stats():
 @app.post("/unlock-source", response_model=SourceUnlockResponse)
 async def unlock_source(request: SourceUnlockRequest):
     """
-    Process a source unlock request.
-    Simulates wallet deduction and unlocks source content.
+    Process a source unlock request using LedeWire API.
+    Handles authentication and individual source purchasing.
     """
     try:
-        # Simulate wallet deduction
-        wallet_response = await simulate_wallet_deduction(
-            wallet_id=request.user_wallet_id or "demo_wallet",
-            amount=request.price,
-            description=f"Unlock source: {request.title}"
+        # Convert price to cents for LedeWire API
+        price_cents = int(request.price * 100)
+        access_token = request.user_wallet_id or "mock_token"  # Will be real JWT in production
+        
+        # Generate content ID for this source
+        source_content_id = f"source_{request.source_id}"
+        
+        # Create purchase through LedeWire
+        purchase_result = ledewire.create_purchase(
+            access_token=access_token,
+            content_id=source_content_id,
+            price_cents=price_cents
         )
         
-        if not wallet_response.success:
+        # Check for purchase errors
+        if "error" in purchase_result:
+            error_message = ledewire.handle_api_error(purchase_result)
             return SourceUnlockResponse(
                 success=False,
-                message="Insufficient wallet balance or wallet error",
+                message=error_message,
                 wallet_deduction=0.0
             )
         
@@ -213,6 +235,28 @@ Key insights from this source:
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "AI Research Tool MVP"}
+
+@app.get("/research-packet/{content_id}", response_class=HTMLResponse)
+async def get_research_packet_html(content_id: str):
+    """
+    Serve research packet as clean academic HTML report.
+    This would check LedeWire purchase verification in production.
+    """
+    try:
+        # In production, this would verify purchase via LedeWire API
+        # For now, we'll retrieve from our ledger for demo purposes
+        packet_data = ledger.get_packet_by_content_id(content_id)
+        
+        if not packet_data:
+            raise HTTPException(status_code=404, detail="Research packet not found")
+        
+        # Generate clean HTML report
+        html_content = generate_html_packet(packet_data)
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error serving research packet: {str(e)}")
 
 if __name__ == "__main__":
     # For production deployment
