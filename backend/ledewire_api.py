@@ -74,15 +74,26 @@ class LedeWireAPI:
         except requests.RequestException as e:
             if self.use_mock:
                 # Development-only fallback
+                user_id = f"mock_user_{uuid.uuid4().hex[:8]}"
                 return {
                     "access_token": f"mock_jwt_token_{uuid.uuid4().hex[:16]}",
                     "refresh_token": f"mock_refresh_token_{uuid.uuid4().hex[:16]}",
                     "expires_at": (datetime.now() + timedelta(hours=2)).isoformat(),
+                    "user_id": user_id,
+                    "email": email,
                     "_fallback": True
                 }
             else:
-                # PRODUCTION: FAIL CLOSED - no free access
-                raise Exception(f"LedeWire authentication failed: {str(e)}")
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 401:
+                        raise requests.HTTPError("Invalid credentials", response=e.response)
+                    elif e.response.status_code == 400:
+                        raise requests.HTTPError("Invalid request", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     def signup_user(self, email: str, password: str, name: str) -> Dict[str, Any]:
         """
@@ -103,16 +114,64 @@ class LedeWireAPI:
             return response.json()
         except requests.RequestException as e:
             if self.use_mock:
-                # Development-only fallback  
+                # Development-only fallback
+                user_id = f"mock_user_{uuid.uuid4().hex[:8]}"
                 return {
                     "access_token": f"mock_jwt_token_{uuid.uuid4().hex[:16]}",
                     "refresh_token": f"mock_refresh_token_{uuid.uuid4().hex[:16]}",
                     "expires_at": (datetime.now() + timedelta(hours=2)).isoformat(),
+                    "user_id": user_id,
+                    "email": email,
+                    "name": name,
                     "_fallback": True
                 }
             else:
-                # PRODUCTION: FAIL CLOSED - no free access
-                raise Exception(f"LedeWire signup failed: {str(e)}")
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 400:
+                        raise requests.HTTPError("Invalid signup data", response=e.response)
+                    elif e.response.status_code == 409:
+                        raise requests.HTTPError("Email already exists", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+    
+    # User Methods
+    
+    def get_user_info(self, access_token: str) -> Dict[str, Any]:
+        """
+        GET /v1/user/me
+        Get current user information from access token.
+        """
+        try:
+            response = self.session.get(
+                f"{self.api_base}/user/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            if self.use_mock:
+                # Development-only fallback
+                # Extract mock user ID from token for consistency
+                user_id = f"mock_user_{uuid.uuid4().hex[:8]}"
+                return {
+                    "user_id": user_id,
+                    "email": f"user_{user_id.split('_')[2]}@example.com",
+                    "name": f"User {user_id.split('_')[2]}",
+                    "_fallback": True
+                }
+            else:
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 401:
+                        raise requests.HTTPError("Invalid or expired token", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     # Wallet Methods
     
@@ -137,8 +196,14 @@ class LedeWireAPI:
                     "_fallback": True
                 }
             else:
-                # PRODUCTION: FAIL CLOSED - no free money!
-                raise Exception(f"LedeWire wallet balance check failed: {str(e)}")
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 401:
+                        raise requests.HTTPError("Invalid or expired token", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     def check_sufficient_funds(self, access_token: str, amount_cents: int) -> bool:
         """
@@ -196,8 +261,18 @@ class LedeWireAPI:
                     "_fallback": True
                 }
             else:
-                # PRODUCTION: FAIL CLOSED - no free purchases!
-                raise Exception(f"LedeWire purchase failed: {str(e)}")
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 402:
+                        raise requests.HTTPError("Insufficient funds in wallet", response=e.response)
+                    elif e.response.status_code == 401:
+                        raise requests.HTTPError("Invalid or expired token", response=e.response)
+                    elif e.response.status_code == 400:
+                        raise requests.HTTPError("Invalid purchase request", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     def verify_purchase(self, access_token: str, content_id: str) -> Dict[str, Any]:
         """
@@ -229,8 +304,16 @@ class LedeWireAPI:
                     "_fallback": True
                 }
             else:
-                # PRODUCTION: FAIL CLOSED - no free access verification!
-                raise Exception(f"LedeWire purchase verification failed: {str(e)}")
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 401:
+                        raise requests.HTTPError("Invalid or expired token", response=e.response)
+                    elif e.response.status_code == 404:
+                        raise requests.HTTPError("Content not found", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     # Content Access Methods
     
@@ -260,8 +343,16 @@ class LedeWireAPI:
                     "_fallback": True
                 }
             else:
-                # PRODUCTION: FAIL CLOSED - no free content access info!
-                raise Exception(f"LedeWire content access check failed: {str(e)}")
+                # PRODUCTION: Re-raise with proper HTTP status
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 401:
+                        raise requests.HTTPError("Invalid or expired token", response=e.response)
+                    elif e.response.status_code == 404:
+                        raise requests.HTTPError("Content not found", response=e.response)
+                    else:
+                        raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
 
     # Error Handling
     

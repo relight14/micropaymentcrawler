@@ -51,15 +51,7 @@ class PurchaseResponse(BaseModel):
     wallet_deduction: float
     packet: Optional[ResearchPacket] = None
 
-class WalletDeductRequest(BaseModel):
-    wallet_id: str
-    amount: float
-    description: str
-
-class WalletDeductResponse(BaseModel):
-    success: bool
-    remaining_balance: float
-    transaction_id: str
+# WalletDeduct models removed - handled directly through LedeWire API
 
 class SourceUnlockRequest(BaseModel):
     source_id: str

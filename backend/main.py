@@ -1,18 +1,14 @@
 import uuid
-import os
+import requests
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
 import uvicorn
 
-# TEMPORARY: Force mock mode in Replit environment due to TLS/SNI issues
-os.environ['LEDEWIRE_USE_MOCK'] = 'true'
-
 from models import (
     TiersRequest, TiersResponse, TierInfo, TierType,
     PurchaseRequest, PurchaseResponse, 
-    WalletDeductRequest, WalletDeductResponse,
     SourceUnlockRequest, SourceUnlockResponse,
     LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
 )
@@ -40,7 +36,7 @@ app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 crawler = ContentCrawlerStub()
 ledger = ResearchLedger()
 packet_builder = PacketBuilder()
-ledewire = LedeWireAPI()  # Mock implementation - ready for real API keys
+ledewire = LedeWireAPI()  # Production LedeWire API integration
 
 # Authentication Helper Functions
 
@@ -83,8 +79,18 @@ def validate_user_token(access_token: str):
         # Re-raise HTTP exceptions (auth failures)
         raise
     except Exception as e:
-        # Any other error means token validation failed
-        raise HTTPException(status_code=401, detail="Token validation failed")
+        # Distinguish network errors from auth errors
+        import requests
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Authentication service error")
+        else:
+            # Network error or other connection issue
+            raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 @app.get("/")
 async def root():
@@ -141,8 +147,10 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         # SECURITY: Extract and validate Bearer token from Authorization header
         access_token = extract_bearer_token(authorization)
         
-        # SECURITY: Validate JWT token with LedeWire API
+        # SECURITY: Validate JWT token and get user info
         validate_user_token(access_token)
+        user_info = ledewire.get_user_info(access_token)
+        user_id = user_info["user_id"]
         
         # Get tier pricing in cents (LedeWire uses cents)
         tier_prices = {
@@ -177,12 +185,12 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         packet = packet_builder.build_packet(request.query, request.tier)
         packet.content_id = content_id  # Add LedeWire content ID
         
-        # Record the purchase in ledger
+        # Record the purchase in ledger with user ID (not raw token)
         purchase_id = ledger.record_purchase(
             query=request.query,
             tier=request.tier,
             price=price_dollars,
-            wallet_id=access_token,
+            wallet_id=user_id,  # SECURITY: Use user ID instead of raw access token
             transaction_id=purchase_result["id"],
             packet=packet
         )
@@ -197,33 +205,25 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
     except HTTPException:
         # Re-raise HTTP exceptions (including 401 auth failures) with original status
         raise
+    except requests.HTTPError as e:
+        # Handle LedeWire API errors with correct status codes
+        if hasattr(e, 'response') and e.response is not None:
+            if e.response.status_code == 402:
+                raise HTTPException(status_code=402, detail="Insufficient funds in wallet")
+            elif e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            elif e.response.status_code == 400:
+                raise HTTPException(status_code=400, detail="Invalid purchase request")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Purchase service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Purchase service error")
+        else:
+            raise HTTPException(status_code=503, detail="Purchase service unavailable")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Purchase failed: {str(e)}")
 
-@app.post("/wallet/deduct", response_model=WalletDeductResponse)
-async def simulate_wallet_deduction(wallet_id: str, amount: float, description: str):
-    """
-    Simulate LedeWire wallet deduction.
-    In production, this will call the actual LedeWire API.
-    """
-    # Simulate wallet logic
-    mock_balance = 100.00  # Demo wallet starts with $100
-    
-    if amount > mock_balance:
-        return WalletDeductResponse(
-            success=False,
-            remaining_balance=mock_balance,
-            transaction_id=""
-        )
-    
-    new_balance = mock_balance - amount
-    transaction_id = f"txn_{uuid.uuid4().hex[:8]}"
-    
-    return WalletDeductResponse(
-        success=True,
-        remaining_balance=round(new_balance, 2),
-        transaction_id=transaction_id
-    )
+# Wallet deduction handled directly through LedeWire API in purchase endpoint
 
 @app.get("/stats")
 async def get_stats():
@@ -244,8 +244,10 @@ async def unlock_source(request: SourceUnlockRequest, authorization: str = Heade
         # SECURITY: Extract and validate Bearer token from Authorization header
         access_token = extract_bearer_token(authorization)
         
-        # SECURITY: Validate JWT token with LedeWire API
+        # SECURITY: Validate JWT token and get user info
         validate_user_token(access_token)
+        user_info = ledewire.get_user_info(access_token)
+        user_id = user_info["user_id"]
         
         # Convert price to cents for LedeWire API
         price_cents = int(request.price * 100)
@@ -281,6 +283,9 @@ Key insights from this source:
 
 [Content unlocked for ${request.price:.2f}]"""
         
+        # Note: In production, would record source unlock with user_id
+        # ledger.record_source_unlock(purchase_id, request.source_id, request.price, user_id)
+        
         return SourceUnlockResponse(
             success=True,
             message=f"Source unlocked successfully",
@@ -291,6 +296,21 @@ Key insights from this source:
     except HTTPException:
         # Re-raise HTTP exceptions (including 401 auth failures) with original status
         raise
+    except requests.HTTPError as e:
+        # Handle LedeWire API errors with correct status codes
+        if hasattr(e, 'response') and e.response is not None:
+            if e.response.status_code == 402:
+                raise HTTPException(status_code=402, detail="Insufficient funds in wallet")
+            elif e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            elif e.response.status_code == 400:
+                raise HTTPException(status_code=400, detail="Invalid source unlock request")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Source unlock service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Source unlock service error")
+        else:
+            raise HTTPException(status_code=503, detail="Source unlock service unavailable")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Source unlock failed: {str(e)}")
 
@@ -317,7 +337,19 @@ async def login_user(request: LoginRequest):
             
     except Exception as e:
         print(f"Login error: {e}")
-        raise HTTPException(status_code=500, detail="Authentication failed")
+        import requests
+        # Handle LedeWire API errors with correct status codes
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            elif e.response.status_code == 400:
+                raise HTTPException(status_code=400, detail="Invalid request format")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Authentication service error")
+        else:
+            raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 @app.post("/auth/signup", response_model=AuthResponse) 
 async def signup_user(request: SignupRequest):
@@ -339,7 +371,19 @@ async def signup_user(request: SignupRequest):
             
     except Exception as e:
         print(f"Signup error: {e}")
-        raise HTTPException(status_code=500, detail="Account creation failed")
+        import requests
+        # Handle LedeWire API errors with correct status codes
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+            if e.response.status_code == 400:
+                raise HTTPException(status_code=400, detail="Invalid signup data")
+            elif e.response.status_code == 409:
+                raise HTTPException(status_code=409, detail="Email address already registered")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Account creation service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Account creation service error")
+        else:
+            raise HTTPException(status_code=503, detail="Account creation service unavailable")
 
 @app.get("/wallet/balance", response_model=WalletBalanceResponse)
 async def get_wallet_balance(authorization: str = Header(None, alias="Authorization")):
@@ -364,6 +408,20 @@ async def get_wallet_balance(authorization: str = Header(None, alias="Authorizat
             
     except HTTPException:
         raise
+    except requests.HTTPError as e:
+        # Handle LedeWire API errors with correct status codes
+        print(f"Wallet balance HTTP error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            elif e.response.status_code == 400:
+                raise HTTPException(status_code=400, detail="Invalid wallet balance request")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Wallet service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Wallet service error")
+        else:
+            raise HTTPException(status_code=503, detail="Wallet service unavailable")
     except Exception as e:
         print(f"Wallet balance error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get wallet balance")
