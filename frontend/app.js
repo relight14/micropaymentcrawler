@@ -135,7 +135,7 @@ class ResearchApp {
         return tier.charAt(0).toUpperCase() + tier.slice(1);
     }
 
-    selectTier(tierType, cardElement) {
+    async selectTier(tierType, cardElement) {
         // Remove selection from all cards
         document.querySelectorAll('.tier-card').forEach(card => {
             card.classList.remove('selected');
@@ -144,7 +144,65 @@ class ResearchApp {
         // Select current card
         cardElement.classList.add('selected');
         this.selectedTier = tierType;
+        
+        // Fetch licensing summary for this tier
+        await this.loadLicensingSummary(tierType);
+        
         this.updatePurchaseButton();
+    }
+
+    async loadLicensingSummary(tierType) {
+        if (!this.currentQuery) return;
+        
+        try {
+            const response = await fetch(`${this.apiBase}/licensing-summary`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    query: this.currentQuery,
+                    tier: tierType 
+                })
+            });
+
+            if (response.ok) {
+                this.currentLicensingSummary = await response.json();
+                this.updateTierPricing();
+            } else {
+                console.warn('Failed to load licensing summary');
+                this.currentLicensingSummary = null;
+            }
+        } catch (error) {
+            console.error('Error loading licensing summary:', error);
+            this.currentLicensingSummary = null;
+        }
+    }
+
+    updateTierPricing() {
+        if (!this.currentLicensingSummary || !this.selectedTier) return;
+        
+        const selectedCard = document.querySelector('.tier-card.selected');
+        if (!selectedCard) return;
+        
+        // Add licensing cost display to the selected tier card
+        let licensingInfo = selectedCard.querySelector('.tier-licensing-info');
+        if (!licensingInfo) {
+            licensingInfo = document.createElement('div');
+            licensingInfo.className = 'tier-licensing-info';
+            selectedCard.appendChild(licensingInfo);
+        }
+        
+        if (this.currentLicensingSummary.total_cost > 0) {
+            licensingInfo.innerHTML = `
+                <div class="tier-licensing">
+                    <div class="licensing-cost">+ $${this.currentLicensingSummary.total_cost.toFixed(2)} licensing fees</div>
+                    <div class="licensing-details">${this.currentLicensingSummary.licensed_count} licensed sources</div>
+                </div>
+            `;
+        } else {
+            licensingInfo.innerHTML = '';
+        }
     }
 
     updatePurchaseButton() {
@@ -168,12 +226,19 @@ class ResearchApp {
         // Update balance display
         balanceElement.textContent = `$${this.walletBalance.toFixed(2)}`;
 
-        let price, description;
+        let price, description, licensingBreakdown = '';
         
         if (type === 'tier') {
             const tierPrices = { basic: 1.00, research: 2.00, pro: 4.00 };
-            price = tierPrices[this.selectedTier];
+            let basePrice = tierPrices[this.selectedTier];
             description = `${this.formatTierName(this.selectedTier)} Research Package`;
+            
+            // Calculate total price including licensing costs
+            price = basePrice;
+            if (this.currentLicensingSummary && this.currentLicensingSummary.total_cost > 0) {
+                price += this.currentLicensingSummary.total_cost;
+                licensingBreakdown = this.createLicensingBreakdownHTML(this.currentLicensingSummary);
+            }
         } else if (type === 'source') {
             price = itemDetails.price;
             description = `Unlock: ${itemDetails.title}`;
@@ -187,8 +252,15 @@ class ResearchApp {
             itemDetails: itemDetails
         };
 
-        // Update modal content
+        // Update modal content (fix XSS vulnerability)
         itemElement.textContent = description;
+        
+        // Safely add licensing breakdown as DOM element
+        if (licensingBreakdown) {
+            const breakdownDiv = document.createElement('div');
+            breakdownDiv.innerHTML = licensingBreakdown; // This is now safe since licensingBreakdown is controlled
+            itemElement.appendChild(breakdownDiv);
+        }
         amountElement.textContent = `$${price.toFixed(2)}`;
         totalElement.textContent = `$${price.toFixed(2)}`;
 
@@ -453,6 +525,50 @@ class ResearchApp {
 
     formatText(text) {
         return text.replace(/\n/g, '<br>').replace(/\n\n/g, '<br><br>');
+    }
+
+    createLicensingBreakdownHTML(licensingSummary) {
+        if (!licensingSummary || licensingSummary.licensed_count === 0) {
+            return '';
+        }
+
+        let breakdown = '<div class="licensing-summary"><h4>Content Licensing Breakdown</h4>';
+        
+        // Protocol breakdown
+        Object.entries(licensingSummary.protocol_breakdown).forEach(([protocol, info]) => {
+            const protocolClass = `protocol-${protocol}`;
+            breakdown += `
+                <div class="protocol-summary">
+                    <span class="protocol-badge ${protocolClass}">
+                        ${this.getProtocolDisplayName(protocol)}
+                    </span>
+                    <span class="protocol-details">
+                        ${info.count} sources - $${info.cost.toFixed(2)}
+                    </span>
+                </div>
+            `;
+        });
+
+        // Total summary
+        breakdown += `
+            <div class="licensing-total">
+                <strong>Licensing Fees: $${licensingSummary.total_cost.toFixed(2)}</strong>
+                <div class="licensing-note">
+                    ${licensingSummary.licensed_count} of ${licensingSummary.licensed_count + licensingSummary.unlicensed_count} sources have premium licensing
+                </div>
+            </div>
+        </div>`;
+
+        return breakdown;
+    }
+
+    getProtocolDisplayName(protocol) {
+        const names = {
+            'rsl': '🔒 RSL',
+            'tollbit': '⚡ Tollbit', 
+            'cloudflare': '☁️ Cloudflare'
+        };
+        return names[protocol] || protocol.toUpperCase();
     }
 
     showLoading(show) {

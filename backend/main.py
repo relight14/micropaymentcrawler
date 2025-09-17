@@ -12,6 +12,8 @@ from models import (
     SourceUnlockRequest, SourceUnlockResponse,
     LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
 )
+from pydantic import BaseModel
+from typing import Dict, Any
 from crawler_stub import ContentCrawlerStub
 from ledger import ResearchLedger
 from packet_builder import PacketBuilder
@@ -137,11 +139,77 @@ async def get_tiers(request: TiersRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating tiers: {str(e)}")
 
+# Licensing Summary Models
+class LicensingSummaryRequest(BaseModel):
+    query: str
+    tier: TierType
+
+class LicensingSummaryResponse(BaseModel):
+    query: str
+    tier: TierType
+    total_cost: float
+    currency: str
+    licensed_count: int
+    unlicensed_count: int
+    protocol_breakdown: Dict[str, Dict[str, Any]]
+
+@app.post("/licensing-summary", response_model=LicensingSummaryResponse)
+async def get_licensing_summary(request: LicensingSummaryRequest):
+    """
+    Get licensing cost summary for a research query and tier.
+    Analyzes sources to determine multi-protocol licensing costs.
+    """
+    try:
+        # Map tier to source count
+        tier_source_counts = {
+            TierType.BASIC: 10,
+            TierType.RESEARCH: 20, 
+            TierType.PRO: 40
+        }
+        
+        source_count = tier_source_counts[request.tier]
+        
+        # Generate sources with licensing discovery
+        sources = crawler.generate_sources(request.query, source_count)
+        
+        # Convert SourceCard objects to dictionaries for license service
+        sources_dicts = []
+        for source in sources:
+            source_dict = source.dict()  # Convert Pydantic model to dict
+            # Add license_info if available
+            if source.licensing_protocol:
+                source_dict['license_info'] = {
+                    'protocol': source.licensing_protocol,
+                    'terms': {
+                        'protocol': source.licensing_protocol,
+                        'ai_include_price': source.license_cost,
+                        'publisher': source.publisher_name
+                    }
+                }
+            sources_dicts.append(source_dict)
+        
+        # Get licensing summary from crawler's license service
+        licensing_summary = crawler.license_service.get_license_summary(sources_dicts)
+        
+        return LicensingSummaryResponse(
+            query=request.query,
+            tier=request.tier,
+            total_cost=licensing_summary['total_cost'],
+            currency=licensing_summary['currency'],
+            licensed_count=licensing_summary['licensed_count'],
+            unlicensed_count=licensing_summary['unlicensed_count'],
+            protocol_breakdown=licensing_summary['protocol_breakdown']
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating licensing summary: {str(e)}")
+
 @app.post("/purchase", response_model=PurchaseResponse)
 async def purchase_research(request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """
-    Process a research purchase request using LedeWire API.
+    Process a research purchase request using LedeWire API with server-enforced licensing costs.
     Requires valid Bearer token authentication for all purchases.
+    Server-side pricing is authoritative to ensure publisher compensation.
     """
     try:
         # SECURITY: Extract and validate Bearer token from Authorization header
@@ -152,15 +220,60 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         user_info = ledewire.get_user_info(access_token)
         user_id = user_info["user_id"]
         
-        # Get tier pricing in cents (LedeWire uses cents)
-        tier_prices = {
-            TierType.BASIC: 100,    # $1.00
-            TierType.RESEARCH: 200, # $2.00  
-            TierType.PRO: 400       # $4.00
+        # SERVER-SIDE PRICING: Calculate licensing costs (authoritative pricing)
+        tier_source_counts = {
+            TierType.BASIC: 10,
+            TierType.RESEARCH: 20, 
+            TierType.PRO: 40
         }
         
-        price_cents = tier_prices[request.tier]
-        price_dollars = price_cents / 100
+        # Generate sources with licensing discovery (server-side)
+        sources = crawler.generate_sources(request.query, tier_source_counts[request.tier])
+        
+        # Convert to dicts and calculate licensing summary
+        sources_dicts = []
+        license_tokens = []
+        for source in sources:
+            source_dict = source.dict()
+            if source.licensing_protocol:
+                source_dict['license_info'] = {
+                    'protocol': source.licensing_protocol,
+                    'terms': {
+                        'protocol': source.licensing_protocol,
+                        'ai_include_price': source.license_cost,
+                        'publisher': source.publisher_name
+                    }
+                }
+                # REQUEST LICENSE TOKENS for licensed sources (publisher compensation!)
+                try:
+                    license_info = crawler.license_service.discover_licensing(source_dict.get('url', ''))
+                    if license_info:
+                        token = crawler.license_service.request_license(license_info, "ai-include")
+                        if token:
+                            license_tokens.append({
+                                'source_id': source.id,
+                                'protocol': token.protocol,
+                                'cost': token.cost,
+                                'token': token.token
+                            })
+                except Exception as e:
+                    print(f"License token request failed for {source.id}: {e}")
+            sources_dicts.append(source_dict)
+        
+        # Get server-authoritative licensing summary 
+        licensing_summary = crawler.license_service.get_license_summary(sources_dicts)
+        
+        # Calculate TOTAL price (base + licensing costs)
+        tier_base_prices = {
+            TierType.BASIC: 1.00,
+            TierType.RESEARCH: 2.00,  
+            TierType.PRO: 4.00
+        }
+        
+        base_price = tier_base_prices[request.tier]
+        licensing_cost = licensing_summary['total_cost']
+        total_price_dollars = base_price + licensing_cost
+        price_cents = int(total_price_dollars * 100)  # Convert to cents for LedeWire
         
         # Generate unique content ID for this research packet
         content_id = f"research_{uuid.uuid4().hex[:12]}"
@@ -189,7 +302,7 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         purchase_id = ledger.record_purchase(
             query=request.query,
             tier=request.tier,
-            price=price_dollars,
+            price=total_price_dollars,  # Use total price including licensing
             wallet_id=user_id,  # SECURITY: Use user ID instead of raw access token
             transaction_id=purchase_result["id"],
             packet=packet
@@ -197,9 +310,11 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         return PurchaseResponse(
             success=True,
-            message=f"Research packet generated successfully (ID: {purchase_id})",
-            wallet_deduction=price_dollars,
-            packet=packet
+            message=f"Research packet generated successfully (ID: {purchase_id}) - {len(license_tokens)} licenses purchased",
+            wallet_deduction=total_price_dollars,
+            packet=packet,
+            licensing_summary=licensing_summary,  # Include licensing breakdown in response
+            license_tokens=license_tokens  # Include issued tokens
         )
     
     except HTTPException:

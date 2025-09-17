@@ -58,6 +58,8 @@ class PurchaseResponse(BaseModel):
     message: str
     wallet_deduction: float
     packet: Optional[ResearchPacket] = None
+    licensing_summary: Optional[dict] = None  # Licensing cost breakdown
+    license_tokens: Optional[List[dict]] = None  # Issued protocol tokens
 
 # WalletDeduct models removed - handled directly through LedeWire API
 
