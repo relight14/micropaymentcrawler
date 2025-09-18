@@ -338,20 +338,25 @@ class ChatResearchApp {
         modal.innerHTML = `
             <div class="modal-content auth-modal">
                 <span class="close" onclick="this.parentElement.parentElement.style.display='none'">&times;</span>
-                <h2>🔐 LedeWire Authentication Required</h2>
-                <p>Please sign in to access your wallet and make purchases.</p>
+                <h2>Welcome back!</h2>
+                <p>Sign in to access your wallet and purchase this premium content.</p>
                 
                 <div class="auth-form">
-                    <input type="email" id="authEmail" placeholder="Email address" required>
-                    <input type="password" id="authPassword" placeholder="Password" required>
-                    <input type="text" id="authName" placeholder="Full name (for signup)" style="display:none;">
+                    <input type="email" id="authEmail" placeholder="Email *" required>
+                    <input type="password" id="authPassword" placeholder="Password *" required>
+                    <input type="text" id="authName" placeholder="Full name *" style="display:none;">
                     
-                    <button id="loginBtn" class="auth-btn primary">Sign In</button>
-                    <button id="signupBtn" class="auth-btn secondary">Create Account</button>
+                    <button id="loginBtn" class="auth-btn primary">Log In</button>
+                    <button id="signupBtn" class="auth-btn primary">Sign up</button>
                     
                     <div class="auth-toggle">
+                        <a href="#" id="forgotPassword">Forgot Password?</a>
                         <a href="#" id="toggleAuth">Need an account? Sign up</a>
                     </div>
+                </div>
+                
+                <div class="auth-footer">
+                    Powered by LedeWire
                 </div>
             </div>
         `;
@@ -372,6 +377,7 @@ class ChatResearchApp {
         const loginBtn = document.getElementById('loginBtn');
         const signupBtn = document.getElementById('signupBtn');
         const toggleLink = document.getElementById('toggleAuth');
+        const forgotLink = document.getElementById('forgotPassword');
 
         if (nameField.style.display === 'none') {
             // Switch to signup mode
@@ -379,12 +385,14 @@ class ChatResearchApp {
             loginBtn.style.display = 'none';
             signupBtn.style.display = 'block';
             toggleLink.textContent = 'Already have an account? Sign in';
+            forgotLink.style.display = 'none';
         } else {
             // Switch to login mode
             nameField.style.display = 'none';
             loginBtn.style.display = 'block';
             signupBtn.style.display = 'none';
             toggleLink.textContent = 'Need an account? Sign up';
+            forgotLink.style.display = 'inline';
         }
     }
 
@@ -472,8 +480,20 @@ class ChatResearchApp {
         const price = prices[this.selectedTier] || 0;
         
         document.getElementById('walletBalance').textContent = `$${this.walletBalance.toFixed(2)}`;
-        document.getElementById('transactionItem').textContent = `${this.selectedTier.charAt(0).toUpperCase() + this.selectedTier.slice(1)} Research Package`;
+        document.getElementById('transactionItemLabel').textContent = `${this.selectedTier.charAt(0).toUpperCase() + this.selectedTier.slice(1)} Research Package Price`;
         document.getElementById('transactionAmount').textContent = `$${price.toFixed(2)}`;
+        
+        // Update success banner if insufficient funds
+        const successBanner = walletModal.querySelector('.wallet-success-banner');
+        if (this.walletBalance < price) {
+            successBanner.style.background = 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
+            successBanner.style.color = '#991b1b';
+            successBanner.textContent = 'Insufficient funds in your wallet to purchase this content.';
+        } else {
+            successBanner.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+            successBanner.style.color = '#065f46';
+            successBanner.textContent = 'Ready to purchase! You have sufficient funds in your wallet to purchase this content.';
+        }
         
         walletModal.style.display = 'block';
     }
@@ -485,25 +505,30 @@ class ChatResearchApp {
         modal.innerHTML = `
             <div class="modal-content wallet-modal">
                 <span class="close" onclick="this.parentElement.parentElement.style.display='none'">&times;</span>
-                <h2>💳 LedeWire Wallet</h2>
-                <div class="wallet-info">
-                    <p class="balance-label">Current Balance:</p>
-                    <p class="balance-amount" id="walletBalance">$0.00</p>
+                
+                <div class="wallet-success-banner">
+                    Ready to purchase! You have sufficient funds in your wallet to purchase this content.
                 </div>
-                <hr>
-                <div class="transaction-details">
-                    <div class="transaction-row">
-                        <span>Item:</span>
-                        <span id="transactionItem">Research Package</span>
+                
+                <div class="wallet-content">
+                    <div class="wallet-balance-section">
+                        <span class="balance-label">Current Balance</span>
+                        <div class="balance-amount" id="walletBalance">$0.00</div>
                     </div>
-                    <div class="transaction-row total">
-                        <span>Total:</span>
-                        <span id="transactionAmount">$0.00</span>
+                    
+                    <div class="wallet-item-section">
+                        <span class="item-label" id="transactionItemLabel">Research Package Price</span>
+                        <div class="item-price" id="transactionAmount">$0.00</div>
                     </div>
                 </div>
+                
                 <div class="wallet-actions">
-                    <button id="confirmPaymentBtn" class="wallet-btn primary">Confirm Payment</button>
+                    <button id="confirmPaymentBtn" class="wallet-btn primary">Purchase Article</button>
                     <button onclick="document.getElementById('walletModal').style.display='none'" class="wallet-btn secondary">Cancel</button>
+                </div>
+                
+                <div class="wallet-footer">
+                    Powered by LedeWire
                 </div>
             </div>
         `;
