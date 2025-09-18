@@ -145,9 +145,7 @@ class ChatResearchApp {
             console.error('Chat error:', error);
             
             let errorMessage = "I'm having trouble connecting right now. Please try again in a moment.";
-            if (error.message.includes('401')) {
-                errorMessage = "Authentication required for Deep Research mode. Please log in to access premium features.";
-            } else if (error.message.includes('503')) {
+            if (error.message.includes('503')) {
                 errorMessage = "The research service is temporarily unavailable. Please try again shortly.";
             }
             
@@ -202,6 +200,9 @@ class ChatResearchApp {
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results';
         
+        // Display research tier options for unauthenticated users
+        const tiersSection = this.createTiersSection(data.refined_query);
+        
         let licensingInfo = '';
         if (data.licensing_summary && data.total_cost > 0) {
             const protocolBreakdown = Object.entries(data.licensing_summary.by_protocol || {})
@@ -211,14 +212,11 @@ class ChatResearchApp {
                 }).join(' • ');
 
             licensingInfo = `
-                <div class="licensing-summary">
-                    <h4>💰 Licensed Research Package Available</h4>
-                    <p class="cost-breakdown">Total Cost: <strong>$${data.total_cost.toFixed(2)}</strong></p>
+                <div class="current-query-summary">
+                    <h4>💰 Current Query Research Package</h4>
+                    <p class="cost-breakdown">Estimated Cost: <strong>$${data.total_cost.toFixed(2)}</strong></p>
                     <p class="protocol-breakdown">${protocolBreakdown}</p>
                     <p class="source-count">Licensed Sources: ${data.licensing_summary.licensed_count} of ${data.sources.length}</p>
-                    <button onclick="app.purchaseResearch('${this.escapeHtml(data.refined_query)}', ${data.total_cost})" class="purchase-btn">
-                        🔓 Purchase Full Research Access
-                    </button>
                 </div>
             `;
         }
@@ -255,6 +253,7 @@ class ChatResearchApp {
                 <h3>🎯 Research Results Found</h3>
                 <p>Discovered ${data.sources.length} relevant sources for your query</p>
             </div>
+            ${tiersSection}
             ${licensingInfo}
             <div class="sources-preview">
                 <h4>📚 Source Preview</h4>
@@ -266,6 +265,134 @@ class ChatResearchApp {
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Add event listeners for tier cards (security fix)
+        this.addTierCardListeners();
+    }
+
+    createTiersSection(query) {
+        const tiers = [
+            {
+                name: 'Basic',
+                price: 1.00,
+                sources: 10,
+                features: ['10 research sources', 'Comprehensive summary'],
+                description: '10 research sources with summary'
+            },
+            {
+                name: 'Research', 
+                price: 2.00,
+                sources: 20,
+                features: ['20 research sources', 'Comprehensive summary', 'Structured research outline'],
+                description: '20 research sources with summary and structured outline'
+            },
+            {
+                name: 'Pro',
+                price: 4.00,
+                sources: 40,
+                features: ['40 research sources', 'Comprehensive summary', 'Structured research outline', 'Strategic insights & analysis'],
+                description: '40 research sources with summary, outline, and strategic insights'
+            }
+        ];
+
+        // Create tiers section container
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'research-tiers-section';
+        
+        const header = document.createElement('h4');
+        header.textContent = '📦 Choose Your Research Package';
+        sectionDiv.appendChild(header);
+        
+        const description = document.createElement('p');
+        description.textContent = 'Select the research depth that fits your needs:';
+        sectionDiv.appendChild(description);
+        
+        const tiersGrid = document.createElement('div');
+        tiersGrid.className = 'tiers-grid';
+        
+        // Create tier cards using DOM APIs (secure from XSS)
+        tiers.forEach(tier => {
+            const tierCard = document.createElement('div');
+            tierCard.className = 'tier-card';
+            
+            // Use dataset to safely set attributes (no XSS)
+            tierCard.dataset.tier = tier.name.toLowerCase();
+            tierCard.dataset.query = query; // Safe - directly set via DOM API
+            tierCard.dataset.price = tier.price.toString();
+            
+            const tierTitle = document.createElement('h4');
+            tierTitle.textContent = `${tier.name} Package`;
+            tierCard.appendChild(tierTitle);
+            
+            const tierPrice = document.createElement('div');
+            tierPrice.className = 'tier-price';
+            tierPrice.textContent = `$${tier.price.toFixed(2)}`;
+            tierCard.appendChild(tierPrice);
+            
+            const tierDesc = document.createElement('div');
+            tierDesc.className = 'tier-description';
+            tierDesc.textContent = tier.description;
+            tierCard.appendChild(tierDesc);
+            
+            const featuresList = document.createElement('ul');
+            featuresList.className = 'tier-features';
+            
+            tier.features.forEach(feature => {
+                const listItem = document.createElement('li');
+                listItem.textContent = feature;
+                featuresList.appendChild(listItem);
+            });
+            
+            tierCard.appendChild(featuresList);
+            tiersGrid.appendChild(tierCard);
+        });
+        
+        sectionDiv.appendChild(tiersGrid);
+        
+        // Store the query for later use by event handlers
+        this.currentQuery = query;
+        
+        return sectionDiv.outerHTML;
+    }
+
+    selectTier(tierName, query) {
+        // Remove selection from all tier cards
+        document.querySelectorAll('.tier-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+
+        // Add selection to clicked card
+        const selectedCard = document.querySelector(`[data-tier="${tierName}"]`);
+        if (selectedCard) {
+            selectedCard.classList.add('selected');
+        }
+
+        // Show purchase option for selected tier
+        this.showPurchaseOption(tierName, query);
+    }
+
+    showPurchaseOption(tierName, query) {
+        // Check if user is authenticated
+        if (!this.authToken) {
+            // Show authentication required message for purchase
+            this.addMessage('system', `To purchase the ${tierName.charAt(0).toUpperCase() + tierName.slice(1)} research package, please log in to your account first. Authentication is required for making purchases.`);
+            return;
+        }
+
+        // If authenticated, proceed with purchase
+        const prices = { basic: 1.00, research: 2.00, pro: 4.00 };
+        const price = prices[tierName];
+        this.purchaseResearch(query, price, tierName);
+    }
+
+    purchaseResearch(query, cost, tierName = null) {
+        if (!this.authToken) {
+            this.addMessage('system', 'Please log in to purchase research packages.');
+            return;
+        }
+        
+        // Implementation would go here for actual purchase flow
+        this.addMessage('system', `Purchase functionality for ${tierName || 'research package'} ($${cost.toFixed(2)}) would be implemented here.`);
     }
 
     getLicenseIcon(protocol) {
@@ -275,6 +402,26 @@ class ChatResearchApp {
             'cloudflare': '☁️ Cloudflare'
         };
         return `<span class="license-badge">${icons[protocol] || '🔐 Licensed'}</span>`;
+    }
+
+    addTierCardListeners() {
+        // Add click listeners to tier cards (replaces inline onclick for security)
+        const tierCards = document.querySelectorAll('.tier-card');
+        tierCards.forEach(card => {
+            // Remove any existing listeners to avoid duplicates
+            card.removeEventListener('click', this.handleTierCardClick);
+            card.addEventListener('click', (event) => this.handleTierCardClick(event));
+        });
+    }
+
+    handleTierCardClick(event) {
+        const card = event.currentTarget;
+        const tierName = card.dataset.tier;
+        const query = card.dataset.query;
+        
+        if (tierName && query) {
+            this.selectTier(tierName, query);
+        }
     }
 
     showTypingIndicator() {

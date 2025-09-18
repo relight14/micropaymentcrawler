@@ -41,6 +41,11 @@
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
+    
+    /* Status Colors */
+    --success-color: #10b981;
+    --error-color: #ef4444;
+    --warning-color: #f59e0b;
 }
 
 * {
@@ -488,6 +493,135 @@ body {
 
 .sources-preview {
     padding: 1.5rem;
+}
+
+/* Research Tiers Section */
+.research-tiers-section {
+    background: var(--bg-card);
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.research-tiers-section h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-weight: var(--font-weight-semibold);
+    font-size: 1.1rem;
+}
+
+.research-tiers-section p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+.tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.tier-card {
+    background: var(--bg-card);
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.tier-card:hover {
+    border-color: var(--ledewire-yellow);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.tier-card.selected {
+    border-color: var(--ledewire-yellow);
+    box-shadow: var(--shadow-yellow);
+    background: var(--yellow-light);
+}
+
+.tier-card.selected::after {
+    content: "✓";
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: var(--ledewire-yellow);
+    color: var(--charcoal);
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-weight-bold);
+    font-size: 0.75rem;
+}
+
+.tier-card h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    font-size: 1.1rem;
+}
+
+.tier-price {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--ledewire-yellow);
+    margin-bottom: 0.75rem;
+}
+
+.tier-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.tier-features {
+    list-style: none;
+    padding: 0;
+    text-align: left;
+}
+
+.tier-features li {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    padding-left: 1.25rem;
+    position: relative;
+}
+
+.tier-features li::before {
+    content: "•";
+    color: var(--ledewire-yellow);
+    position: absolute;
+    left: 0;
+    font-weight: var(--font-weight-bold);
+}
+
+.tier-features li:last-child {
+    margin-bottom: 0;
+}
+
+/* Current Query Summary */
+.current-query-summary {
+    background: var(--pale-grey);
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.current-query-summary h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    font-weight: var(--font-weight-semibold);
 }
 
 .source-card {

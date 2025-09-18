@@ -739,12 +739,8 @@ async def chat(request: Request, chat_request: ChatRequest, authorization: str =
                 # Extract proper user ID for session isolation
                 user_id = extract_user_id_from_token(token)
             except HTTPException:
-                if chat_request.mode == "deep_research":
-                    raise  # Deep research requires authentication
-                # For conversational mode, continue as anonymous
+                # For both modes, continue as anonymous if authentication fails
                 pass
-        elif chat_request.mode == "deep_research":
-            raise HTTPException(status_code=401, detail="Authentication required for deep research mode")
         
         # Process chat message with user-specific session
         response = ai_service.chat(chat_request.message, chat_request.mode, user_id)
