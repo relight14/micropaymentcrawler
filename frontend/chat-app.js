@@ -200,67 +200,10 @@ class ChatResearchApp {
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results';
         
-        // Display research tier options for unauthenticated users
+        // Display clean tier options only - no overwhelming text
         const tiersSection = this.createTiersSection(data.refined_query);
         
-        let licensingInfo = '';
-        if (data.licensing_summary && data.total_cost > 0) {
-            const protocolBreakdown = Object.entries(data.licensing_summary.by_protocol || {})
-                .map(([protocol, info]) => {
-                    const icon = this.getLicenseIcon(protocol);
-                    return `<span class="protocol-cost">${icon}: $${info.total_cost.toFixed(2)}</span>`;
-                }).join(' • ');
-
-            licensingInfo = `
-                <div class="current-query-summary">
-                    <h4>💰 Current Query Research Package</h4>
-                    <p class="cost-breakdown">Estimated Cost: <strong>$${data.total_cost.toFixed(2)}</strong></p>
-                    <p class="protocol-breakdown">${protocolBreakdown}</p>
-                    <p class="source-count">Licensed Sources: ${data.licensing_summary.licensed_count} of ${data.sources.length}</p>
-                </div>
-            `;
-        }
-
-        const sourcesHtml = data.sources.slice(0, 5).map((source, index) => {
-            const licenseIcon = source.license_info ? 
-                this.getLicenseIcon(source.license_info.terms.protocol) : '';
-            
-            const costInfo = source.license_cost ? `<span class="source-cost">$${source.license_cost.toFixed(2)}</span>` : '';
-            
-            return `
-                <div class="source-card">
-                    <div class="source-header">
-                        <h4>${this.escapeHtml(source.title)}</h4>
-                        <div class="source-badges">
-                            ${licenseIcon}
-                            ${costInfo}
-                        </div>
-                    </div>
-                    <p class="source-excerpt">${this.escapeHtml(source.excerpt)}</p>
-                    <div class="source-meta">
-                        <span class="source-domain">📄 ${source.domain}</span>
-                        <span class="source-quality">Quality: ${source.quality_score}/10</span>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        const moreSourcesInfo = data.sources.length > 5 ? 
-            `<p class="more-sources">... and ${data.sources.length - 5} more sources</p>` : '';
-
-        resultsDiv.innerHTML = `
-            <div class="research-header">
-                <h3>🎯 Research Results Found</h3>
-                <p>Discovered ${data.sources.length} relevant sources for your query</p>
-            </div>
-            ${tiersSection}
-            ${licensingInfo}
-            <div class="sources-preview">
-                <h4>📚 Source Preview</h4>
-                ${sourcesHtml}
-                ${moreSourcesInfo}
-            </div>
-        `;
+        resultsDiv.innerHTML = tiersSection;
 
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
@@ -276,33 +219,28 @@ class ChatResearchApp {
                 name: 'Basic',
                 price: 1.00,
                 sources: 10,
-                valueProps: '10 sources'
+                valueProps: '10 licensed sources',
+                description: 'Professional summary with key insights'
             },
             {
                 name: 'Research', 
                 price: 2.00,
                 sources: 20,
-                valueProps: '20 sources + outline'
+                valueProps: '20 licensed sources + structured outline',
+                description: 'Expert analysis & actionable recommendations'
             },
             {
                 name: 'Pro',
                 price: 4.00,
                 sources: 40,
-                valueProps: '40 sources + outline + insights'
+                valueProps: '40 licensed sources + outline + strategic insights',
+                description: 'Comprehensive report with competitive intelligence'
             }
         ];
 
-        // Create tiers section container
+        // Create tiers section container - just the cards, no headers
         const sectionDiv = document.createElement('div');
         sectionDiv.className = 'research-tiers-section';
-        
-        const header = document.createElement('h4');
-        header.textContent = '📦 Choose Your Research Package';
-        sectionDiv.appendChild(header);
-        
-        const description = document.createElement('p');
-        description.textContent = 'Select the research depth that fits your needs:';
-        sectionDiv.appendChild(description);
         
         const tiersGrid = document.createElement('div');
         tiersGrid.className = 'tiers-grid';
@@ -331,6 +269,11 @@ class ChatResearchApp {
             tierValue.className = 'tier-value';
             tierValue.textContent = tier.valueProps;
             tierCard.appendChild(tierValue);
+            
+            const tierDescription = document.createElement('div');
+            tierDescription.className = 'tier-description-compelling';
+            tierDescription.textContent = tier.description;
+            tierCard.appendChild(tierDescription);
             
             tiersGrid.appendChild(tierCard);
         });
