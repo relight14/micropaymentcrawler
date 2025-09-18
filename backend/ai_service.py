@@ -61,7 +61,7 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
         
         try:
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=1000,
                 temperature=0.7,
                 system=system_prompt,
@@ -111,7 +111,7 @@ Be specific and targeted based on our conversation. Don't be generic."""
         try:
             # Get research strategy from Claude
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=500,
                 temperature=0.3,
                 system=system_prompt,
