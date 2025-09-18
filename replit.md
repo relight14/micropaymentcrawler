@@ -8,6 +8,17 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **September 18, 2025**: 🤖 DUAL-MODE AI RESEARCH EXPERIENCE COMPLETE! 🤖
+  - **Conversational AI Mode**: Natural conversation interface for research discovery and question refinement
+  - **Deep Research Mode**: Structured research with licensed source access and dynamic pricing
+  - **Anthropic Claude Integration**: Production-ready AI service with conversation state persistence  
+  - **Seamless Mode Switching**: Users can toggle between conversational exploration and deep research
+  - **Dynamic Pricing Model**: AI-determined source relevance drives contextual pricing instead of fixed tiers
+  - **Enhanced User Experience**: Beautiful chat interface with typing indicators, message formatting, and real-time responses
+  - **State Management**: Conversation history maintained across mode switches for contextual continuity
+  - **Authentication Integration**: Deep research mode integrates with LedeWire wallet for premium access
+  - **Responsive Design**: Mobile-optimized chat interface with modern UI patterns
+
 - **September 17, 2025**: 🚀 MULTI-PROTOCOL CONTENT LICENSING SYSTEM COMPLETE! 🚀
   - **Revolutionary Architecture**: Transformed from content scraping to legitimate licensed access
   - **Multi-Protocol Support**: Complete abstraction layer supporting RSL, Tollbit, and Cloudflare licensing protocols

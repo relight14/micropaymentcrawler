@@ -6,19 +6,33 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
 import uvicorn
 
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
 from models import (
     TiersRequest, TiersResponse, TierInfo, TierType,
     PurchaseRequest, PurchaseResponse, 
     SourceUnlockRequest, SourceUnlockResponse,
     LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
 )
-from pydantic import BaseModel
-from typing import Dict, Any
+
+class ChatRequest(BaseModel):
+    message: str
+    mode: str = "conversational"  # "conversational" or "deep_research"
+
+class ChatResponse(BaseModel):
+    response: str
+    mode: str
+    conversation_length: int
+    sources: Optional[list] = None
+    licensing_summary: Optional[dict] = None
+    total_cost: Optional[float] = None
+    refined_query: Optional[str] = None
 from crawler_stub import ContentCrawlerStub
 from ledger import ResearchLedger
 from packet_builder import PacketBuilder
 from ledewire_api import LedeWireAPI
 from html_generator import generate_html_packet
+from ai_service import AIResearchService
 
 app = FastAPI(title="AI Research Tool MVP", version="1.0.0")
 
@@ -39,6 +53,7 @@ crawler = ContentCrawlerStub()
 ledger = ResearchLedger()
 packet_builder = PacketBuilder()
 ledewire = LedeWireAPI()  # Production LedeWire API integration
+ai_service = AIResearchService()  # AI conversational and research service
 
 # Authentication Helper Functions
 
@@ -96,8 +111,8 @@ def validate_user_token(access_token: str):
 
 @app.get("/")
 async def root():
-    """Root endpoint - redirect to frontend."""
-    return RedirectResponse(url="/static/index.html")
+    """Root endpoint - redirect to chat interface."""
+    return RedirectResponse(url="/static/chat.html")
 
 @app.post("/tiers", response_model=TiersResponse)
 async def get_tiers(request: TiersRequest):
@@ -567,6 +582,44 @@ async def get_research_packet_html(content_id: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error serving research packet: {str(e)}")
+
+# AI Chat Endpoints
+
+@app.post("/chat")
+async def chat(request: ChatRequest, authorization: str = Header(None)):
+    """AI chat endpoint supporting both conversational and deep research modes"""
+    try:
+        # Authentication check for deep research mode (optional for conversational)
+        if request.mode == "deep_research" and authorization:
+            validate_user_token(extract_bearer_token(authorization))
+        
+        # Process chat message
+        response = ai_service.chat(request.message, request.mode)
+        
+        return ChatResponse(**response)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return ChatResponse(
+            response="I'm having trouble right now, but I'm here to help with your research questions!",
+            mode=request.mode,
+            conversation_length=len(ai_service.conversation_history)
+        )
+
+@app.get("/conversation-history")
+async def get_conversation_history():
+    """Get current conversation history"""
+    return {
+        "history": ai_service.get_conversation_history(),
+        "length": len(ai_service.conversation_history)
+    }
+
+@app.post("/clear-conversation")
+async def clear_conversation():
+    """Clear conversation history for fresh start"""
+    ai_service.clear_conversation()
+    return {"success": True, "message": "Conversation cleared"}
 
 if __name__ == "__main__":
     # For production deployment
