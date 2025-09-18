@@ -328,7 +328,35 @@ class ChatResearchApp {
             authModal = this.createAuthModal();
             document.body.appendChild(authModal);
         }
+        // Clear any previous errors
+        this.clearModalErrors();
         authModal.style.display = 'block';
+    }
+
+    showModalError(message) {
+        // Clear any existing errors first
+        this.clearModalErrors();
+        
+        // Create error element
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'modal-error';
+        errorDiv.textContent = message;
+        
+        // Add to current modal (auth or wallet)
+        const authModal = document.getElementById('authModal');
+        const walletModal = document.getElementById('walletModal');
+        
+        if (authModal && authModal.style.display === 'block') {
+            const authForm = authModal.querySelector('.auth-form');
+            authForm.insertBefore(errorDiv, authForm.firstChild);
+        } else if (walletModal && walletModal.style.display === 'block') {
+            const walletContent = walletModal.querySelector('.wallet-content');
+            walletContent.insertBefore(errorDiv, walletContent.firstChild);
+        }
+    }
+
+    clearModalErrors() {
+        document.querySelectorAll('.modal-error').forEach(error => error.remove());
     }
 
     createAuthModal() {
@@ -407,7 +435,7 @@ class ChatResearchApp {
         }
 
         try {
-            const endpoint = type === 'login' ? '/auth/login/email' : '/auth/signup';
+            const endpoint = type === 'login' ? '/auth/login' : '/auth/signup';
             const body = type === 'login' 
                 ? { email, password }
                 : { email, password, name };
@@ -436,7 +464,7 @@ class ChatResearchApp {
 
         } catch (error) {
             console.error(`${type} error:`, error);
-            this.addMessage('system', `${type} failed: ${error.message}`);
+            this.showModalError(error.message || `${type} failed. Please try again.`);
         }
     }
 
@@ -463,7 +491,7 @@ class ChatResearchApp {
 
         } catch (error) {
             console.error('Wallet balance error:', error);
-            this.addMessage('system', 'Could not load wallet balance. Please try again.');
+            this.showModalError('Could not load wallet balance. Please try again.');
         }
     }
 
@@ -545,7 +573,7 @@ class ChatResearchApp {
 
         // Check balance
         if (this.walletBalance < price) {
-            this.addMessage('system', 'Insufficient wallet balance');
+            this.showModalError('Insufficient wallet balance. Please add funds to your wallet.');
             return;
         }
 
