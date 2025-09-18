@@ -586,7 +586,7 @@ Key insights from this source:
 
 @app.post("/auth/login", response_model=AuthResponse)
 @limiter.limit("10/minute")  # Rate limit login attempts
-async def login_user(http_request: Request, request: LoginRequest):
+async def login_user(request: LoginRequest, http_request: Request):
     """
     Authenticate user with email and password.
     Returns JWT access token for wallet access.
@@ -622,7 +622,7 @@ async def login_user(http_request: Request, request: LoginRequest):
 
 @app.post("/auth/signup", response_model=AuthResponse) 
 @limiter.limit("5/minute")  # Rate limit signup attempts
-async def signup_user(http_request: Request, request: SignupRequest):
+async def signup_user(request: SignupRequest, http_request: Request):
     """
     Create new user account and return JWT token.
     """
