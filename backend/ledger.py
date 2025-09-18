@@ -46,6 +46,18 @@ class ResearchLedger:
                 )
             """)
             
+            # Payment protection table for idempotency
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS idempotency_keys (
+                    user_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    operation_type TEXT NOT NULL,
+                    response_data TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, idempotency_key, operation_type)
+                )
+            """)
+            
             conn.commit()
     
     def record_purchase(self, 
@@ -72,6 +84,30 @@ class ResearchLedger:
             ))
             
             return cursor.lastrowid or 0
+    
+    def check_idempotency(self, user_id: str, idempotency_key: str, operation_type: str) -> Optional[Dict]:
+        """Check if operation was already processed and return cached response."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT response_data FROM idempotency_keys 
+                WHERE user_id = ? AND idempotency_key = ? AND operation_type = ?
+            """, (user_id, idempotency_key, operation_type))
+            
+            result = cursor.fetchone()
+            if result:
+                return json.loads(result[0])
+            return None
+    
+    def store_idempotency(self, user_id: str, idempotency_key: str, operation_type: str, response_data: Dict):
+        """Store operation result for idempotency protection."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO idempotency_keys 
+                (user_id, idempotency_key, operation_type, response_data)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, idempotency_key, operation_type, json.dumps(response_data)))
     
     def record_source_unlock(self, 
                            purchase_id: int, 

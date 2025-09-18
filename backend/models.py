@@ -26,6 +26,7 @@ class PurchaseRequest(BaseModel):
     query: str
     tier: TierType
     user_wallet_id: Optional[str] = None
+    idempotency_key: Optional[str] = None  # Prevent double-spending
 
 class SourceCard(BaseModel):
     id: str
@@ -68,6 +69,7 @@ class SourceUnlockRequest(BaseModel):
     price: float
     title: str
     user_wallet_id: Optional[str] = None
+    idempotency_key: Optional[str] = None  # Prevent double-spending
 
 class SourceUnlockResponse(BaseModel):
     success: bool

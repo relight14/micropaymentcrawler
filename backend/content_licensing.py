@@ -5,7 +5,7 @@ Multi-protocol support for RSL, Tollbit, Cloudflare and future licensing systems
 import os
 import uuid
 import requests
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import json
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List

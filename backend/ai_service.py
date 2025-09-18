@@ -20,14 +20,19 @@ class AIResearchService:
         )
         self.license_service = ContentLicenseService()
         self.crawler = ContentCrawlerStub()
-        self.conversation_history = []
+        # Store conversations per user to prevent cross-user data leakage
+        self.user_conversations: Dict[str, List[Dict[str, Any]]] = {}
         
-    def chat(self, user_message: str, mode: str = "conversational") -> Dict[str, Any]:
+    def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
         Main chat interface supporting both conversational and deep research modes
         """
-        # Add user message to conversation history
-        self.conversation_history.append({
+        # Initialize user conversation if not exists
+        if user_id not in self.user_conversations:
+            self.user_conversations[user_id] = []
+        
+        # Add user message to user-specific conversation history
+        self.user_conversations[user_id].append({
             "role": "user", 
             "content": user_message,
             "timestamp": datetime.now().isoformat(),
@@ -35,11 +40,11 @@ class AIResearchService:
         })
         
         if mode == "conversational":
-            return self._conversational_response(user_message)
+            return self._conversational_response(user_message, user_id)
         else:  # deep_research
-            return self._deep_research_response(user_message)
+            return self._deep_research_response(user_message, user_id)
     
-    def _conversational_response(self, user_message: str) -> Dict[str, Any]:
+    def _conversational_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
         """Generate conversational response to help explore research interests"""
         
         system_prompt = """You are an expert research assistant helping users explore and refine their research interests. Your role is to:
@@ -53,10 +58,11 @@ class AIResearchService:
 Be curious, engaging, and intellectually stimulating. Help them think deeper about their topic.
 When they seem ready for deep research, you can suggest they switch to "Deep Research" mode to find specific sources and data."""
         
-        # Create conversation context for Claude
+        # Create conversation context for Claude using user-specific history
+        user_history = self.user_conversations.get(user_id, [])
         messages = [
             {"role": msg["role"], "content": msg["content"]} 
-            for msg in self.conversation_history[-10:]  # Last 10 messages for context
+            for msg in user_history[-10:]  # Last 10 messages for context
         ]
         
         try:
@@ -70,8 +76,8 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
             
             ai_response = response.content[0].text
             
-            # Add AI response to conversation history
-            self.conversation_history.append({
+            # Add AI response to user-specific conversation history
+            self.user_conversations[user_id].append({
                 "role": "assistant",
                 "content": ai_response,
                 "timestamp": datetime.now().isoformat(),
@@ -81,7 +87,7 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
             return {
                 "response": ai_response,
                 "mode": "conversational",
-                "conversation_length": len(self.conversation_history)
+                "conversation_length": len(self.user_conversations[user_id])
             }
             
         except Exception as e:
@@ -91,11 +97,11 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
                 "error": str(e)
             }
     
-    def _deep_research_response(self, user_message: str) -> Dict[str, Any]:
+    def _deep_research_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
         """Generate deep research with context-aware source selection"""
         
         # Analyze conversation history to understand research focus
-        conversation_context = self._extract_research_context()
+        conversation_context = self._extract_research_context(user_id)
         
         system_prompt = f"""You are an expert research analyst. Based on this conversation history about the user's research interests:
 
@@ -121,21 +127,22 @@ Be specific and targeted based on our conversation. Don't be generic."""
             research_query = response.content[0].text.strip()
             
             # Execute deep research with the refined query
-            return self._execute_deep_research(research_query, user_message)
+            return self._execute_deep_research(research_query, user_message, user_id)
             
         except Exception as e:
             # Fallback: use original user message as query
-            return self._execute_deep_research(user_message, user_message)
+            return self._execute_deep_research(user_message, user_message, user_id)
     
-    def _extract_research_context(self) -> str:
+    def _extract_research_context(self, user_id: str) -> str:
         """Extract key research themes from conversation history"""
+        user_history = self.user_conversations.get(user_id, [])
         recent_messages = [
-            msg["content"] for msg in self.conversation_history[-8:] 
+            msg["content"] for msg in user_history[-8:] 
             if msg["role"] == "user"
         ]
         return "\n".join([f"- {msg}" for msg in recent_messages])
     
-    def _execute_deep_research(self, refined_query: str, original_query: str) -> Dict[str, Any]:
+    def _execute_deep_research(self, refined_query: str, original_query: str, user_id: str) -> Dict[str, Any]:
         """Execute deep research with intelligent source selection"""
         
         try:
@@ -172,8 +179,11 @@ Be specific and targeted based on our conversation. Don't be generic."""
             # Create the research response
             ai_response = f"Based on our conversation, I've found {len(selected_sources)} highly relevant sources for your research on this topic. Here's what I discovered:\n\n{outline}"
             
-            # Add to conversation history
-            self.conversation_history.append({
+            # Add to user-specific conversation history
+            if user_id not in self.user_conversations:
+                self.user_conversations[user_id] = []
+            
+            self.user_conversations[user_id].append({
                 "role": "assistant",
                 "content": ai_response,
                 "timestamp": datetime.now().isoformat(),
@@ -187,7 +197,7 @@ Be specific and targeted based on our conversation. Don't be generic."""
                 "licensing_summary": licensing_summary,
                 "refined_query": refined_query,
                 "total_cost": licensing_summary.get('total_cost', 0.0),
-                "conversation_length": len(self.conversation_history)
+                "conversation_length": len(self.user_conversations.get(user_id, []))
             }
             
         except Exception as e:
@@ -271,10 +281,11 @@ Keep it concise but compelling - make the user excited about what they'll discov
         except Exception:
             return "Here are the most relevant sources I found for your research. Each offers unique insights that will help answer your questions."
     
-    def get_conversation_history(self) -> List[Dict]:
-        """Get the current conversation history"""
-        return self.conversation_history
+    def get_conversation_history(self, user_id: str) -> List[Dict]:
+        """Get the current conversation history for a specific user"""
+        return self.user_conversations.get(user_id, [])
     
-    def clear_conversation(self) -> None:
-        """Clear conversation history for a fresh start"""
-        self.conversation_history = []
+    def clear_conversation(self, user_id: str) -> None:
+        """Clear conversation history for a specific user"""
+        if user_id in self.user_conversations:
+            self.user_conversations[user_id] = []

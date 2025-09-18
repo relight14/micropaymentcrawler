@@ -1,10 +1,15 @@
 import uuid
 import requests
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
 import uvicorn
+import os
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
@@ -36,17 +41,32 @@ from ai_service import AIResearchService
 
 app = FastAPI(title="AI Research Tool MVP", version="1.0.0")
 
-# CORS middleware for frontend communication
+# Rate limiting for security
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# CORS middleware - Security hardened for production
+import os
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",") if os.environ.get("ALLOWED_ORIGINS") else ["http://localhost:3000", "http://localhost:5000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend domain
+    allow_origins=ALLOWED_ORIGINS,  # Restrict to known domains - NO wildcards
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],  # Only needed methods
+    allow_headers=["Content-Type", "Authorization"],  # Only needed headers
 )
 
 # Serve frontend files
 app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+
+# Production Safety Checks
+if os.environ.get('ENVIRONMENT') == 'production':
+    if os.environ.get('LEDEWIRE_USE_MOCK', 'false').lower() == 'true':
+        raise RuntimeError("CRITICAL SECURITY: Mock APIs cannot be enabled in production environment")
+    print("✅ Production mode: Mock APIs disabled, real integrations active")
 
 # Initialize components
 crawler = ContentCrawlerStub()
@@ -56,6 +76,23 @@ ledewire = LedeWireAPI()  # Production LedeWire API integration
 ai_service = AIResearchService()  # AI conversational and research service
 
 # Authentication Helper Functions
+
+def extract_user_id_from_token(access_token: str) -> str:
+    """Extract user ID from JWT token for session isolation"""
+    try:
+        # Use wallet balance call to get authenticated user identity  
+        response = ledewire.get_wallet_balance(access_token)
+        if response.get('success'):
+            # Use wallet ID as stable user identifier
+            return f"user_{response.get('wallet_id', 'unknown')}"
+        else:
+            # Fallback to token-based ID for development
+            import hashlib
+            return f"user_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
+    except Exception:
+        # Secure fallback - each token gets unique anonymous ID
+        import hashlib  
+        return f"anon_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
 
 def extract_bearer_token(authorization: str) -> str:
     """
@@ -115,7 +152,8 @@ async def root():
     return RedirectResponse(url="/static/chat.html")
 
 @app.post("/tiers", response_model=TiersResponse)
-async def get_tiers(request: TiersRequest):
+@limiter.limit("60/minute")  # Rate limit tiers endpoint
+async def get_tiers(http_request: Request, request: TiersRequest):
     """
     Get pricing tiers for a research query.
     Returns estimated costs and features for Basic, Research, and Pro tiers.
@@ -220,7 +258,8 @@ async def get_licensing_summary(request: LicensingSummaryRequest):
         raise HTTPException(status_code=500, detail=f"Error calculating licensing summary: {str(e)}")
 
 @app.post("/purchase", response_model=PurchaseResponse)
-async def purchase_research(request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
+@limiter.limit("5/minute")  # Rate limit purchase attempts
+async def purchase_research(http_request: Request, request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """
     Process a research purchase request using LedeWire API with server-enforced licensing costs.
     Requires valid Bearer token authentication for all purchases.
@@ -232,8 +271,16 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         # SECURITY: Validate JWT token and get user info
         validate_user_token(access_token)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # PAYMENT PROTECTION: Check idempotency to prevent double-spending
+        if request.idempotency_key:
+            existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "purchase")
+            if existing_response:
+                return PurchaseResponse(**existing_response)
+        
         user_info = ledewire.get_user_info(access_token)
-        user_id = user_info["user_id"]
+        # Keep user_id consistent for idempotency - don't overwrite
         
         # SERVER-SIDE PRICING: Calculate licensing costs (authoritative pricing)
         tier_source_counts = {
@@ -323,7 +370,8 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
             packet=packet
         )
         
-        return PurchaseResponse(
+        # Create final response
+        response_data = PurchaseResponse(
             success=True,
             message=f"Research packet generated successfully (ID: {purchase_id}) - {len(license_tokens)} licenses purchased",
             wallet_deduction=total_price_dollars,
@@ -331,6 +379,12 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
             licensing_summary=licensing_summary,  # Include licensing breakdown in response
             license_tokens=license_tokens  # Include issued tokens
         )
+        
+        # PAYMENT PROTECTION: Store idempotency for duplicate prevention
+        if request.idempotency_key:
+            ledger.store_idempotency(user_id, request.idempotency_key, "purchase", response_data.model_dump())
+        
+        return response_data
     
     except HTTPException:
         # Re-raise HTTP exceptions (including 401 auth failures) with original status
@@ -447,7 +501,8 @@ Key insights from this source:
 # Authentication Endpoints
 
 @app.post("/auth/login", response_model=AuthResponse)
-async def login_user(request: LoginRequest):
+@limiter.limit("10/minute")  # Rate limit login attempts
+async def login_user(http_request: Request, request: LoginRequest):
     """
     Authenticate user with email and password.
     Returns JWT access token for wallet access.
@@ -482,7 +537,8 @@ async def login_user(request: LoginRequest):
             raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 @app.post("/auth/signup", response_model=AuthResponse) 
-async def signup_user(request: SignupRequest):
+@limiter.limit("5/minute")  # Rate limit signup attempts
+async def signup_user(http_request: Request, request: SignupRequest):
     """
     Create new user account and return JWT token.
     """
@@ -586,15 +642,28 @@ async def get_research_packet_html(content_id: str):
 # AI Chat Endpoints
 
 @app.post("/chat")
-async def chat(request: ChatRequest, authorization: str = Header(None)):
+@limiter.limit("30/minute")  # Rate limit: 30 requests per minute per IP
+async def chat(request: Request, chat_request: ChatRequest, authorization: str = Header(None)):
     """AI chat endpoint supporting both conversational and deep research modes"""
     try:
-        # Authentication check for deep research mode (optional for conversational)
-        if request.mode == "deep_research" and authorization:
-            validate_user_token(extract_bearer_token(authorization))
+        # Extract user identity for session isolation
+        user_id = "anonymous"
+        if authorization:
+            try:
+                token = extract_bearer_token(authorization)
+                validate_user_token(token)
+                # Extract proper user ID for session isolation
+                user_id = extract_user_id_from_token(token)
+            except HTTPException:
+                if chat_request.mode == "deep_research":
+                    raise  # Deep research requires authentication
+                # For conversational mode, continue as anonymous
+                pass
+        elif chat_request.mode == "deep_research":
+            raise HTTPException(status_code=401, detail="Authentication required for deep research mode")
         
-        # Process chat message
-        response = ai_service.chat(request.message, request.mode)
+        # Process chat message with user-specific session
+        response = ai_service.chat(chat_request.message, chat_request.mode, user_id)
         
         return ChatResponse(**response)
         
@@ -603,22 +672,45 @@ async def chat(request: ChatRequest, authorization: str = Header(None)):
     except Exception as e:
         return ChatResponse(
             response="I'm having trouble right now, but I'm here to help with your research questions!",
-            mode=request.mode,
-            conversation_length=len(ai_service.conversation_history)
+            mode=chat_request.mode,
+            conversation_length=0
         )
 
 @app.get("/conversation-history")
-async def get_conversation_history():
-    """Get current conversation history"""
+@limiter.limit("60/minute")  # Rate limit: 60 requests per minute per IP
+async def get_conversation_history(request: Request, authorization: str = Header(None)):
+    """Get current conversation history for authenticated user"""
+    # Extract user identity
+    user_id = "anonymous"
+    if authorization:
+        try:
+            token = extract_bearer_token(authorization)
+            validate_user_token(token)
+            user_id = token[:16]  # Use first 16 chars as user identifier
+        except HTTPException:
+            pass  # Continue as anonymous for backward compatibility
+    
+    history = ai_service.get_conversation_history(user_id)
     return {
-        "history": ai_service.get_conversation_history(),
-        "length": len(ai_service.conversation_history)
+        "history": history,
+        "length": len(history)
     }
 
 @app.post("/clear-conversation")
-async def clear_conversation():
-    """Clear conversation history for fresh start"""
-    ai_service.clear_conversation()
+@limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
+async def clear_conversation(request: Request, authorization: str = Header(None)):
+    """Clear conversation history for authenticated user"""
+    # Extract user identity
+    user_id = "anonymous"
+    if authorization:
+        try:
+            token = extract_bearer_token(authorization)
+            validate_user_token(token)
+            user_id = token[:16]  # Use first 16 chars as user identifier
+        except HTTPException:
+            pass  # Continue as anonymous for backward compatibility
+    
+    ai_service.clear_conversation(user_id)
     return {"success": True, "message": "Conversation cleared"}
 
 if __name__ == "__main__":
