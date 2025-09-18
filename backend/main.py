@@ -3,7 +3,7 @@ import requests
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 import uvicorn
 import os
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -41,10 +41,30 @@ from ai_service import AIResearchService
 
 app = FastAPI(title="AI Research Tool MVP", version="1.0.0")
 
-# Rate limiting for security
-limiter = Limiter(key_func=get_remote_address)
+# Custom rate limiting key function for per-user limits  
+def get_user_or_ip_key(request: Request):
+    """Rate limit by authenticated user ID, fallback to IP for unauthenticated"""
+    try:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            # Extract user ID without expensive validation for rate limiting
+            import hashlib
+            user_hash = hashlib.sha256(token.encode()).hexdigest()[:12]
+            return f"user:{user_hash}"
+    except:
+        pass  # Fall back to IP-based limiting
+    return f"ip:{request.client.host if request.client else 'unknown'}"
+
+# Rate limiting for security - per-user for authenticated, per-IP for anonymous
+limiter = Limiter(key_func=get_user_or_ip_key)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": f"Rate limit exceeded: {exc.detail}"}
+    )
 app.add_middleware(SlowAPIMiddleware)
 
 # CORS middleware - Security hardened for production
@@ -273,11 +293,36 @@ async def purchase_research(http_request: Request, request: PurchaseRequest, aut
         validate_user_token(access_token)
         user_id = extract_user_id_from_token(access_token)
         
-        # PAYMENT PROTECTION: Check idempotency to prevent double-spending
-        if request.idempotency_key:
+        # Calculate pricing first for stable idempotency key generation
+        tier_base_prices = {
+            TierType.BASIC: 1.00,
+            TierType.RESEARCH: 2.00,  
+            TierType.PRO: 4.00
+        }
+        base_price = tier_base_prices[request.tier]
+        
+        # PAYMENT PROTECTION: MANDATORY idempotency - generate stable key if not provided
+        import hashlib
+        if not request.idempotency_key:
+            # Generate stable key from request contents to prevent double charges
+            request_signature = f"{user_id}:{request.query}:{request.tier.value}:{base_price}"
+            request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
+        
+        # Always use idempotency protection - no optional paths
+        existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "purchase")
+        if existing_response:
+            return PurchaseResponse(**existing_response)
+        
+        # Try to atomically reserve this operation
+        if not ledger.reserve_idempotency(user_id, request.idempotency_key, "purchase"):
+            # Someone else is processing this - wait and check again
+            import time
+            time.sleep(0.2)
             existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "purchase")
             if existing_response:
                 return PurchaseResponse(**existing_response)
+            else:
+                raise HTTPException(status_code=409, detail="Duplicate request processing - please retry")
         
         user_info = ledewire.get_user_info(access_token)
         # Keep user_id consistent for idempotency - don't overwrite
@@ -340,11 +385,13 @@ async def purchase_research(http_request: Request, request: PurchaseRequest, aut
         # Generate unique content ID for this research packet
         content_id = f"research_{uuid.uuid4().hex[:12]}"
         
-        # Create purchase through LedeWire
+        # Create STABLE provider idempotency key for LedeWire dedupe
+        provider_idempotency_key = f"purchase_{user_id}_{request.idempotency_key}"
         purchase_result = ledewire.create_purchase(
             access_token=access_token,
             content_id=content_id,
-            price_cents=price_cents
+            price_cents=price_cents,
+            idempotency_key=provider_idempotency_key
         )
         
         # Check for purchase errors
@@ -419,7 +466,8 @@ async def get_stats():
         return {"success": False, "error": str(e)}
 
 @app.post("/unlock-source", response_model=SourceUnlockResponse)
-async def unlock_source(request: SourceUnlockRequest, authorization: str = Header(None, alias="Authorization")):
+@limiter.limit("10/minute")  # Rate limit source unlock attempts
+async def unlock_source(http_request: Request, request: SourceUnlockRequest, authorization: str = Header(None, alias="Authorization")):
     """
     Process a source unlock request using LedeWire API.
     Requires valid Bearer token authentication for all source purchases.
@@ -428,10 +476,32 @@ async def unlock_source(request: SourceUnlockRequest, authorization: str = Heade
         # SECURITY: Extract and validate Bearer token from Authorization header
         access_token = extract_bearer_token(authorization)
         
-        # SECURITY: Validate JWT token and get user info
+        # SECURITY: Validate JWT token and get user info  
         validate_user_token(access_token)
-        user_info = ledewire.get_user_info(access_token)
-        user_id = user_info["user_id"]
+        user_id = extract_user_id_from_token(access_token)
+        
+        # PAYMENT PROTECTION: MANDATORY idempotency - generate stable key if not provided
+        import hashlib
+        if not request.idempotency_key:
+            # Generate stable key from request contents to prevent double charges
+            request_signature = f"{user_id}:{request.source_id}:{request.price}:{request.title}"
+            request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
+        
+        # Always use idempotency protection - no optional paths
+        existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "source_unlock")
+        if existing_response:
+            return SourceUnlockResponse(**existing_response)
+        
+        # Try to atomically reserve this operation
+        if not ledger.reserve_idempotency(user_id, request.idempotency_key, "source_unlock"):
+            # Someone else is processing this - wait and check again
+            import time
+            time.sleep(0.2)
+            existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "source_unlock")
+            if existing_response:
+                return SourceUnlockResponse(**existing_response)
+            else:
+                raise HTTPException(status_code=409, detail="Duplicate request processing - please retry")
         
         # Convert price to cents for LedeWire API
         price_cents = int(request.price * 100)
@@ -439,11 +509,13 @@ async def unlock_source(request: SourceUnlockRequest, authorization: str = Heade
         # Generate content ID for this source
         source_content_id = f"source_{request.source_id}"
         
-        # Create purchase through LedeWire
+        # Create STABLE provider idempotency key for LedeWire dedupe
+        provider_idempotency_key = f"unlock_{user_id}_{request.idempotency_key}"
         purchase_result = ledewire.create_purchase(
             access_token=access_token,
             content_id=source_content_id,
-            price_cents=price_cents
+            price_cents=price_cents,
+            idempotency_key=provider_idempotency_key
         )
         
         # Check for purchase errors
@@ -470,12 +542,19 @@ Key insights from this source:
         # Note: In production, would record source unlock with user_id
         # ledger.record_source_unlock(purchase_id, request.source_id, request.price, user_id)
         
-        return SourceUnlockResponse(
+        # Create final response
+        response_data = SourceUnlockResponse(
             success=True,
             message=f"Source unlocked successfully",
             wallet_deduction=request.price,
             unlocked_content=unlocked_content
         )
+        
+        # PAYMENT PROTECTION: Store idempotency for duplicate prevention
+        if request.idempotency_key:
+            ledger.store_idempotency(user_id, request.idempotency_key, "source_unlock", response_data.model_dump())
+        
+        return response_data
     
     except HTTPException:
         # Re-raise HTTP exceptions (including 401 auth failures) with original status

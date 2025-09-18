@@ -85,18 +85,49 @@ class ResearchLedger:
             
             return cursor.lastrowid or 0
     
+    def reserve_idempotency(self, user_id: str, idempotency_key: str, operation_type: str) -> bool:
+        """Atomically reserve an idempotency key. Returns True if reserved, False if already exists."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                # Try to insert with "processing" status
+                cursor.execute("""
+                    INSERT INTO idempotency_keys 
+                    (user_id, idempotency_key, operation_type, response_data)
+                    VALUES (?, ?, ?, ?)
+                """, (user_id, idempotency_key, operation_type, json.dumps({"status": "processing"})))
+                return True  # Successfully reserved
+            except sqlite3.IntegrityError:
+                return False  # Already exists
+
     def check_idempotency(self, user_id: str, idempotency_key: str, operation_type: str) -> Optional[Dict]:
         """Check if operation was already processed and return cached response."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT response_data FROM idempotency_keys 
+                SELECT response_data, created_at FROM idempotency_keys 
                 WHERE user_id = ? AND idempotency_key = ? AND operation_type = ?
             """, (user_id, idempotency_key, operation_type))
             
             result = cursor.fetchone()
             if result:
-                return json.loads(result[0])
+                data = json.loads(result[0])
+                created_at = result[1]
+                
+                # Check for stuck processing entries (timeout after 5 minutes)
+                if data.get("status") == "processing":
+                    from datetime import datetime, timedelta
+                    created_time = datetime.fromisoformat(created_at)
+                    if datetime.now() - created_time > timedelta(minutes=5):
+                        # Clean up stuck entry to allow retry
+                        cursor.execute("""
+                            DELETE FROM idempotency_keys 
+                            WHERE user_id = ? AND idempotency_key = ? AND operation_type = ?
+                        """, (user_id, idempotency_key, operation_type))
+                        conn.commit()
+                        return None
+                    return None  # Still processing, let caller handle
+                return data  # Completed result
             return None
     
     def store_idempotency(self, user_id: str, idempotency_key: str, operation_type: str, response_data: Dict):

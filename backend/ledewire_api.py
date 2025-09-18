@@ -214,20 +214,23 @@ class LedeWireAPI:
     
     # Purchase Methods
     
-    def create_purchase(self, access_token: str, content_id: str, price_cents: int) -> Dict[str, Any]:
+    def create_purchase(self, access_token: str, content_id: str, price_cents: int, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
         """
         POST /v1/purchases
         Create a new content purchase with idempotency.
         """
-        # Add idempotency key for safe retries
-        idempotency_key = str(uuid.uuid4())
+        # PRODUCTION SAFETY: Require idempotency key to prevent double charges
+        if not idempotency_key:
+            raise ValueError("CRITICAL: Idempotency key required for payment operations")
         
         try:
+            # CRITICAL: Ensure idempotency key is sent to LedeWire for provider-side protection
             response = self.session.post(
                 f"{self.api_base}/purchases",
                 headers={
                     "Authorization": f"Bearer {access_token}",
-                    "Idempotency-Key": idempotency_key
+                    "Idempotency-Key": idempotency_key,  # MUST be sent to prevent provider double charges
+                    "X-Request-ID": idempotency_key  # Backup header for redundancy
                 },
                 json={
                     "content_id": content_id,
