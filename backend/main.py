@@ -168,7 +168,12 @@ def validate_user_token(access_token: str):
 
 @app.get("/")
 async def root():
-    """Root endpoint - redirect to chat interface."""
+    """Root endpoint - health check for deployment."""
+    return {"status": "ok", "message": "AI Research Tool API is running"}
+
+@app.get("/chat")
+async def chat_interface():
+    """Chat interface endpoint - redirect to chat interface."""
     return RedirectResponse(url="/static/chat.html")
 
 @app.post("/tiers", response_model=TiersResponse)
