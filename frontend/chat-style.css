@@ -526,12 +526,17 @@ body {
     background: var(--bg-card);
     border: 2px solid var(--border-light);
     border-radius: var(--radius-lg);
-    padding: 1.25rem;
+    padding: 1.5rem;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
     position: relative;
     overflow: hidden;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .tier-card:hover {
@@ -563,51 +568,28 @@ body {
     font-size: 0.75rem;
 }
 
-.tier-card h4 {
+.tier-title {
     color: var(--text-primary);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     font-weight: var(--font-weight-semibold);
-    font-size: 1.1rem;
+    font-size: 1rem;
+    opacity: 0.8;
 }
 
 .tier-price {
-    font-size: 1.5rem;
+    font-size: 2.2rem;
     font-weight: var(--font-weight-bold);
     color: var(--ledewire-yellow);
-    margin-bottom: 0.75rem;
-}
-
-.tier-description {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-    line-height: 1.4;
-}
-
-.tier-features {
-    list-style: none;
-    padding: 0;
-    text-align: left;
-}
-
-.tier-features li {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
     margin-bottom: 0.5rem;
-    padding-left: 1.25rem;
-    position: relative;
+    line-height: 1;
 }
 
-.tier-features li::before {
-    content: "•";
-    color: var(--ledewire-yellow);
-    position: absolute;
-    left: 0;
-    font-weight: var(--font-weight-bold);
-}
-
-.tier-features li:last-child {
-    margin-bottom: 0;
+.tier-value {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.2;
+    margin-top: 0.25rem;
 }
 
 /* Current Query Summary */

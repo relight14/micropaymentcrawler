@@ -266,8 +266,8 @@ class ChatResearchApp {
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        // Add event listeners for tier cards (security fix)
-        this.addTierCardListeners();
+        // Add event listeners for tier cards in this specific results section
+        this.addTierCardListeners(resultsDiv);
     }
 
     createTiersSection(query) {
@@ -276,22 +276,19 @@ class ChatResearchApp {
                 name: 'Basic',
                 price: 1.00,
                 sources: 10,
-                features: ['10 research sources', 'Comprehensive summary'],
-                description: '10 research sources with summary'
+                valueProps: '10 sources'
             },
             {
                 name: 'Research', 
                 price: 2.00,
                 sources: 20,
-                features: ['20 research sources', 'Comprehensive summary', 'Structured research outline'],
-                description: '20 research sources with summary and structured outline'
+                valueProps: '20 sources + outline'
             },
             {
                 name: 'Pro',
                 price: 4.00,
                 sources: 40,
-                features: ['40 research sources', 'Comprehensive summary', 'Structured research outline', 'Strategic insights & analysis'],
-                description: '40 research sources with summary, outline, and strategic insights'
+                valueProps: '40 sources + outline + insights'
             }
         ];
 
@@ -313,15 +310,16 @@ class ChatResearchApp {
         // Create tier cards using DOM APIs (secure from XSS)
         tiers.forEach(tier => {
             const tierCard = document.createElement('div');
-            tierCard.className = 'tier-card';
+            tierCard.className = 'tier-card story-card';
             
             // Use dataset to safely set attributes (no XSS)
             tierCard.dataset.tier = tier.name.toLowerCase();
             tierCard.dataset.query = query; // Safe - directly set via DOM API
             tierCard.dataset.price = tier.price.toString();
             
-            const tierTitle = document.createElement('h4');
-            tierTitle.textContent = `${tier.name} Package`;
+            const tierTitle = document.createElement('div');
+            tierTitle.className = 'tier-title';
+            tierTitle.textContent = `${tier.name} Tier`;
             tierCard.appendChild(tierTitle);
             
             const tierPrice = document.createElement('div');
@@ -329,21 +327,11 @@ class ChatResearchApp {
             tierPrice.textContent = `$${tier.price.toFixed(2)}`;
             tierCard.appendChild(tierPrice);
             
-            const tierDesc = document.createElement('div');
-            tierDesc.className = 'tier-description';
-            tierDesc.textContent = tier.description;
-            tierCard.appendChild(tierDesc);
+            const tierValue = document.createElement('div');
+            tierValue.className = 'tier-value';
+            tierValue.textContent = tier.valueProps;
+            tierCard.appendChild(tierValue);
             
-            const featuresList = document.createElement('ul');
-            featuresList.className = 'tier-features';
-            
-            tier.features.forEach(feature => {
-                const listItem = document.createElement('li');
-                listItem.textContent = feature;
-                featuresList.appendChild(listItem);
-            });
-            
-            tierCard.appendChild(featuresList);
             tiersGrid.appendChild(tierCard);
         });
         
@@ -355,14 +343,14 @@ class ChatResearchApp {
         return sectionDiv.outerHTML;
     }
 
-    selectTier(tierName, query) {
-        // Remove selection from all tier cards
-        document.querySelectorAll('.tier-card').forEach(card => {
+    selectTier(tierName, query, container) {
+        // Remove selection from tier cards in this specific container
+        container.querySelectorAll('.tier-card').forEach(card => {
             card.classList.remove('selected');
         });
 
-        // Add selection to clicked card
-        const selectedCard = document.querySelector(`[data-tier="${tierName}"]`);
+        // Add selection to clicked card in this container
+        const selectedCard = container.querySelector(`[data-tier="${tierName}"]`);
         if (selectedCard) {
             selectedCard.classList.add('selected');
         }
@@ -404,24 +392,19 @@ class ChatResearchApp {
         return `<span class="license-badge">${icons[protocol] || '🔐 Licensed'}</span>`;
     }
 
-    addTierCardListeners() {
-        // Add click listeners to tier cards (replaces inline onclick for security)
-        const tierCards = document.querySelectorAll('.tier-card');
-        tierCards.forEach(card => {
-            // Remove any existing listeners to avoid duplicates
-            card.removeEventListener('click', this.handleTierCardClick);
-            card.addEventListener('click', (event) => this.handleTierCardClick(event));
+    addTierCardListeners(container) {
+        // Use event delegation to avoid duplicate listeners
+        container.addEventListener('click', (event) => {
+            const tierCard = event.target.closest('.tier-card');
+            if (tierCard) {
+                const tierName = tierCard.dataset.tier;
+                const query = tierCard.dataset.query;
+                
+                if (tierName && query) {
+                    this.selectTier(tierName, query, container);
+                }
+            }
         });
-    }
-
-    handleTierCardClick(event) {
-        const card = event.currentTarget;
-        const tierName = card.dataset.tier;
-        const query = card.dataset.query;
-        
-        if (tierName && query) {
-            this.selectTier(tierName, query);
-        }
     }
 
     showTypingIndicator() {
