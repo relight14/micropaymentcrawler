@@ -8,6 +8,15 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **September 19, 2025**: 🎯 BUDGET-CONSTRAINED PRICING MODEL IMPLEMENTED! 🎯
+  - **Fixed Tier Pricing**: Transparent $1 Basic, $2 Research, $4 Pro pricing with no hidden costs
+  - **60/40 Budget Allocation**: 60% of tier price allocated for licensing costs, 40% corporate margin for sustainable operations
+  - **Budget-Constrained Source Generation**: System generates sources within licensing budget limits and stops when budget would be exceeded
+  - **Transparent Tier Descriptions**: Updated to show "up to X premium sources" instead of exact counts for honest user expectations
+  - **Enhanced Mock Mode**: LedeWire API properly short-circuits in development mode, eliminating network timeouts
+  - **Revenue Model**: Predictable pricing for users while maintaining profit margins and publisher compensation
+  - **Quality-Based Content**: Budget constraints ensure high-value source selection within tier limits
+  - **Production Ready**: Fixed pricing model tested and verified with Basic tier showing exact $1.00 charges
 - **September 18, 2025**: 🤖 DUAL-MODE AI RESEARCH EXPERIENCE COMPLETE! 🤖
   - **Conversational AI Mode**: Natural conversation interface for research discovery and question refinement
   - **Deep Research Mode**: Structured research with licensed source access and dynamic pricing
