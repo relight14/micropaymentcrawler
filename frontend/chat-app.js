@@ -127,6 +127,17 @@ class ChatResearchApp {
                 })
             });
 
+            // Handle 401 responses in deep research mode - token is invalid/expired
+            if (response.status === 401 && this.currentMode === 'deep_research') {
+                console.log('Token expired during deep research, clearing auth and showing login...');
+                this.hideTypingIndicator(); // Fix: ensure loading state is cleared
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.addMessage('assistant', 'Session expired. Please sign in to continue with deep research.');
+                this.showAuthModal();
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -677,6 +688,15 @@ class ChatResearchApp {
                 }
             });
 
+            // Handle 401 responses - token is invalid/expired
+            if (response.status === 401) {
+                console.log('Token expired or invalid, clearing auth and showing login...');
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.showAuthModal();
+                return;
+            }
+
             if (response.ok) {
                 const data = await response.json();
                 if (data.balance_cents !== undefined) {
@@ -697,13 +717,7 @@ class ChatResearchApp {
             
             // Handle different error types  
             let errorMessage;
-            if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-                errorMessage = 'Authentication expired. Please sign in again.';
-                this.authToken = null;
-                localStorage.removeItem('authToken');
-                this.showAuthModal();
-                return;
-            } else if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
+            if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
                 errorMessage = 'Wallet service temporarily unavailable. Please try again in a moment.';
             } else {
                 errorMessage = 'Could not load wallet balance. Please try again.';
@@ -818,6 +832,18 @@ class ChatResearchApp {
                     user_wallet_id: 'demo_wallet_' + Date.now()
                 })
             });
+
+            // Handle 401 responses - token is invalid/expired
+            if (response.status === 401) {
+                console.log('Token expired during purchase, clearing auth and showing login...');
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                // Fix: close wallet modal before showing auth modal
+                const walletModal = document.getElementById('walletModal');
+                if (walletModal) walletModal.style.display = 'none';
+                this.showAuthModal();
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

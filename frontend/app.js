@@ -324,6 +324,16 @@ class ResearchApp {
                 })
             });
 
+            // Handle 401 responses - token is invalid/expired
+            if (response.status === 401) {
+                console.log('Token expired during purchase, clearing auth and showing login...');
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.showLoading(false);
+                this.showAuthModal();
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -360,6 +370,15 @@ class ResearchApp {
                     title: itemDetails.title
                 })
             });
+
+            // Handle 401 responses - token is invalid/expired
+            if (response.status === 401) {
+                console.log('Token expired during source unlock, clearing auth and showing login...');
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.showAuthModal();
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -837,6 +856,15 @@ class ResearchApp {
                 }
             });
 
+            // Handle 401 responses - token is invalid/expired
+            if (response.status === 401) {
+                console.log('Token expired or invalid, clearing auth and showing login...');
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.showAuthModal();
+                return;
+            }
+
             if (response.ok) {
                 const data = await response.json();
                 this.walletBalance = data.balance_cents / 100; // Convert cents to dollars
@@ -852,13 +880,7 @@ class ResearchApp {
             
             // Handle different error types
             let errorMessage;
-            if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-                errorMessage = 'Authentication expired. Please sign in again.';
-                this.authToken = null;
-                localStorage.removeItem('authToken');
-                this.showAuthModal();
-                return;
-            } else if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
+            if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
                 errorMessage = 'Wallet service temporarily unavailable. Please try again in a moment.';
             } else {
                 errorMessage = 'Could not load wallet balance. Please try again.';
