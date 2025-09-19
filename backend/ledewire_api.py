@@ -29,9 +29,8 @@ class LedeWireAPI:
         self.api_base = "https://api.ledewire.com/v1"
         self.use_mock = os.getenv("LEDEWIRE_USE_MOCK", "false").lower() == "true"
         
-        # PRODUCTION SECURITY: Validate credentials required
-        if not self.use_mock and (not self.api_key or not self.api_secret):
-            raise ValueError("PRODUCTION ERROR: LedeWire API credentials required. Set LEDEWIRE_API_KEY and LEDEWIRE_API_SECRET")
+        # Note: API key/secret only required for API key authentication endpoint
+        # Email/password auth and other buyer flows work without API credentials
         
         # Setup HTTP session with default headers (auth added per-request as needed)
         self.session = requests.Session()
@@ -130,6 +129,46 @@ class LedeWireAPI:
                     raise requests.HTTPError("Invalid signup data", response=e.response)
                 elif e.response.status_code == 409:
                     raise requests.HTTPError("Email already exists", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+            else:
+                raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+    
+    def login_api_key(self, key: str, secret: Optional[str] = None) -> Dict[str, Any]:
+        """
+        POST /v1/auth/login/api-key
+        Authenticate using API key and secret, returns JWT token.
+        """
+        # Short-circuit for mock mode - no network calls
+        if self.use_mock:
+            return {
+                "access_token": f"mock_jwt_token_{uuid.uuid4().hex[:16]}",
+                "refresh_token": f"mock_refresh_token_{uuid.uuid4().hex[:16]}",
+                "expires_at": (datetime.now() + timedelta(hours=2)).isoformat(),
+                "user_id": f"mock_seller_{uuid.uuid4().hex[:8]}",
+                "_fallback": True
+            }
+            
+        try:
+            # Send API key credentials in request body (NOT headers)
+            request_body = {"key": key}
+            if secret:
+                request_body["secret"] = secret
+                
+            response = self.session.post(
+                f"{self.api_base}/auth/login/api-key",
+                json=request_body,
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            # PRODUCTION: Re-raise with proper HTTP status
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code == 401:
+                    raise requests.HTTPError("Invalid API key or secret", response=e.response)
+                elif e.response.status_code == 400:
+                    raise requests.HTTPError("Invalid API key request", response=e.response)
                 else:
                     raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
             else:
