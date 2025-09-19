@@ -457,7 +457,14 @@ async def purchase_research(http_request: Request, request: PurchaseRequest, aut
         else:
             raise HTTPException(status_code=503, detail="Purchase service unavailable")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Purchase failed: {str(e)}")
+        # Handle connection errors, SSL errors, etc.
+        error_msg = str(e).lower()
+        if "ssl" in error_msg or "certificate" in error_msg:
+            return {"success": False, "message": "Unable to connect securely to payment service"}
+        elif "connection" in error_msg or "timeout" in error_msg:
+            return {"success": False, "message": "Payment service temporarily unavailable"}
+        else:
+            return {"success": False, "message": f"Purchase failed: {str(e)}"}
 
 # Wallet deduction handled directly through LedeWire API in purchase endpoint
 
@@ -580,7 +587,14 @@ Key insights from this source:
         else:
             raise HTTPException(status_code=503, detail="Source unlock service unavailable")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Source unlock failed: {str(e)}")
+        # Handle connection errors, SSL errors, etc.
+        error_msg = str(e).lower()
+        if "ssl" in error_msg or "certificate" in error_msg:
+            return {"success": False, "message": "Unable to connect securely to source unlock service"}
+        elif "connection" in error_msg or "timeout" in error_msg:
+            return {"success": False, "message": "Source unlock service temporarily unavailable"}
+        else:
+            return {"success": False, "message": "Source unlock failed: Invalid request"}
 
 # Authentication Endpoints
 
@@ -671,7 +685,7 @@ async def signup_user(request: SignupRequest):
             else:
                 return {"success": False, "message": "Registration service unavailable"}
 
-@app.get("/wallet/balance", response_model=WalletBalanceResponse)
+@app.get("/wallet/balance")
 async def get_wallet_balance(authorization: str = Header(None, alias="Authorization")):
     """
     Get user's current wallet balance.
@@ -695,22 +709,29 @@ async def get_wallet_balance(authorization: str = Header(None, alias="Authorizat
     except HTTPException:
         raise
     except requests.HTTPError as e:
-        # Handle LedeWire API errors with correct status codes
+        # Handle LedeWire API errors with JSON responses
         print(f"Wallet balance HTTP error: {e}")
         if hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid or expired token")
+                return {"success": False, "message": "Invalid or expired token"}
             elif e.response.status_code == 400:
-                raise HTTPException(status_code=400, detail="Invalid wallet balance request")
+                return {"success": False, "message": "Invalid wallet balance request"}
             elif e.response.status_code in [502, 503, 504]:
-                raise HTTPException(status_code=503, detail="Wallet service temporarily unavailable")
+                return {"success": False, "message": "Wallet service temporarily unavailable"}
             else:
-                raise HTTPException(status_code=500, detail="Wallet service error")
+                return {"success": False, "message": "Wallet service error"}
         else:
-            raise HTTPException(status_code=503, detail="Wallet service unavailable")
+            return {"success": False, "message": "Wallet service unavailable"}
     except Exception as e:
         print(f"Wallet balance error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get wallet balance")
+        # Handle connection errors, SSL errors, etc.
+        error_msg = str(e).lower()
+        if "ssl" in error_msg or "certificate" in error_msg:
+            return {"success": False, "message": "Unable to connect securely to wallet service"}
+        elif "connection" in error_msg or "timeout" in error_msg:
+            return {"success": False, "message": "Wallet service temporarily unavailable"}
+        else:
+            return {"success": False, "message": "Failed to get wallet balance"}
 
 @app.get("/health")
 async def health_check():

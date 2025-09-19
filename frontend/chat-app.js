@@ -491,7 +491,22 @@ class ChatResearchApp {
 
         } catch (error) {
             console.error('Wallet balance error:', error);
-            this.showModalError('Could not load wallet balance. Please try again.');
+            
+            // Handle different error types  
+            let errorMessage;
+            if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                errorMessage = 'Authentication expired. Please sign in again.';
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.showAuthModal();
+                return;
+            } else if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
+                errorMessage = 'Wallet service temporarily unavailable. Please try again in a moment.';
+            } else {
+                errorMessage = 'Could not load wallet balance. Please try again.';
+            }
+            
+            this.showModalError(errorMessage);
         }
     }
 

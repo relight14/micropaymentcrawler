@@ -316,11 +316,11 @@ class ResearchApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
                 },
                 body: JSON.stringify({
                     query: this.currentQuery,
-                    tier: this.selectedTier,
-                    user_wallet_id: 'demo_wallet_' + Date.now()
+                    tier: this.selectedTier
                 })
             });
 
@@ -352,12 +352,12 @@ class ResearchApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
                 },
                 body: JSON.stringify({
                     source_id: itemDetails.id,
                     price: itemDetails.price,
-                    title: itemDetails.title,
-                    user_wallet_id: 'demo_wallet_' + Date.now()
+                    title: itemDetails.title
                 })
             });
 
@@ -744,7 +744,22 @@ class ResearchApp {
 
         } catch (error) {
             console.error('Wallet balance error:', error);
-            this.showError('Could not load wallet balance. Please try again.');
+            
+            // Handle different error types
+            let errorMessage;
+            if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                errorMessage = 'Authentication expired. Please sign in again.';
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.showAuthModal();
+                return;
+            } else if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
+                errorMessage = 'Wallet service temporarily unavailable. Please try again in a moment.';
+            } else {
+                errorMessage = 'Could not load wallet balance. Please try again.';
+            }
+            
+            this.showError(errorMessage);
         }
     }
 }
