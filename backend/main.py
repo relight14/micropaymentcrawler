@@ -191,7 +191,7 @@ async def get_tiers(request: TiersRequest):
                 sources=10,
                 includes_outline=False,
                 includes_insights=False,
-                description="Up to 10 premium sources with summary"
+                description="Legally-licensed content from top publishers with professional analysis"
             ),
             TierInfo(
                 tier=TierType.RESEARCH,
@@ -199,7 +199,7 @@ async def get_tiers(request: TiersRequest):
                 sources=20,
                 includes_outline=True,
                 includes_insights=False,
-                description="Up to 20 premium sources with summary and structured outline"
+                description="Premium licensed sources with structured insights and actionable recommendations"
             ),
             TierInfo(
                 tier=TierType.PRO,
@@ -207,7 +207,7 @@ async def get_tiers(request: TiersRequest):
                 sources=40,
                 includes_outline=True,
                 includes_insights=True,
-                description="Up to 40 premium sources with summary, outline, and strategic insights"
+                description="Comprehensive licensed research with competitive intelligence and strategic analysis"
             )
         ]
         

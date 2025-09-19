@@ -219,22 +219,22 @@ class ChatResearchApp {
                 name: 'Basic',
                 price: 1.00,
                 sources: 10,
-                valueProps: '10 licensed sources',
-                description: 'Professional summary with key insights'
+                valueProps: 'Up to 10 licensed premium sources',
+                description: 'Legally-licensed content from top publishers with professional analysis'
             },
             {
                 name: 'Research', 
                 price: 2.00,
                 sources: 20,
-                valueProps: '20 licensed sources + structured outline',
-                description: 'Expert analysis & actionable recommendations'
+                valueProps: 'Up to 20 licensed sources + expert outline',
+                description: 'Premium licensed sources with structured insights and actionable recommendations'
             },
             {
                 name: 'Pro',
                 price: 4.00,
                 sources: 40,
-                valueProps: '40 licensed sources + outline + strategic insights',
-                description: 'Comprehensive report with competitive intelligence'
+                valueProps: 'Up to 40 licensed sources + outline + strategic insights',
+                description: 'Comprehensive licensed research with competitive intelligence and strategic analysis'
             }
         ];
 
