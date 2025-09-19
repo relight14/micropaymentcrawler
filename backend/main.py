@@ -609,7 +609,7 @@ async def login_user(request: LoginRequest):
         print(f"Login error: {e}")
         import requests
         # Handle LedeWire API errors with proper JSON responses
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
                 return {"success": False, "message": "Invalid email or password"}
             elif e.response.status_code == 400:
@@ -619,7 +619,14 @@ async def login_user(request: LoginRequest):
             else:
                 return {"success": False, "message": "Authentication service error"}
         else:
-            return {"success": False, "message": "Authentication service unavailable"}
+            # Handle connection errors, SSL errors, etc.
+            error_msg = str(e).lower()
+            if "ssl" in error_msg or "certificate" in error_msg:
+                return {"success": False, "message": "Unable to connect securely to authentication service"}
+            elif "connection" in error_msg or "timeout" in error_msg:
+                return {"success": False, "message": "Authentication service temporarily unavailable"}
+            else:
+                return {"success": False, "message": "Authentication service unavailable"}
 
 @app.post("/auth/signup") 
 async def signup_user(request: SignupRequest):
@@ -645,7 +652,7 @@ async def signup_user(request: SignupRequest):
         print(f"Signup error: {e}")
         import requests
         # Handle LedeWire API errors with proper JSON responses
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 409:
                 return {"success": False, "message": "Account with this email already exists"}
             elif e.response.status_code == 400:
@@ -655,20 +662,14 @@ async def signup_user(request: SignupRequest):
             else:
                 return {"success": False, "message": "Registration service error"}
         else:
-            return {"success": False, "message": "Registration service unavailable"}
-        import requests
-        # Handle LedeWire API errors with correct status codes
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
-            if e.response.status_code == 400:
-                raise HTTPException(status_code=400, detail="Invalid signup data")
-            elif e.response.status_code == 409:
-                raise HTTPException(status_code=409, detail="Email address already registered")
-            elif e.response.status_code in [502, 503, 504]:
-                raise HTTPException(status_code=503, detail="Account creation service temporarily unavailable")
+            # Handle connection errors, SSL errors, etc.
+            error_msg = str(e).lower()
+            if "ssl" in error_msg or "certificate" in error_msg:
+                return {"success": False, "message": "Unable to connect securely to registration service"}
+            elif "connection" in error_msg or "timeout" in error_msg:
+                return {"success": False, "message": "Registration service temporarily unavailable"}
             else:
-                raise HTTPException(status_code=500, detail="Account creation service error")
-        else:
-            raise HTTPException(status_code=503, detail="Account creation service unavailable")
+                return {"success": False, "message": "Registration service unavailable"}
 
 @app.get("/wallet/balance", response_model=WalletBalanceResponse)
 async def get_wallet_balance(authorization: str = Header(None, alias="Authorization")):
