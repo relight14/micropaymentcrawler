@@ -280,44 +280,27 @@ class ChatResearchApp {
             `<span class="license-badge">${this.getLicenseIcon(source.licensing_protocol)}</span>` : 
             '<span class="license-badge">📄</span>';
 
-        // Create card element safely
-        const cardElement = document.createElement('div');
-        cardElement.className = 'source-card-chat';
-        cardElement.setAttribute('data-source-id', sourceId);
-        
-        cardElement.innerHTML = `
-            <div class="source-header">
-                <h5></h5>
-                <div class="source-meta">
-                    <span class="domain-badge"></span>
-                    ${licensingBadge}
+        return `
+            <div class="source-card-chat" data-source-id="${this.escapeHtml(sourceId)}">
+                <div class="source-header">
+                    <h5>${this.escapeHtml(title)}</h5>
+                    <div class="source-meta">
+                        <span class="domain-badge">${this.escapeHtml(domain)}</span>
+                        ${licensingBadge}
+                    </div>
+                </div>
+                <div class="source-content">
+                    <blockquote>"${this.escapeHtml(quote)}"</blockquote>
+                    <p>${this.escapeHtml(this.createSourceDescription(excerpt, quote))}</p>
+                </div>
+                <div class="source-unlock">
+                    <span class="unlock-price">$${unlockPrice.toFixed(2)}</span>
+                    <button class="unlock-btn-chat" onclick="chatApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${unlockPrice}, '${this.escapeHtml(title).replace(/'/g, "\\'")}')">
+                        🔓 Unlock
+                    </button>
                 </div>
             </div>
-            <div class="source-content">
-                <blockquote></blockquote>
-                <p></p>
-            </div>
-            <div class="source-unlock">
-                <span class="unlock-price">$${unlockPrice.toFixed(2)}</span>
-                <button class="unlock-btn-chat">
-                        🔓 Unlock
-                </button>
-            </div>
         `;
-        
-        // Safely set text content
-        cardElement.querySelector('h5').textContent = title;
-        cardElement.querySelector('.domain-badge').textContent = domain;
-        cardElement.querySelector('blockquote').textContent = `"${quote}"`;
-        cardElement.querySelector('p').textContent = this.createSourceDescription(excerpt, quote);
-        
-        // Add event listener safely
-        const unlockButton = cardElement.querySelector('.unlock-btn-chat');
-        unlockButton.addEventListener('click', () => {
-            this.handleSourceUnlockInChat(sourceId, unlockPrice, title);
-        });
-        
-        return cardElement.outerHTML;
     }
 
     extractCompellingQuote(excerpt) {
