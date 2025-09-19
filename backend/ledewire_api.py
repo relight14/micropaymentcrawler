@@ -26,7 +26,7 @@ class LedeWireAPI:
         # Load credentials from secure environment variables
         self.api_key = api_key or os.getenv("LEDEWIRE_API_KEY")
         self.api_secret = os.getenv("LEDEWIRE_API_SECRET")
-        self.api_base = "https://api.ledewire.com/v1"
+        self.api_base = "https://api-staging.ledewire.com/v1"
         self.use_mock = os.getenv("LEDEWIRE_USE_MOCK", "false").lower() == "true"
         
         # Note: API key/secret only required for API key authentication endpoint
