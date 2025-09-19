@@ -177,8 +177,7 @@ async def chat_interface():
     return RedirectResponse(url="/static/chat.html")
 
 @app.post("/tiers", response_model=TiersResponse)
-@limiter.limit("60/minute")  # Rate limit tiers endpoint
-async def get_tiers(http_request: Request, request: TiersRequest):
+async def get_tiers(request: TiersRequest):
     """
     Get pricing tiers for a research query.
     Returns estimated costs and features for Basic, Research, and Pro tiers.
@@ -282,9 +281,8 @@ async def get_licensing_summary(request: LicensingSummaryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating licensing summary: {str(e)}")
 
-@app.post("/purchase", response_model=PurchaseResponse)
-@limiter.limit("5/minute")  # Rate limit purchase attempts
-async def purchase_research(http_request: Request, request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
+@app.post("/purchase")
+async def purchase_research(request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """
     Process a research purchase request using LedeWire API with server-enforced licensing costs.
     Requires valid Bearer token authentication for all purchases.
@@ -477,9 +475,8 @@ async def get_stats():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@app.post("/unlock-source", response_model=SourceUnlockResponse)
-@limiter.limit("10/minute")  # Rate limit source unlock attempts
-async def unlock_source(http_request: Request, request: SourceUnlockRequest, authorization: str = Header(None, alias="Authorization")):
+@app.post("/unlock-source")
+async def unlock_source(request: SourceUnlockRequest, authorization: str = Header(None, alias="Authorization")):
     """
     Process a source unlock request using LedeWire API.
     Requires valid Bearer token authentication for all source purchases.
