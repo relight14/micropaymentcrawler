@@ -35,13 +35,28 @@ class ContentCrawlerStub:
             "premium_journal": 1.6
         }
         
-        # Fallback domains for mock data
-        self.sample_domains = [
-            "arxiv.org", "nature.com", "science.org", "ieee.org", "acm.org",
-            "researchgate.net", "jstor.org", "springer.com", "wiley.com",
-            "sciencedirect.com", "plos.org", "biorxiv.org", "ssrn.com",
-            "scholar.google.com", "pubmed.ncbi.nlm.nih.gov"
-        ]
+        # Diverse domains for realistic source variety
+        self.domain_sets = {
+            'academic': [
+                "arxiv.org", "nature.com", "science.org", "ieee.org", "acm.org",
+                "researchgate.net", "jstor.org", "springer.com", "wiley.com",
+                "sciencedirect.com", "plos.org", "pubmed.ncbi.nlm.nih.gov"
+            ],
+            'industry': [
+                "mckinsey.com", "deloitte.com", "pwc.com", "bcg.com", "accenture.com",
+                "gartner.com", "forrester.com", "idc.com", "frost.com"
+            ],
+            'news': [
+                "reuters.com", "bloomberg.com", "wsj.com", "ft.com", "economist.com",
+                "techcrunch.com", "wired.com", "spectrum.ieee.org", "mit.edu"
+            ],
+            'government': [
+                "energy.gov", "nist.gov", "nsf.gov", "doe.gov", "epa.gov"
+            ]
+        }
+        
+        # Fallback for compatibility
+        self.sample_domains = self.domain_sets['academic']
 
     def generate_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
         """Generate source cards using Tavily AI search or fallback to mock data.
@@ -120,27 +135,31 @@ class ContentCrawlerStub:
             return self._generate_mock_sources(query, count, budget_limit)
     
     def _generate_mock_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
-        """Generate mock source cards with budget constraints."""
+        """Generate diverse, compelling mock source cards."""
         sources = []
         current_cost = 0.0
         
+        # Ensure variety by cycling through domain types
+        domain_types = list(self.domain_sets.keys())
+        
         for i in range(count):
-            source_id = str(uuid.uuid4())
-            domain = random.choice(self.sample_domains)
+            # Cycle through domain types for variety
+            domain_type = domain_types[i % len(domain_types)]
+            domain = random.choice(self.domain_sets[domain_type])
             
-            # Generate realistic titles based on query
+            # Generate title and excerpt for this specific source
             title = self._generate_title(query, i)
             excerpt = self._generate_excerpt(query, title)
             
-            # Calculate dynamic pricing based on simulated quality factors
-            unlock_price = self._calculate_unlock_price(domain)
+            # Calculate realistic pricing based on domain type
+            unlock_price = self._calculate_unlock_price_by_type(domain, domain_type)
             
             # Check if adding this source would exceed budget
             if budget_limit is not None and (current_cost + unlock_price) > budget_limit:
                 break
                 
             source = SourceCard(
-                id=source_id,
+                id=str(uuid.uuid4()),
                 title=title,
                 excerpt=excerpt,
                 domain=domain,
@@ -148,9 +167,10 @@ class ContentCrawlerStub:
                 is_unlocked=False
             )
             
-            # For mock sources, occasionally simulate licensing (20% chance for demo)
-            if random.random() < 0.2:
-                mock_license_info = self._generate_mock_licensing(domain)
+            # Assign licensing protocols based on domain type  
+            licensing_protocol = self._get_licensing_protocol(domain_type)
+            if licensing_protocol:
+                mock_license_info = self._generate_new_mock_licensing(domain, licensing_protocol)
                 if mock_license_info:
                     self._apply_licensing_info(source, mock_license_info)
             
@@ -158,6 +178,86 @@ class ContentCrawlerStub:
             current_cost += unlock_price
         
         return sources
+    
+    def _calculate_unlock_price_by_type(self, domain: str, domain_type: str) -> float:
+        """Calculate pricing based on domain type and prestige."""
+        base_prices = {
+            'academic': random.uniform(0.15, 0.35),
+            'industry': random.uniform(0.20, 0.50),
+            'news': random.uniform(0.10, 0.25),
+            'government': random.uniform(0.05, 0.20)
+        }
+        
+        base_price = base_prices.get(domain_type, 0.15)
+        
+        # Premium domain multipliers
+        premium_multipliers = {
+            'nature.com': 2.0, 'science.org': 1.8, 'ieee.org': 1.6,
+            'mckinsey.com': 1.7, 'deloitte.com': 1.5, 'gartner.com': 1.6,
+            'wsj.com': 1.4, 'economist.com': 1.3, 'bloomberg.com': 1.3
+        }
+        
+        multiplier = premium_multipliers.get(domain, 1.0)
+        final_price = base_price * multiplier
+        
+        # Add realistic variation
+        final_price *= random.uniform(0.8, 1.2)
+        
+        return round(max(0.10, min(2.00, final_price)), 2)
+    
+    def _get_licensing_protocol(self, domain_type: str) -> Optional[str]:
+        """Assign licensing protocols based on domain type."""
+        protocol_weights = {
+            'academic': {'rsl': 0.4, 'tollbit': 0.3, 'cloudflare': 0.2, None: 0.1},
+            'industry': {'tollbit': 0.5, 'cloudflare': 0.3, 'rsl': 0.1, None: 0.1},
+            'news': {'cloudflare': 0.6, 'tollbit': 0.2, 'rsl': 0.1, None: 0.1},
+            'government': {None: 0.8, 'rsl': 0.1, 'tollbit': 0.1, 'cloudflare': 0.0}
+        }
+        
+        weights = protocol_weights.get(domain_type, {'rsl': 0.3, 'tollbit': 0.3, 'cloudflare': 0.3, None: 0.1})
+        
+        # Use weighted random selection
+        rand = random.random()
+        cumulative = 0.0
+        
+        for protocol, weight in weights.items():
+            cumulative += weight
+            if rand <= cumulative:
+                return protocol
+        
+        # Fallback
+        return None
+    
+    def _generate_new_mock_licensing(self, domain: str, protocol: str = None) -> Optional[dict]:
+        """Generate mock licensing information for sources."""
+        if not protocol:
+            protocol = random.choice(['rsl', 'tollbit', 'cloudflare'])
+        
+        base_cost = random.uniform(0.05, 0.30)
+        
+        # Import LicenseTerms for proper object creation
+        from content_licensing import LicenseTerms
+        
+        terms = LicenseTerms(
+            protocol=protocol,
+            ai_include_price=round(base_cost, 2),
+            publisher=self._get_publisher_name(domain),
+            permits_ai_include=True,
+            requires_attribution=random.choice([True, False])
+        )
+        
+        return {
+            'protocol': protocol,
+            'terms': terms
+        }
+    
+    def _get_publisher_name(self, domain: str) -> str:
+        """Generate publisher name from domain."""
+        # Extract main domain name for publisher
+        if '.' in domain:
+            name_part = domain.split('.')[0]
+            return f"{name_part.capitalize()} Publishing"
+        return "Unknown Publisher"
     
     def _truncate_content(self, content: str, max_length: int = 200) -> str:
         """Truncate content to excerpt length."""
@@ -198,35 +298,127 @@ class ContentCrawlerStub:
         # Ensure within bounds
         return round(max(0.10, min(2.00, final_price)), 2)
     
+    def _extract_key_topics(self, query: str) -> List[str]:
+        """Extract key topics from long query text."""
+        import re
+        
+        # Remove common research phrases and extract core topics
+        clean_query = re.sub(r'(research query|search terms|based on|comprehensive|analysis|report)', '', query.lower())
+        
+        # Extract quoted terms and key phrases
+        quoted_terms = re.findall(r'"([^"]+)"', query)
+        
+        # If we have quoted terms, use those as primary topics
+        if quoted_terms:
+            return [term.strip() for term in quoted_terms[:3]]  # Take first 3
+        
+        # Fallback: extract key noun phrases
+        words = query.split()
+        key_terms = []
+        for i, word in enumerate(words[:20]):  # Look at first 20 words
+            if len(word) > 4 and word.lower() not in ['based', 'used', 'improve', 'materials', 'research', 'writing', 'report']:
+                key_terms.append(word)
+                if len(key_terms) >= 3:
+                    break
+        
+        # Default fallback
+        if not key_terms:
+            key_terms = ['advanced materials', 'emerging technologies', 'innovation']
+        
+        return key_terms[:3]
+    
     def _generate_title(self, query: str, index: int) -> str:
-        """Generate realistic academic titles."""
-        templates = [
-            f"Advanced Research on {query}: Methods and Applications",
-            f"A Comprehensive Study of {query} in Modern Context",
-            f"{query}: Recent Developments and Future Perspectives",
-            f"Theoretical Framework for Understanding {query}",
-            f"Empirical Analysis of {query}: Case Studies",
-            f"{query} and Its Implications for Scientific Research",
-            f"Novel Approaches to {query}: A Systematic Review",
-            f"The Impact of {query} on Contemporary Science",
-            f"{query}: Methodological Innovations and Findings",
-            f"Exploring {query} Through Interdisciplinary Lens"
+        """Generate diverse, compelling titles based on source type."""
+        topics = self._extract_key_topics(query)
+        main_topic = topics[0] if topics else 'emerging technologies'
+        
+        # Define different source types with unique title patterns
+        source_types = [
+            # Academic Research Papers
+            {
+                'templates': [
+                    f"Breakthrough Advances in {main_topic}: A Systematic Review",
+                    f"Novel {main_topic} Applications: Performance Analysis and Future Outlook",
+                    f"Optimizing {main_topic}: Computational Models and Experimental Validation",
+                    f"Next-Generation {main_topic}: Materials Science Perspectives"
+                ]
+            },
+            # Industry Reports
+            {
+                'templates': [
+                    f"Market Analysis: {main_topic} Industry Trends and Forecasts 2024",
+                    f"Commercial Deployment of {main_topic}: Case Studies and ROI Analysis",
+                    f"Industry Insight: Scaling {main_topic} for Mass Production",
+                    f"Technical Brief: {main_topic} Implementation Strategies"
+                ]
+            },
+            # Case Studies
+            {
+                'templates': [
+                    f"Real-World Success: {main_topic} Implementation at Global Tech Company",
+                    f"Case Study: Transforming Infrastructure with {main_topic}",
+                    f"Pilot Project Results: {main_topic} Performance in Live Environment",
+                    f"Field Trial Analysis: {main_topic} Deployment Outcomes"
+                ]
+            },
+            # News & Analysis
+            {
+                'templates': [
+                    f"Breaking: Major {main_topic} Breakthrough Changes Industry Landscape",
+                    f"Expert Analysis: Why {main_topic} is the Future of Technology",
+                    f"Industry Leaders Bet Big on {main_topic} Innovation",
+                    f"Emerging Trends: How {main_topic} is Disrupting Traditional Markets"
+                ]
+            }
         ]
         
-        if index < len(templates):
-            return templates[index]
-        else:
-            return f"Research Paper #{index + 1} on {query}"
+        # Cycle through source types to ensure variety
+        source_type = source_types[index % len(source_types)]
+        template_index = (index // len(source_types)) % len(source_type['templates'])
+        
+        return source_type['templates'][template_index]
     
     def _generate_excerpt(self, query: str, title: str) -> str:
-        """Generate realistic academic excerpts."""
-        excerpts = [
-            f"This paper presents a comprehensive analysis of {query}, examining key methodologies and their applications in current research paradigms.",
-            f"We investigate the fundamental principles underlying {query} and propose new theoretical frameworks for understanding its mechanisms.",
-            f"Through systematic review and meta-analysis, this study explores the current state of {query} research and identifies future directions.",
-            f"Our findings demonstrate significant advances in {query} research, with implications for both theoretical understanding and practical applications.",
-            f"This research contributes to the growing body of literature on {query} by presenting novel empirical evidence and analytical approaches.",
-        ]
+        """Generate compelling, diverse excerpts based on source type."""
+        topics = self._extract_key_topics(query)
+        main_topic = topics[0] if topics else 'emerging technologies'
+        
+        # Determine source type from title pattern
+        title_lower = title.lower()
+        
+        if any(word in title_lower for word in ['breakthrough', 'systematic review', 'novel', 'optimizing']):
+            # Academic research excerpts
+            excerpts = [
+                f"This groundbreaking study reveals how {main_topic} can achieve 40% efficiency improvements over conventional approaches, with experimental validation across three independent test facilities.",
+                f"Our research team discovered a novel mechanism in {main_topic} that could revolutionize current industry standards, offering both cost reduction and performance enhancement.",
+                f"Through rigorous testing and peer review, we demonstrate that {main_topic} applications show consistent performance gains of 25-50% in real-world deployment scenarios.",
+                f"This comprehensive analysis of {main_topic} identifies three critical breakthrough areas that promise to transform how the industry approaches next-generation solutions."
+            ]
+        elif any(word in title_lower for word in ['market', 'industry', 'commercial', 'technical brief']):
+            # Industry report excerpts
+            excerpts = [
+                f"Industry analysis shows {main_topic} market growing at 23% CAGR, with major corporations investing $2.3B in R&D and commercial deployment initiatives.",
+                f"Leading manufacturers report 35% cost reduction and 60% performance improvement after implementing {main_topic} solutions in their production lines.",
+                f"Market research indicates {main_topic} adoption will reach 45% of enterprise customers by 2025, driven by compelling ROI and regulatory advantages.",
+                f"Executive survey reveals 78% of industry leaders consider {main_topic} a strategic priority, with 67% planning major investments within 18 months."
+            ]
+        elif any(word in title_lower for word in ['case study', 'real-world', 'pilot project', 'field trial']):
+            # Case study excerpts
+            excerpts = [
+                f"Fortune 500 company reports 42% efficiency gain and $3.2M annual savings after implementing {main_topic} across their global infrastructure.",
+                f"Six-month pilot program demonstrates {main_topic} reduces operational costs by 38% while improving system reliability to 99.7% uptime.",
+                f"Multi-site deployment shows {main_topic} delivers consistent 30-45% performance improvements across diverse environmental conditions and usage patterns.",
+                f"Customer testimonials highlight dramatic improvements in both efficiency and user satisfaction following {main_topic} implementation."
+            ]
+        else:
+            # News/analysis excerpts
+            excerpts = [
+                f"Industry experts predict {main_topic} will disrupt the $150B market within five years, with early adopters already reporting significant competitive advantages.",
+                f"Major breakthrough in {main_topic} technology promises to address critical industry challenges while creating new opportunities for innovation and growth.",
+                f"Recent developments in {main_topic} are attracting attention from venture capitalists, with three startups raising $89M in Series A funding this quarter.",
+                f"Technology leaders describe {main_topic} as a 'game-changer' that could fundamentally alter industry dynamics and create new market categories."
+            ]
+        
         return random.choice(excerpts)
     
     def _calculate_unlock_price(self, domain: str) -> float:
