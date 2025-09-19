@@ -191,7 +191,7 @@ async def get_tiers(request: TiersRequest):
                 sources=10,
                 includes_outline=False,
                 includes_insights=False,
-                description="10 research sources with summary"
+                description="Up to 10 premium sources with summary"
             ),
             TierInfo(
                 tier=TierType.RESEARCH,
@@ -199,7 +199,7 @@ async def get_tiers(request: TiersRequest):
                 sources=20,
                 includes_outline=True,
                 includes_insights=False,
-                description="20 research sources with summary and structured outline"
+                description="Up to 20 premium sources with summary and structured outline"
             ),
             TierInfo(
                 tier=TierType.PRO,
@@ -207,7 +207,7 @@ async def get_tiers(request: TiersRequest):
                 sources=40,
                 includes_outline=True,
                 includes_insights=True,
-                description="40 research sources with summary, outline, and strategic insights"
+                description="Up to 40 premium sources with summary, outline, and strategic insights"
             )
         ]
         
