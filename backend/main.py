@@ -102,9 +102,11 @@ def extract_user_id_from_token(access_token: str) -> str:
     try:
         # Use wallet balance call to get authenticated user identity  
         response = ledewire.get_wallet_balance(access_token)
-        if response.get('success'):
-            # Use wallet ID as stable user identifier
-            return f"user_{response.get('wallet_id', 'unknown')}"
+        # Check if we got a valid response (either production or mock)
+        if response.get('balance_cents') is not None:
+            # Use wallet ID as stable user identifier, or generate from token for mock
+            wallet_id = response.get('wallet_id', 'mock_wallet')
+            return f"user_{wallet_id}"
         else:
             # Fallback to token-based ID for development
             import hashlib
@@ -142,10 +144,15 @@ def validate_user_token(access_token: str):
         # This also confirms the user exists and token is not expired
         balance_result = ledewire.get_wallet_balance(access_token)
         
-        # Check for API errors
+        # Check for API errors (production) or valid mock response
         if "error" in balance_result:
             error_message = ledewire.handle_api_error(balance_result)
             raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
+        elif balance_result.get('balance_cents') is not None:
+            # Valid response (either production or mock)
+            return True
+        else:
+            raise HTTPException(status_code=401, detail="Invalid token response")
             
         return True
         
