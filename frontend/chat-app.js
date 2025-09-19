@@ -665,8 +665,12 @@ class ChatResearchApp {
                 localStorage.setItem('authToken', data.token);
                 document.getElementById('authModal').style.display = 'none';
                 
-                // Now proceed with the original purchase flow
-                this.checkWalletAndShowModal('tier');
+                // Resume the original purchase flow with stored tier context
+                if (this.selectedTier && this.currentQuery) {
+                    this.checkWalletAndShowModal('tier');
+                } else {
+                    console.log('No pending tier purchase context after auth');
+                }
             } else {
                 throw new Error(data.message || `${type} failed`);
             }
@@ -841,6 +845,7 @@ class ChatResearchApp {
                 // Fix: close wallet modal before showing auth modal
                 const walletModal = document.getElementById('walletModal');
                 if (walletModal) walletModal.style.display = 'none';
+                // Note: selectedTier and currentQuery are already stored, so auth resume will work correctly
                 this.showAuthModal();
                 return;
             }

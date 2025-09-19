@@ -330,6 +330,13 @@ class ResearchApp {
                 this.authToken = null;
                 localStorage.removeItem('authToken');
                 this.showLoading(false);
+                // Store the transaction context before showing auth modal  
+                if (!this.pendingTransaction) {
+                    this.pendingTransaction = { type: 'tier', itemDetails: null };
+                }
+                // Hide wallet modal before showing auth modal to prevent stacking
+                const walletModal = document.getElementById('walletModal');
+                if (walletModal) walletModal.style.display = 'none';
                 this.showAuthModal();
                 return;
             }
@@ -376,6 +383,13 @@ class ResearchApp {
                 console.log('Token expired during source unlock, clearing auth and showing login...');
                 this.authToken = null;
                 localStorage.removeItem('authToken');
+                // Store the transaction context before showing auth modal
+                if (!this.pendingTransaction) {
+                    this.pendingTransaction = { type: 'source', itemDetails: itemDetails };
+                }
+                // Hide wallet modal before showing auth modal to prevent stacking
+                const walletModal = document.getElementById('walletModal');
+                if (walletModal) walletModal.style.display = 'none';
                 this.showAuthModal();
                 return;
             }
@@ -833,8 +847,13 @@ class ResearchApp {
                 document.getElementById('authModal').style.display = 'none';
                 this.showSuccess(`Welcome! Successfully ${type === 'login' ? 'signed in' : 'created account'}.`);
                 
-                // Now proceed with the original purchase flow
-                this.checkWalletAndShowModal('tier');
+                // Resume the original transaction flow with stored context
+                if (this.pendingTransaction) {
+                    this.checkWalletAndShowModal(this.pendingTransaction.type, this.pendingTransaction.itemDetails);
+                } else {
+                    // Fallback to tier if no pending transaction
+                    this.checkWalletAndShowModal('tier');
+                }
             } else {
                 throw new Error(data.message || `${type} failed`);
             }
@@ -861,6 +880,13 @@ class ResearchApp {
                 console.log('Token expired or invalid, clearing auth and showing login...');
                 this.authToken = null;
                 localStorage.removeItem('authToken');
+                // Store the transaction context before showing auth modal
+                if (!this.pendingTransaction) {
+                    this.pendingTransaction = { type: type, itemDetails: itemDetails };
+                }
+                // Hide wallet modal before showing auth modal to prevent stacking
+                const walletModal = document.getElementById('walletModal');
+                if (walletModal) walletModal.style.display = 'none';
                 this.showAuthModal();
                 return;
             }
