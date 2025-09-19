@@ -194,6 +194,174 @@ class ChatResearchApp {
         this.conversationHistory.push({ sender, content, timestamp: new Date() });
     }
 
+    displayResearchPacketInChat(packet) {
+        // Create formatted research package content for chat display
+        if (!packet) {
+            console.error('No packet data provided');
+            return;
+        }
+        
+        const tierName = this.formatTierName(packet.tier);
+        const totalSources = packet.total_sources || 0;
+        const researchContent = `
+            <div class="research-package-chat">
+                <div class="package-header">
+                    <h3>📋 ${this.escapeHtml(tierName)} Research Package</h3>
+                    <div class="package-meta">${totalSources} Licensed Sources</div>
+                </div>
+                
+                <div class="package-section">
+                    <h4>📝 Executive Summary</h4>
+                    <div class="content">${this.formatResearchContent(packet.summary || 'No summary available.')}</div>
+                </div>
+                
+                ${packet.outline ? `
+                <div class="package-section">
+                    <h4>🗂️ Research Outline</h4>
+                    <div class="content">${this.formatResearchContent(packet.outline)}</div>
+                </div>
+                ` : ''}
+                
+                ${packet.insights ? `
+                <div class="package-section">
+                    <h4>💡 Key Insights</h4>
+                    <div class="content">${this.formatResearchContent(packet.insights)}</div>
+                </div>
+                ` : ''}
+                
+                <div class="package-section">
+                    <h4>📚 Licensed Sources (${(packet.sources || []).length} available)</h4>
+                    <div class="sources-grid-chat">
+                        ${(packet.sources || []).map(source => this.createSourceCardForChat(source)).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add as system message with special formatting
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message system-message research-package-message';
+        messageDiv.innerHTML = `
+            <div class="system-message">
+                ${researchContent}
+            </div>
+        `;
+
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    formatTierName(tier) {
+        return tier.charAt(0).toUpperCase() + tier.slice(1);
+    }
+
+    formatResearchContent(text) {
+        // Enhanced formatting for research content
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/^/, '<p>')
+            .replace(/$/, '</p>');
+    }
+
+    createSourceCardForChat(source) {
+        if (!source) return '';
+        
+        const excerpt = source.excerpt || '';
+        const title = source.title || 'Untitled Source';
+        const domain = source.domain || 'Unknown';
+        const unlockPrice = source.unlock_price || 0;
+        const sourceId = source.id || '';
+        
+        const quote = this.extractCompellingQuote(excerpt);
+        const licensingBadge = source.licensing_protocol ? 
+            `<span class="license-badge">${this.getLicenseIcon(source.licensing_protocol)}</span>` : 
+            '<span class="license-badge">📄</span>';
+
+        // Create card element safely
+        const cardElement = document.createElement('div');
+        cardElement.className = 'source-card-chat';
+        cardElement.setAttribute('data-source-id', sourceId);
+        
+        cardElement.innerHTML = `
+            <div class="source-header">
+                <h5></h5>
+                <div class="source-meta">
+                    <span class="domain-badge"></span>
+                    ${licensingBadge}
+                </div>
+            </div>
+            <div class="source-content">
+                <blockquote></blockquote>
+                <p></p>
+            </div>
+            <div class="source-unlock">
+                <span class="unlock-price">$${unlockPrice.toFixed(2)}</span>
+                <button class="unlock-btn-chat">
+                        🔓 Unlock
+                </button>
+            </div>
+        `;
+        
+        // Safely set text content
+        cardElement.querySelector('h5').textContent = title;
+        cardElement.querySelector('.domain-badge').textContent = domain;
+        cardElement.querySelector('blockquote').textContent = `"${quote}"`;
+        cardElement.querySelector('p').textContent = this.createSourceDescription(excerpt, quote);
+        
+        // Add event listener safely
+        const unlockButton = cardElement.querySelector('.unlock-btn-chat');
+        unlockButton.addEventListener('click', () => {
+            this.handleSourceUnlockInChat(sourceId, unlockPrice, title);
+        });
+        
+        return cardElement.outerHTML;
+    }
+
+    extractCompellingQuote(excerpt) {
+        // Extract first meaningful sentence or chunk
+        if (!excerpt || typeof excerpt !== 'string') {
+            return 'No preview available';
+        }
+        
+        const sentences = excerpt.split(/[.!?]+/);
+        const meaningfulSentence = sentences.find(s => s && s.trim().length > 20) || sentences[0] || '';
+        const cleanSentence = meaningfulSentence.trim();
+        return cleanSentence.substring(0, 120) + (cleanSentence.length > 120 ? '...' : '');
+    }
+
+    createSourceDescription(excerpt, quote) {
+        // Create description without repeating the quote
+        if (!excerpt || typeof excerpt !== 'string') {
+            return 'No description available';
+        }
+        
+        const remaining = excerpt.replace(quote || '', '').trim();
+        return remaining.substring(0, 200) + (remaining.length > 200 ? '...' : '');
+    }
+
+    async handleSourceUnlockInChat(sourceId, price, title) {
+        if (!this.authToken) {
+            this.addMessage('system', 'Please log in to unlock premium sources.');
+            return;
+        }
+
+        if (this.walletBalance < price) {
+            this.addMessage('system', 'Insufficient wallet balance to unlock this source.');
+            return;
+        }
+
+        this.addMessage('system', `🔓 Unlocking "${title}" for $${price.toFixed(2)}...`);
+        
+        // For now, simulate unlocking - in full version would make API call
+        setTimeout(() => {
+            this.walletBalance -= price;
+            this.addMessage('system', `✅ Source unlocked! $${price.toFixed(2)} deducted from wallet. Full article content would be displayed here.`);
+        }, 1000);
+    }
+
     displayResearchResults(data) {
         if (!data.sources || data.sources.length === 0) return;
 
@@ -625,7 +793,10 @@ class ChatResearchApp {
             if (data.success) {
                 // Update wallet balance
                 this.walletBalance -= data.wallet_deduction;
-                this.addMessage('system', `🎉 Payment processed successfully! $${data.wallet_deduction.toFixed(2)} deducted from wallet. Your research package is being prepared.`);
+                this.addMessage('system', `🎉 Payment processed successfully! $${data.wallet_deduction.toFixed(2)} deducted from wallet.`);
+                
+                // Display the research package
+                this.displayResearchPacketInChat(data.packet);
             } else {
                 throw new Error(data.message || 'Purchase failed');
             }
