@@ -237,17 +237,19 @@ async def get_licensing_summary(request: LicensingSummaryRequest):
     Analyzes sources to determine multi-protocol licensing costs.
     """
     try:
-        # Map tier to source count
-        tier_source_counts = {
-            TierType.BASIC: 10,
-            TierType.RESEARCH: 20, 
-            TierType.PRO: 40
+        # Define budget constraints: 60% for licensing, 40% for margin
+        tier_configs = {
+            TierType.BASIC: {"price": 1.00, "max_sources": 10},
+            TierType.RESEARCH: {"price": 2.00, "max_sources": 20}, 
+            TierType.PRO: {"price": 4.00, "max_sources": 40}
         }
         
-        source_count = tier_source_counts[request.tier]
+        config = tier_configs[request.tier]
+        budget_limit = config["price"] * 0.60  # 60% for licensing
+        max_sources = config["max_sources"]
         
-        # Generate sources with licensing discovery
-        sources = crawler.generate_sources(request.query, source_count)
+        # Generate sources with budget constraints
+        sources = crawler.generate_sources(request.query, max_sources, budget_limit)
         
         # Convert SourceCard objects to dictionaries for license service
         sources_dicts = []
@@ -330,15 +332,19 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         user_info = ledewire.get_user_info(access_token)
         # Keep user_id consistent for idempotency - don't overwrite
         
-        # SERVER-SIDE PRICING: Calculate licensing costs (authoritative pricing)
-        tier_source_counts = {
-            TierType.BASIC: 10,
-            TierType.RESEARCH: 20, 
-            TierType.PRO: 40
+        # SERVER-SIDE PRICING: Budget-constrained source generation (60% for licensing, 40% margin)
+        tier_configs = {
+            TierType.BASIC: {"price": 1.00, "max_sources": 10},
+            TierType.RESEARCH: {"price": 2.00, "max_sources": 20}, 
+            TierType.PRO: {"price": 4.00, "max_sources": 40}
         }
         
-        # Generate sources with licensing discovery (server-side)
-        sources = crawler.generate_sources(request.query, tier_source_counts[request.tier])
+        config = tier_configs[request.tier]
+        budget_limit = config["price"] * 0.60  # 60% for licensing costs
+        max_sources = config["max_sources"]
+        
+        # Generate sources with budget constraints (server-side)
+        sources = crawler.generate_sources(request.query, max_sources, budget_limit)
         
         # Convert to dicts and calculate licensing summary
         sources_dicts = []
@@ -373,12 +379,8 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         # Get server-authoritative licensing summary 
         licensing_summary = crawler.license_service.get_license_summary(sources_dicts)
         
-        # Calculate TOTAL price (base + licensing costs)
-        tier_base_prices = {
-            TierType.BASIC: 1.00,
-            TierType.RESEARCH: 2.00,  
-            TierType.PRO: 4.00
-        }
+        # Use fixed tier pricing (budget-constrained approach)
+        total_price_dollars = config["price"]  # Fixed price regardless of actual licensing costs
         
         base_price = tier_base_prices[request.tier]
         licensing_cost = licensing_summary['total_cost']

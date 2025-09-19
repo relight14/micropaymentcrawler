@@ -1,7 +1,7 @@
 import random
 import uuid
 import os
-from typing import List
+from typing import List, Optional
 from tavily import TavilyClient
 from models import SourceCard
 from content_licensing import ContentLicenseService
@@ -43,15 +43,21 @@ class ContentCrawlerStub:
             "scholar.google.com", "pubmed.ncbi.nlm.nih.gov"
         ]
 
-    def generate_sources(self, query: str, count: int) -> List[SourceCard]:
-        """Generate source cards using Tavily AI search or fallback to mock data."""
+    def generate_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
+        """Generate source cards using Tavily AI search or fallback to mock data.
+        
+        Args:
+            query: Research query
+            count: Maximum number of sources to generate
+            budget_limit: Maximum budget for licensing costs (60% of tier price)
+        """
         if self.use_real_search:
-            return self._generate_tavily_sources(query, count)
+            return self._generate_tavily_sources(query, count, budget_limit)
         else:
-            return self._generate_mock_sources(query, count)
+            return self._generate_mock_sources(query, count, budget_limit)
     
-    def _generate_tavily_sources(self, query: str, count: int) -> List[SourceCard]:
-        """Generate source cards using Tavily AI search."""
+    def _generate_tavily_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
+        """Generate source cards using Tavily AI search with budget constraints."""
         if not self.tavily_client:
             return self._generate_mock_sources(query, count)
             
@@ -93,12 +99,17 @@ class ContentCrawlerStub:
                 if license_info:
                     self._apply_licensing_info(source, license_info)
                 
-                sources.append(source)
+                # Check budget constraint before adding source
+                if budget_limit is None or (self._calculate_total_cost(sources) + source.unlock_price) <= budget_limit:
+                    sources.append(source)
+                else:
+                    break  # Budget exceeded, stop generating sources
             
-            # If we have fewer results than requested, fill with mock data
-            if len(sources) < count:
+            # If we have fewer results than requested and budget allows, fill with mock data
+            if len(sources) < count and (budget_limit is None or self._calculate_total_cost(sources) < budget_limit):
                 remaining = count - len(sources)
-                mock_sources = self._generate_mock_sources(query, remaining)
+                remaining_budget = budget_limit - self._calculate_total_cost(sources) if budget_limit else None
+                mock_sources = self._generate_mock_sources(query, remaining, remaining_budget)
                 sources.extend(mock_sources)
             
             return sources
@@ -106,11 +117,12 @@ class ContentCrawlerStub:
         except Exception as e:
             print(f"Tavily API error: {e}")
             # Fallback to mock data on error
-            return self._generate_mock_sources(query, count)
+            return self._generate_mock_sources(query, count, budget_limit)
     
-    def _generate_mock_sources(self, query: str, count: int) -> List[SourceCard]:
-        """Generate mock source cards (original logic)."""
+    def _generate_mock_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
+        """Generate mock source cards with budget constraints."""
         sources = []
+        current_cost = 0.0
         
         for i in range(count):
             source_id = str(uuid.uuid4())
@@ -123,6 +135,10 @@ class ContentCrawlerStub:
             # Calculate dynamic pricing based on simulated quality factors
             unlock_price = self._calculate_unlock_price(domain)
             
+            # Check if adding this source would exceed budget
+            if budget_limit is not None and (current_cost + unlock_price) > budget_limit:
+                break
+                
             source = SourceCard(
                 id=source_id,
                 title=title,
@@ -139,6 +155,7 @@ class ContentCrawlerStub:
                     self._apply_licensing_info(source, mock_license_info)
             
             sources.append(source)
+            current_cost += unlock_price
         
         return sources
     
@@ -310,7 +327,13 @@ class ContentCrawlerStub:
     
     def get_estimated_cost(self, query: str, source_count: int) -> float:
         """Estimate total unlock cost for sources (for tier pricing)."""
-        # Generate a sample to estimate average unlock price
-        sample_sources = self.generate_sources(query, min(10, source_count))
+        # Generate a sample to estimate average unlock price (without budget constraints for estimation)
+        sample_sources = self.generate_sources(query, min(10, source_count), budget_limit=None)
+        if not sample_sources:
+            return 0.0
         avg_unlock_price = sum(s.unlock_price for s in sample_sources) / len(sample_sources)
         return round(avg_unlock_price * source_count, 2)
+    
+    def _calculate_total_cost(self, sources: List[SourceCard]) -> float:
+        """Calculate total licensing cost for a list of sources."""
+        return sum(source.unlock_price for source in sources)
