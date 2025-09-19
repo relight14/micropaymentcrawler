@@ -7,11 +7,6 @@ class ChatResearchApp {
         this.conversationHistory = [];
         this.initializeEventListeners();
         this.updateCharacterCount();
-        
-        // Validate token on startup if present
-        if (this.authToken) {
-            this.validateTokenOnStartup();
-        }
     }
 
     initializeEventListeners() {
@@ -45,29 +40,6 @@ class ChatResearchApp {
         chatInput.addEventListener('input', () => this.autoResizeTextarea(chatInput));
     }
 
-    async validateTokenOnStartup() {
-        try {
-            const response = await fetch(`${this.apiBase}/wallet/balance`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.authToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                // Token is invalid, clear it
-                console.log('Stored auth token is invalid, clearing...');
-                this.authToken = null;
-                localStorage.removeItem('authToken');
-            }
-        } catch (error) {
-            // Network or other error, clear token to be safe
-            console.log('Error validating token on startup, clearing...', error);
-            this.authToken = null;
-            localStorage.removeItem('authToken');
-        }
-    }
 
     updateCharacterCount() {
         const chatInput = document.getElementById('chatInput');
