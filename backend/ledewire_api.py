@@ -259,7 +259,7 @@ class LedeWireAPI:
                 },
                 json={
                     "content_id": content_id,
-                    "amount_cents": price_cents
+                    "price_cents": price_cents
                 },
                 timeout=10
             )
