@@ -3,9 +3,15 @@ class ChatResearchApp {
         this.currentMode = 'conversational'; // 'conversational' or 'deep_research'
         this.apiBase = window.location.origin;
         this.authToken = localStorage.getItem('authToken');
+        this.walletBalance = 0; // Initialize to prevent NaN display
         this.conversationHistory = [];
         this.initializeEventListeners();
         this.updateCharacterCount();
+        
+        // Validate token on startup if present
+        if (this.authToken) {
+            this.validateTokenOnStartup();
+        }
     }
 
     initializeEventListeners() {
@@ -37,6 +43,30 @@ class ChatResearchApp {
 
         // Auto-resize textarea
         chatInput.addEventListener('input', () => this.autoResizeTextarea(chatInput));
+    }
+
+    async validateTokenOnStartup() {
+        try {
+            const response = await fetch(`${this.apiBase}/wallet/balance`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                // Token is invalid, clear it
+                console.log('Stored auth token is invalid, clearing...');
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+            }
+        } catch (error) {
+            // Network or other error, clear token to be safe
+            console.log('Error validating token on startup, clearing...', error);
+            this.authToken = null;
+            localStorage.removeItem('authToken');
+        }
     }
 
     updateCharacterCount() {
@@ -677,12 +707,17 @@ class ChatResearchApp {
 
             if (response.ok) {
                 const data = await response.json();
-                this.walletBalance = data.balance_cents / 100; // Convert cents to dollars
-                
-                // Now show wallet modal with real balance
-                this.showWalletModal(type, itemDetails);
+                if (data.balance_cents !== undefined) {
+                    this.walletBalance = data.balance_cents / 100; // Convert cents to dollars
+                    // Now show wallet modal with real balance
+                    this.showWalletModal(type, itemDetails);
+                } else {
+                    // Handle error response with success: false
+                    throw new Error(data.message || 'Invalid wallet response');
+                }
             } else {
-                throw new Error('Failed to get wallet balance');
+                const errorData = await response.json();
+                throw new Error(errorData.message || errorData.detail || 'Failed to get wallet balance');
             }
 
         } catch (error) {
