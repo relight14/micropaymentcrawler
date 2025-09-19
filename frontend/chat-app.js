@@ -257,13 +257,58 @@ class ChatResearchApp {
     }
 
     formatResearchContent(text) {
-        // Enhanced formatting for research content
-        return text
+        // Enhanced formatting for research content with sanitization
+        const formatted = text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>')
             .replace(/^/, '<p>')
             .replace(/$/, '</p>');
+        return this.sanitizeHtml(formatted);
+    }
+
+    sanitizeHtml(text) {
+        // Create a temporary element to safely parse HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = text;
+        
+        // Define allowed tags and their allowed attributes
+        const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'blockquote', 'ul', 'ol', 'li', 'span'];
+        const allowedAttributes = ['class'];
+        
+        // Recursively clean all elements
+        this.cleanElement(temp, allowedTags, allowedAttributes);
+        
+        return temp.innerHTML;
+    }
+
+    cleanElement(element, allowedTags, allowedAttributes) {
+        // Remove script and style elements completely
+        const scripts = element.querySelectorAll('script, style');
+        scripts.forEach(script => script.remove());
+        
+        // Check all child elements
+        const children = Array.from(element.children);
+        children.forEach(child => {
+            if (!allowedTags.includes(child.tagName.toLowerCase())) {
+                // Replace disallowed tags with their text content
+                const textNode = document.createTextNode(child.textContent);
+                child.parentNode.replaceChild(textNode, child);
+            } else {
+                // Remove disallowed attributes
+                const attributes = Array.from(child.attributes);
+                attributes.forEach(attr => {
+                    if (!allowedAttributes.includes(attr.name.toLowerCase()) && 
+                        !attr.name.startsWith('data-') && 
+                        attr.name !== 'class') {
+                        child.removeAttribute(attr.name);
+                    }
+                });
+                
+                // Recursively clean child elements
+                this.cleanElement(child, allowedTags, allowedAttributes);
+            }
+        });
     }
 
     createSourceCardForChat(source) {
@@ -283,19 +328,19 @@ class ChatResearchApp {
         return `
             <div class="source-card-chat" data-source-id="${this.escapeHtml(sourceId)}">
                 <div class="source-header">
-                    <h5>${title}</h5>
+                    <h5>${this.sanitizeHtml(title)}</h5>
                     <div class="source-meta">
-                        <span class="domain-badge">${domain}</span>
+                        <span class="domain-badge">${this.escapeHtml(domain)}</span>
                         ${licensingBadge}
                     </div>
                 </div>
                 <div class="source-content">
-                    <blockquote>"${quote}"</blockquote>
-                    <p>${this.createSourceDescription(excerpt, quote)}</p>
+                    <blockquote>"${this.sanitizeHtml(quote)}"</blockquote>
+                    <p>${this.sanitizeHtml(this.createSourceDescription(excerpt, quote))}</p>
                 </div>
                 <div class="source-unlock">
                     <span class="unlock-price">$${unlockPrice.toFixed(2)}</span>
-                    <button class="unlock-btn-chat" onclick="chatApp.handleSourceUnlockInChat('${sourceId}', ${unlockPrice}, '${title.replace(/'/g, "\\'")}')">
+                    <button class="unlock-btn-chat" onclick="chatApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${unlockPrice}, '${this.escapeHtml(title)}')">
                         🔓 Unlock
                     </button>
                 </div>
@@ -902,13 +947,14 @@ class ChatResearchApp {
     }
 
     formatMessage(text) {
-        // Basic markdown-like formatting
-        return text
+        // Basic markdown-like formatting with sanitization
+        const formatted = text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`(.*?)`/g, '<code>$1</code>')
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>');
+        return this.sanitizeHtml(formatted);
     }
 
     escapeHtml(text) {

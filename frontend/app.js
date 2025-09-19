@@ -460,11 +460,11 @@ class ResearchApp {
         const licensingBadge = this.createLicensingBadge(source);
         
         // Generate domain badge
-        const domainBadge = `<span class="domain-badge">${source.domain}</span>`;
+        const domainBadge = `<span class="domain-badge">${this.escapeHtml(source.domain)}</span>`;
 
         card.innerHTML = `
             <div class="story-card-header">
-                <h4 class="story-title">${source.title}</h4>
+                <h4 class="story-title">${this.sanitizeHtml(source.title)}</h4>
                 <div class="story-meta">
                     ${domainBadge}
                     ${licensingBadge}
@@ -472,16 +472,16 @@ class ResearchApp {
             </div>
             <div class="story-content">
                 <blockquote class="story-quote">
-                    "${quote}"
+                    "${this.sanitizeHtml(quote)}"
                 </blockquote>
-                <p class="story-description">${this.createSourceDescription(source.excerpt, quote)}</p>
+                <p class="story-description">${this.sanitizeHtml(this.createSourceDescription(source.excerpt, quote))}</p>
             </div>
             <div class="story-footer">
                 <div class="unlock-pricing">
                     <span class="unlock-label">Full Article Access</span>
                     <span class="unlock-price">$${source.unlock_price.toFixed(2)}</span>
                 </div>
-                <button class="story-unlock-btn" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
+                <button class="story-unlock-btn" onclick="app.handleSourceUnlock('${this.escapeHtml(source.id)}', ${source.unlock_price}, '${this.escapeHtml(source.title)}')">
                     🔓 Unlock Full Article
                 </button>
             </div>
@@ -543,13 +543,58 @@ class ResearchApp {
     }
 
     formatResearchContent(text) {
-        // Enhanced formatting for research content with better typography
-        return text
+        // Enhanced formatting for research content with better typography and sanitization
+        const formatted = text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold formatting
             .replace(/\n\n/g, '</p><p>') // Paragraph breaks
             .replace(/\n/g, '<br>') // Line breaks
             .replace(/^/, '<p>') // Start with paragraph
             .replace(/$/, '</p>'); // End with paragraph
+        return this.sanitizeHtml(formatted);
+    }
+
+    sanitizeHtml(text) {
+        // Create a temporary element to safely parse HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = text;
+        
+        // Define allowed tags and their allowed attributes
+        const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'blockquote', 'ul', 'ol', 'li', 'span'];
+        const allowedAttributes = ['class'];
+        
+        // Recursively clean all elements
+        this.cleanElement(temp, allowedTags, allowedAttributes);
+        
+        return temp.innerHTML;
+    }
+
+    cleanElement(element, allowedTags, allowedAttributes) {
+        // Remove script and style elements completely
+        const scripts = element.querySelectorAll('script, style');
+        scripts.forEach(script => script.remove());
+        
+        // Check all child elements
+        const children = Array.from(element.children);
+        children.forEach(child => {
+            if (!allowedTags.includes(child.tagName.toLowerCase())) {
+                // Replace disallowed tags with their text content
+                const textNode = document.createTextNode(child.textContent);
+                child.parentNode.replaceChild(textNode, child);
+            } else {
+                // Remove disallowed attributes
+                const attributes = Array.from(child.attributes);
+                attributes.forEach(attr => {
+                    if (!allowedAttributes.includes(attr.name.toLowerCase()) && 
+                        !attr.name.startsWith('data-') && 
+                        attr.name !== 'class') {
+                        child.removeAttribute(attr.name);
+                    }
+                });
+                
+                // Recursively clean child elements
+                this.cleanElement(child, allowedTags, allowedAttributes);
+            }
+        });
     }
 
     extractCompellingQuote(excerpt) {
