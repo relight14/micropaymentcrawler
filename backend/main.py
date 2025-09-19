@@ -381,10 +381,6 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         # Use fixed tier pricing (budget-constrained approach)
         total_price_dollars = config["price"]  # Fixed price regardless of actual licensing costs
-        
-        base_price = tier_base_prices[request.tier]
-        licensing_cost = licensing_summary['total_cost']
-        total_price_dollars = base_price + licensing_cost
         price_cents = int(total_price_dollars * 100)  # Convert to cents for LedeWire
         
         # Generate unique content ID for this research packet
