@@ -584,7 +584,7 @@ Key insights from this source:
 
 # Authentication Endpoints
 
-@app.post("/auth/login", response_model=AuthResponse)
+@app.post("/auth/login")
 async def login_user(request: LoginRequest):
     """
     Authenticate user with email and password.
@@ -595,31 +595,33 @@ async def login_user(request: LoginRequest):
         auth_result = ledewire.authenticate_user(request.email, request.password)
         
         if "access_token" in auth_result:
-            return AuthResponse(
-                access_token=auth_result["access_token"],
-                refresh_token=auth_result.get("refresh_token", ""),
-                expires_at=auth_result.get("expires_at", "")
-            )
+            return {
+                "success": True,
+                "token": auth_result["access_token"],
+                "access_token": auth_result["access_token"],
+                "refresh_token": auth_result.get("refresh_token", ""),
+                "expires_at": auth_result.get("expires_at", "")
+            }
         else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            return {"success": False, "message": "Invalid credentials"}
             
     except Exception as e:
         print(f"Login error: {e}")
         import requests
-        # Handle LedeWire API errors with correct status codes
+        # Handle LedeWire API errors with proper JSON responses
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
             if e.response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid email or password")
+                return {"success": False, "message": "Invalid email or password"}
             elif e.response.status_code == 400:
-                raise HTTPException(status_code=400, detail="Invalid request format")
+                return {"success": False, "message": "Invalid request format"}
             elif e.response.status_code in [502, 503, 504]:
-                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+                return {"success": False, "message": "Authentication service temporarily unavailable"}
             else:
-                raise HTTPException(status_code=500, detail="Authentication service error")
+                return {"success": False, "message": "Authentication service error"}
         else:
-            raise HTTPException(status_code=503, detail="Authentication service unavailable")
+            return {"success": False, "message": "Authentication service unavailable"}
 
-@app.post("/auth/signup", response_model=AuthResponse) 
+@app.post("/auth/signup") 
 async def signup_user(request: SignupRequest):
     """
     Create new user account and return JWT token.
@@ -629,16 +631,31 @@ async def signup_user(request: SignupRequest):
         auth_result = ledewire.signup_user(request.email, request.password, request.name)
         
         if "access_token" in auth_result:
-            return AuthResponse(
-                access_token=auth_result["access_token"],
-                refresh_token=auth_result.get("refresh_token", ""),
-                expires_at=auth_result.get("expires_at", "")
-            )
+            return {
+                "success": True,
+                "token": auth_result["access_token"],
+                "access_token": auth_result["access_token"],
+                "refresh_token": auth_result.get("refresh_token", ""),
+                "expires_at": auth_result.get("expires_at", "")
+            }
         else:
-            raise HTTPException(status_code=400, detail="Account creation failed")
+            return {"success": False, "message": "Account creation failed"}
             
     except Exception as e:
         print(f"Signup error: {e}")
+        import requests
+        # Handle LedeWire API errors with proper JSON responses
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+            if e.response.status_code == 409:
+                return {"success": False, "message": "Account with this email already exists"}
+            elif e.response.status_code == 400:
+                return {"success": False, "message": "Invalid signup data"}
+            elif e.response.status_code in [502, 503, 504]:
+                return {"success": False, "message": "Registration service temporarily unavailable"}
+            else:
+                return {"success": False, "message": "Registration service error"}
+        else:
+            return {"success": False, "message": "Registration service unavailable"}
         import requests
         # Handle LedeWire API errors with correct status codes
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):

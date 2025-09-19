@@ -430,7 +430,7 @@ class ChatResearchApp {
         const name = document.getElementById('authName').value;
 
         if (!email || !password || (type === 'signup' && !name)) {
-            this.addMessage('system', 'Please fill in all required fields');
+            this.showModalError('Please fill in all required fields');
             return;
         }
 
