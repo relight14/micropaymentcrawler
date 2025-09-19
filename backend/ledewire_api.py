@@ -33,7 +33,7 @@ class LedeWireAPI:
         if not self.use_mock and (not self.api_key or not self.api_secret):
             raise ValueError("PRODUCTION ERROR: LedeWire API credentials required. Set LEDEWIRE_API_KEY and LEDEWIRE_API_SECRET")
         
-        # Setup HTTP session with REAL authentication headers
+        # Setup HTTP session with default headers (auth added per-request as needed)
         self.session = requests.Session()
         
         # Configure retry strategy for connection issues
@@ -44,14 +44,12 @@ class LedeWireAPI:
         )
         self.session.mount('https://', HTTPAdapter(max_retries=retry_strategy))
         
-        if self.api_key and self.api_secret:
-            self.session.headers.update({
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-API-Key': self.api_key,
-                'X-API-Secret': self.api_secret,
-                'User-Agent': 'LedeWire-Client/1.0'
-            })
+        # Set default headers (NO API KEY HEADERS - those are only for specific endpoints)
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'LedeWire-Client/1.0'
+        })
     
     # Authentication Methods
     
