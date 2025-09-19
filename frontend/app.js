@@ -397,34 +397,34 @@ class ResearchApp {
     }
 
     displayResearchPacket(packet) {
-        // Update packet header
+        // Update packet header with more compelling presentation
         document.getElementById('packetTitle').textContent = packet.query;
-        document.getElementById('packetMeta').textContent = 
-            `${this.formatTierName(packet.tier)} Tier • ${packet.total_sources} Sources`;
+        document.getElementById('packetMeta').innerHTML = 
+            `<span class="tier-badge tier-${packet.tier}">${this.formatTierName(packet.tier)} Research</span> • ${packet.total_sources} Licensed Sources`;
 
-        // Display summary
-        document.getElementById('packetSummaryContent').innerHTML = 
-            this.formatText(packet.summary);
+        // Display summary with enhanced formatting
+        const summaryContent = document.getElementById('packetSummaryContent');
+        summaryContent.innerHTML = this.formatResearchContent(packet.summary);
 
-        // Display outline if available
+        // Display outline if available with better presentation
         const outlineSection = document.getElementById('packetOutlineSection');
         if (packet.outline) {
-            document.getElementById('packetOutlineContent').textContent = packet.outline;
+            document.getElementById('packetOutlineContent').innerHTML = this.formatResearchContent(packet.outline);
             outlineSection.style.display = 'block';
         } else {
             outlineSection.style.display = 'none';
         }
 
-        // Display insights if available
+        // Display insights if available with enhanced formatting
         const insightsSection = document.getElementById('packetInsightsSection');
         if (packet.insights) {
-            document.getElementById('packetInsightsContent').textContent = packet.insights;
+            document.getElementById('packetInsightsContent').innerHTML = this.formatResearchContent(packet.insights);
             insightsSection.style.display = 'block';
         } else {
             insightsSection.style.display = 'none';
         }
 
-        // Display sources
+        // Display sources with new story card format
         this.displaySources(packet.sources);
 
         // Show packet section
@@ -435,7 +435,11 @@ class ResearchApp {
         const sourcesGrid = document.getElementById('sourcesGrid');
         const sourcesTitle = document.getElementById('sourcesTitle');
         
-        sourcesTitle.textContent = `Research Sources (${sources.length})`;
+        sourcesTitle.innerHTML = `
+            <span class="sources-icon">📚</span>
+            Licensed Source Articles 
+            <span class="sources-count">(${sources.length} available)</span>
+        `;
         sourcesGrid.innerHTML = '';
 
         sources.forEach(source => {
@@ -446,30 +450,41 @@ class ResearchApp {
 
     createSourceCard(source) {
         const card = document.createElement('div');
-        card.className = 'source-card';
+        card.className = 'story-source-card';
         card.setAttribute('data-source-id', source.id);
 
+        // Generate compelling quote from excerpt (first sentence or meaningful chunk)
+        const quote = this.extractCompellingQuote(source.excerpt);
+        
         // Generate licensing badge if available
         const licensingBadge = this.createLicensingBadge(source);
         
-        // Generate pricing breakdown
-        const pricingInfo = this.createPricingBreakdown(source);
+        // Generate domain badge
+        const domainBadge = `<span class="domain-badge">${source.domain}</span>`;
 
         card.innerHTML = `
-            <div class="source-header">
-                <div style="flex-grow: 1;">
-                    <div class="source-title">${source.title}</div>
-                    <div class="source-domain">${source.domain}</div>
+            <div class="story-card-header">
+                <h4 class="story-title">${source.title}</h4>
+                <div class="story-meta">
+                    ${domainBadge}
                     ${licensingBadge}
                 </div>
             </div>
-            <div class="source-content">
-                <div class="source-excerpt">${source.excerpt}</div>
-                ${pricingInfo}
+            <div class="story-content">
+                <blockquote class="story-quote">
+                    "${quote}"
+                </blockquote>
+                <p class="story-description">${this.createSourceDescription(source.excerpt, quote)}</p>
             </div>
-            <button class="unlock-button unlock-source-btn" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
-                🔓 Unlock Full Source - $${source.unlock_price.toFixed(2)}
-            </button>
+            <div class="story-footer">
+                <div class="unlock-pricing">
+                    <span class="unlock-label">Full Article Access</span>
+                    <span class="unlock-price">$${source.unlock_price.toFixed(2)}</span>
+                </div>
+                <button class="story-unlock-btn" onclick="app.handleSourceUnlock('${source.id}', ${source.unlock_price}, '${source.title.replace(/'/g, "\\'")}')">
+                    🔓 Unlock Full Article
+                </button>
+            </div>
         `;
 
         return card;
@@ -525,6 +540,51 @@ class ResearchApp {
 
     formatText(text) {
         return text.replace(/\n/g, '<br>').replace(/\n\n/g, '<br><br>');
+    }
+
+    formatResearchContent(text) {
+        // Enhanced formatting for research content with better typography
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold formatting
+            .replace(/\n\n/g, '</p><p>') // Paragraph breaks
+            .replace(/\n/g, '<br>') // Line breaks
+            .replace(/^/, '<p>') // Start with paragraph
+            .replace(/$/, '</p>'); // End with paragraph
+    }
+
+    extractCompellingQuote(excerpt) {
+        // Extract first compelling sentence or meaningful chunk
+        const sentences = excerpt.split(/[.!?]+/);
+        let quote = sentences[0]?.trim();
+        
+        // If first sentence is too short, try to get a meaningful chunk
+        if (quote && quote.length < 50 && sentences[1]) {
+            quote = `${quote}. ${sentences[1].trim()}`;
+        }
+        
+        // Limit length and clean up
+        if (quote && quote.length > 150) {
+            quote = quote.substring(0, 147) + '...';
+        }
+        
+        return quote || excerpt.substring(0, 100) + '...';
+    }
+
+    createSourceDescription(excerpt, quote) {
+        // Create a description that doesn't repeat the quote
+        const remainingText = excerpt.replace(quote.replace('...', ''), '').trim();
+        let description = remainingText;
+        
+        // If there's meaningful remaining text, use it
+        if (description.length > 20) {
+            if (description.length > 200) {
+                description = description.substring(0, 197) + '...';
+            }
+            return description;
+        }
+        
+        // Otherwise, create a generic but compelling description
+        return 'This source provides in-depth analysis and expert insights on the research topic.';
     }
 
     createLicensingBreakdownHTML(licensingSummary) {

@@ -240,7 +240,8 @@
 
         .sources-grid {
             display: grid;
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
         }
 
         .source-card {
@@ -291,6 +292,182 @@
 
         .unlock-button:hover {
             background: #e0a800;
+        }
+
+        /* Enhanced sources section styling */
+        .sources-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sources-icon {
+            font-size: 1.2em;
+        }
+
+        .sources-count {
+            color: #666;
+            font-weight: normal;
+            font-size: 0.9em;
+        }
+
+        /* Enhanced research content styling */
+        .tier-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tier-badge.tier-basic {
+            background: #e8f4fd;
+            color: #0066cc;
+        }
+
+        .tier-badge.tier-research {
+            background: #f0f9ff;
+            color: #0369a1;
+        }
+
+        .tier-badge.tier-pro {
+            background: #fef3e2;
+            color: #d97706;
+        }
+
+        /* Story card styling */
+        .story-source-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .story-source-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+
+        .story-card-header {
+            padding: 24px 24px 16px 24px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .story-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.4;
+            margin: 0 0 12px 0;
+        }
+
+        .story-meta {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .domain-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #e2e8f0;
+            color: #475569;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .story-content {
+            padding: 24px;
+        }
+
+        .story-quote {
+            font-size: 1.1rem;
+            font-style: italic;
+            color: #334155;
+            border-left: 4px solid #3b82f6;
+            padding-left: 20px;
+            margin: 0 0 16px 0;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+
+        .story-description {
+            color: #64748b;
+            line-height: 1.6;
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .story-footer {
+            padding: 20px 24px 24px 24px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .unlock-pricing {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .unlock-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .unlock-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #059669;
+        }
+
+        .story-unlock-btn {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+        }
+
+        .story-unlock-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.35);
+            background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+        }
+
+        /* Enhanced research content typography */
+        #packetSummaryContent p, 
+        #packetOutlineContent p, 
+        #packetInsightsContent p {
+            margin-bottom: 16px;
+            line-height: 1.7;
+        }
+
+        #packetSummaryContent strong, 
+        #packetOutlineContent strong, 
+        #packetInsightsContent strong {
+            color: #1e293b;
+            font-weight: 700;
         }
 
         .loading {
