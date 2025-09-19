@@ -283,19 +283,19 @@ class ChatResearchApp {
         return `
             <div class="source-card-chat" data-source-id="${this.escapeHtml(sourceId)}">
                 <div class="source-header">
-                    <h5>${this.escapeHtml(title)}</h5>
+                    <h5>${title}</h5>
                     <div class="source-meta">
-                        <span class="domain-badge">${this.escapeHtml(domain)}</span>
+                        <span class="domain-badge">${domain}</span>
                         ${licensingBadge}
                     </div>
                 </div>
                 <div class="source-content">
-                    <blockquote>"${this.escapeHtml(quote)}"</blockquote>
-                    <p>${this.escapeHtml(this.createSourceDescription(excerpt, quote))}</p>
+                    <blockquote>"${quote}"</blockquote>
+                    <p>${this.createSourceDescription(excerpt, quote)}</p>
                 </div>
                 <div class="source-unlock">
                     <span class="unlock-price">$${unlockPrice.toFixed(2)}</span>
-                    <button class="unlock-btn-chat" onclick="chatApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${unlockPrice}, '${this.escapeHtml(title).replace(/'/g, "\\'")}')">
+                    <button class="unlock-btn-chat" onclick="chatApp.handleSourceUnlockInChat('${sourceId}', ${unlockPrice}, '${title.replace(/'/g, "\\'")}')">
                         🔓 Unlock
                     </button>
                 </div>
@@ -920,5 +920,5 @@ class ChatResearchApp {
 
 // Initialize the chat app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new ChatResearchApp();
+    window.chatApp = new ChatResearchApp();
 });
