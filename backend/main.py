@@ -336,8 +336,6 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
             else:
                 raise HTTPException(status_code=409, detail="Duplicate request processing - please retry")
         
-        user_info = ledewire.get_user_info(access_token)
-        # Keep user_id consistent for idempotency - don't overwrite
         
         # SERVER-SIDE PRICING: Budget-constrained source generation (60% for licensing, 40% margin)
         tier_configs = {
