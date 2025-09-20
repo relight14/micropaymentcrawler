@@ -612,8 +612,6 @@ async def login_user(request: LoginRequest):
         
         if "access_token" in auth_result:
             return {
-                "success": True,
-                "token": auth_result["access_token"],
                 "access_token": auth_result["access_token"],
                 "refresh_token": auth_result.get("refresh_token", ""),
                 "expires_at": auth_result.get("expires_at", "")
@@ -655,8 +653,6 @@ async def signup_user(request: SignupRequest):
         
         if "access_token" in auth_result:
             return {
-                "success": True,
-                "token": auth_result["access_token"],
                 "access_token": auth_result["access_token"],
                 "refresh_token": auth_result.get("refresh_token", ""),
                 "expires_at": auth_result.get("expires_at", "")

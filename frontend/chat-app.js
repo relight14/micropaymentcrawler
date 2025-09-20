@@ -660,10 +660,10 @@ class ChatResearchApp {
 
             const data = await response.json();
             
-            if (response.ok && data.success) {
-                this.authToken = data.token;
+            if (response.ok && data.access_token) {
+                this.authToken = data.access_token;
                 // Persist token to localStorage for future sessions
-                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('authToken', data.access_token);
                 document.getElementById('authModal').style.display = 'none';
                 
                 // Resume the original purchase flow with stored tier context
