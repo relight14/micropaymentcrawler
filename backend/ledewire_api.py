@@ -88,7 +88,7 @@ class LedeWireAPI:
                 elif e.response.status_code == 400:
                     raise requests.HTTPError("Invalid request", response=e.response)
                 elif e.response.status_code == 404:
-                    raise requests.HTTPError("Login feature temporarily unavailable in staging environment. Please try signup instead.", response=e.response)
+                    raise requests.HTTPError("Invalid email or password", response=e.response)
                 else:
                     raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
             else:
