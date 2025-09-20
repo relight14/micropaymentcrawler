@@ -412,7 +412,8 @@ class ChatResearchApp {
         // Display clean tier options only - no overwhelming text
         const tiersSection = this.createTiersSection(data.refined_query);
         
-        resultsDiv.innerHTML = tiersSection;
+        // Append the DOM element directly instead of using innerHTML
+        resultsDiv.appendChild(tiersSection);
 
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
@@ -492,7 +493,7 @@ class ChatResearchApp {
         // Store the query for later use by event handlers
         this.currentQuery = query;
         
-        return sectionDiv.outerHTML;
+        return sectionDiv;
     }
 
     selectTier(tierName, query, container) {
