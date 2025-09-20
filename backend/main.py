@@ -626,6 +626,8 @@ async def login_user(request: LoginRequest):
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
                 raise HTTPException(status_code=401, detail="Invalid email or password")
+            elif e.response.status_code == 404:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
             elif e.response.status_code == 400:
                 raise HTTPException(status_code=400, detail="Invalid request format")
             elif e.response.status_code in [502, 503, 504]:
