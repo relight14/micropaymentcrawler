@@ -713,8 +713,14 @@ class ChatResearchApp {
                     throw new Error(data.message || 'Invalid wallet response');
                 }
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || errorData.detail || 'Failed to get wallet balance');
+                let errorMessage = 'Failed to get wallet balance';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+                } catch (jsonError) {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
             }
 
         } catch (error) {
@@ -722,10 +728,14 @@ class ChatResearchApp {
             
             // Handle different error types  
             let errorMessage;
-            if (error.message.includes('503') || error.message.includes('temporarily unavailable')) {
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Network connection error. Please check your internet connection.';
+            } else if (error.message && error.message.includes('503')) {
                 errorMessage = 'Wallet service temporarily unavailable. Please try again in a moment.';
+            } else if (error.message && error.message.includes('JSON')) {
+                errorMessage = 'Server response error. Please try again.';
             } else {
-                errorMessage = 'Could not load wallet balance. Please try again.';
+                errorMessage = error.message || 'Could not load wallet balance. Please try again.';
             }
             
             this.showModalError(errorMessage);
