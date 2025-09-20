@@ -673,7 +673,7 @@ class ChatResearchApp {
                     console.log('No pending tier purchase context after auth');
                 }
             } else {
-                throw new Error(data.message || `${type} failed`);
+                throw new Error(data.detail || `${type} failed`);
             }
 
         } catch (error) {
