@@ -27,16 +27,12 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && LEDEWIRE_USE_MOCK=true python main.py"
+args = "cd backend && python main.py"
 waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 35703
-externalPort = 3000
 
 [[ports]]
 localPort = 38873
