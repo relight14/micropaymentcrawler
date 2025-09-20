@@ -5,6 +5,7 @@ Real HTTP implementation using secured credentials.
 import os
 import uuid
 import json
+import logging
 import requests
 from requests.adapters import HTTPAdapter
 import ssl
@@ -13,6 +14,10 @@ from urllib3.util.retry import Retry
 from urllib3.util.ssl_ import create_urllib3_context
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+
+# Set up detailed logging for debugging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # SSL adapter removed - was unsafe and ineffective for SNI issues
 
@@ -27,7 +32,6 @@ class LedeWireAPI:
         self.api_key = api_key or os.getenv("LEDEWIRE_API_KEY")
         self.api_secret = os.getenv("LEDEWIRE_API_SECRET")
         self.api_base = "https://api-staging.ledewire.com/v1"
-        self.use_mock = os.getenv("LEDEWIRE_USE_MOCK", "false").lower() == "true"
         
         # Note: API key/secret only required for API key authentication endpoint
         # Email/password auth and other buyer flows work without API credentials
@@ -57,18 +61,6 @@ class LedeWireAPI:
         POST /v1/auth/login/email
         Authenticate user and return JWT token.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            user_id = f"mock_user_{uuid.uuid4().hex[:8]}"
-            return {
-                "access_token": f"mock_jwt_token_{uuid.uuid4().hex[:16]}",
-                "refresh_token": f"mock_refresh_token_{uuid.uuid4().hex[:16]}",
-                "expires_at": (datetime.now() + timedelta(hours=2)).isoformat(),
-                "user_id": user_id,
-                "email": email,
-                "_fallback": True
-            }
-            
         try:
             response = self.session.post(
                 f"{self.api_base}/auth/login/email",
@@ -99,19 +91,6 @@ class LedeWireAPI:
         POST /v1/auth/signup
         Register new user and return JWT token.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            user_id = f"mock_user_{uuid.uuid4().hex[:8]}"
-            return {
-                "access_token": f"mock_jwt_token_{uuid.uuid4().hex[:16]}",
-                "refresh_token": f"mock_refresh_token_{uuid.uuid4().hex[:16]}",
-                "expires_at": (datetime.now() + timedelta(hours=2)).isoformat(),
-                "user_id": user_id,
-                "email": email,
-                "name": name,
-                "_fallback": True
-            }
-            
         try:
             response = self.session.post(
                 f"{self.api_base}/auth/signup",
@@ -141,16 +120,6 @@ class LedeWireAPI:
         POST /v1/auth/login/api-key
         Authenticate using API key and secret, returns JWT token.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            return {
-                "access_token": f"mock_jwt_token_{uuid.uuid4().hex[:16]}",
-                "refresh_token": f"mock_refresh_token_{uuid.uuid4().hex[:16]}",
-                "expires_at": (datetime.now() + timedelta(hours=2)).isoformat(),
-                "user_id": f"mock_seller_{uuid.uuid4().hex[:8]}",
-                "_fallback": True
-            }
-            
         try:
             # Send API key credentials in request body (NOT headers)
             request_body = {"key": key}
@@ -183,17 +152,6 @@ class LedeWireAPI:
         GET /v1/user/me
         Get current user information from access token.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            # Extract mock user ID from token for consistency
-            user_id = f"mock_user_{uuid.uuid4().hex[:8]}"
-            return {
-                "user_id": user_id,
-                "email": f"user_{user_id.split('_')[2]}@example.com",
-                "name": f"User {user_id.split('_')[2]}",
-                "_fallback": True
-            }
-            
         try:
             response = self.session.get(
                 f"{self.api_base}/user/me",
@@ -219,13 +177,6 @@ class LedeWireAPI:
         GET /v1/wallet/balance
         Get user's current wallet balance.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            return {
-                "balance_cents": 10000,  # $100.00 mock balance
-                "_fallback": True
-            }
-            
         try:
             response = self.session.get(
                 f"{self.api_base}/wallet/balance",
@@ -262,32 +213,22 @@ class LedeWireAPI:
         if not idempotency_key:
             raise ValueError("CRITICAL: Idempotency key required for payment operations")
         
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            # Check funds first in mock mode
-            balance = self.get_wallet_balance(access_token)
-            if balance["balance_cents"] < price_cents:
-                return {
-                    "error": {
-                        "code": 402,
-                        "message": "Insufficient funds in wallet"
-                    }
-                }
-            
-            # Mock purchase for development
-            purchase_id = str(uuid.uuid4())
-            return {
-                "id": purchase_id,
-                "content_id": content_id,
-                "buyer_id": f"mock_buyer_{uuid.uuid4().hex[:8]}",
-                "seller_id": f"mock_seller_{uuid.uuid4().hex[:8]}",
-                "amount_cents": price_cents,
-                "timestamp": datetime.now().isoformat(),
-                "status": "completed",
-                "_fallback": True
-            }
-        
         try:
+            # Log the purchase request details
+            request_data = {
+                "content_id": content_id,
+                "price_cents": price_cents
+            }
+            headers = {
+                "Authorization": f"Bearer {access_token[:20]}...",  # Truncate token for security
+                "Idempotency-Key": idempotency_key,
+                "X-Request-ID": idempotency_key
+            }
+            
+            logger.info(f"Creating purchase - URL: {self.api_base}/purchases")
+            logger.info(f"Request headers: {headers}")
+            logger.info(f"Request body: {request_data}")
+            
             # CRITICAL: Ensure idempotency key is sent to LedeWire for provider-side protection
             response = self.session.post(
                 f"{self.api_base}/purchases",
@@ -296,17 +237,38 @@ class LedeWireAPI:
                     "Idempotency-Key": idempotency_key,  # MUST be sent to prevent provider double charges
                     "X-Request-ID": idempotency_key  # Backup header for redundancy
                 },
-                json={
-                    "content_id": content_id,
-                    "price_cents": price_cents
-                },
+                json=request_data,
                 timeout=10
             )
+            
+            logger.info(f"Purchase response status: {response.status_code}")
+            logger.info(f"Purchase response headers: {dict(response.headers)}")
+            
+            try:
+                response_data = response.json()
+                logger.info(f"Purchase response body: {response_data}")
+            except:
+                response_text = response.text
+                logger.error(f"Purchase response (non-JSON): {response_text}")
+                response_data = {"error": {"code": 500, "message": f"Invalid JSON response: {response_text}"}}
+            
             response.raise_for_status()
-            return response.json()
+            return response_data
         except requests.RequestException as e:
-            # PRODUCTION: Re-raise with proper HTTP status
+            # Log detailed error information
+            logger.error(f"Purchase request failed: {str(e)}")
+            
             if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Error response status: {e.response.status_code}")
+                logger.error(f"Error response headers: {dict(e.response.headers)}")
+                try:
+                    error_body = e.response.json()
+                    logger.error(f"Error response body: {error_body}")
+                except:
+                    error_text = e.response.text
+                    logger.error(f"Error response text: {error_text}")
+                
+                # PRODUCTION: Re-raise with proper HTTP status
                 if e.response.status_code == 402:
                     raise requests.HTTPError("Insufficient funds in wallet", response=e.response)
                 elif e.response.status_code == 401:
@@ -316,6 +278,7 @@ class LedeWireAPI:
                 else:
                     raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
             else:
+                logger.error(f"Network error: {str(e)}")
                 raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     def verify_purchase(self, access_token: str, content_id: str) -> Dict[str, Any]:
@@ -323,21 +286,6 @@ class LedeWireAPI:
         GET /v1/purchase/verify?content_id=X
         Verify if user has purchased specific content.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            return {
-                "has_purchased": True,  # Always true for mock
-                "purchase_details": {
-                    "purchase_id": f"mock_purchase_{uuid.uuid4().hex[:8]}",
-                    "purchase_date": datetime.now().isoformat()
-                },
-                "checkout_readiness": {
-                    "is_authenticated": True,
-                    "has_sufficient_funds": self.check_sufficient_funds(access_token, 100)  # $1.00 example
-                },
-                "_fallback": True
-            }
-            
         try:
             response = self.session.get(
                 f"{self.api_base}/purchase/verify",
@@ -366,18 +314,6 @@ class LedeWireAPI:
         GET /v1/content/{id}/with-access
         Get content access information for user.
         """
-        # Short-circuit for mock mode - no network calls
-        if self.use_mock:
-            balance = self.get_wallet_balance(access_token)
-            return {
-                "user_id": f"mock_user_{uuid.uuid4().hex[:8]}",
-                "has_purchased": False,  # Default to false, check purchase history
-                "has_sufficient_funds": balance["balance_cents"] >= 100,  # $1.00 minimum
-                "wallet_balance_cents": balance["balance_cents"],
-                "next_required_action": "purchase",  # Could be: authenticate, fund_wallet, purchase, none
-                "_fallback": True
-            }
-            
         try:
             response = self.session.get(
                 f"{self.api_base}/content/{content_id}/with-access",
