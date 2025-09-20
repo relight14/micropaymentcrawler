@@ -624,16 +624,16 @@ async def login_user(request: LoginRequest):
     except Exception as e:
         print(f"Login error: {e}")
         import requests
-        # Handle LedeWire API errors with proper JSON responses
+        # Handle LedeWire API errors with proper HTTP status propagation
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
-                return {"success": False, "message": "Invalid email or password"}
+                raise HTTPException(status_code=401, detail="Invalid email or password")
             elif e.response.status_code == 400:
-                return {"success": False, "message": "Invalid request format"}
+                raise HTTPException(status_code=400, detail="Invalid request format")
             elif e.response.status_code in [502, 503, 504]:
-                return {"success": False, "message": "Authentication service temporarily unavailable"}
+                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
             else:
-                return {"success": False, "message": "Authentication service error"}
+                raise HTTPException(status_code=500, detail="Authentication service error")
         else:
             # Handle connection errors, SSL errors, etc.
             error_msg = str(e).lower()
@@ -667,16 +667,16 @@ async def signup_user(request: SignupRequest):
     except Exception as e:
         print(f"Signup error: {e}")
         import requests
-        # Handle LedeWire API errors with proper JSON responses
+        # Handle LedeWire API errors with proper HTTP status propagation
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 409:
-                return {"success": False, "message": "Account with this email already exists"}
+                raise HTTPException(status_code=409, detail="Account with this email already exists")
             elif e.response.status_code == 400:
-                return {"success": False, "message": "Invalid signup data"}
+                raise HTTPException(status_code=400, detail="Invalid signup data")
             elif e.response.status_code in [502, 503, 504]:
-                return {"success": False, "message": "Registration service temporarily unavailable"}
+                raise HTTPException(status_code=503, detail="Registration service temporarily unavailable")
             else:
-                return {"success": False, "message": "Registration service error"}
+                raise HTTPException(status_code=500, detail="Registration service error")
         else:
             # Handle connection errors, SSL errors, etc.
             error_msg = str(e).lower()
@@ -711,19 +711,19 @@ async def get_wallet_balance(authorization: str = Header(None, alias="Authorizat
     except HTTPException:
         raise
     except requests.HTTPError as e:
-        # Handle LedeWire API errors with JSON responses
+        # Handle LedeWire API errors with proper HTTP status propagation
         print(f"Wallet balance HTTP error: {e}")
         if hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
-                return {"success": False, "message": "Invalid or expired token"}
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
             elif e.response.status_code == 400:
-                return {"success": False, "message": "Invalid wallet balance request"}
+                raise HTTPException(status_code=400, detail="Invalid wallet balance request")
             elif e.response.status_code in [502, 503, 504]:
-                return {"success": False, "message": "Wallet service temporarily unavailable"}
+                raise HTTPException(status_code=503, detail="Wallet service temporarily unavailable")
             else:
-                return {"success": False, "message": "Wallet service error"}
+                raise HTTPException(status_code=500, detail="Wallet service error")
         else:
-            return {"success": False, "message": "Wallet service unavailable"}
+            raise HTTPException(status_code=503, detail="Wallet service unavailable")
     except Exception as e:
         print(f"Wallet balance error: {e}")
         # Handle connection errors, SSL errors, etc.
