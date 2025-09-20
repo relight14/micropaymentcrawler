@@ -22,21 +22,17 @@ args = "FastAPI Server"
 name = "FastAPI Server"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend && LEDEWIRE_USE_MOCK=false python main.py"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && LEDEWIRE_USE_MOCK=true python main.py"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 34583
-externalPort = 3001
 
 [[ports]]
 localPort = 35703
@@ -65,10 +61,6 @@ externalPort = 6000
 [[ports]]
 localPort = 44543
 externalPort = 3002
-
-[[ports]]
-localPort = 46587
-externalPort = 6800
 
 [deployment]
 deploymentTarget = "autoscale"
