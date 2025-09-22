@@ -410,10 +410,24 @@ class ChatResearchApp {
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results';
         
-        // Display clean tier options only - no overwhelming text
-        const tiersSection = await this.createTiersSection(data.refined_query);
+        // First, display the actual polished source cards from Tavily+Claude hybrid pipeline
+        const sourcesPreview = document.createElement('div');
+        sourcesPreview.className = 'sources-preview-section';
+        sourcesPreview.innerHTML = `
+            <div class="preview-header">
+                <h3>🔬 Research Preview: ${data.sources.length} Premium Sources Found</h3>
+                <p>Real URLs with AI-polished content and licensing verification</p>
+            </div>
+            <div class="sources-preview-grid">
+                ${data.sources.slice(0, 6).map(source => this.createSourceCardForChat(source)).join('')}
+            </div>
+            ${data.sources.length > 6 ? `<p class="more-sources-hint">+ ${data.sources.length - 6} more sources available with tier selection</p>` : ''}
+        `;
         
-        // Append the DOM element directly instead of using innerHTML
+        resultsDiv.appendChild(sourcesPreview);
+        
+        // Then show tier options for purchase
+        const tiersSection = await this.createTiersSection(data.refined_query);
         resultsDiv.appendChild(tiersSection);
 
         const messagesContainer = document.getElementById('messagesContainer');
