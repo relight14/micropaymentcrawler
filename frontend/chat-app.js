@@ -460,7 +460,7 @@ class ChatResearchApp {
     async getTierPrice(tierName) {
         // Helper method to get tier price from API
         try {
-            const response = await fetch(`${this.apiBase}/tiers`, {
+            const response = await fetch(`${this.apiBase}/api/tiers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -487,7 +487,7 @@ class ChatResearchApp {
         // Fetch dynamic pricing from backend API instead of hardcoded values
         let tiers = [];
         try {
-            const response = await fetch(`${this.apiBase}/tiers`, {
+            const response = await fetch(`${this.apiBase}/api/tiers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
