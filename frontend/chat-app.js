@@ -336,8 +336,8 @@ class ChatResearchApp {
         
         const quote = this.extractCompellingQuote(excerpt);
         const licensingBadge = source.licensing_protocol ? 
-            `<span class="license-badge">${this.getLicenseIcon(source.licensing_protocol)}</span>` : 
-            '<span class="license-badge">📄</span>';
+            this.getLicenseIcon(source.licensing_protocol) : 
+            '<span class="license-badge">📄 Standard</span>';
 
         return `
             <div class="source-card-chat" data-source-id="${this.escapeHtml(sourceId)}">
@@ -380,7 +380,26 @@ class ChatResearchApp {
             return 'No description available';
         }
         
-        const remaining = excerpt.replace(quote || '', '').trim();
+        // More robust quote removal - try multiple approaches
+        let remaining = excerpt;
+        
+        // Remove exact quote match
+        if (quote) {
+            remaining = remaining.replace(quote, '');
+            // Also try removing quote without quotes
+            remaining = remaining.replace(quote.replace(/"/g, ''), '');
+            // Remove any leftover quote marks that might be orphaned
+            remaining = remaining.replace(/^["']|["']$/g, '');
+        }
+        
+        // Clean up extra spaces and trim
+        remaining = remaining.replace(/\s+/g, ' ').trim();
+        
+        // If nothing meaningful left, return a generic description
+        if (remaining.length < 20) {
+            return 'Additional insights and analysis available with full access.';
+        }
+        
         return remaining.substring(0, 200) + (remaining.length > 200 ? '...' : '');
     }
 
