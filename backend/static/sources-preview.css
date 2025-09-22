@@ -1,0 +1,38 @@
+/* Sources Preview Section - Styles for displaying polished Tavily+Claude sources */
+.sources-preview-section {
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+}
+
+.preview-header h3 {
+    margin: 0 0 8px 0;
+    color: #1e293b;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.preview-header p {
+    margin: 0 0 16px 0;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.sources-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.more-sources-hint {
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+    font-size: 14px;
+    margin: 0;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+}

@@ -36,10 +36,10 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     
-    # Static files with no-cache (only if frontend directory exists)
-    frontend_dir = "../frontend"
-    if os.path.exists(frontend_dir):
-        app.mount("/static", NoCacheStaticFiles(directory=frontend_dir), name="static")
+    # Static files with no-cache
+    static_dir = "static"
+    if os.path.exists(static_dir):
+        app.mount("/static", NoCacheStaticFiles(directory=static_dir), name="static")
     
     # Include API routes
     app.include_router(health.router, tags=["health"])  # Root level routes like /
