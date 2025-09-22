@@ -33,6 +33,7 @@ class SourceCard(BaseModel):
     title: str
     excerpt: str
     domain: str
+    url: str  # Real URL for clickable links
     unlock_price: float
     is_unlocked: bool = False
     

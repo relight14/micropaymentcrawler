@@ -228,7 +228,7 @@ class ContentCrawlerStub:
         # Fallback
         return None
     
-    def _generate_new_mock_licensing(self, domain: str, protocol: str = None) -> Optional[dict]:
+    def _generate_new_mock_licensing(self, domain: str, protocol: Optional[str] = None) -> Optional[dict]:
         """Generate mock licensing information for sources."""
         if not protocol:
             protocol = random.choice(['rsl', 'tollbit', 'cloudflare'])
