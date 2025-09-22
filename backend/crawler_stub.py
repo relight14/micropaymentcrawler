@@ -79,9 +79,12 @@ class ContentCrawlerStub:
             return self._generate_mock_sources(query, count)
             
         try:
-            # Step 1: Tavily URL Discovery
+            # Step 1: Tavily URL Discovery with query length truncation
+            # Tavily has a 400 character limit, so truncate to 350 to be safe
+            tavily_query = query[:350] if len(query) > 350 else query
+            
             response = self.tavily_client.search(
-                query=query,
+                query=tavily_query,
                 search_depth="advanced",
                 max_results=min(count, 20),  # Tavily has limits
                 include_answer=False,

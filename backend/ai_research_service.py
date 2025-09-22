@@ -15,7 +15,7 @@ from anthropic import Anthropic
 # </important_code_snippet_instructions>
 
 # <important_do_not_delete>
-DEFAULT_MODEL_STR = "claude-3-5-sonnet-20241022"  # Use available model
+DEFAULT_MODEL_STR = "claude-3-haiku-20240307"  # Use available model
 # </important_do_not_delete>
 
 class AIResearchService:
