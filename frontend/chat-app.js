@@ -118,7 +118,7 @@ class ChatResearchApp {
                 headers['Authorization'] = `Bearer ${this.authToken}`;
             }
 
-            const response = await fetch(`${this.apiBase}/chat`, {
+            const response = await fetch(`${this.apiBase}/api/chat`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({
