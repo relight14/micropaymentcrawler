@@ -2,6 +2,7 @@
 LedeWire AI Research Tool - Application Factory
 """
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -35,8 +36,10 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     
-    # Static files with no-cache
-    app.mount("/static", NoCacheStaticFiles(directory="../frontend"), name="static")
+    # Static files with no-cache (only if frontend directory exists)
+    frontend_dir = "../frontend"
+    if os.path.exists(frontend_dir):
+        app.mount("/static", NoCacheStaticFiles(directory=frontend_dir), name="static")
     
     # Include API routes
     app.include_router(health.router, tags=["health"])  # Root level routes like /
