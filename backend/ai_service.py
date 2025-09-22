@@ -74,10 +74,12 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
         
         # Create conversation context for Claude using user-specific history
         user_history = self.user_conversations.get(user_id, [])
-        messages = [
+        # Convert to proper message format for Anthropic API
+        from typing import cast
+        messages = cast(list, [
             {"role": msg["role"], "content": msg["content"]} 
             for msg in user_history[-10:]  # Last 10 messages for context
-        ]
+        ])
         
         try:
             response = self.client.messages.create(
