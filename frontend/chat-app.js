@@ -427,10 +427,10 @@ class ChatResearchApp {
         const tiers = [
             {
                 name: 'Basic',
-                price: 1.00,
+                price: 0.00,
                 sources: 10,
                 valueProps: 'Up to 10 licensed premium sources',
-                description: 'Legally-licensed content from top publishers with professional analysis'
+                description: 'Free research with quality sources and professional analysis'
             },
             {
                 name: 'Research', 
@@ -751,7 +751,7 @@ class ChatResearchApp {
         }
 
         // Update modal content based on type and current selection
-        const prices = { basic: 1.00, research: 2.00, pro: 4.00 };
+        const prices = { basic: 0.00, research: 2.00, pro: 4.00 };
         const price = prices[this.selectedTier] || 0;
         
         document.getElementById('walletBalance').textContent = `$${this.walletBalance.toFixed(2)}`;
@@ -815,7 +815,7 @@ class ChatResearchApp {
     }
 
     async confirmPayment(type, itemDetails = null) {
-        const prices = { basic: 1.00, research: 2.00, pro: 4.00 };
+        const prices = { basic: 0.00, research: 2.00, pro: 4.00 };
         const price = prices[this.selectedTier] || 0;
 
         // Check balance
