@@ -8,6 +8,15 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **September 22, 2025**: 🆓 FREE BASIC TIER IMPLEMENTATION COMPLETE! 🆓
+  - **Free Basic Research**: Basic tier now completely free ($0.00) while maintaining authentication requirements
+  - **Payment Flow Bypass**: Basic tier skips LedeWire payment processing entirely for instant research access
+  - **Consistent Pricing**: Fixed pricing across all endpoints (/tiers, /purchase, /licensing-summary) for UI consistency
+  - **Smart Authentication**: Users still authenticate with LedeWire to establish identity, then get immediate free research access
+  - **Preserved Upgrade Path**: Research ($2) and Pro ($4) tiers remain available for enhanced features
+  - **Production Ready**: Architect-approved implementation with proper response schemas and idempotency protection
+  - **User Experience**: Frontend displays "Free" for Basic tier with seamless authentication-to-research flow
+  - **Future Monetization**: Foundation established for easy transition to paid-only or freemium models
 - **September 19, 2025**: 🎯 OPTIMISTIC AUTHENTICATION SYSTEM COMPLETE! 🎯
   - **Option 3 Implementation**: Replaced eager validation with optimistic authentication approach for superior UX
   - **Robust 401 Handling**: All protected API calls properly detect response.status === 401 and gracefully fallback to authentication
