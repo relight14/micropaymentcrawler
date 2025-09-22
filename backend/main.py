@@ -194,11 +194,11 @@ async def get_tiers(request: TiersRequest):
         tiers = [
             TierInfo(
                 tier=TierType.BASIC,
-                price=1.00,
+                price=0.00,
                 sources=10,
                 includes_outline=False,
                 includes_insights=False,
-                description="Legally-licensed content from top publishers with professional analysis"
+                description="Free research with quality sources and professional analysis"
             ),
             TierInfo(
                 tier=TierType.RESEARCH,
@@ -246,7 +246,7 @@ async def get_licensing_summary(request: LicensingSummaryRequest):
     try:
         # Define budget constraints: 60% for licensing, 40% for margin
         tier_configs = {
-            TierType.BASIC: {"price": 1.00, "max_sources": 10},
+            TierType.BASIC: {"price": 0.00, "max_sources": 10},
             TierType.RESEARCH: {"price": 2.00, "max_sources": 20}, 
             TierType.PRO: {"price": 4.00, "max_sources": 40}
         }
@@ -307,7 +307,7 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         # Calculate pricing first for stable idempotency key generation
         tier_base_prices = {
-            TierType.BASIC: 1.00,
+            TierType.BASIC: 0.00,
             TierType.RESEARCH: 2.00,  
             TierType.PRO: 4.00
         }
@@ -339,12 +339,43 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         # SERVER-SIDE PRICING: Budget-constrained source generation (60% for licensing, 40% margin)
         tier_configs = {
-            TierType.BASIC: {"price": 1.00, "max_sources": 10},
+            TierType.BASIC: {"price": 0.00, "max_sources": 10},
             TierType.RESEARCH: {"price": 2.00, "max_sources": 20}, 
             TierType.PRO: {"price": 4.00, "max_sources": 40}
         }
         
         config = tier_configs[request.tier]
+        
+        # Handle FREE TIER: Skip LedeWire payment processing entirely
+        if config["price"] == 0.00:
+            # Generate research packet directly for free tier
+            packet = packet_builder.build_packet(request.query, request.tier)
+            
+            # Record free tier access in ledger
+            free_transaction_id = f"free_{uuid.uuid4().hex[:12]}"
+            purchase_id = ledger.record_purchase(
+                query=request.query,
+                tier=request.tier,
+                price=0.00,
+                wallet_id=None,
+                transaction_id=free_transaction_id,
+                packet=packet
+            )
+            
+            # Store the successful response for idempotency  
+            response_data = PurchaseResponse(
+                success=True,
+                message="Free research unlocked! Enjoy your Basic tier research.",
+                packet=packet,
+                wallet_deduction=0.0
+            )
+            
+            # Store the response for idempotency
+            ledger.store_idempotency(user_id, request.idempotency_key, "purchase", response_data.dict())
+            
+            return response_data
+        
+        # PAID TIERS: Continue with LedeWire payment processing
         budget_limit = config["price"] * 0.60  # 60% for licensing costs
         max_sources = config["max_sources"]
         

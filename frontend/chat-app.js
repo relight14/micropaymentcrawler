@@ -472,7 +472,7 @@ class ChatResearchApp {
             
             const tierPrice = document.createElement('div');
             tierPrice.className = 'tier-price';
-            tierPrice.textContent = `$${tier.price.toFixed(2)}`;
+            tierPrice.textContent = tier.price === 0 ? 'Free' : `$${tier.price.toFixed(2)}`;
             tierCard.appendChild(tierPrice);
             
             const tierValue = document.createElement('div');
