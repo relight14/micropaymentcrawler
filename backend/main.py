@@ -79,8 +79,22 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],  # Only needed headers
 )
 
-# Serve frontend files
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+# Custom static file handler with cache-busting headers
+from fastapi import Response
+from fastapi.staticfiles import StaticFiles
+import mimetypes
+
+class NoCacheStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        # Add cache-busting headers to prevent browser caching
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+# Serve frontend files with cache-busting
+app.mount("/static", NoCacheStaticFiles(directory="../frontend"), name="static")
 
 # Production Safety Checks
 if os.environ.get('ENVIRONMENT') == 'production':

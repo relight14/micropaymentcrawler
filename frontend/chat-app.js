@@ -150,7 +150,7 @@ class ChatResearchApp {
             
             // Handle deep research results
             if (data.mode === 'deep_research' && data.sources) {
-                this.displayResearchResults(data);
+                await this.displayResearchResults(data);
             }
 
         } catch (error) {
@@ -403,14 +403,14 @@ class ChatResearchApp {
         }, 1000);
     }
 
-    displayResearchResults(data) {
+    async displayResearchResults(data) {
         if (!data.sources || data.sources.length === 0) return;
 
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results';
         
         // Display clean tier options only - no overwhelming text
-        const tiersSection = this.createTiersSection(data.refined_query);
+        const tiersSection = await this.createTiersSection(data.refined_query);
         
         // Append the DOM element directly instead of using innerHTML
         resultsDiv.appendChild(tiersSection);
@@ -423,30 +423,85 @@ class ChatResearchApp {
         this.addTierCardListeners(resultsDiv);
     }
 
-    createTiersSection(query) {
-        const tiers = [
-            {
-                name: 'Basic',
-                price: 0.00,
-                sources: 10,
-                valueProps: 'Up to 10 licensed premium sources',
-                description: 'Free research with quality sources and professional analysis'
-            },
-            {
-                name: 'Research', 
-                price: 2.00,
-                sources: 20,
-                valueProps: 'Up to 20 licensed sources + expert outline',
-                description: 'Premium licensed sources with structured insights and actionable recommendations'
-            },
-            {
-                name: 'Pro',
-                price: 4.00,
-                sources: 40,
-                valueProps: 'Up to 40 licensed sources + outline + strategic insights',
-                description: 'Comprehensive licensed research with competitive intelligence and strategic analysis'
+    async getTierPrice(tierName) {
+        // Helper method to get tier price from API
+        try {
+            const response = await fetch(`${this.apiBase}/tiers`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: 'pricing_query' })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        ];
+
+            const data = await response.json();
+            const tier = data.tiers.find(t => t.tier === tierName.toLowerCase());
+            return tier ? tier.price : 0;
+        } catch (error) {
+            console.error('Failed to fetch tier price from API:', error);
+            // Fallback pricing
+            const fallbackPrices = { basic: 0.00, research: 2.00, pro: 4.00 };
+            return fallbackPrices[tierName.toLowerCase()] || 0;
+        }
+    }
+
+    async createTiersSection(query) {
+        // Fetch dynamic pricing from backend API instead of hardcoded values
+        let tiers = [];
+        try {
+            const response = await fetch(`${this.apiBase}/tiers`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: query })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // Transform backend response to frontend format
+            tiers = data.tiers.map(tier => ({
+                name: tier.tier.charAt(0).toUpperCase() + tier.tier.slice(1),
+                price: tier.price,
+                sources: tier.sources,
+                valueProps: `Up to ${tier.sources} licensed${tier.includes_outline ? ' sources + expert outline' : ' premium sources'}${tier.includes_insights ? ' + strategic insights' : ''}`,
+                description: tier.description
+            }));
+        } catch (error) {
+            console.error('Failed to fetch tiers from API, using fallback:', error);
+            // Fallback to hardcoded tiers if API fails
+            tiers = [
+                {
+                    name: 'Basic',
+                    price: 0.00,
+                    sources: 10,
+                    valueProps: 'Up to 10 licensed premium sources',
+                    description: 'Free research with quality sources and professional analysis'
+                },
+                {
+                    name: 'Research', 
+                    price: 2.00,
+                    sources: 20,
+                    valueProps: 'Up to 20 licensed sources + expert outline',
+                    description: 'Premium licensed sources with structured insights and actionable recommendations'
+                },
+                {
+                    name: 'Pro',
+                    price: 4.00,
+                    sources: 40,
+                    valueProps: 'Up to 40 licensed sources + outline + strategic insights',
+                    description: 'Comprehensive licensed research with competitive intelligence and strategic analysis'
+                }
+            ];
+        }
 
         // Create tiers section container - just the cards, no headers
         const sectionDiv = document.createElement('div');
@@ -707,7 +762,7 @@ class ChatResearchApp {
                 if (data.balance_cents !== undefined) {
                     this.walletBalance = data.balance_cents / 100; // Convert cents to dollars
                     // Now show wallet modal with real balance
-                    this.showWalletModal(type, itemDetails);
+                    await this.showWalletModal(type, itemDetails);
                 } else {
                     // Handle error response with success: false
                     throw new Error(data.message || 'Invalid wallet response');
@@ -742,7 +797,7 @@ class ChatResearchApp {
         }
     }
 
-    showWalletModal(type, itemDetails = null) {
+    async showWalletModal(type, itemDetails = null) {
         // Create wallet modal if it doesn't exist
         let walletModal = document.getElementById('walletModal');
         if (!walletModal) {
@@ -750,9 +805,8 @@ class ChatResearchApp {
             document.body.appendChild(walletModal);
         }
 
-        // Update modal content based on type and current selection
-        const prices = { basic: 0.00, research: 2.00, pro: 4.00 };
-        const price = prices[this.selectedTier] || 0;
+        // Get current tier price dynamically (prices now come from API)
+        const price = await this.getTierPrice(this.selectedTier);
         
         document.getElementById('walletBalance').textContent = `$${this.walletBalance.toFixed(2)}`;
         document.getElementById('transactionItemLabel').textContent = `${this.selectedTier.charAt(0).toUpperCase() + this.selectedTier.slice(1)} Research Package Price`;
@@ -815,8 +869,7 @@ class ChatResearchApp {
     }
 
     async confirmPayment(type, itemDetails = null) {
-        const prices = { basic: 0.00, research: 2.00, pro: 4.00 };
-        const price = prices[this.selectedTier] || 0;
+        const price = await this.getTierPrice(this.selectedTier);
 
         // Check balance
         if (this.walletBalance < price) {
