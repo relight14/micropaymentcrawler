@@ -22,6 +22,20 @@ class AIResearchService:
         self.crawler = ContentCrawlerStub()
         # Store conversations per user to prevent cross-user data leakage
         self.user_conversations: Dict[str, List[Dict[str, Any]]] = {}
+    
+    def _extract_response_text(self, response) -> str:
+        """Safely extract text from Anthropic response."""
+        try:
+            if hasattr(response, 'content') and response.content and len(response.content) > 0:
+                content_block = response.content[0]
+                if hasattr(content_block, 'text') and content_block.text:
+                    return content_block.text
+                else:
+                    return str(content_block)
+            else:
+                return str(response)
+        except Exception:
+            return str(response)
         
     def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
@@ -74,7 +88,7 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
                 messages=messages
             )
             
-            ai_response = response.content[0].text
+            ai_response = self._extract_response_text(response)
             
             # Add AI response to user-specific conversation history
             self.user_conversations[user_id].append({
@@ -124,7 +138,7 @@ Be specific and targeted based on our conversation. Don't be generic."""
                 messages=[{"role": "user", "content": f"Generate a targeted research query for: {user_message}"}]
             )
             
-            research_query = response.content[0].text.strip()
+            research_query = self._extract_response_text(response).strip()
             
             # Execute deep research with the refined query
             return self._execute_deep_research(research_query, user_message, user_id)
@@ -238,7 +252,7 @@ Return only the numbers separated by commas, like: 0,3,7,12"""
             )
             
             # Parse selected indices
-            selected_indices = [int(x.strip()) for x in response.content[0].text.strip().split(',') if x.strip().isdigit()]
+            selected_indices = [int(x.strip()) for x in self._extract_response_text(response).strip().split(',') if x.strip().isdigit()]
             
             # Return selected sources
             return [all_sources[i] for i in selected_indices if i < len(all_sources)][:count]
@@ -276,7 +290,7 @@ Keep it concise but compelling - make the user excited about what they'll discov
                 messages=[{"role": "user", "content": prompt}]
             )
             
-            return response.content[0].text
+            return self._extract_response_text(response)
             
         except Exception:
             return "Here are the most relevant sources I found for your research. Each offers unique insights that will help answer your questions."

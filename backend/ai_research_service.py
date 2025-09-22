@@ -18,7 +18,7 @@ from anthropic import Anthropic
 DEFAULT_MODEL_STR = "claude-3-haiku-20240307"  # Use available model
 # </important_do_not_delete>
 
-class AIResearchService:
+class ContentPolishingService:
     """Service for AI-powered content polishing and research assistance."""
     
     def __init__(self):
@@ -36,6 +36,20 @@ class AIResearchService:
                 print(f"Failed to initialize Anthropic client: {e}")
                 self.client = None
                 self.use_ai_polish = False
+    
+    def _extract_response_text(self, response) -> str:
+        """Safely extract text from Anthropic response."""
+        try:
+            if hasattr(response, 'content') and response.content and len(response.content) > 0:
+                content_block = response.content[0]
+                if hasattr(content_block, 'text') and content_block.text:
+                    return content_block.text
+                else:
+                    return str(content_block)
+            else:
+                return str(response)
+        except Exception:
+            return str(response)
     
     def polish_sources(self, query: str, raw_sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -107,15 +121,8 @@ Return your response as JSON in this exact format:
         # Parse Claude's response
         import json
         try:
-            # Handle Anthropic response format
-            if hasattr(response, 'content') and response.content:
-                content_block = response.content[0]
-                if hasattr(content_block, 'text'):
-                    response_text = content_block.text
-                else:
-                    response_text = str(content_block)
-            else:
-                response_text = str(response)
+            # Handle Anthropic response format properly
+            response_text = self._extract_response_text(response)
             
             result = json.loads(response_text)
             polished = result.get('polished_sources', [])

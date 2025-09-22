@@ -5,7 +5,7 @@ from typing import List, Optional
 from tavily import TavilyClient
 from models import SourceCard
 from content_licensing import ContentLicenseService
-from ai_research_service import AIResearchService
+from ai_research_service import ContentPolishingService
 
 class ContentCrawlerStub:
     """
@@ -26,7 +26,7 @@ class ContentCrawlerStub:
         
         # Initialize content licensing service and AI research service
         self.license_service = ContentLicenseService()
-        self.ai_service = AIResearchService()
+        self.ai_service = ContentPolishingService()
         
         # Content quality factors that influence pricing
         self.quality_factors = {
