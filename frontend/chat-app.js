@@ -774,7 +774,7 @@ class ChatResearchApp {
     async checkWalletAndShowModal(type, itemDetails = null) {
         try {
             // Get real wallet balance from backend
-            const response = await fetch(`${this.apiBase}/wallet/balance`, {
+            const response = await fetch(`${this.apiBase}/api/auth/wallet/balance`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.authToken}`,
@@ -922,7 +922,7 @@ class ChatResearchApp {
         if (!this.selectedTier || !this.currentQuery) return;
 
         try {
-            const response = await fetch(`${this.apiBase}/purchase`, {
+            const response = await fetch(`${this.apiBase}/api/purchase`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1026,7 +1026,7 @@ class ChatResearchApp {
     async clearConversation() {
         if (confirm('Clear the entire conversation? This cannot be undone.')) {
             try {
-                const response = await fetch(`${this.apiBase}/clear-conversation`, {
+                const response = await fetch(`${this.apiBase}/api/chat/clear-conversation`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
