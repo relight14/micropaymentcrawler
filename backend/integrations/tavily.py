@@ -20,18 +20,27 @@ class TavilyClient:
                 print("Tavily package not installed, using mock mode")
                 self.use_mock = True
     
-    def search(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = 10, search_depth: str = "basic", 
+               include_answer: bool = False, include_images: bool = False, 
+               include_raw_content: bool = False) -> Dict[str, Any]:
         """Search for sources using Tavily API"""
         if self.use_mock:
-            return self._mock_search_results(query, max_results)
+            return {"results": self._mock_search_results(query, max_results)}
         
         try:
-            # Use actual Tavily API
-            response = self.client.search(query=query, search_depth="basic", max_results=max_results)
-            return response.get("results", [])
+            # Use actual Tavily API with all parameters
+            response = self.client.search(
+                query=query, 
+                search_depth=search_depth, 
+                max_results=max_results,
+                include_answer=include_answer,
+                include_images=include_images,
+                include_raw_content=include_raw_content
+            )
+            return response
         except Exception as e:
             print(f"Tavily API error: {e}, falling back to mock")
-            return self._mock_search_results(query, max_results)
+            return {"results": self._mock_search_results(query, max_results)}
     
     def _mock_search_results(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         """Mock search results for development"""
