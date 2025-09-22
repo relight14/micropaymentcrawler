@@ -8,6 +8,14 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **September 22, 2025**: 🔧 FRONTEND-BACKEND PRICING SYNCHRONIZATION COMPLETE! 🔧
+  - **Cache-Busting Headers**: Implemented NoCacheStaticFiles to prevent browser caching of static assets with old pricing logic
+  - **Dynamic API Integration**: Replaced all hardcoded frontend pricing with real-time API calls to /tiers endpoint
+  - **Consistent Pricing Display**: Basic tier now consistently shows as Free ($0.00) across all frontend components
+  - **Eliminated Pricing Drift**: Frontend pricing updates automatically when backend pricing changes
+  - **Architect Approved**: Reviewed implementation ensures no more $1.00 vs Free Basic tier discrepancies
+  - **Production Stability**: Cache-Control headers force browser revalidation, preventing stale pricing issues
+  - **API-First Architecture**: All pricing decisions now centralized in backend, frontend becomes pure presentation layer
 - **September 22, 2025**: 🆓 FREE BASIC TIER IMPLEMENTATION COMPLETE! 🆓
   - **Free Basic Research**: Basic tier now completely free ($0.00) while maintaining authentication requirements
   - **Payment Flow Bypass**: Basic tier skips LedeWire payment processing entirely for instant research access
