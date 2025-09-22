@@ -1,164 +1,44 @@
 # Overview
 
-This is an AI-powered research tool MVP that provides tiered research services with dynamic pricing. Users can input complex research queries and purchase different levels of research packets (Basic, Research, Pro) that include varying numbers of sources, outlines, and insights. The application simulates content crawling and source unlocking functionality while integrating with a wallet-based payment system.
+This project is an AI-powered research tool MVP offering tiered research services with dynamic pricing. Users can submit complex research queries and purchase different levels of research packets (Basic, Research, Pro), which include varying numbers of sources, outlines, and insights. The application simulates content crawling and source unlocking, integrated with a wallet-based payment system. The business vision is to provide a competitive differentiator with "real data, not made up," ensuring authentic source validation and professional presentation.
 
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
 
-# Recent Changes
-
-- **September 22, 2025**: 🔧 FRONTEND-BACKEND PRICING SYNCHRONIZATION COMPLETE! 🔧
-  - **Cache-Busting Headers**: Implemented NoCacheStaticFiles to prevent browser caching of static assets with old pricing logic
-  - **Dynamic API Integration**: Replaced all hardcoded frontend pricing with real-time API calls to /tiers endpoint
-  - **Consistent Pricing Display**: Basic tier now consistently shows as Free ($0.00) across all frontend components
-  - **Eliminated Pricing Drift**: Frontend pricing updates automatically when backend pricing changes
-  - **Architect Approved**: Reviewed implementation ensures no more $1.00 vs Free Basic tier discrepancies
-  - **Production Stability**: Cache-Control headers force browser revalidation, preventing stale pricing issues
-  - **API-First Architecture**: All pricing decisions now centralized in backend, frontend becomes pure presentation layer
-- **September 22, 2025**: 🆓 FREE BASIC TIER IMPLEMENTATION COMPLETE! 🆓
-  - **Free Basic Research**: Basic tier now completely free ($0.00) while maintaining authentication requirements
-  - **Payment Flow Bypass**: Basic tier skips LedeWire payment processing entirely for instant research access
-  - **Consistent Pricing**: Fixed pricing across all endpoints (/tiers, /purchase, /licensing-summary) for UI consistency
-  - **Smart Authentication**: Users still authenticate with LedeWire to establish identity, then get immediate free research access
-  - **Preserved Upgrade Path**: Research ($2) and Pro ($4) tiers remain available for enhanced features
-  - **Production Ready**: Architect-approved implementation with proper response schemas and idempotency protection
-  - **User Experience**: Frontend displays "Free" for Basic tier with seamless authentication-to-research flow
-  - **Future Monetization**: Foundation established for easy transition to paid-only or freemium models
-- **September 19, 2025**: 🎯 OPTIMISTIC AUTHENTICATION SYSTEM COMPLETE! 🎯
-  - **Option 3 Implementation**: Replaced eager validation with optimistic authentication approach for superior UX
-  - **Robust 401 Handling**: All protected API calls properly detect response.status === 401 and gracefully fallback to authentication
-  - **Perfect Transaction Resume**: Fixed critical bug where authentication interrupted tier/source purchases - now resumes with exact context
-  - **Modal Management Fixed**: Eliminated modal stacking issues by properly hiding wallet modal before showing authentication modal
-  - **UI State Consistency**: Fixed loading state bugs in chat mode - typing indicators properly cleared on authentication errors
-  - **Complete Coverage**: Consistent authentication fallback implemented across both app.js and chat-app.js frontend files  
-  - **Fast Startup Performance**: No unnecessary validation calls on application load - optimistic approach provides instant startup
-  - **Production Security**: Token clearing from localStorage and memory prevents stale token authentication bypass
-  - **Architect Approved**: Multiple review cycles confirmed robust error handling and user experience optimization
-- **September 19, 2025**: 🚀 INSTANT MOCK MODE & ENHANCED USER EXPERIENCE COMPLETE! 🚀  
-  - **Perfect Mock Mode Short-Circuit**: All LedeWire API methods now properly short-circuit when LEDEWIRE_USE_MOCK=true
-  - **Lightning-Fast Development**: Authentication reduced from 10+ seconds to ~5ms (2000x speed improvement)
-  - **Zero Network Calls**: Mock mode eliminates all HTTP timeouts for instant development experience
-  - **Enhanced Story Cards**: Source articles now display as compelling story cards with quotes and descriptions
-  - **Production Safety Verified**: Mock mode automatically blocked in production environments
-  - **Seamless User Flow**: Complete login → research → purchase → unlock flow works smoothly in development
-  - **Architect Approved**: Full system review confirms no regressions and proper mock/production separation
-  - **Ready for Production**: Real LedeWire API integration maintained for live deployment
-- **September 19, 2025**: 🎯 BUDGET-CONSTRAINED PRICING MODEL IMPLEMENTED! 🎯
-  - **Fixed Tier Pricing**: Transparent $1 Basic, $2 Research, $4 Pro pricing with no hidden costs
-  - **60/40 Budget Allocation**: 60% of tier price allocated for licensing costs, 40% corporate margin for sustainable operations
-  - **Budget-Constrained Source Generation**: System generates sources within licensing budget limits and stops when budget would be exceeded
-  - **Transparent Tier Descriptions**: Updated to show "up to X premium sources" instead of exact counts for honest user expectations
-  - **Enhanced Mock Mode**: LedeWire API properly short-circuits in development mode, eliminating network timeouts
-  - **Revenue Model**: Predictable pricing for users while maintaining profit margins and publisher compensation
-  - **Quality-Based Content**: Budget constraints ensure high-value source selection within tier limits
-  - **Production Ready**: Fixed pricing model tested and verified with Basic tier showing exact $1.00 charges
-- **September 18, 2025**: 🤖 DUAL-MODE AI RESEARCH EXPERIENCE COMPLETE! 🤖
-  - **Conversational AI Mode**: Natural conversation interface for research discovery and question refinement
-  - **Deep Research Mode**: Structured research with licensed source access and dynamic pricing
-  - **Anthropic Claude Integration**: Production-ready AI service with conversation state persistence  
-  - **Seamless Mode Switching**: Users can toggle between conversational exploration and deep research
-  - **Dynamic Pricing Model**: AI-determined source relevance drives contextual pricing instead of fixed tiers
-  - **Enhanced User Experience**: Beautiful chat interface with typing indicators, message formatting, and real-time responses
-  - **State Management**: Conversation history maintained across mode switches for contextual continuity
-  - **Authentication Integration**: Deep research mode integrates with LedeWire wallet for premium access
-  - **Responsive Design**: Mobile-optimized chat interface with modern UI patterns
-
-- **September 17, 2025**: 🚀 MULTI-PROTOCOL CONTENT LICENSING SYSTEM COMPLETE! 🚀
-  - **Revolutionary Architecture**: Transformed from content scraping to legitimate licensed access
-  - **Multi-Protocol Support**: Complete abstraction layer supporting RSL, Tollbit, and Cloudflare licensing protocols
-  - **Live RSL Integration**: Real-time discovery and parsing of /rsl.xml files for content licensing
-  - **Server-Authoritative Pricing**: Licensing costs calculated and enforced server-side to guarantee publisher compensation
-  - **Beautiful Protocol Badges**: Frontend displays 🔒 RSL, ⚡ Tollbit, ☁️ Cloudflare licensing with transparent cost breakdowns
-  - **Real License Token Issuance**: Protocols actually issue tokens during checkout, ensuring publishers get paid
-  - **Enhanced Purchase Flow**: Wallet modal shows detailed licensing cost breakdowns with protocol-specific information
-  - **Security Hardened**: Eliminated XSS vulnerabilities with safe DOM manipulation
-  - **Publisher Revenue Model**: Creates sustainable revenue streams for content publishers through proper licensing
-  - **Production Ready**: Architect-approved foundation ready for real licensing provider integration
-  - **Extensible Design**: ContentLicenseService abstraction supports future protocol additions
-- **September 17, 2025**: PRODUCTION-READY LedeWire API Integration Complete!
-  - **Real HTTP Integration**: Replaced all mock LedeWire API calls with production-ready HTTP requests
-    - Live authentication endpoints: `/auth/login/email` and `/auth/signup`
-    - Real wallet balance checks: `/wallet/balance` with Bearer token authorization  
-    - Production purchase processing: `/purchases` with proper wallet deduction
-    - Verification and content access via real API calls
-    - Automatic fallback to mock responses during development/API issues
-    - Secured credentials via Replit environment variables (LEDEWIRE_API_KEY, LEDEWIRE_API_SECRET)
-  - **Robust Error Handling**: 10-second HTTP timeouts, proper exception handling, graceful fallbacks
-  - **Production Security**: Fail-closed architecture prevents revenue leakage - no mock fallbacks in production
-  - **Real Authentication**: X-API-Key and X-API-Secret headers, Bearer token authorization
-  - **Protected Against Fraud**: Idempotency keys prevent duplicate charges, credential validation required
-  - **Development Mode**: LEDEWIRE_USE_MOCK environment variable controls fallback behavior (defaults to secure)
-  - **Ready for Live Payments**: Full production LedeWire integration with real money transactions - ARCHITECT APPROVED ✅
-  - All API methods tested and verified: authentication, wallet, purchases, verification, content access
-- **September 15, 2025**: Completed full API integration for LedeWire wallet readiness + AI search
-  - **Tavily AI Search Integration**: Replaced mock data with real-time AI search results
-  - Added `/unlock-source` backend endpoint with proper wallet deduction simulation
-  - Updated frontend to call backend API for all payment operations
-  - **September 12, 2025**: Complete MVP implementation deployed and tested
-  - Built FastAPI backend with all required modules (main.py, models.py, crawler_stub.py, ledger.py, packet_builder.py)
-  - Implemented tier-based research system with correct pricing (Basic $1, Research $2, Pro $4)
-  - Created simulated content crawler with dynamic source unlock pricing ($0.10-$2.00 per source)
-  - Developed clean frontend interface with search, tier selection, and payment flow
-  - Set up SQLite ledger for tracking purchases and research packet deliveries
-  - Configured and tested workflow running successfully on port 5000
-  - Verified end-to-end functionality with API testing
-
 # System Architecture
 
-## Frontend Architecture
-- **Single Page Application**: Built with vanilla HTML/CSS/JavaScript for simplicity and direct control
-- **Component-based Design**: Uses a JavaScript class-based approach with the ResearchApp controller managing all user interactions
-- **Responsive UI**: Clean, modern interface with tier selection cards and dynamic content loading
-- **Event-driven Architecture**: Handles user interactions through event listeners for search, tier selection, and purchases
+## UI/UX Decisions
+The frontend is a Single Page Application built with vanilla HTML/CSS/JavaScript, utilizing a component-based, event-driven design. It features a responsive, clean, and modern interface with tier selection cards and dynamic content loading. UI elements include story cards with quotes and descriptions for source articles, professional presentation for search results, and transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️).
 
-## Backend Architecture
-- **FastAPI Framework**: Python-based REST API with automatic OpenAPI documentation and type validation
-- **Modular Design**: Separated concerns across multiple modules:
-  - `main.py`: API routes and request handling
-  - `models.py`: Pydantic schemas for request/response validation
-  - `crawler_stub.py`: Simulated content crawling with dynamic pricing
-  - `ledger.py`: Transaction and research packet tracking
-  - `packet_builder.py`: Research content composition and organization
-- **Simulation Layer**: ContentCrawlerStub simulates real content crawling with realistic pricing algorithms
-- **CORS Support**: Configured for cross-origin requests to support frontend-backend communication
+## Technical Implementations
+- **Frontend**: Vanilla HTML/CSS/JavaScript with a `ResearchApp` controller for interactions. It dynamically fetches pricing from the backend, uses cache-busting headers for static assets, and implements an optimistic authentication system with robust 401 handling for a superior user experience.
+- **Backend**: Built with FastAPI, using a modular design for API routes, Pydantic schemas for validation, and separate modules for simulated crawling, ledger tracking, and packet building. It supports CORS and integrates a budget-constrained pricing model for source generation.
+- **Content Generation**: A hybrid pipeline uses Tavily for discovering real, clickable URLs and Claude for polishing raw search snippets into professional excerpts and titles. It includes licensing detection and graceful fallbacks for API unavailability.
+- **Authentication**: Implemented an optimistic authentication approach that handles 401 errors gracefully, resumes transactions, and clears tokens securely. It supports both email/password login and signup via LedeWire.
+- **Dual-Mode AI Experience**: Offers both a conversational AI mode (Anthropic Claude integration with state persistence) for research discovery and a deep research mode with licensed source access and dynamic pricing.
 
-## Data Storage
-- **SQLite Database**: Lightweight file-based database for MVP persistence
-- **Transaction Tracking**: Dedicated tables for purchases and source unlocks
-- **Ledger System**: Maintains audit trail of all financial transactions and research deliveries
-- **JSON Serialization**: Complex data structures stored as JSON in database fields
+## Feature Specifications
+- **Tiered Research Services**: Basic (Free), Research ($2), and Pro ($4) tiers with varying numbers of sources and features. The Basic tier is free and bypasses payment processing but requires authentication.
+- **Dynamic Pricing**: Source unlocking costs are dynamically simulated and determined by AI relevance, with a 60/40 budget allocation for licensing and corporate margin.
+- **Content Licensing**: A multi-protocol abstraction layer supports RSL, Tollbit, and Cloudflare licensing, with server-authoritative pricing and real license token issuance. Frontend displays protocol badges and cost breakdowns.
+- **Mock Mode**: A robust mock mode (`LEDEWIRE_USE_MOCK=true`) short-circuits LedeWire API methods for faster development, eliminating network calls and preventing production use.
+- **Wallet Integration**: Designed for secure integration with LedeWire for real-time wallet balance checks, purchase processing, and content access, including idempotency keys for fraud protection.
 
-## Pricing and Payment Architecture
-- **Tiered Pricing Model**: Three distinct service levels with different feature sets and pricing
-  - Basic: $1 for 10 sources
-  - Research: $2 for 20 sources + outline
-  - Pro: $4 for 40 sources + outline + insights
-- **Dynamic Pricing Engine**: Simulates variable source unlock costs based on quality factors
-- **Wallet Integration**: Designed to integrate with LedeWire wallet API for payment processing
-- **Future Monetization**: Supports per-source unlocking with micro-transactions
-
-## Content Management
-- **Research Packet System**: Structured delivery of research materials with summaries, outlines, and insights
-- **Source Card Architecture**: Locked content preview system with individual unlock pricing
-- **Content Simulation**: Generates realistic academic and research content for testing
-- **Quality-based Pricing**: Simulates pricing variations based on source quality factors
+## System Design Choices
+- **Data Storage**: SQLite database for lightweight persistence, tracking purchases, source unlocks, and maintaining an audit trail. Complex data structures are stored as JSON.
+- **Simulation Layer**: `ContentCrawlerStub` simulates content crawling and pricing algorithms, generating realistic academic content for testing.
+- **API-First Architecture**: All pricing decisions are centralized in the backend, making the frontend a pure presentation layer.
+- **Production Readiness**: Architect-approved implementations ensure robust error handling, security, and scalability for live deployment.
 
 # External Dependencies
 
-## Planned Integrations (Not Yet Implemented)
-- **LedeWire Wallet API**: Payment processing and wallet deduction system for user transactions
-- **Cloudflare Pay-Per-Crawl API**: Live content crawling and source material retrieval (currently stubbed)
-
-## Current Dependencies
-- **FastAPI**: Web framework for building the REST API backend
-- **Pydantic**: Data validation and serialization using Python type annotations
-- **SQLite3**: Built-in Python database interface for local persistence
-- **UUID**: Python standard library for generating unique identifiers
-- **CORS Middleware**: FastAPI middleware for handling cross-origin requests
-
-## Development Dependencies
-- **Uvicorn**: ASGI server for running the FastAPI application
-- **Static File Serving**: FastAPI's StaticFiles for serving frontend assets
-
-The architecture is designed for easy integration of real services while maintaining a functional MVP with simulated data and pricing.
+- **FastAPI**: Python web framework for the backend API.
+- **Pydantic**: Data validation and serialization.
+- **SQLite3**: For local database persistence.
+- **UUID**: For generating unique identifiers.
+- **CORS Middleware**: For handling cross-origin requests.
+- **Uvicorn**: ASGI server for running FastAPI.
+- **Tavily API**: For discovering real, clickable URLs from live web search.
+- **Anthropic Claude API**: For AI-powered content polishing and conversational AI.
+- **LedeWire Wallet API**: Integrated for authentication, wallet balance, and purchase processing (live HTTP integration with production security).
