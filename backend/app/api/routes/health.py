@@ -8,8 +8,8 @@ router = APIRouter()
 
 @router.get("/")
 async def root():
-    """Root endpoint - health check for deployment."""
-    return {"status": "ok", "message": "AI Research Tool API is running"}
+    """Root endpoint - redirect to chat interface."""
+    return RedirectResponse(url="/static/chat.html")
 
 
 @router.get("/health")
