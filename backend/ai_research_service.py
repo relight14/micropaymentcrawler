@@ -15,7 +15,7 @@ from anthropic import Anthropic
 # </important_code_snippet_instructions>
 
 # <important_do_not_delete>
-DEFAULT_MODEL_STR = "claude-sonnet-4-20250514"
+DEFAULT_MODEL_STR = "claude-3-5-sonnet-20241022"  # Use available model
 # </important_do_not_delete>
 
 class AIResearchService:
@@ -29,8 +29,13 @@ class AIResearchService:
             self.use_ai_polish = False
             print("Warning: ANTHROPIC_API_KEY not found, AI polishing disabled")
         else:
-            self.client = Anthropic(api_key=anthropic_key)
-            self.use_ai_polish = True
+            try:
+                self.client = Anthropic(api_key=anthropic_key)
+                self.use_ai_polish = True
+            except Exception as e:
+                print(f"Failed to initialize Anthropic client: {e}")
+                self.client = None
+                self.use_ai_polish = False
     
     def polish_sources(self, query: str, raw_sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -90,6 +95,9 @@ Return your response as JSON in this exact format:
   ]
 }}"""
 
+        if not self.client:
+            return self._fallback_polish(raw_sources)
+            
         response = self.client.messages.create(
             model=DEFAULT_MODEL_STR,
             max_tokens=2000,
@@ -99,7 +107,17 @@ Return your response as JSON in this exact format:
         # Parse Claude's response
         import json
         try:
-            result = json.loads(response.content[0].text)
+            # Handle Anthropic response format
+            if hasattr(response, 'content') and response.content:
+                content_block = response.content[0]
+                if hasattr(content_block, 'text'):
+                    response_text = content_block.text
+                else:
+                    response_text = str(content_block)
+            else:
+                response_text = str(response)
+            
+            result = json.loads(response_text)
             polished = result.get('polished_sources', [])
             
             # Merge polished content back into raw sources

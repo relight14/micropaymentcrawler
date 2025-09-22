@@ -330,6 +330,7 @@ class ChatResearchApp {
         const excerpt = source.excerpt || '';
         const title = source.title || 'Untitled Source';
         const domain = source.domain || 'Unknown';
+        const url = source.url || '#';
         const unlockPrice = source.unlock_price || 0;
         const sourceId = source.id || '';
         
@@ -341,7 +342,7 @@ class ChatResearchApp {
         return `
             <div class="source-card-chat" data-source-id="${this.escapeHtml(sourceId)}">
                 <div class="source-header">
-                    <h5>${this.sanitizeHtml(title)}</h5>
+                    <h5><a href="${this.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${this.sanitizeHtml(title)}</a></h5>
                     <div class="source-meta">
                         <span class="domain-badge">${this.escapeHtml(domain)}</span>
                         ${licensingBadge}
@@ -939,11 +940,11 @@ class ChatResearchApp {
 
     getLicenseIcon(protocol) {
         const icons = {
-            'rsl': '🔒 RSL',
-            'tollbit': '⚡ Tollbit',
-            'cloudflare': '☁️ Cloudflare'
+            'rsl': '🔒 RSL Licensed',
+            'tollbit': '⚡ Tollbit Access',
+            'cloudflare': '☁️ CF Licensed'
         };
-        return `<span class="license-badge">${icons[protocol] || '🔐 Licensed'}</span>`;
+        return `<span class="license-badge">${icons[protocol] || '📋 Standard'}</span>`;
     }
 
     addTierCardListeners(container) {

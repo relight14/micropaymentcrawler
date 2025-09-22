@@ -5,6 +5,7 @@ from typing import List, Optional
 from tavily import TavilyClient
 from models import SourceCard
 from content_licensing import ContentLicenseService
+from ai_research_service import AIResearchService
 
 class ContentCrawlerStub:
     """
@@ -23,8 +24,9 @@ class ContentCrawlerStub:
             self.use_real_search = False
             print("Warning: TAVILY_API_KEY not found, falling back to mock data")
         
-        # Initialize content licensing service
+        # Initialize content licensing service and AI research service
         self.license_service = ContentLicenseService()
+        self.ai_service = AIResearchService()
         
         # Content quality factors that influence pricing
         self.quality_factors = {
@@ -72,12 +74,12 @@ class ContentCrawlerStub:
             return self._generate_mock_sources(query, count, budget_limit)
     
     def _generate_tavily_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
-        """Generate source cards using Tavily AI search with budget constraints."""
+        """Generate source cards using hybrid Tavily discovery + Claude polish approach."""
         if not self.tavily_client:
             return self._generate_mock_sources(query, count)
             
         try:
-            # Call Tavily API for real search results
+            # Step 1: Tavily URL Discovery
             response = self.tavily_client.search(
                 query=query,
                 search_depth="advanced",
@@ -87,30 +89,48 @@ class ContentCrawlerStub:
                 include_raw_content=False
             )
             
-            sources = []
             results = response.get('results', [])
             
-            for i, result in enumerate(results[:count]):
-                source_id = str(uuid.uuid4())
-                
-                # Extract domain from URL
+            # Step 2: Prepare raw source data for Claude polishing
+            raw_sources = []
+            for result in results[:count]:
                 try:
                     domain = result['url'].split('/')[2]
                 except:
                     domain = "unknown.com"
+                    
+                raw_sources.append({
+                    'url': result.get('url', f'https://{domain}'),
+                    'domain': domain,
+                    'title': result.get('title', ''),
+                    'snippet': result.get('content', '')[:150],  # Truncate for efficiency
+                })
+            
+            # Step 3: Claude Content Polish (batch processing)
+            polished_sources = self.ai_service.polish_sources(query, raw_sources)
+            
+            # Step 4: Create SourceCard objects with licensing and pricing
+            sources = []
+            for i, polished in enumerate(polished_sources):
+                source_id = str(uuid.uuid4())
+                url = polished.get('url', f'https://{polished.get("domain", "unknown.com")}')
+                domain = polished.get('domain', 'unknown.com')
                 
-                # Create source card from Tavily result
+                # Calculate pricing 
+                unlock_price = self._calculate_tavily_price({'title': polished.get('title', ''), 'url': url}, domain)
+                
                 source = SourceCard(
                     id=source_id,
-                    title=result.get('title', f'Research Source {i+1}'),
-                    excerpt=self._truncate_content(result.get('content', 'No preview available')),
+                    title=polished.get('title', f'Research Source {i+1}'),
+                    excerpt=polished.get('excerpt', 'No preview available'),
                     domain=domain,
-                    unlock_price=self._calculate_tavily_price(result, domain),
+                    url=url,
+                    unlock_price=unlock_price,
                     is_unlocked=False
                 )
                 
-                # Check for content licensing
-                license_info = self._discover_licensing(result.get('url', ''))
+                # Step 5: Real licensing detection on actual URL
+                license_info = self._discover_licensing(url)
                 if license_info:
                     self._apply_licensing_info(source, license_info)
                 
@@ -120,7 +140,7 @@ class ContentCrawlerStub:
                 else:
                     break  # Budget exceeded, stop generating sources
             
-            # If we have fewer results than requested and budget allows, fill with mock data
+            # Fill with mock data if needed
             if len(sources) < count and (budget_limit is None or self._calculate_total_cost(sources) < budget_limit):
                 remaining = count - len(sources)
                 remaining_budget = budget_limit - self._calculate_total_cost(sources) if budget_limit else None
@@ -130,7 +150,7 @@ class ContentCrawlerStub:
             return sources
             
         except Exception as e:
-            print(f"Tavily API error: {e}")
+            print(f"Hybrid Tavily+Claude generation error: {e}")
             # Fallback to mock data on error
             return self._generate_mock_sources(query, count, budget_limit)
     
@@ -163,6 +183,7 @@ class ContentCrawlerStub:
                 title=title,
                 excerpt=excerpt,
                 domain=domain,
+                url=f'https://{domain}/research/{str(uuid.uuid4())[:8]}',  # Generate mock URL
                 unlock_price=unlock_price,
                 is_unlocked=False
             )
