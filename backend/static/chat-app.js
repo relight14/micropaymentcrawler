@@ -557,8 +557,9 @@ class ChatResearchApp {
     }
 
     async handleSourceUnlockInChat(sourceId, price, title) {
-        if (!this.ledewire_token) {
-            // Launch authentication modal instead of just showing a message
+        // Enhanced authentication check that validates token authenticity
+        const isAuthenticated = await this.validateAuthenticationAndBalance();
+        if (!isAuthenticated) {
             this.showAuthModal('unlock', { sourceId, price, title });
             return;
         }
@@ -805,8 +806,9 @@ class ChatResearchApp {
     }
 
     async handleSourceUnlock(button, sourceId, price) {
-        // Check authentication first
-        if (!this.ledewire_token) {
+        // Enhanced authentication check that validates token authenticity
+        const isAuthenticated = await this.validateAuthenticationAndBalance();
+        if (!isAuthenticated) {
             this.showAuthModal('unlock', { sourceId, price, button });
             return;
         }
@@ -1303,6 +1305,48 @@ class ChatResearchApp {
         } catch (error) {
             console.error('Failed to update wallet balance:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Enhanced authentication check that validates token authenticity
+     * Returns true if properly authenticated, false if should show auth modal
+     */
+    async validateAuthenticationAndBalance() {
+        // First check if token exists
+        if (!this.ledewire_token) {
+            return false;
+        }
+
+        try {
+            // Validate token by checking wallet balance API
+            const response = await fetch(`${this.apiBase}/api/auth/balance`, {
+                headers: { 'Authorization': `Bearer ${this.ledewire_token}` }
+            });
+            
+            if (response.ok) {
+                // Token is valid, update balance (keep in cents for consistency)
+                const data = await response.json();
+                this.walletBalance = data.balance_cents; // Keep in cents like rest of codebase
+                this.updateWalletDisplay();
+                return true;
+            } else if (response.status === 401) {
+                // Token is expired/invalid, clear it
+                console.log('Token expired/invalid, clearing authentication');
+                localStorage.removeItem('ledewire_token');
+                this.ledewire_token = null;
+                this.walletBalance = 0;
+                this.updateAuthDisplay(false); // Update both wallet and auth UI states
+                return false;
+            } else {
+                // Other API error, assume authentication issue for safety
+                console.warn('Wallet balance API error:', response.status);
+                return false;
+            }
+        } catch (error) {
+            // Network error or other issue, assume authentication needed for safety
+            console.error('Error validating authentication:', error);
+            return false;
         }
     }
 
