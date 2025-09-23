@@ -558,7 +558,8 @@ class ChatResearchApp {
 
     async handleSourceUnlockInChat(sourceId, price, title) {
         if (!this.ledewire_token) {
-            this.addMessage('system', 'Please log in to unlock premium sources.');
+            // Launch authentication modal instead of just showing a message
+            this.showAuthModal('unlock', { sourceId, price, title });
             return;
         }
 
@@ -2315,5 +2316,5 @@ class ChatResearchApp {
 
 // Initialize the chat app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    window.chatApp = new ChatResearchApp();
+    window.researchApp = new ChatResearchApp();
 });
