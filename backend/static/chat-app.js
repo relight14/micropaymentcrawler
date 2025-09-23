@@ -181,7 +181,7 @@ class ChatResearchApp {
         
         // Add specific loading message for Research Mode
         if (this.currentMode === 'research') {
-            this.addMessage('system', '🔍 Scanning licensed sources across the web… This might take a few seconds — we\'re fetching high-quality, paywalled content you can ethically unlock.');
+            this.addMessage('system', '🔍 Analyzing your research query and building comprehensive packages... This takes 30-60 seconds as we scan licensed sources, optimize pricing tiers, and prepare your complete research briefing.');
         }
 
         try {
@@ -219,16 +219,22 @@ class ChatResearchApp {
             }
 
             const data = await response.json();
-            this.hideTypingIndicator();
             
-            // Add AI response
-            this.addMessage('assistant', data.response);
-            
-            // Handle research results
+            // Handle research results differently - wait for everything to be ready
             if (data.mode === 'research' || data.mode === 'deep_research') {
                 if (data.sources && data.sources.length > 0) {
+                    // Keep typing indicator until all results are ready
                     await this.displayResearchResults(data);
+                    this.hideTypingIndicator();
+                } else {
+                    // No sources found, show response only
+                    this.hideTypingIndicator();
+                    this.addMessage('assistant', data.response);
                 }
+            } else {
+                // Chat mode - show response immediately
+                this.hideTypingIndicator();
+                this.addMessage('assistant', data.response);
             }
 
         } catch (error) {
@@ -1667,6 +1673,9 @@ class ChatResearchApp {
     async displayResearchResults(data) {
         if (!data.sources || data.sources.length === 0) return;
 
+        // Build all results off-DOM first, including tier analysis
+        
+        // 1. Build research results section
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results figma-design';
         
@@ -1709,10 +1718,16 @@ class ChatResearchApp {
         resultsDiv.appendChild(researchHeader);
         resultsDiv.appendChild(resultsArea);
         
-        // Add Tier Cards section using dynamic pricing
+        // 2. Build Tier Cards section using dynamic pricing - this takes 30+ seconds
         const tierCardsSection = await this.createTierCardsSection(data.refined_query || 'your research');
         resultsDiv.appendChild(tierCardsSection);
 
+        // 3. Only NOW display everything at once: outline + sources + tier cards
+        
+        // Add the AI response with the research outline
+        this.addMessage('assistant', data.response);
+        
+        // Add the complete research results
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
