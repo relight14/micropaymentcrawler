@@ -751,6 +751,139 @@ class ChatResearchApp {
         });
     }
 
+    createResearchPacketsSection(query) {
+        const packetsSection = document.createElement('div');
+        packetsSection.className = 'research-packets-section';
+        
+        const packets = [
+            {
+                id: 'basic',
+                name: 'Basic Tier',
+                price: 'Free',
+                icon: '⭐',
+                description: 'Up to 10 licensed premium sources',
+                subtitle: 'Free research with quality sources and professional analysis',
+                features: [
+                    'Up to 10 licensed premium sources',
+                    'Professional analysis',
+                    'Quality source verification',
+                    'Basic summarization'
+                ],
+                buttonText: 'Get Started',
+                highlighted: false,
+                ctaClass: 'btn-basic'
+            },
+            {
+                id: 'research',
+                name: 'Research Tier',
+                price: '$0.99',
+                icon: '⚡',
+                description: 'Up to 20 licensed sources + expert outline',
+                subtitle: 'Craving clarity on this topic? For $0.99, we\'ll ethically license and distill the web\'s most relevant sources into a single, powerful summary.',
+                features: [
+                    'Up to 20 licensed sources',
+                    'Expert research outline',
+                    'Advanced summarization',
+                    'Source credibility analysis',
+                    'Topic deep-dive'
+                ],
+                buttonText: 'Unlock Research',
+                highlighted: true,
+                ctaClass: 'btn-research'
+            },
+            {
+                id: 'pro',
+                name: 'Pro Tier',
+                price: '$1.99',
+                icon: '👑',
+                description: 'Up to 40 licensed sources + expert outline + strategic insights',
+                subtitle: 'Serious about answers? Our Pro tier delivers full-spectrum research — licensed sources, competitive intelligence, and strategic framing.',
+                features: [
+                    'Up to 40 licensed sources',
+                    'Expert research outline',
+                    'Strategic insights & framing',
+                    'Competitive intelligence',
+                    'Executive summary',
+                    'Actionable recommendations'
+                ],
+                buttonText: 'Unlock Pro',
+                highlighted: false,
+                ctaClass: 'btn-pro'
+            }
+        ];
+
+        packetsSection.innerHTML = `
+            <div class="packets-header">
+                <div class="packets-header-content">
+                    <h3 class="packets-title">Research Packages</h3>
+                    <p class="packets-subtitle">Get comprehensive research bundles with licensed content and expert analysis</p>
+                </div>
+            </div>
+            
+            <div class="packets-grid">
+                ${packets.map(packet => `
+                    <div class="research-packet-card ${packet.highlighted ? 'highlighted' : ''}" data-packet-id="${packet.id}">
+                        ${packet.highlighted ? '<div class="popular-badge"><span>Most Popular</span></div>' : ''}
+                        
+                        <div class="packet-header">
+                            <div class="packet-icon ${packet.highlighted ? 'highlighted' : ''}">
+                                <span>${packet.icon}</span>
+                            </div>
+                            
+                            <div class="packet-info">
+                                <h4 class="packet-name">${packet.name}</h4>
+                                <div class="packet-price">${packet.price}</div>
+                            </div>
+                            
+                            <p class="packet-description">${packet.description}</p>
+                            <p class="packet-subtitle">${packet.subtitle}</p>
+                        </div>
+                        
+                        <div class="packet-content">
+                            <ul class="packet-features">
+                                ${packet.features.map(feature => `
+                                    <li class="packet-feature">
+                                        <span class="feature-check ${packet.highlighted ? 'highlighted' : ''}">✓</span>
+                                        <span>${feature}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                            
+                            <button class="packet-cta ${packet.ctaClass}" data-packet="${packet.id}" data-price="${packet.price}">
+                                ${packet.buttonText}
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        return packetsSection;
+    }
+
+    addResearchPacketListeners(resultsDiv) {
+        // Add click handlers for research packet purchases
+        resultsDiv.addEventListener('click', (e) => {
+            if (e.target.matches('.packet-cta') || e.target.closest('.packet-cta')) {
+                const btn = e.target.matches('.packet-cta') ? e.target : e.target.closest('.packet-cta');
+                const packetId = btn.dataset.packet;
+                const price = btn.dataset.price;
+                
+                console.log(`Purchase ${packetId} tier for ${price}`);
+                
+                // Disable button and show loading state
+                btn.disabled = true;
+                btn.textContent = 'Processing...';
+                
+                // Here you would integrate with your purchase logic
+                setTimeout(() => {
+                    btn.textContent = '✅ Purchased';
+                    btn.style.opacity = '0.7';
+                }, 1500);
+            }
+        });
+    }
+
     async displayResearchResults(data) {
         if (!data.sources || data.sources.length === 0) return;
 
@@ -795,13 +928,18 @@ class ChatResearchApp {
         
         resultsDiv.appendChild(researchHeader);
         resultsDiv.appendChild(resultsArea);
+        
+        // Add Research Packets section (matching Figma design)
+        const packetsSection = this.createResearchPacketsSection(data.refined_query || 'your research');
+        resultsDiv.appendChild(packetsSection);
 
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        // Add event listeners for source cards
+        // Add event listeners for source cards and research packets
         this.addSourceCardListeners(resultsDiv);
+        this.addResearchPacketListeners(resultsDiv);
     }
 
     async getTierPrice(tierName) {
