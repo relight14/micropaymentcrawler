@@ -648,55 +648,160 @@ class ChatResearchApp {
         }
     }
 
+    createFigmaSourceCard(source) {
+        // Extract data
+        const title = source.title || 'Untitled Source';
+        const excerpt = source.excerpt || source.snippet || 'No preview available';
+        const author = source.publisher_name || source.domain || 'Unknown Publisher';
+        const publishDate = new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        const url = source.url || '#';
+        
+        // Determine license type and styling
+        const hasLicense = source.licensing_protocol || source.license_info;
+        const licenseType = hasLicense ? 'paid' : 'free';
+        const licensePrice = source.license_cost || (hasLicense ? 2.99 : null);
+        const licenseProtocol = source.licensing_protocol || (source.license_info?.protocol) || null;
+        
+        // License badge styling
+        const getLicenseColor = (type) => {
+            switch (type) {
+                case 'free': return 'license-free';
+                case 'paid': return 'license-paid';  
+                case 'premium': return 'license-premium';
+                default: return 'license-free';
+            }
+        };
+        
+        // Protocol badge
+        const protocolBadge = licenseProtocol ? `<span class="protocol-badge protocol-${licenseProtocol.toLowerCase()}">${licenseProtocol.toUpperCase()}</span>` : '';
+        
+        // Mock rating for design consistency
+        const rating = 4 + Math.random();
+        const fullStars = Math.floor(rating);
+        const starDisplay = Array.from({length: 5}, (_, i) => 
+            `<span class="star ${i < fullStars ? 'star-filled' : 'star-empty'}">★</span>`
+        ).join('');
+
+        return `
+            <div class="figma-source-card" data-source-id="${source.id || Date.now()}">
+                <div class="card-header">
+                    <div class="card-main-info">
+                        <h3 class="card-title">${title}</h3>
+                        <p class="card-meta">${author} • ${publishDate}</p>
+                    </div>
+                    <div class="card-badges">
+                        <span class="source-type-badge">Article</span>
+                        <span class="license-badge ${getLicenseColor(licenseType)}">
+                            ${licenseType}${licensePrice ? ` $${licensePrice}` : ''}
+                        </span>
+                        ${protocolBadge}
+                    </div>
+                </div>
+                
+                <div class="card-rating">
+                    <div class="stars">${starDisplay}</div>
+                    <span class="rating-text">(${rating.toFixed(1)}/5)</span>
+                </div>
+                
+                <div class="card-content">
+                    <p class="card-summary">${excerpt.substring(0, 150)}${excerpt.length > 150 ? '...' : ''}</p>
+                </div>
+                
+                <div class="card-actions">
+                    <button class="btn-secondary view-source-btn" onclick="window.open('${url}', '_blank')">
+                        <span class="btn-icon">🔗</span>
+                        View Source
+                    </button>
+                    
+                    <div class="action-buttons">
+                        ${licenseType === 'free' 
+                            ? `<button class="btn-download">
+                                 <span class="btn-icon">⬇️</span>
+                                 Download
+                               </button>` 
+                            : `<button class="btn-unlock" data-price="${licensePrice}">
+                                 <span class="btn-icon">🔓</span>
+                                 Unlock $${licensePrice}
+                               </button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    addSourceCardListeners(resultsDiv) {
+        // Add click handlers for source card interactions
+        resultsDiv.addEventListener('click', (e) => {
+            if (e.target.matches('.btn-unlock') || e.target.closest('.btn-unlock')) {
+                const btn = e.target.matches('.btn-unlock') ? e.target : e.target.closest('.btn-unlock');
+                const price = btn.dataset.price;
+                console.log(`Unlock source for $${price}`);
+                // Add unlock logic here
+            }
+            
+            if (e.target.matches('.btn-download') || e.target.closest('.btn-download')) {
+                console.log('Download free source');
+                // Add download logic here
+            }
+        });
+    }
+
     async displayResearchResults(data) {
         if (!data.sources || data.sources.length === 0) return;
 
         const resultsDiv = document.createElement('div');
-        resultsDiv.className = 'research-results';
+        resultsDiv.className = 'research-results figma-design';
         
-        // Discovery Mode - show real-time licensing results
-        const licensedCount = data.sources.filter(s => s.licensing_protocol !== null).length;
-        const unlicensedCount = data.sources.length - licensedCount;
-        
-        const sourcesPreview = document.createElement('div');
-        sourcesPreview.className = 'sources-preview-section discovery-mode';
-        sourcesPreview.innerHTML = `
-            <div class="preview-header">
-                <h3>🔍 Discovery Mode: Found ${data.sources.length} Research Sources</h3>
-                <div class="licensing-summary">
-                    <span class="licensed-count">${licensedCount} Licensed Sources</span>
-                    <span class="unlicensed-count">${unlicensedCount} Unlicensed Sources</span>
+        // Research Header (matching Figma design)
+        const researchHeader = document.createElement('div');
+        researchHeader.className = 'research-header';
+        researchHeader.innerHTML = `
+            <div class="research-header-content">
+                <div class="header-info">
+                    <h2 class="header-title">LedeWire Research Assistant</h2>
+                    <p class="header-subtitle">Ethically Licensed Content</p>
                 </div>
-                <p>Real-time protocol detection • Publisher attribution • Ethical pricing</p>
-            </div>
-            <div class="sources-preview-grid">
-                ${data.sources.slice(0, 8).map(source => this.createSourceCardForChat(source)).join('')}
-            </div>
-            ${data.sources.length > 8 ? `<p class="more-sources-hint">+ ${data.sources.length - 8} more sources in full research mode</p>` : ''}
-        `;
-        
-        resultsDiv.appendChild(sourcesPreview);
-        
-        // Add upsell call-to-action message before tier options
-        const upsellMessage = document.createElement('div');
-        upsellMessage.className = 'upsell-message';
-        upsellMessage.innerHTML = `
-            <div class="upsell-content">
-                <h4>💡 Go deeper with full article access, AI-curated insights, and verified sources.</h4>
+                <div class="ai-badge">
+                    <span class="sparkles-icon">✨</span>
+                    <span>AI-Powered</span>
+                </div>
             </div>
         `;
-        resultsDiv.appendChild(upsellMessage);
         
-        // Then show tier options for purchase
-        const tiersSection = await this.createTiersSection(data.refined_query);
-        resultsDiv.appendChild(tiersSection);
+        // Results area with count and filters
+        const resultsArea = document.createElement('div');
+        resultsArea.className = 'results-area';
+        
+        const resultsMeta = document.createElement('div');
+        resultsMeta.className = 'results-meta';
+        resultsMeta.innerHTML = `
+            <div class="results-count">
+                <span>${data.sources.length} results for your research</span>
+            </div>
+        `;
+        
+        // Professional source cards grid (matching Figma SourceCard design)
+        const sourceGrid = document.createElement('div');
+        sourceGrid.className = 'source-cards-grid';
+        sourceGrid.innerHTML = data.sources.map(source => this.createFigmaSourceCard(source)).join('');
+        
+        resultsArea.appendChild(resultsMeta);
+        resultsArea.appendChild(sourceGrid);
+        
+        resultsDiv.appendChild(researchHeader);
+        resultsDiv.appendChild(resultsArea);
 
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        // Add event listeners for tier cards in this specific results section
-        this.addTierCardListeners(resultsDiv);
+        // Add event listeners for source cards
+        this.addSourceCardListeners(resultsDiv);
     }
 
     async getTierPrice(tierName) {
