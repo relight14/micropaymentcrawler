@@ -1285,20 +1285,10 @@ class ChatResearchApp {
         }
     }
 
-    showAuthModal(action = null, data = null) {
-        this.pendingAction = action ? { action, data } : null;
-        const modal = document.getElementById('authModal');
-        if (modal) {
-            modal.classList.add('show');
-            document.getElementById('authForm')?.reset();
-            this.clearAuthMessage();
-            this.updateAuthModalMode();
-        }
-    }
 
     closeAuthModal() {
         const modal = document.getElementById('authModal');
-        if (modal) modal.classList.remove('show');
+        if (modal) modal.style.display = 'none';
         this.pendingAction = null;
     }
 
@@ -1805,7 +1795,10 @@ class ChatResearchApp {
         }
     }
 
-    showAuthModal() {
+    showAuthModal(action = null, data = null) {
+        // Store pending action for resume after authentication
+        this.pendingAction = action ? { action, data } : null;
+        
         // Create authentication modal if it doesn't exist
         let authModal = document.getElementById('authModal');
         if (!authModal) {
