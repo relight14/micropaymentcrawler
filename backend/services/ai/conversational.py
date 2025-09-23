@@ -203,12 +203,12 @@ Be specific and targeted based on our conversation. Don't be generic."""
                 "role": "assistant",
                 "content": ai_response,
                 "timestamp": datetime.now().isoformat(),
-                "mode": "deep_research"
+                "mode": "research"
             })
             
             return {
                 "response": ai_response,
-                "mode": "deep_research",
+                "mode": "research",
                 "sources": selected_sources,
                 "licensing_summary": licensing_summary,
                 "refined_query": refined_query,
@@ -218,8 +218,8 @@ Be specific and targeted based on our conversation. Don't be generic."""
             
         except Exception as e:
             return {
-                "response": f"I encountered an issue during deep research, but I can still help you explore this topic conversationally. What specific aspect would you like to discuss?",
-                "mode": "deep_research",
+                "response": f"I encountered an issue during research, but I can still help you explore this topic conversationally. What specific aspect would you like to discuss?",
+                "mode": "research",
                 "error": str(e)
             }
     

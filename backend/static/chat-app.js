@@ -206,12 +206,10 @@ class ChatResearchApp {
             this.addMessage('assistant', data.response);
             
             // Handle research results
-            if (data.mode === 'research' && data.sources) {
-                console.log('Research data received:', data); // Debug log
-                console.log('Sources count:', data.sources.length); // Debug log
-                await this.displayResearchResults(data);
-            } else if (data.mode === 'research') {
-                console.log('Research mode but no sources:', data); // Debug log
+            if (data.mode === 'research' || data.mode === 'deep_research') {
+                if (data.sources && data.sources.length > 0) {
+                    await this.displayResearchResults(data);
+                }
             }
 
         } catch (error) {
@@ -651,11 +649,7 @@ class ChatResearchApp {
     }
 
     async displayResearchResults(data) {
-        console.log('displayResearchResults called with:', data); // Debug log
-        if (!data.sources || data.sources.length === 0) {
-            console.log('No sources to display'); // Debug log
-            return;
-        }
+        if (!data.sources || data.sources.length === 0) return;
 
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results';
