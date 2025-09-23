@@ -1,0 +1,101 @@
+UI Copy for Discovery Results
+
+👇 This is the content layout for each result in the Discovery Mode view. Designed to feel polished, informative, and action-driven.
+
+🔍 Discovery Result Component
+────────────────────────────────────────────
+📰 [Article Title Goes Here]
+by [Author Name] · [Publisher] · [Date]
+
+💡 Summary:
+"[2–3 sentence Claude-generated summary of key takeaway]"
+
+🔖 Protocol: [RSL | Tollbit | Cloudflare]  
+💵 Unlock full article: $0.15  
+🔓 [ Unlock Article Button ]  
+
+👁️ View count: 123  |  👍 Helpful? [Yes] [No]
+────────────────────────────────────────────
+
+💡 Optional UI Enhancements
+
+🏷️ “Licensed” or “Supports Publisher” badge next to the protocol
+
+Offer bundle unlock CTA after 3 clicks:
+
+“🔓 Unlock all 4 for $1.10 – Save 27%”
+
+If unlicensed:
+
+📄 Not yet licensed – summary only
+[Notify Me When Available] 
+
+📊 Analytics Schema (MVP)
+
+Track what matters: engagement, conversion, and eventual relevance training.
+
+🔐 User Session Table
+Field	Type	Notes
+session_id	UUID	Tied to anonymous or logged-in user
+user_id	UUID or NULL	If logged in
+start_time	Timestamp	Session start
+end_time	Timestamp	Optional for long sessions
+referrer	String	(Optional) How user arrived
+🔍 Search Event Table
+Field	Type	Notes
+search_id	UUID	Unique per query
+session_id	UUID	Foreign key
+query	Text	Raw user input
+timestamp	Timestamp	Time of query
+result_count	Integer	# of documents returned
+licensed_result_count	Integer	Filter for protocol-based tracking
+bundle_offer_shown	Boolean	UX testing
+📄 Search Result Interaction Table
+Field	Type	Notes
+interaction_id	UUID	One per result interaction
+search_id	UUID	Tied to the search event
+source_url	Text	Normalized
+publisher	Text	For cohort analysis
+protocol_type	Enum	RSL / Tollbit / Cloudflare / None
+was_licensed	Boolean	True/False
+viewed_summary	Boolean	Summary clicked
+clicked_unlock	Boolean	User clicked to unlock
+purchased_unlock	Boolean	Payment processed
+feedback	Enum	👍 / 👎 / null
+📦 Content Purchase Table
+Field	Type	Notes
+purchase_id	UUID	Unique
+user_id	UUID	Foreign key
+source_url	Text	Normalized
+price_usd	Decimal	$0.10–$0.50
+protocol	Enum	RSL / Tollbit / Cloudflare
+timestamp	Timestamp	Purchase time
+was_bundle	Boolean	Tracks single vs multi-purchase
+token_granted	Boolean	Licensing token returned successfully
+🚀 Benefits of This Schema
+
+Tracks full funnel conversion: search → click → payment
+
+Captures per-source feedback loop for Claude summaries
+
+Enables relevance training:
+
+What sources get clicked?
+
+What protocols convert best?
+
+What topics are high-value?
+
+Enables publisher reporting later:
+
+"Your content was shown 900 times, clicked 270, purchased 63"
+
+✅ MVP Implementation Tips
+
+Track anonymously first (don’t require login)
+
+Keep raw events in a queue or log (e.g., JSON to file or SQLite table)
+
+You can implement delayed analysis (don’t need real-time dashboards yet)
+
+Consider future export to Redshift or BigQuery for cohort analysis

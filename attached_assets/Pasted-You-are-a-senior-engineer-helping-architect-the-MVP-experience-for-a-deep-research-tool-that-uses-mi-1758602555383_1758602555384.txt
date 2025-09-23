@@ -1,0 +1,99 @@
+You are a senior engineer helping architect the MVP experience for a deep research tool that uses micropayments to deliver ethically licensed search results.
+
+Our app supports licensing protocols including RSL, Tollbit, and Cloudflare Pay-Per-Crawl, but not all publishers are live across all protocols yet. We want to ship a smooth MVP that:
+
+Surfaces the most relevant search results
+
+Highlights and enables payment-based access for licensed sources
+
+Tracks user interaction to improve future relevancy
+
+Gracefully falls back to unlicensed content when needed
+
+Scales to deeper protocol integration in future versions
+
+✅ DELIVERABLE: Implement the following behavior in MVP form
+1. Unified Licensing Discovery (already stubbed in ContentLicenseService)
+
+Check each result for support across all 3 protocols
+
+If found, populate:
+
+license_type (e.g., "summary", "full")
+
+license_cost
+
+publisher_name
+
+protocol (e.g., rsl, tollbit, cloudflare)
+
+Else, mark is_licensed=False
+
+2. Relevance Ranking
+
+For now, use Tavily rank order but:
+
+Boost sources with licensing available
+
+Demote sources with broken links or poor metadata
+
+Prefer .org, .edu, or known domains for trust
+
+3. Result Display Behavior
+
+Licensed source:
+
+Show protocol badge (🔒 RSL, ⚡ Tollbit, ☁️ CF)
+
+Show pricing + "Preview Summary" or "Purchase Full Access" CTA
+
+Unlicensed source:
+
+Show fallback summary with disclaimer: "Not licensed for full display"
+
+Optional CTA: "Visit original source" or "Report low quality"
+
+4. User Behavior Tracking
+
+Track the following events to local DB:
+
+Query string
+
+Source selected or purchased
+
+Whether user clicked full access / preview
+
+Whether summary satisfied user (simple thumbs up/down)
+
+Log schema:
+
+{
+  "query": "cold fusion history",
+  "timestamp": "2025-09-17T18:20Z",
+  "selected_source": "https://nytimes.com/.../cold-fusion",
+  "license_protocol": "rsl",
+  "license_cost": 0.10,
+  "interaction": {
+    "clicked_summary": true,
+    "purchased_full": false,
+    "feedback": "thumbs_up"
+  }
+}
+
+5. Scalability Notes (MVP Scope)
+
+Don’t implement full API integrations for Cloudflare/Tollbit — use fixed price stub responses
+
+Do write modular handlers for each protocol so real APIs can be plugged in later
+
+Log discovery failures for RSL, Tollbit, Cloudflare (for future coverage map)
+
+🧱 GOALS FOR THIS BUILD
+
+Build confidence that the platform can surface licensed, high-value content
+
+Show users they are supporting publishers directly
+
+Provide a working payment flow
+
+Begin collecting valuable product analytics

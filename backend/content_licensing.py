@@ -350,6 +350,12 @@ class ContentLicenseService:
         if cache_key in self._cache:
             return self._cache[cache_key]
         
+        # SSRF protection
+        if not self._is_safe_url(source_url):
+            print(f"Unsafe URL blocked: {source_url}")
+            self._cache[cache_key] = None
+            return None
+        
         # Try each protocol in order of preference
         for protocol_name, handler in self.protocols.items():
             try:
@@ -393,6 +399,169 @@ class ContentLicenseService:
             print(f"License request failed: {e}")
             return None
     
+    def check_all(self, url: str, license_type: str = 'ai-include') -> Dict[str, Any]:
+        """
+        Discovery Mode UI-ready licensing check for a single URL.
+        Returns structured metadata for frontend display.
+        """
+        try:
+            # Basic URL validation for SSRF protection
+            if not self._is_safe_url(url):
+                raise ValueError(f"Unsafe URL: {url}")
+            
+            license_info = self.discover_licensing(url)
+            
+            if license_info:
+                terms = license_info['terms']
+                protocol = license_info['protocol']
+                
+                # Check if requested license type is actually permitted
+                is_permitted = False
+                license_cost = 0.0
+                
+                if license_type == 'ai-include' and terms.permits_ai_include:
+                    is_permitted = True
+                    license_cost = terms.ai_include_price or 0.0
+                elif license_type == 'search' and terms.permits_search:
+                    is_permitted = True
+                    license_cost = terms.purchase_price or 0.0
+                elif license_type == 'ai-train' and terms.permits_ai_training:
+                    is_permitted = True
+                    license_cost = terms.ai_include_price or 0.0
+                
+                # Only show as licensed if permissions match request
+                if is_permitted:
+                    protocol_badges = {
+                        'rsl': '🔒 RSL',
+                        'tollbit': '⚡ Tollbit', 
+                        'cloudflare': '☁️ Cloudflare'
+                    }
+                    
+                    return {
+                        'is_licensed': True,
+                        'protocol': protocol,
+                        'protocol_badge': protocol_badges.get(protocol, f'📋 {protocol.upper()}'),
+                        'license_type': license_type,
+                        'license_cost': license_cost,
+                        'publisher_name': terms.publisher or self._extract_publisher_from_url(url),
+                        'currency': terms.currency or 'USD',
+                        'permits_ai_include': terms.permits_ai_include,
+                        'permits_search': terms.permits_search,
+                        'requires_attribution': terms.requires_attribution,
+                        # Internal data for purchase flow
+                        '_license_info': license_info
+                    }
+                else:
+                    # Protocol found but doesn't permit requested license type
+                    return {
+                        'is_licensed': False,
+                        'protocol': protocol,
+                        'protocol_badge': f'🚫 {protocol.upper()} (No {license_type})',
+                        'license_type': None,
+                        'license_cost': 0.0,
+                        'publisher_name': terms.publisher or self._extract_publisher_from_url(url),
+                        'currency': terms.currency or 'USD',
+                        'permits_ai_include': terms.permits_ai_include,
+                        'permits_search': terms.permits_search,
+                        'requires_attribution': terms.requires_attribution,
+                        '_license_info': None  # Don't allow purchase
+                    }
+            else:
+                # Unlicensed source
+                return {
+                    'is_licensed': False,
+                    'protocol': None,
+                    'protocol_badge': None,
+                    'license_type': None,
+                    'license_cost': 0.0,
+                    'publisher_name': self._extract_publisher_from_url(url),
+                    'currency': 'USD',
+                    'permits_ai_include': False,
+                    'permits_search': True,  # Can still be viewed at source
+                    'requires_attribution': True,  # Default to safe choice
+                    '_license_info': None
+                }
+        except Exception as e:
+            print(f"Licensing check failed for {url}: {e}")
+            # Return safe defaults on error
+            return {
+                'is_licensed': False,
+                'protocol': None,
+                'protocol_badge': None,
+                'license_type': None, 
+                'license_cost': 0.0,
+                'publisher_name': self._extract_publisher_from_url(url),
+                'currency': 'USD',
+                'permits_ai_include': False,
+                'permits_search': True,
+                'requires_attribution': True,
+                '_license_info': None
+            }
+    
+    def _is_safe_url(self, url: str) -> bool:
+        """Basic SSRF protection for licensing checks"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            
+            # Only allow http/https
+            if parsed.scheme not in ['http', 'https']:
+                return False
+            
+            # Block private networks and localhost
+            hostname = parsed.hostname
+            if not hostname:
+                return False
+                
+            import ipaddress
+            try:
+                ip = ipaddress.ip_address(hostname)
+                # Block private/loopback addresses
+                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                    return False
+            except ValueError:
+                # Hostname is not an IP - check for suspicious domains
+                if hostname.lower() in ['localhost', '127.0.0.1', '0.0.0.0', '::1']:
+                    return False
+            
+            return True
+        except:
+            return False
+
+    def _extract_publisher_from_url(self, url: str) -> str:
+        """Extract publisher name from URL domain"""
+        try:
+            domain = urlparse(url).netloc.replace('www.', '')
+            # Convert domain to readable publisher name
+            if 'nytimes.com' in domain:
+                return 'The New York Times'
+            elif 'washingtonpost.com' in domain:
+                return 'The Washington Post'
+            elif 'bloomberg.com' in domain:
+                return 'Bloomberg'
+            elif 'reuters.com' in domain:
+                return 'Reuters'
+            elif 'wsj.com' in domain:
+                return 'The Wall Street Journal'
+            elif 'forbes.com' in domain:
+                return 'Forbes'
+            elif 'ft.com' in domain:
+                return 'Financial Times'
+            elif 'economist.com' in domain:
+                return 'The Economist'
+            elif 'apnews.com' in domain:
+                return 'Associated Press'
+            elif 'time.com' in domain:
+                return 'Time Magazine'
+            else:
+                # Capitalize first letter of domain parts
+                parts = domain.split('.')
+                if len(parts) >= 2:
+                    return parts[0].replace('-', ' ').title()
+                return domain.title()
+        except:
+            return "Unknown Publisher"
+
     def get_license_summary(self, sources: List[Dict]) -> Dict[str, Any]:
         """Get summary of licensing costs and protocols for sources"""
         summary = {

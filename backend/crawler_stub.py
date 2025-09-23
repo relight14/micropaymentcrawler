@@ -478,38 +478,38 @@ class ContentCrawlerStub:
         return round(final_price, 2)
     
     def _discover_licensing(self, url: str):
-        """Discover content licensing for a given URL"""
+        """Discover content licensing for a given URL using Discovery Mode format"""
         try:
-            return self.license_service.discover_licensing(url)
+            return self.license_service.check_all(url)
         except Exception as e:
             print(f"License discovery failed for {url}: {e}")
             return None
     
     def _apply_licensing_info(self, source: SourceCard, license_info: dict):
-        """Apply licensing information to a source card"""
+        """Apply Discovery Mode licensing information to a source card"""
         if not license_info:
             return
             
-        terms = license_info['terms']
-        protocol = terms.protocol
-        
-        source.licensing_protocol = protocol
-        source.license_cost = terms.ai_include_price
-        source.publisher_name = terms.publisher
-        source.license_type = "ai-include"
-        source.requires_attribution = terms.requires_attribution
-        
-        # Set protocol badge for UI
-        protocol_badges = {
-            'rsl': '🔒 RSL Licensed',
-            'tollbit': '⚡ Tollbit Access',
-            'cloudflare': '☁️ CF Licensed'
-        }
-        source.protocol_badge = protocol_badges.get(protocol, f'📋 {protocol.upper()} Licensed')
-        
-        # Update unlock price to include license cost if applicable
-        if source.license_cost:
-            source.unlock_price += source.license_cost
+        # Handle new Discovery Mode format from check_all()
+        if license_info.get('is_licensed', False):
+            source.licensing_protocol = license_info.get('protocol')
+            source.license_cost = license_info.get('license_cost', 0.0)
+            source.publisher_name = license_info.get('publisher_name')
+            source.license_type = license_info.get('license_type', 'ai-include')
+            source.protocol_badge = license_info.get('protocol_badge')
+            source.requires_attribution = license_info.get('requires_attribution', False)
+            
+            # Update unlock price to include license cost if applicable
+            if source.license_cost and source.license_cost > 0:
+                source.unlock_price += source.license_cost
+        else:
+            # Unlicensed source - still set publisher name
+            source.publisher_name = license_info.get('publisher_name', 'Unknown Publisher')
+            source.licensing_protocol = None
+            source.license_cost = 0.0
+            source.license_type = None
+            source.protocol_badge = None
+            source.requires_attribution = license_info.get('requires_attribution', True)
     
     def _generate_mock_licensing(self, domain: str):
         """Generate mock licensing info for demonstration"""
