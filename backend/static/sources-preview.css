@@ -69,3 +69,26 @@
     padding-top: 12px;
     border-top: 1px solid #e2e8f0;
 }
+
+/* Upsell message styling */
+.upsell-message {
+    margin: 24px 0 20px 0;
+    text-align: center;
+}
+
+.upsell-content {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+    border: 2px solid #3b82f6;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 0 auto;
+    max-width: 600px;
+}
+
+.upsell-content h4 {
+    margin: 0;
+    color: #1e40af;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
+}

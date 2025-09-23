@@ -108,6 +108,11 @@ class ChatResearchApp {
         
         // Show typing indicator
         this.showTypingIndicator();
+        
+        // Add specific loading message for Discovery Mode
+        if (this.currentMode === 'deep_research') {
+            this.addMessage('system', '🔍 Scanning licensed sources across the web… This might take a few seconds — we\'re fetching high-quality, paywalled content you can ethically unlock.');
+        }
 
         try {
             const headers = {
@@ -618,6 +623,16 @@ class ChatResearchApp {
         `;
         
         resultsDiv.appendChild(sourcesPreview);
+        
+        // Add upsell call-to-action message before tier options
+        const upsellMessage = document.createElement('div');
+        upsellMessage.className = 'upsell-message';
+        upsellMessage.innerHTML = `
+            <div class="upsell-content">
+                <h4>💡 Go deeper with full article access, AI-curated insights, and verified sources.</h4>
+            </div>
+        `;
+        resultsDiv.appendChild(upsellMessage);
         
         // Then show tier options for purchase
         const tiersSection = await this.createTiersSection(data.refined_query);
