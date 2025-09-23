@@ -5,8 +5,10 @@ LedeWire AI Research Tool - Application Factory
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from utils.rate_limit import get_user_or_ip_key
 from utils.static import NoCacheStaticFiles
@@ -31,10 +33,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # Rate limiting - temporarily disabled to fix 405 errors
-    # limiter = Limiter(key_func=get_user_or_ip_key)
-    # app.state.limiter = limiter
-    # app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # Rate limiting
+    limiter = Limiter(key_func=get_user_or_ip_key)
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+    
+    # Custom rate limit exception handler
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request, exc):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": f"Rate limit exceeded: {exc.detail}"}
+        )
     
     # Static files with no-cache
     static_dir = "static"

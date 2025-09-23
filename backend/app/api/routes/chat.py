@@ -5,6 +5,8 @@ from slowapi import Limiter
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
+# Note: Rate limiting is handled by middleware in app/__init__.py
+
 from services.ai.conversational import AIResearchService
 from utils.rate_limit import get_user_or_ip_key
 from integrations.ledewire import LedeWireAPI
@@ -89,7 +91,7 @@ def extract_user_id_from_token(access_token: str) -> str:
 
 
 @router.post("", response_model=ChatResponse)
-# @limiter.limit("30/minute")
+# Rate limiting: 30/minute enforced by middleware
 async def chat(request: Request, chat_request: ChatRequest, authorization: str = Header(None)):
     """AI chat endpoint supporting both conversational and deep research modes"""
     try:
@@ -120,7 +122,7 @@ async def chat(request: Request, chat_request: ChatRequest, authorization: str =
 
 
 @router.get("/history")
-# @limiter.limit("60/minute")
+# Rate limiting: 60/minute enforced by middleware
 async def get_conversation_history(request: Request, authorization: str = Header(None)):
     """Get current conversation history for authenticated user"""
     # Extract user identity
@@ -141,7 +143,7 @@ async def get_conversation_history(request: Request, authorization: str = Header
 
 
 @router.post("/clear")
-# @limiter.limit("10/minute")
+# Rate limiting: 10/minute enforced by middleware
 async def clear_conversation(request: Request, authorization: str = Header(None)):
     """Clear conversation history for authenticated user"""
     # Extract user identity
