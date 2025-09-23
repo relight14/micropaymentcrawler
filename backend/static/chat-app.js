@@ -334,17 +334,64 @@ class ChatResearchApp {
         const unlockPrice = source.unlock_price || 0;
         const sourceId = source.id || '';
         
+        // Discovery Mode licensing data
+        const isLicensed = !!source.licensing_protocol;
+        const protocolBadge = source.protocol_badge || '';
+        const publisherName = source.publisher_name || domain;
+        const licenseCost = source.license_cost || 0;
+        const requiresAttribution = source.requires_attribution || false;
+        
         const quote = this.extractCompellingQuote(excerpt);
-        const licensingBadge = source.licensing_protocol ? 
-            this.getLicenseIcon(source.licensing_protocol) : 
-            '<span class="license-badge">📄 Standard</span>';
+        
+        // Create licensing badge based on Discovery Mode data
+        let licensingBadge = '';
+        if (isLicensed && protocolBadge) {
+            licensingBadge = `<span class="license-badge licensed">${protocolBadge}</span>`;
+        } else {
+            licensingBadge = '<span class="license-badge unlicensed">📄 Unlicensed</span>';
+        }
+        
+        // Publisher attribution
+        const publisherInfo = publisherName !== domain ? 
+            `<span class="publisher-name">by ${this.escapeHtml(publisherName)}</span>` : '';
+        
+        // Create unlock button based on licensing status
+        let unlockSection = '';
+        if (isLicensed) {
+            const totalCost = unlockPrice;
+            unlockSection = `
+                <div class="source-unlock licensed">
+                    <div class="license-details">
+                        <span class="unlock-price">$${totalCost.toFixed(2)}</span>
+                        ${licenseCost > 0 ? `<span class="license-fee">includes $${licenseCost.toFixed(2)} license</span>` : ''}
+                        ${requiresAttribution ? '<span class="attribution-required">⚖️ Attribution required</span>' : ''}
+                    </div>
+                    <button class="unlock-btn-chat licensed" onclick="chatApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${totalCost}, '${this.escapeHtml(title)}')">
+                        🔓 Unlock & License
+                    </button>
+                </div>
+            `;
+        } else {
+            unlockSection = `
+                <div class="source-unlock unlicensed">
+                    <div class="no-license-info">
+                        <span class="view-source">View at source</span>
+                        <small>No AI-include rights available</small>
+                    </div>
+                    <a href="${this.escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="view-btn-chat">
+                        🔗 View Original
+                    </a>
+                </div>
+            `;
+        }
 
         return `
-            <div class="source-card-chat" data-source-id="${this.escapeHtml(sourceId)}">
+            <div class="source-card-chat ${isLicensed ? 'licensed' : 'unlicensed'}" data-source-id="${this.escapeHtml(sourceId)}">
                 <div class="source-header">
                     <h5><a href="${this.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${this.sanitizeHtml(title)}</a></h5>
                     <div class="source-meta">
                         <span class="domain-badge">${this.escapeHtml(domain)}</span>
+                        ${publisherInfo}
                         ${licensingBadge}
                     </div>
                 </div>
@@ -352,12 +399,7 @@ class ChatResearchApp {
                     <blockquote>"${this.sanitizeHtml(quote)}"</blockquote>
                     <p>${this.sanitizeHtml(this.createSourceDescription(excerpt, quote))}</p>
                 </div>
-                <div class="source-unlock">
-                    <span class="unlock-price">$${unlockPrice.toFixed(2)}</span>
-                    <button class="unlock-btn-chat" onclick="chatApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${unlockPrice}, '${this.escapeHtml(title)}')">
-                        🔓 Unlock
-                    </button>
-                </div>
+                ${unlockSection}
             </div>
         `;
     }
@@ -429,18 +471,25 @@ class ChatResearchApp {
         const resultsDiv = document.createElement('div');
         resultsDiv.className = 'research-results';
         
-        // First, display the actual polished source cards from Tavily+Claude hybrid pipeline
+        // Discovery Mode - show real-time licensing results
+        const licensedCount = data.sources.filter(s => s.licensing_protocol !== null).length;
+        const unlicensedCount = data.sources.length - licensedCount;
+        
         const sourcesPreview = document.createElement('div');
-        sourcesPreview.className = 'sources-preview-section';
+        sourcesPreview.className = 'sources-preview-section discovery-mode';
         sourcesPreview.innerHTML = `
             <div class="preview-header">
-                <h3>🔬 Research Preview: ${data.sources.length} Premium Sources Found</h3>
-                <p>Real URLs with AI-polished content and licensing verification</p>
+                <h3>🔍 Discovery Mode: Found ${data.sources.length} Research Sources</h3>
+                <div class="licensing-summary">
+                    <span class="licensed-count">${licensedCount} Licensed Sources</span>
+                    <span class="unlicensed-count">${unlicensedCount} Unlicensed Sources</span>
+                </div>
+                <p>Real-time protocol detection • Publisher attribution • Ethical pricing</p>
             </div>
             <div class="sources-preview-grid">
-                ${data.sources.slice(0, 6).map(source => this.createSourceCardForChat(source)).join('')}
+                ${data.sources.slice(0, 8).map(source => this.createSourceCardForChat(source)).join('')}
             </div>
-            ${data.sources.length > 6 ? `<p class="more-sources-hint">+ ${data.sources.length - 6} more sources available with tier selection</p>` : ''}
+            ${data.sources.length > 8 ? `<p class="more-sources-hint">+ ${data.sources.length - 8} more sources in full research mode</p>` : ''}
         `;
         
         resultsDiv.appendChild(sourcesPreview);
