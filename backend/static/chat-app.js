@@ -2,14 +2,19 @@ class ChatResearchApp {
     constructor() {
         this.currentMode = 'chat'; // 'chat' or 'research'
         this.apiBase = window.location.origin;
-        this.authToken = localStorage.getItem('authToken');
+        this.authToken = localStorage.getItem('ledewire_token');
         this.walletBalance = 0; // Initialize to prevent NaN display
         this.conversationHistory = [];
         this.isDarkMode = localStorage.getItem('darkMode') === 'true';
+        this.purchasedItems = new Set();
+        this.currentQuery = '';
+        this.isLoginMode = true;
+        this.pendingAction = null;
         this.initializeEventListeners();
         this.initializeWalletDisplay();
         this.initializeDarkMode();
         this.updateModeDisplay();
+        this.initializeAuth();
     }
 
     initializeEventListeners() {
@@ -20,6 +25,9 @@ class ChatResearchApp {
         const chatModeBtn = document.getElementById('chatModeBtn');
         const researchModeBtn = document.getElementById('researchModeBtn');
         const darkModeToggle = document.getElementById('darkModeToggle');
+        const authButton = document.getElementById('authButton');
+        const authForm = document.getElementById('authForm');
+        const authToggleButton = document.getElementById('authToggleButton');
 
         // Chat functionality
         sendButton.addEventListener('click', () => this.sendMessage());
@@ -47,6 +55,14 @@ class ChatResearchApp {
             this.updateInputPlaceholder();
             this.updateCharacterCount();
         });
+
+        // Authentication events - single event listener to avoid conflicts
+        if (authButton) {
+            authButton.removeEventListener('click', this.handleAuthButtonClick); // Remove any existing
+            authButton.addEventListener('click', () => this.handleAuthButtonClick());
+        }
+        if (authForm) authForm.addEventListener('submit', (e) => this.handleAuthSubmit(e));
+        if (authToggleButton) authToggleButton.addEventListener('click', () => this.toggleAuthMode());
     }
 
 
@@ -649,10 +665,10 @@ class ChatResearchApp {
     }
 
     createFigmaSourceCard(source) {
-        // Extract data
-        const title = source.title || 'Untitled Source';
-        const excerpt = source.excerpt || source.snippet || 'No preview available';
-        const author = source.publisher_name || source.domain || 'Unknown Publisher';
+        // Extract and sanitize data to prevent XSS
+        const title = this.sanitizeText(source.title || 'Untitled Source');
+        const excerpt = this.sanitizeText(source.excerpt || source.snippet || 'No preview available');
+        const author = this.sanitizeText(source.publisher_name || source.domain || 'Unknown Publisher');
         const publishDate = new Date().toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'short', 
@@ -736,19 +752,69 @@ class ChatResearchApp {
 
     addSourceCardListeners(resultsDiv) {
         // Add click handlers for source card interactions
-        resultsDiv.addEventListener('click', (e) => {
+        resultsDiv.addEventListener('click', async (e) => {
             if (e.target.matches('.btn-unlock') || e.target.closest('.btn-unlock')) {
                 const btn = e.target.matches('.btn-unlock') ? e.target : e.target.closest('.btn-unlock');
                 const price = btn.dataset.price;
-                console.log(`Unlock source for $${price}`);
-                // Add unlock logic here
+                const sourceId = btn.closest('[data-source-id]')?.dataset.sourceId;
+                await this.handleSourceUnlock(btn, sourceId, price);
             }
             
             if (e.target.matches('.btn-download') || e.target.closest('.btn-download')) {
-                console.log('Download free source');
-                // Add download logic here
+                const sourceId = e.target.closest('[data-source-id]')?.dataset.sourceId;
+                await this.handleSourceDownload(sourceId);
             }
         });
+    }
+
+    async handleSourceUnlock(button, sourceId, price) {
+        // Check authentication first
+        if (!this.authToken) {
+            this.showAuthModal('unlock', { sourceId, price, button });
+            return;
+        }
+
+        const priceCents = Math.round(parseFloat(price) * 100);
+        
+        // Check sufficient funds
+        if (this.walletBalance < priceCents) {
+            this.showInsufficientFundsModal(priceCents);
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = 'Unlocking...';
+        
+        try {
+            // **MOCK SOURCE UNLOCK** - Simulate purchase
+            const mockResult = await this.mockPurchaseConfirmation('source', priceCents);
+            
+            if (mockResult.success) {
+                // Mock wallet deduction
+                this.walletBalance -= priceCents;
+                this.updateAuthDisplay(true);
+                
+                // Update button state
+                button.textContent = '✅ Unlocked';
+                button.classList.add('unlocked');
+                button.disabled = true;
+                
+                this.showSuccessToast('Source unlocked successfully!');
+            }
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = `Unlock $${price}`;
+            this.showErrorToast('Failed to unlock source');
+        }
+    }
+
+    async handleSourceDownload(sourceId) {
+        if (!this.authToken) {
+            this.showAuthModal('download', { sourceId });
+            return;
+        }
+        
+        this.showSuccessToast('Source downloaded successfully!');
     }
 
     createResearchPacketsSection(query) {
@@ -863,25 +929,468 @@ class ChatResearchApp {
 
     addResearchPacketListeners(resultsDiv) {
         // Add click handlers for research packet purchases
-        resultsDiv.addEventListener('click', (e) => {
+        resultsDiv.addEventListener('click', async (e) => {
             if (e.target.matches('.packet-cta') || e.target.closest('.packet-cta')) {
                 const btn = e.target.matches('.packet-cta') ? e.target : e.target.closest('.packet-cta');
                 const packetId = btn.dataset.packet;
                 const price = btn.dataset.price;
                 
-                console.log(`Purchase ${packetId} tier for ${price}`);
-                
-                // Disable button and show loading state
-                btn.disabled = true;
-                btn.textContent = 'Processing...';
-                
-                // Here you would integrate with your purchase logic
-                setTimeout(() => {
-                    btn.textContent = '✅ Purchased';
-                    btn.style.opacity = '0.7';
-                }, 1500);
+                await this.handleResearchPacketPurchase(btn, packetId, price);
             }
         });
+    }
+
+    // Authentication Methods
+    initializeAuth() {
+        if (this.authToken) {
+            this.updateWalletBalance().catch(() => {
+                localStorage.removeItem('ledewire_token');
+                this.authToken = null;
+                this.updateAuthDisplay(false);
+            });
+        } else {
+            this.updateAuthDisplay(false);
+        }
+    }
+
+    updateAuthDisplay(isAuthenticated) {
+        const walletDisplay = document.getElementById('walletDisplay');
+        const authButton = document.getElementById('authButton');
+        
+        if (isAuthenticated && this.walletBalance !== null) {
+            if (walletDisplay) {
+                walletDisplay.style.display = 'flex';
+                const balanceEl = walletDisplay.querySelector('.wallet-balance');
+                if (balanceEl) balanceEl.textContent = `$${(this.walletBalance / 100).toFixed(2)}`;
+            }
+            if (authButton) {
+                authButton.textContent = 'Logout';
+                // Don't use onclick to avoid conflicts with addEventListener
+                authButton.classList.add('authenticated');
+            }
+        } else {
+            if (walletDisplay) walletDisplay.style.display = 'none';
+            if (authButton) {
+                authButton.textContent = 'Login';
+                authButton.classList.remove('authenticated');
+            }
+        }
+    }
+
+    async updateWalletBalance() {
+        if (!this.authToken) return;
+        
+        try {
+            const response = await fetch('/api/auth/wallet/balance', {
+                headers: { 'Authorization': `Bearer ${this.authToken}` }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.walletBalance = data.balance_cents;
+                this.updateAuthDisplay(true);
+            } else if (response.status === 401) {
+                throw new Error('Token expired');
+            }
+        } catch (error) {
+            console.error('Failed to update wallet balance:', error);
+            throw error;
+        }
+    }
+
+    handleAuthButtonClick() {
+        // Check button state to determine action
+        const authButton = document.getElementById('authButton');
+        if (authButton && authButton.classList.contains('authenticated')) {
+            this.logout();
+        } else {
+            this.showAuthModal();
+        }
+    }
+
+    showAuthModal(action = null, data = null) {
+        this.pendingAction = action ? { action, data } : null;
+        const modal = document.getElementById('authModal');
+        if (modal) {
+            modal.classList.add('show');
+            document.getElementById('authForm')?.reset();
+            this.clearAuthMessage();
+            this.updateAuthModalMode();
+        }
+    }
+
+    closeAuthModal() {
+        const modal = document.getElementById('authModal');
+        if (modal) modal.classList.remove('show');
+        this.pendingAction = null;
+    }
+
+    toggleAuthMode() {
+        this.isLoginMode = !this.isLoginMode;
+        this.updateAuthModalMode();
+        this.clearAuthMessage();
+    }
+
+    updateAuthModalMode() {
+        const title = document.getElementById('authModalTitle');
+        const submitBtn = document.getElementById('authSubmitButton');
+        const toggleText = document.getElementById('authToggleText');
+        const toggleBtn = document.getElementById('authToggleButton');
+        const signupFields = document.getElementById('signupFields');
+        
+        if (this.isLoginMode) {
+            if (title) title.textContent = 'Login to LedeWire';
+            if (submitBtn) submitBtn.textContent = 'Login';
+            if (toggleText) toggleText.innerHTML = 'Don\'t have an account? ';
+            if (toggleBtn) toggleBtn.textContent = 'Sign Up';
+            if (signupFields) signupFields.style.display = 'none';
+        } else {
+            if (title) title.textContent = 'Sign Up for LedeWire';
+            if (submitBtn) submitBtn.textContent = 'Sign Up';
+            if (toggleText) toggleText.innerHTML = 'Already have an account? ';
+            if (toggleBtn) toggleBtn.textContent = 'Login';
+            if (signupFields) signupFields.style.display = 'block';
+        }
+    }
+
+    async handleAuthSubmit(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('authEmail')?.value;
+        const password = document.getElementById('authPassword')?.value;
+        const name = document.getElementById('authName')?.value;
+        const submitBtn = document.getElementById('authSubmitButton');
+        
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = this.isLoginMode ? 'Logging in...' : 'Creating account...';
+        }
+        
+        try {
+            let result;
+            if (this.isLoginMode) {
+                result = await this.loginUser(email, password);
+            } else {
+                result = await this.signupUser(email, password, name);
+            }
+            
+            if (result.success) {
+                this.authToken = result.access_token;
+                localStorage.setItem('ledewire_token', result.access_token);
+                
+                await this.updateWalletBalance();
+                this.closeAuthModal();
+                this.showSuccessToast(`${this.isLoginMode ? 'Login' : 'Account creation'} successful!`);
+                
+                if (this.pendingAction) {
+                    await this.executePendingAction();
+                }
+            }
+        } catch (error) {
+            this.showAuthMessage(error.message, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = this.isLoginMode ? 'Login' : 'Sign Up';
+            }
+        }
+    }
+
+    async loginUser(email, password) {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Login failed');
+        }
+        
+        return await response.json();
+    }
+
+    async signupUser(email, password, name) {
+        const response = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, name })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Signup failed');
+        }
+        
+        return await response.json();
+    }
+
+    logout() {
+        localStorage.removeItem('ledewire_token');
+        this.authToken = null;
+        this.walletBalance = 0;
+        this.purchasedItems.clear();
+        this.updateAuthDisplay(false);
+        this.showSuccessToast('Logged out successfully');
+    }
+
+    showAuthMessage(message, type = 'error') {
+        const messageEl = document.getElementById('authMessage');
+        if (messageEl) {
+            messageEl.textContent = message;
+            messageEl.className = `auth-message ${type}`;
+        }
+    }
+
+    clearAuthMessage() {
+        const messageEl = document.getElementById('authMessage');
+        if (messageEl) {
+            messageEl.className = 'auth-message';
+            messageEl.textContent = '';
+        }
+    }
+
+    // Purchase Flow Methods
+    generateIdempotencyKey() {
+        return `${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    }
+
+    async handleResearchPacketPurchase(button, packetId, price) {
+        this.currentQuery = this.getLastQuery();
+        
+        // Check authentication first
+        if (!this.authToken) {
+            this.showAuthModal('purchase', { packetId, price, button });
+            return;
+        }
+
+        button.dataset.originalText = button.textContent;
+
+        // For basic tier (free), skip payment processing
+        if (packetId === 'basic' || price === 'Free') {
+            await this.processFreeTier(button, packetId);
+            return;
+        }
+
+        // Convert price to cents
+        const priceCents = Math.round(parseFloat(price.replace('$', '')) * 100);
+        
+        // Check sufficient funds
+        if (this.walletBalance < priceCents) {
+            this.showInsufficientFundsModal(priceCents);
+            return;
+        }
+
+        // Process purchase
+        await this.processPurchase(button, packetId, priceCents);
+    }
+
+    async processFreeTier(button, packetId) {
+        button.disabled = true;
+        button.textContent = 'Processing...';
+        
+        try {
+            const response = await fetch('/api/purchase/tier', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                body: JSON.stringify({
+                    tier: packetId,
+                    query: this.currentQuery,
+                    idempotency_key: this.generateIdempotencyKey()
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.handlePurchaseSuccess(button, packetId, result);
+            } else {
+                this.handlePurchaseError(button, await response.json());
+            }
+        } catch (error) {
+            this.handleNetworkError(button, error);
+        }
+    }
+
+    async processPurchase(button, packetId, priceCents) {
+        button.disabled = true;
+        button.textContent = 'Processing...';
+        
+        try {
+            // **MOCK PURCHASE MODE** - No real charges
+            const mockResult = await this.mockPurchaseConfirmation(packetId, priceCents);
+            
+            if (mockResult.success) {
+                // Mock wallet deduction
+                this.walletBalance -= priceCents;
+                this.updateAuthDisplay(true);
+                
+                // Generate research packet
+                const response = await fetch('/api/purchase/tier', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.authToken}`
+                    },
+                    body: JSON.stringify({
+                        tier: packetId,
+                        query: this.currentQuery,
+                        idempotency_key: this.generateIdempotencyKey(),
+                        mock_purchase: true
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    this.handlePurchaseSuccess(button, packetId, result);
+                } else {
+                    this.handlePurchaseError(button, await response.json());
+                }
+            }
+        } catch (error) {
+            this.handleNetworkError(button, error);
+        }
+    }
+
+    async mockPurchaseConfirmation(packetId, priceCents) {
+        console.log(`🧪 MOCK PURCHASE: ${packetId} for $${(priceCents/100).toFixed(2)}`);
+        
+        // Simulate processing delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        return {
+            success: true,
+            transaction_id: `mock_txn_${Date.now()}`,
+            content_id: `${packetId}_${this.currentQuery.substring(0, 20)}`
+        };
+    }
+
+    handlePurchaseSuccess(button, packetId, result) {
+        button.textContent = '✅ Purchased';
+        button.classList.add('purchased');
+        this.purchasedItems.add(packetId);
+        
+        if (result.packet) {
+            this.displayResearchPacket(result.packet);
+        }
+        
+        this.showSuccessToast(`${packetId.charAt(0).toUpperCase() + packetId.slice(1)} tier purchased!`);
+    }
+
+    handlePurchaseError(button, error) {
+        button.disabled = false;
+        button.textContent = button.dataset.originalText || 'Purchase';
+        this.showErrorToast(`Purchase failed: ${error.detail || 'Unknown error'}`);
+    }
+
+    handleNetworkError(button, error) {
+        button.disabled = false;
+        button.textContent = button.dataset.originalText || 'Try Again';
+        this.showErrorToast('Network error. Please try again.');
+    }
+
+    showInsufficientFundsModal(priceCents) {
+        const needed = (priceCents / 100).toFixed(2);
+        const current = (this.walletBalance / 100).toFixed(2);
+        this.showErrorToast(`Insufficient funds. Need $${needed}, have $${current}. Please add funds to your wallet.`);
+    }
+
+    async executePendingAction() {
+        if (!this.pendingAction) return;
+        
+        const { action, data } = this.pendingAction;
+        this.pendingAction = null;
+        
+        if (action === 'purchase' && data) {
+            await this.handleResearchPacketPurchase(data.button, data.packetId, data.price);
+        } else if (action === 'unlock' && data) {
+            await this.handleSourceUnlock(data.button, data.sourceId, data.price);
+        } else if (action === 'download' && data) {
+            await this.handleSourceDownload(data.sourceId);
+        }
+    }
+
+    getLastQuery() {
+        if (this.conversationHistory.length > 0) {
+            return this.conversationHistory[this.conversationHistory.length - 1].user || 'general research';
+        }
+        return 'general research';
+    }
+
+    displayResearchPacket(packet) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Create elements safely to prevent XSS
+        const packetDiv = document.createElement('div');
+        packetDiv.className = 'research-packet-display';
+        
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'packet-header';
+        
+        const titleH3 = document.createElement('h3');
+        titleH3.textContent = `📋 Research Report: ${packet.tier}`;
+        
+        const metaPara = document.createElement('p');
+        metaPara.className = 'packet-meta';
+        metaPara.textContent = `Generated ${new Date().toLocaleString()}`;
+        
+        headerDiv.appendChild(titleH3);
+        headerDiv.appendChild(metaPara);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'packet-content';
+        
+        // Safely add content - check if it's HTML or text
+        const content = packet.content || packet.packet_html || '<p>Research packet generated successfully!</p>';
+        if (content.includes('<') && content.includes('>')) {
+            // HTML content - should be sanitized on backend
+            contentDiv.innerHTML = content;
+        } else {
+            // Plain text
+            contentDiv.textContent = content;
+        }
+        
+        packetDiv.appendChild(headerDiv);
+        packetDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(packetDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Toast Notifications
+    showSuccessToast(message) { this.showToast(message, 'success'); }
+    showErrorToast(message) { this.showToast(message, 'error'); }
+    showInfoToast(message) { this.showToast(message, 'info'); }
+
+    // Security: Text sanitization to prevent XSS
+    sanitizeText(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Security: Create DOM elements safely without innerHTML
+    createSecureElement(tag, className, textContent) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (textContent) element.textContent = textContent;
+        return element;
+    }
+
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = this.sanitizeText(message); // Sanitize message
+        
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 100);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => container.removeChild(toast), 300);
+        }, 5000);
     }
 
     async displayResearchResults(data) {
