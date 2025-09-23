@@ -564,7 +564,8 @@ class ChatResearchApp {
             return;
         }
 
-        if (this.walletBalance < price) {
+        const priceCents = Math.round(price * 100);
+        if (this.walletBalance < priceCents) {
             this.addMessage('system', 'Insufficient wallet balance to unlock this source.');
             return;
         }
@@ -616,8 +617,8 @@ class ChatResearchApp {
             const data = await response.json();
             
             if (data.success) {
-                // Update wallet balance (server returns cents, convert to dollars)
-                this.walletBalance = data.remaining_balance_cents / 100;
+                // Update wallet balance (keep in cents for consistency)
+                this.walletBalance = data.remaining_balance_cents;
                 this.updateWalletDisplay();
                 
                 // Show unlocked content (sanitized by server)
@@ -660,7 +661,7 @@ class ChatResearchApp {
                 
                 if (response.ok) {
                     const data = await response.json();
-                    this.walletBalance = data.balance_cents / 100;  // Convert cents to dollars
+                    this.walletBalance = data.balance_cents;  // Keep in cents for consistency
                     this.updateWalletDisplay();
                 } else if (response.status === 401) {
                     // Token expired, clear it and prompt login
@@ -681,7 +682,7 @@ class ChatResearchApp {
         
         if (this.ledewire_token && this.walletBalance !== undefined) {
             walletDisplay.style.display = 'block';
-            walletBalance.textContent = this.walletBalance.toFixed(2);
+            walletBalance.textContent = (this.walletBalance / 100).toFixed(2); // Convert cents to dollars for display
         } else {
             walletDisplay.style.display = 'none';
         }
@@ -2057,7 +2058,7 @@ class ChatResearchApp {
             if (response.ok) {
                 const data = await response.json();
                 if (data.balance_cents !== undefined) {
-                    this.walletBalance = data.balance_cents / 100; // Convert cents to dollars
+                    this.walletBalance = data.balance_cents; // Keep in cents for consistency
                     // Now show wallet modal with real balance
                     await this.showWalletModal(type, itemDetails);
                 } else {
@@ -2105,13 +2106,14 @@ class ChatResearchApp {
         // Get current tier price dynamically (prices now come from API)
         const price = await this.getTierPrice(this.selectedTier);
         
-        document.getElementById('walletBalance').textContent = `$${this.walletBalance.toFixed(2)}`;
+        document.getElementById('walletBalance').textContent = `$${(this.walletBalance / 100).toFixed(2)}`;
         document.getElementById('transactionItemLabel').textContent = `${this.selectedTier.charAt(0).toUpperCase() + this.selectedTier.slice(1)} Research Package Price`;
         document.getElementById('transactionAmount').textContent = `$${price.toFixed(2)}`;
         
         // Update success banner if insufficient funds
         const successBanner = walletModal.querySelector('.wallet-success-banner');
-        if (this.walletBalance < price) {
+        const priceCents = Math.round(price * 100);
+        if (this.walletBalance < priceCents) {
             successBanner.style.background = 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
             successBanner.style.color = '#991b1b';
             successBanner.textContent = 'Insufficient funds in your wallet to purchase this content.';
@@ -2168,8 +2170,9 @@ class ChatResearchApp {
     async confirmPayment(type, itemDetails = null) {
         const price = await this.getTierPrice(this.selectedTier);
 
-        // Check balance
-        if (this.walletBalance < price) {
+        // Check balance (convert price to cents for comparison)
+        const priceCents = Math.round(price * 100);
+        if (this.walletBalance < priceCents) {
             this.showModalError('Insufficient wallet balance. Please add funds to your wallet.');
             return;
         }
@@ -2218,8 +2221,8 @@ class ChatResearchApp {
             const data = await response.json();
             
             if (data.success) {
-                // Update wallet balance
-                this.walletBalance -= data.wallet_deduction;
+                // Update wallet balance (server returns deduction in dollars, convert to cents for storage)
+                this.walletBalance -= Math.round(data.wallet_deduction * 100);
                 this.addMessage('system', `🎉 Payment processed successfully! $${data.wallet_deduction.toFixed(2)} deducted from wallet.`);
                 
                 // Display the research package
