@@ -160,8 +160,8 @@ class ChatResearchApp {
         // Show typing indicator
         this.showTypingIndicator();
         
-        // Add specific loading message for Discovery Mode
-        if (this.currentMode === 'deep_research') {
+        // Add specific loading message for Research Mode
+        if (this.currentMode === 'research') {
             this.addMessage('system', '🔍 Scanning licensed sources across the web… This might take a few seconds — we\'re fetching high-quality, paywalled content you can ethically unlock.');
         }
 
@@ -170,8 +170,8 @@ class ChatResearchApp {
                 'Content-Type': 'application/json'
             };
             
-            // Add auth token for deep research mode
-            if (this.currentMode === 'deep_research' && this.authToken) {
+            // Add auth token for research mode
+            if (this.currentMode === 'research' && this.authToken) {
                 headers['Authorization'] = `Bearer ${this.authToken}`;
             }
 
@@ -184,13 +184,13 @@ class ChatResearchApp {
                 })
             });
 
-            // Handle 401 responses in deep research mode - token is invalid/expired
-            if (response.status === 401 && this.currentMode === 'deep_research') {
-                console.log('Token expired during deep research, clearing auth and showing login...');
+            // Handle 401 responses in research mode - token is invalid/expired
+            if (response.status === 401 && this.currentMode === 'research') {
+                console.log('Token expired during research, clearing auth and showing login...');
                 this.hideTypingIndicator(); // Fix: ensure loading state is cleared
                 this.authToken = null;
                 localStorage.removeItem('authToken');
-                this.addMessage('assistant', 'Session expired. Please sign in to continue with deep research.');
+                this.addMessage('assistant', 'Session expired. Please sign in to continue with research.');
                 this.showAuthModal();
                 return;
             }
@@ -205,8 +205,8 @@ class ChatResearchApp {
             // Add AI response
             this.addMessage('assistant', data.response);
             
-            // Handle deep research results
-            if (data.mode === 'deep_research' && data.sources) {
+            // Handle research results
+            if (data.mode === 'research' && data.sources) {
                 await this.displayResearchResults(data);
             }
 

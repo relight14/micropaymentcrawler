@@ -53,9 +53,9 @@ class AIResearchService:
             "mode": mode
         })
         
-        if mode == "conversational":
+        if mode == "chat" or mode == "conversational":
             return self._conversational_response(user_message, user_id)
-        else:  # deep_research
+        else:  # research or deep_research
             return self._deep_research_response(user_message, user_id)
     
     def _conversational_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
