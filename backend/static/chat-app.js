@@ -7,6 +7,7 @@ class ChatResearchApp {
         this.conversationHistory = [];
         this.initializeEventListeners();
         this.updateCharacterCount();
+        this.initializeWalletDisplay();
     }
 
     initializeEventListeners() {
@@ -79,10 +80,10 @@ class ChatResearchApp {
         
         if (this.currentMode === 'deep_research') {
             modeToggle.textContent = 'Switch to Conversation';
-            modeIndicator.innerHTML = '🔬 Deep Research Mode';
+            modeIndicator.innerHTML = '🔍 Discovery Mode';
             modeIndicator.className = 'mode-indicator research-mode';
         } else {
-            modeToggle.textContent = 'Switch to Deep Research';
+            modeToggle.textContent = 'Switch to Discovery Mode';
             modeIndicator.innerHTML = '💬 Conversational Mode';
             modeIndicator.className = 'mode-indicator conversation-mode';
         }
@@ -456,13 +457,137 @@ class ChatResearchApp {
             return;
         }
 
-        this.addMessage('system', `🔓 Unlocking "${title}" for $${price.toFixed(2)}...`);
+        // Prevent double-click by disabling button immediately
+        const unlockButton = document.querySelector(`[data-source-id="${sourceId}"] .unlock-btn-chat`);
+        if (unlockButton) {
+            unlockButton.disabled = true;
+            unlockButton.textContent = '⏳ Unlocking...';
+        }
+
+        this.addMessage('system', `🔓 Unlocking "${title}"...`);
         
-        // For now, simulate unlocking - in full version would make API call
-        setTimeout(() => {
-            this.walletBalance -= price;
-            this.addMessage('system', `✅ Source unlocked! $${price.toFixed(2)} deducted from wallet. Full article content would be displayed here.`);
-        }, 1000);
+        try {
+            // Generate idempotency key to prevent double charges
+            const idempotencyKey = `unlock_${sourceId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Make real API call to unlock source - only send source_id, server computes pricing
+            const response = await fetch(`${this.apiBase}/api/sources/unlock-source`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                body: JSON.stringify({
+                    source_id: sourceId,
+                    idempotency_key: idempotencyKey
+                })
+            });
+
+            if (response.status === 401) {
+                // Handle auth failure - clear token and show login
+                this.authToken = null;
+                localStorage.removeItem('authToken');
+                this.updateWalletDisplay();
+                this.addMessage('system', 'Session expired. Please log in to continue.');
+                // Re-enable button for retry after login
+                if (unlockButton) {
+                    unlockButton.disabled = false;
+                    unlockButton.textContent = '🔓 Unlock & License';
+                }
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update wallet balance (server returns cents, convert to dollars)
+                this.walletBalance = data.remaining_balance_cents / 100;
+                this.updateWalletDisplay();
+                
+                // Show unlocked content (sanitized by server)
+                this.addMessage('system', `✅ Source unlocked! $${data.wallet_deduction.toFixed(2)} deducted from wallet.`);
+                
+                // Render unlocked content safely (plain text only)
+                const safeContent = this.escapeHtml(data.unlocked_content || 'Full article content is now available.');
+                this.addMessage('assistant', safeContent);
+                
+                // Update the source card to show unlocked state
+                this.updateSourceCardState(sourceId, true);
+            } else {
+                this.addMessage('system', `❌ Failed to unlock source: ${data.message}`);
+                // Re-enable button on failure
+                if (unlockButton) {
+                    unlockButton.disabled = false;
+                    unlockButton.textContent = '🔓 Unlock & License';
+                }
+            }
+        } catch (error) {
+            console.error('Source unlock error:', error);
+            this.addMessage('system', '❌ Error unlocking source. Please try again.');
+            // Re-enable button on error
+            if (unlockButton) {
+                unlockButton.disabled = false;
+                unlockButton.textContent = '🔓 Unlock & License';
+            }
+        }
+    }
+
+    async initializeWalletDisplay() {
+        if (this.authToken) {
+            try {
+                // Fetch current wallet balance
+                const response = await fetch(`${this.apiBase}/api/auth/wallet/balance`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.walletBalance = data.balance_cents / 100;  // Convert cents to dollars
+                    this.updateWalletDisplay();
+                } else if (response.status === 401) {
+                    // Token expired, clear it and prompt login
+                    this.authToken = null;
+                    localStorage.removeItem('authToken');
+                    this.updateWalletDisplay();
+                    console.log('Authentication expired during wallet balance fetch');
+                }
+            } catch (error) {
+                console.error('Error fetching wallet balance:', error);
+            }
+        }
+    }
+
+    updateWalletDisplay() {
+        const walletDisplay = document.getElementById('walletDisplay');
+        const walletBalance = document.getElementById('walletBalance');
+        
+        if (this.authToken && this.walletBalance !== undefined) {
+            walletDisplay.style.display = 'block';
+            walletBalance.textContent = this.walletBalance.toFixed(2);
+        } else {
+            walletDisplay.style.display = 'none';
+        }
+    }
+
+    updateSourceCardState(sourceId, isUnlocked) {
+        const sourceCard = document.querySelector(`[data-source-id="${sourceId}"]`);
+        if (sourceCard) {
+            if (isUnlocked) {
+                sourceCard.classList.add('unlocked');
+                const unlockBtn = sourceCard.querySelector('.unlock-btn-chat');
+                if (unlockBtn) {
+                    unlockBtn.textContent = '✅ Unlocked';
+                    unlockBtn.disabled = true;
+                    unlockBtn.style.background = '#10b981';
+                }
+            }
+        }
     }
 
     async displayResearchResults(data) {

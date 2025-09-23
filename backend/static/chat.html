@@ -20,6 +20,9 @@
                     <img src="/static/ledewire-logo.png" alt="LedeWire" class="logo-image">
                 </div>
                 <div class="header-controls">
+                    <div class="wallet-display" id="walletDisplay" style="display: none;">
+                        💰 Balance: $<span id="walletBalance">0.00</span>
+                    </div>
                     <div class="mode-indicator conversation-mode">💬 Conversational Mode</div>
                     <button id="modeToggle" class="mode-toggle">Switch to Deep Research</button>
                     <button id="clearButton" class="clear-btn">Clear Chat</button>
@@ -40,8 +43,8 @@
                                 <p>Free exploration and discussion about your research interests. I'll help you refine your questions and discover new angles.</p>
                             </div>
                             <div class="mode-card">
-                                <h3>🔬 Deep Research Mode</h3>
-                                <p>Structured research with access to licensed premium sources. Get comprehensive analysis with citations and evidence.</p>
+                                <h3>🔍 Discovery Mode</h3>
+                                <p>Find and preview licensed sources with real-time pricing. Unlock individual sources ($0.05-$0.25) or purchase research bundles with full analysis.</p>
                             </div>
                         </div>
                         <p><strong>Ask me anything to get started!</strong></p>

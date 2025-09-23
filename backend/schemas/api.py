@@ -70,13 +70,13 @@ class PurchaseResponse(BaseModel):
 
 # Source unlock schemas
 class SourceUnlockRequest(BaseModel):
-    source_title: str
-    source_url: str
-    cost: float
+    source_id: str
+    idempotency_key: str
 
 
 class SourceUnlockResponse(BaseModel):
     success: bool
     message: str
     unlocked_content: str
-    remaining_balance: float
+    remaining_balance_cents: int
+    wallet_deduction: float
