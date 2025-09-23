@@ -614,7 +614,7 @@ class ChatResearchApp {
         if (this.ledewire_token) {
             try {
                 // Fetch current wallet balance
-                const response = await fetch(`${this.apiBase}/api/auth/wallet/balance`, {
+                const response = await fetch(`${this.apiBase}/api/auth/balance`, {
                     headers: {
                         'Authorization': `Bearer ${this.ledewire_token}`
                     }
@@ -927,64 +927,57 @@ class ChatResearchApp {
         return packetsSection;
     }
 
-    addDynamicResearchListeners(resultsDiv) {
-        // Add click handlers for dynamic research purchases
+    addTierCardListeners(resultsDiv) {
+        // Add click handlers for tier card purchases
         resultsDiv.addEventListener('click', async (e) => {
-            if (e.target.matches('.dynamic-purchase-btn') || e.target.closest('.dynamic-purchase-btn')) {
-                const btn = e.target.matches('.dynamic-purchase-btn') ? e.target : e.target.closest('.dynamic-purchase-btn');
-                const analysisData = JSON.parse(btn.dataset.analysis);
+            if (e.target.matches('.tier-cta') || e.target.closest('.tier-cta')) {
+                const btn = e.target.matches('.tier-cta') ? e.target : e.target.closest('.tier-cta');
+                const tierData = JSON.parse(btn.dataset.tierData);
+                const price = parseFloat(btn.dataset.price);
+                const tierName = btn.dataset.tier;
                 
-                await this.handleDynamicResearchPurchase(btn, analysisData);
+                await this.handleTierPurchase(btn, tierData, price, tierName);
             }
         });
     }
 
-    async createDynamicResearchSection(query) {
-        const researchSection = document.createElement('div');
-        researchSection.className = 'dynamic-research-section';
+    async createTierCardsSection(query) {
+        const tierSection = document.createElement('div');
+        tierSection.className = 'tier-cards-section';
         
-        // Show loading state while fetching dynamic research analysis
-        researchSection.innerHTML = `
-            <div class="dynamic-research-header">
-                <h3>🔍 Analyzing Research Query: "${this.sanitizeText(query)}"</h3>
-                <p class="analysis-subtitle">Calculating optimal source selection and pricing...</p>
+        // Show loading state while fetching tier analysis
+        tierSection.innerHTML = `
+            <div class="tier-cards-header">
+                <h3>Research Packages</h3>
+                <p class="packages-subtitle">Get comprehensive research bundles with licensed content and expert analysis</p>
             </div>
-            <div class="research-loading">
+            <div class="tier-cards-loading">
                 <div class="loading-spinner"></div>
-                <p>Analyzing web sources and licensing costs...</p>
+                <p>Analyzing optimal source selection for each tier...</p>
             </div>
         `;
         
         try {
-            // Fetch dynamic research analysis from the new API
-            const response = await fetch('/api/research/analyze', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(this.ledewire_token && { 'Authorization': `Bearer ${this.ledewire_token}` })
-                },
-                body: JSON.stringify({
-                    query: query,
-                    max_budget_dollars: 10.0,
-                    preferred_source_count: 15
-                })
+            // Fetch analysis for all 3 tiers simultaneously
+            const [basicResult, researchResult, proResult] = await Promise.all([
+                this.analyzeQueryForTier(query, 0.0, 10, 'basic'),
+                this.analyzeQueryForTier(query, 0.99, 20, 'research'), 
+                this.analyzeQueryForTier(query, 1.99, 40, 'pro')
+            ]);
+            
+            // Replace loading with tier cards
+            tierSection.innerHTML = this.createTierCardsDisplay(query, {
+                basic: basicResult,
+                research: researchResult,
+                pro: proResult
             });
             
-            if (!response.ok) {
-                throw new Error(`Analysis failed: ${response.status}`);
-            }
-            
-            const analysis = await response.json();
-            
-            // Replace loading with dynamic research display
-            researchSection.innerHTML = this.createDynamicResearchDisplay(analysis);
-            
         } catch (error) {
-            console.error('Dynamic research analysis failed:', error);
-            researchSection.innerHTML = `
+            console.error('Tier analysis failed:', error);
+            tierSection.innerHTML = `
                 <div class="research-error">
                     <h3>⚠️ Research Analysis Unavailable</h3>
-                    <p>Unable to analyze research query at this time. Please try again later.</p>
+                    <p>Unable to analyze research packages at this time. Please try again later.</p>
                     <button class="retry-analysis-btn" onclick="this.parentElement.parentElement.remove()">
                         Try Again
                     </button>
@@ -992,112 +985,194 @@ class ChatResearchApp {
             `;
         }
         
-        return researchSection;
+        return tierSection;
     }
 
-    createDynamicResearchDisplay(analysis) {
-        const avgSourcePrice = analysis.total_estimated_cost / analysis.source_count || 0;
+    async analyzeQueryForTier(query, maxBudget, preferredSourceCount, tierType) {
+        const response = await fetch('/api/research/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(this.ledewire_token && { 'Authorization': `Bearer ${this.ledewire_token}` })
+            },
+            body: JSON.stringify({
+                query: query,
+                max_budget_dollars: maxBudget,
+                preferred_source_count: preferredSourceCount
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Tier ${tierType} analysis failed: ${response.status}`);
+        }
+        
+        const analysis = await response.json();
+        return { ...analysis, tierType, maxBudget, preferredSourceCount };
+    }
+
+    createTierCardsDisplay(query, tierResults) {
+        const { basic, research, pro } = tierResults;
         
         return `
-            <div class="dynamic-research-header">
-                <h3>📋 Research Package: "${this.sanitizeText(analysis.query)}"</h3>
-                <div class="research-metrics">
-                    <div class="metric">
-                        <span class="metric-value">${analysis.source_count}</span>
-                        <span class="metric-label">Quality Sources</span>
+            <div class="tier-cards-container">
+                <div class="tier-card basic-tier">
+                    <div class="tier-icon">⭐</div>
+                    <div class="tier-header">
+                        <h4>Basic Tier</h4>
+                        <div class="tier-price">Free</div>
                     </div>
-                    <div class="metric">
-                        <span class="metric-value">${analysis.premium_source_count}</span>
-                        <span class="metric-label">Premium Licensed</span>
+                    <div class="tier-description">
+                        ${basic.source_count} licensed premium sources found
                     </div>
-                    <div class="metric">
-                        <span class="metric-value">$${analysis.total_estimated_cost.toFixed(2)}</span>
-                        <span class="metric-label">Total Investment</span>
+                    <div class="tier-subtitle">
+                        Free research with quality sources and professional analysis
                     </div>
-                    <div class="metric">
-                        <span class="metric-value">$${avgSourcePrice.toFixed(2)}</span>
-                        <span class="metric-label">Avg per Source</span>
-                    </div>
+                    <ul class="tier-features">
+                        <li>✓ ${basic.source_count} licensed premium sources</li>
+                        <li>✓ Professional analysis</li>
+                        <li>✓ Quality source verification</li>
+                        <li>✓ Basic summarization</li>
+                    </ul>
+                    <button class="tier-cta btn-basic" data-tier-data='${JSON.stringify(basic).replace(/'/g, "&#39;")}' data-price="0.00" data-tier="basic">
+                        Get Started
+                    </button>
                 </div>
-            </div>
-            
-            <div class="research-preview">
-                <div class="preview-content">
-                    ${analysis.research_summary.split('\n').map(line => `<p>${this.sanitizeText(line)}</p>`).join('')}
+                
+                <div class="tier-card research-tier highlighted">
+                    <div class="popular-badge">Most Popular</div>
+                    <div class="tier-icon">⚡</div>
+                    <div class="tier-header">
+                        <h4>Research Tier</h4>
+                        <div class="tier-price">$0.99</div>
+                    </div>
+                    <div class="tier-description">
+                        ${research.source_count} licensed sources + expert outline
+                    </div>
+                    <div class="tier-subtitle">
+                        Craving clarity on this topic? For $0.99, we'll ethically license and distill the web's most relevant sources.
+                    </div>
+                    <ul class="tier-features">
+                        <li>✓ ${research.source_count} licensed sources</li>
+                        <li>✓ Expert research outline</li>
+                        <li>✓ Advanced summarization</li>
+                        <li>✓ Source credibility analysis</li>
+                        <li>✓ Topic deep-dive</li>
+                    </ul>
+                    <button class="tier-cta btn-research primary" data-tier-data='${JSON.stringify(research).replace(/'/g, "&#39;")}' data-price="0.99" data-tier="research">
+                        Unlock Research
+                    </button>
                 </div>
-            </div>
-            
-            <div class="licensing-breakdown">
-                <h4>🔐 Licensing Protocol Breakdown</h4>
-                <div class="protocol-list">
-                    ${Object.entries(analysis.licensing_breakdown).map(([protocol, data]) => `
-                        <div class="protocol-item">
-                            <div class="protocol-info">
-                                <span class="protocol-name">${this.sanitizeText(protocol.toUpperCase())}</span>
-                                <span class="protocol-count">${data.count} sources</span>
-                            </div>
-                            <div class="protocol-cost">$${data.total_cost.toFixed(2)}</div>
-                        </div>
-                    `).join('') || '<p class="no-licensing">No premium licensing required for this research</p>'}
-                </div>
-            </div>
-            
-            <div class="dynamic-purchase-actions">
-                <button class="dynamic-purchase-btn primary" data-analysis='${JSON.stringify(analysis).replace(/'/g, "&#39;")}'>
-                    🚀 Unlock Full Research Package - $${analysis.total_estimated_cost.toFixed(2)}
-                </button>
-                <div class="purchase-details">
-                    <p>✅ Ethically licensed from ${Object.keys(analysis.licensing_breakdown).length || 'multiple'} publisher protocols</p>
-                    <p>📊 Professional research analysis with ${analysis.source_count} verified sources</p>
-                    <p>💰 Dynamic pricing based on actual source value and licensing costs</p>
+                
+                <div class="tier-card pro-tier">
+                    <div class="tier-icon">👑</div>
+                    <div class="tier-header">
+                        <h4>Pro Tier</h4>
+                        <div class="tier-price">$1.99</div>
+                    </div>
+                    <div class="tier-description">
+                        ${pro.source_count} licensed sources + expert outline + strategic insights
+                    </div>
+                    <div class="tier-subtitle">
+                        Serious about answers? Our Pro tier delivers full-spectrum research with competitive intelligence.
+                    </div>
+                    <ul class="tier-features">
+                        <li>✓ ${pro.source_count} licensed sources</li>
+                        <li>✓ Expert research outline</li>
+                        <li>✓ Strategic insights & framing</li>
+                        <li>✓ Competitive intelligence</li>
+                        <li>✓ Executive summary</li>
+                        <li>✓ Actionable recommendations</li>
+                    </ul>
+                    <button class="tier-cta btn-pro" data-tier-data='${JSON.stringify(pro).replace(/'/g, "&#39;")}' data-price="1.99" data-tier="pro">
+                        Unlock Pro
+                    </button>
                 </div>
             </div>
         `;
     }
 
-    async handleDynamicResearchPurchase(button, analysisData) {
-        // Check authentication first
-        if (!this.ledewire_token) {
-            this.showAuthModal('dynamic_purchase', { analysisData, button });
+    async handleTierPurchase(button, tierData, price, tierName) {
+        // Check authentication first (except for free tier)
+        if (price > 0 && !this.ledewire_token) {
+            this.showAuthModal('tier_purchase', { tierData, button, price, tierName });
             return;
         }
 
-        const totalCost = analysisData.total_estimated_cost;
-        const priceCents = Math.round(totalCost * 100);
+        const priceCents = Math.round(price * 100);
         
-        // Check sufficient funds
-        if (this.walletBalance < priceCents) {
+        // Check sufficient funds for paid tiers
+        if (price > 0 && this.walletBalance < priceCents) {
             this.showInsufficientFundsModal(priceCents);
             return;
         }
 
+        const originalText = button.textContent;
         button.disabled = true;
-        button.textContent = '⏳ Processing Research Purchase...';
+        button.textContent = '⏳ Processing...';
         
         try {
-            // **MOCK DYNAMIC PURCHASE** - Simulate purchase
-            const mockResult = await this.mockPurchaseConfirmation('dynamic_research', priceCents);
+            // Mock purchase confirmation
+            const mockResult = await this.mockPurchaseConfirmation(`${tierName}_tier`, priceCents);
             
             if (mockResult.success) {
-                // Mock wallet deduction
-                this.walletBalance -= priceCents;
-                this.updateAuthDisplay(true);
+                // Mock wallet deduction for paid tiers
+                if (price > 0) {
+                    this.walletBalance -= priceCents;
+                    this.updateAuthDisplay(true);
+                }
                 
                 // Update button state
-                button.textContent = '✅ Research Package Unlocked!';
+                button.textContent = '✅ Unlocked!';
                 button.classList.add('purchased');
                 button.disabled = true;
                 
-                this.showSuccessToast(`Dynamic research package purchased for $${totalCost.toFixed(2)}!`);
+                const priceText = price === 0 ? 'free' : `$${price.toFixed(2)}`;
+                this.showSuccessToast(`${tierName.charAt(0).toUpperCase() + tierName.slice(1)} tier unlocked${price > 0 ? ` for ${priceText}` : ''}!`);
                 
-                // Display research package preview (in a real system, this would show the full content)
-                this.displayDynamicResearchPackage(analysisData);
+                // Display the tier research package
+                this.displayTierResearchPackage(tierData, tierName);
             }
         } catch (error) {
             button.disabled = false;
-            button.textContent = `🚀 Unlock Full Research Package - $${totalCost.toFixed(2)}`;
-            this.showErrorToast('Failed to purchase research package');
+            button.textContent = originalText;
+            this.showErrorToast(`Failed to unlock ${tierName} tier`);
         }
+    }
+
+    displayTierResearchPackage(tierData, tierName) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Create elements safely to prevent XSS
+        const packageDiv = document.createElement('div');
+        packageDiv.className = 'tier-research-package-display';
+        
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'package-header';
+        
+        const titleH3 = document.createElement('h3');
+        titleH3.textContent = `📋 ${tierName.charAt(0).toUpperCase() + tierName.slice(1)} Research Package: ${tierData.query}`;
+        
+        const metaPara = document.createElement('p');
+        metaPara.className = 'package-meta';
+        metaPara.textContent = `${tierData.source_count} Sources • Generated ${new Date().toLocaleString()}`;
+        
+        headerDiv.appendChild(titleH3);
+        headerDiv.appendChild(metaPara);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'package-content';
+        
+        // Display the research summary
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'research-summary';
+        summaryDiv.innerHTML = tierData.research_summary.split('\n').map(line => `<p>${this.sanitizeText(line)}</p>`).join('');
+        
+        contentDiv.appendChild(summaryDiv);
+        
+        packageDiv.appendChild(headerDiv);
+        packageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(packageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     displayDynamicResearchPackage(analysisData) {
@@ -1177,7 +1252,7 @@ class ChatResearchApp {
         if (!this.ledewire_token) return;
         
         try {
-            const response = await fetch('/api/auth/wallet/balance', {
+            const response = await fetch('/api/auth/balance', {
                 headers: { 'Authorization': `Bearer ${this.ledewire_token}` }
             });
             
@@ -1634,17 +1709,17 @@ class ChatResearchApp {
         resultsDiv.appendChild(researchHeader);
         resultsDiv.appendChild(resultsArea);
         
-        // Add Dynamic Research section (replacing old tier system)
-        const researchSection = await this.createDynamicResearchSection(data.refined_query || 'your research');
-        resultsDiv.appendChild(researchSection);
+        // Add Tier Cards section using dynamic pricing
+        const tierCardsSection = await this.createTierCardsSection(data.refined_query || 'your research');
+        resultsDiv.appendChild(tierCardsSection);
 
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        // Add event listeners for source cards and dynamic research
+        // Add event listeners for source cards and tier cards
         this.addSourceCardListeners(resultsDiv);
-        this.addDynamicResearchListeners(resultsDiv);
+        this.addTierCardListeners(resultsDiv);
     }
 
     async getTierPrice(tierName) {
@@ -1964,7 +2039,7 @@ class ChatResearchApp {
     async checkWalletAndShowModal(type, itemDetails = null) {
         try {
             // Get real wallet balance from backend
-            const response = await fetch(`${this.apiBase}/api/auth/wallet/balance`, {
+            const response = await fetch(`${this.apiBase}/api/auth/balance`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.ledewire_token}`,
