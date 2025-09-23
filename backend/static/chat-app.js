@@ -672,19 +672,21 @@ class ChatResearchApp {
                 }
             } catch (error) {
                 console.error('Error fetching wallet balance:', error);
+                // Update display to show unauthenticated state
+                this.updateWalletDisplay();
             }
         }
     }
 
     updateWalletDisplay() {
         const walletDisplay = document.getElementById('walletDisplay');
-        const walletBalance = document.getElementById('walletBalance');
+        const walletBalance = walletDisplay ? walletDisplay.querySelector('.wallet-balance') : null;
         
         if (this.ledewire_token && this.walletBalance !== undefined) {
-            walletDisplay.style.display = 'block';
-            walletBalance.textContent = (this.walletBalance / 100).toFixed(2); // Convert cents to dollars for display
+            if (walletDisplay) walletDisplay.style.display = 'block';
+            if (walletBalance) walletBalance.textContent = `$${(this.walletBalance / 100).toFixed(2)}`; // Convert cents to dollars for display
         } else {
-            walletDisplay.style.display = 'none';
+            if (walletDisplay) walletDisplay.style.display = 'none';
         }
     }
 
@@ -1364,12 +1366,22 @@ class ChatResearchApp {
                 const data = await response.json();
                 this.walletBalance = data.balance_cents;
                 this.updateAuthDisplay(true);
+                return true;
             } else if (response.status === 401) {
-                throw new Error('Token expired');
+                // Token expired, clear it and don't throw error
+                console.log('Token expired, clearing authentication');
+                this.ledewire_token = null;
+                localStorage.removeItem('ledewire_token');
+                this.updateAuthDisplay(false);
+                return false;
+            } else {
+                console.warn('Wallet balance API error:', response.status);
+                return false;
             }
         } catch (error) {
             console.error('Failed to update wallet balance:', error);
-            throw error;
+            // Don't throw - just return false so UI updates can continue
+            return false;
         }
     }
 
