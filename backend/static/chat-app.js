@@ -1,6 +1,6 @@
 class ChatResearchApp {
     constructor() {
-        this.currentMode = 'chat'; // 'chat' or 'research'
+        this.currentMode = 'chat'; // 'chat', 'research', or 'report'
         this.apiBase = window.location.origin;
         this.ledewire_token = localStorage.getItem('ledewire_token');
         this.walletBalance = 0; // Initialize to prevent NaN display
@@ -10,6 +10,7 @@ class ChatResearchApp {
         this.currentQuery = '';
         this.isLoginMode = true;
         this.pendingAction = null;
+        this.currentResearchData = null; // Store research data for cross-tab usage
         this.initializeEventListeners();
         this.initializeWalletDisplay();
         this.initializeDarkMode();
@@ -27,6 +28,7 @@ class ChatResearchApp {
         const newChatBtn = document.getElementById('newChatBtn');
         const chatModeBtn = document.getElementById('chatModeBtn');
         const researchModeBtn = document.getElementById('researchModeBtn');
+        const reportModeBtn = document.getElementById('reportModeBtn');
         const darkModeToggle = document.getElementById('darkModeToggle');
         const authButton = document.getElementById('authButton');
         const authForm = document.getElementById('authForm');
@@ -44,6 +46,7 @@ class ChatResearchApp {
         // Mode switching
         if (chatModeBtn) chatModeBtn.addEventListener('click', () => this.setMode('chat'));
         if (researchModeBtn) researchModeBtn.addEventListener('click', () => this.setMode('research'));
+        if (reportModeBtn) reportModeBtn.addEventListener('click', () => this.setMode('report'));
         
         // Clear conversation
         clearButton.addEventListener('click', () => this.clearConversation());
@@ -100,11 +103,19 @@ class ChatResearchApp {
         
         // Add mode change message to chat if there's history
         if (this.conversationHistory.length > 0) {
-            const modeMessage = this.currentMode === 'research' 
-                ? "🔍 Switched to Research mode - I'll find and license authoritative sources with verified information."
-                : "💬 Switched to Chat mode - Let's explore your interests through natural conversation.";
+            const modeMessages = {
+                'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation.",
+                'research': "🔍 Switched to Research mode - I'll find and license authoritative sources with verified information.",
+                'report': "📊 Switched to Report Builder - Ready to create comprehensive research packages."
+            };
             
-            this.addMessage('system', modeMessage);
+            this.addMessage('system', modeMessages[this.currentMode] || modeMessages['chat']);
+        }
+        
+        // Handle Report Builder mode with existing research data
+        if (mode === 'report' && this.currentResearchData) {
+            // Show tier cards for existing research
+            this.displayReportBuilderResults();
         }
     }
 
@@ -143,19 +154,24 @@ class ChatResearchApp {
     updateModeDisplay() {
         const chatModeBtn = document.getElementById('chatModeBtn');
         const researchModeBtn = document.getElementById('researchModeBtn');
+        const reportModeBtn = document.getElementById('reportModeBtn');
         const modeDescription = document.getElementById('modeDescription');
         
         // Update mode buttons
-        if (chatModeBtn && researchModeBtn) {
+        if (chatModeBtn && researchModeBtn && reportModeBtn) {
             chatModeBtn.classList.toggle('active', this.currentMode === 'chat');
             researchModeBtn.classList.toggle('active', this.currentMode === 'research');
+            reportModeBtn.classList.toggle('active', this.currentMode === 'report');
         }
         
         // Update mode description
         if (modeDescription) {
-            modeDescription.textContent = this.currentMode === 'chat' 
-                ? 'Chat Mode - AI Conversations' 
-                : 'Research Mode - Find & License Sources';
+            const descriptions = {
+                'chat': 'Chat Mode - AI Conversations',
+                'research': 'Research Mode - Find & License Sources',
+                'report': 'Report Builder - Create Research Packages'
+            };
+            modeDescription.textContent = descriptions[this.currentMode] || descriptions['chat'];
         }
     }
 
@@ -220,12 +236,26 @@ class ChatResearchApp {
 
             const data = await response.json();
             
-            // Handle research results differently - wait for everything to be ready
+            // Handle different modes
             if (data.mode === 'research' || data.mode === 'deep_research') {
                 if (data.sources && data.sources.length > 0) {
-                    // Keep typing indicator until all results are ready
-                    await this.displayResearchResults(data);
-                    this.hideTypingIndicator();
+                    // Store research data for cross-tab usage
+                    this.currentResearchData = data;
+                    this.currentQuery = message;
+                    
+                    if (this.currentMode === 'research') {
+                        // Research mode: Show sources quickly (no tier analysis)
+                        await this.displayFastResearchResults(data);
+                        this.hideTypingIndicator();
+                    } else if (this.currentMode === 'report') {
+                        // Report Builder mode: Show tier cards with full analysis
+                        await this.displayReportBuilderResults(data);
+                        this.hideTypingIndicator();
+                    } else {
+                        // Fallback to original behavior
+                        await this.displayResearchResults(data);
+                        this.hideTypingIndicator();
+                    }
                 } else {
                     // No sources found, show response only
                     this.hideTypingIndicator();
@@ -1630,6 +1660,102 @@ class ChatResearchApp {
         // Add event listeners for source cards and tier cards
         this.addSourceCardListeners(resultsDiv);
         this.addTierCardListeners(resultsDiv);
+    }
+
+    async displayFastResearchResults(data) {
+        // Fast Research mode: Show outline + sources only (no tier analysis)
+        if (!data.sources || data.sources.length === 0) return;
+
+        // 1. Build research results section (without tier cards)
+        const resultsDiv = document.createElement('div');
+        resultsDiv.className = 'research-results figma-design';
+        
+        // Research Header
+        const researchHeader = document.createElement('div');
+        researchHeader.className = 'research-header';
+        researchHeader.innerHTML = `
+            <div class="research-header-content">
+                <div class="header-info">
+                    <h2 class="header-title">Research Sources Found</h2>
+                    <p class="header-subtitle">Licensed content available • Switch to Report Builder to create packages</p>
+                </div>
+                <div class="ai-badge">
+                    <span class="sparkles-icon">✨</span>
+                    <span>AI-Powered</span>
+                </div>
+            </div>
+        `;
+        
+        // Results area with source cards
+        const resultsArea = document.createElement('div');
+        resultsArea.className = 'results-area';
+        
+        const resultsMeta = document.createElement('div');
+        resultsMeta.className = 'results-meta';
+        resultsMeta.innerHTML = `
+            <div class="results-count">
+                <span>${data.sources.length} sources found for your research</span>
+            </div>
+        `;
+        
+        // Source cards grid
+        const sourceGrid = document.createElement('div');
+        sourceGrid.className = 'source-cards-grid';
+        sourceGrid.innerHTML = data.sources.map(source => this.createFigmaSourceCard(source)).join('');
+        
+        resultsArea.appendChild(resultsMeta);
+        resultsArea.appendChild(sourceGrid);
+        resultsDiv.appendChild(researchHeader);
+        resultsDiv.appendChild(resultsArea);
+        
+        // Display outline + sources immediately
+        this.addMessage('assistant', data.response);
+        
+        const messagesContainer = document.getElementById('messagesContainer');
+        messagesContainer.appendChild(resultsDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Add event listeners for source cards
+        this.addSourceCardListeners(resultsDiv);
+    }
+
+    async displayReportBuilderResults(data) {
+        // Report Builder mode: Show tier cards for research packages
+        if (!this.currentResearchData && !data) {
+            this.addMessage('system', '📊 No research data available. Please run a research query first in Research mode.');
+            return;
+        }
+        
+        const researchData = data || this.currentResearchData;
+        
+        // Show loading message for tier analysis
+        this.addMessage('system', '📊 Building research packages... Analyzing sources and creating pricing tiers (30-60 seconds).');
+        
+        // Build tier cards section
+        const tierCardsDiv = document.createElement('div');
+        tierCardsDiv.className = 'report-builder-section';
+        
+        const builderHeader = document.createElement('div');
+        builderHeader.className = 'builder-header';
+        builderHeader.innerHTML = `
+            <div class="builder-header-content">
+                <h2 class="header-title">Research Package Builder</h2>
+                <p class="header-subtitle">Create comprehensive research reports with licensed sources</p>
+            </div>
+        `;
+        
+        tierCardsDiv.appendChild(builderHeader);
+        
+        // Create tier cards with full analysis
+        const tierCardsSection = await this.createTierCardsSection(researchData.refined_query || this.currentQuery);
+        tierCardsDiv.appendChild(tierCardsSection);
+        
+        const messagesContainer = document.getElementById('messagesContainer');
+        messagesContainer.appendChild(tierCardsDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Add event listeners for tier cards
+        this.addTierCardListeners(tierCardsDiv);
     }
 
     async getTierPrice(tierName) {
