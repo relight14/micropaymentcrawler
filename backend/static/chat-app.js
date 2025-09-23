@@ -252,8 +252,8 @@ class ChatResearchApp {
                         await this.displayReportBuilderResults(data);
                         this.hideTypingIndicator();
                     } else {
-                        // Fallback to original behavior
-                        await this.displayResearchResults(data);
+                        // Fallback to fast research display
+                        await this.displayFastResearchResults(data);
                         this.hideTypingIndicator();
                     }
                 } else {
@@ -1358,20 +1358,20 @@ class ChatResearchApp {
         return `${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     }
 
-    async handleResearchPacketPurchase(button, packetId, price) {
+    async handleTierPurchase(button, tierId, price) {
         this.currentQuery = this.getLastQuery();
         
         // Check authentication first
         if (!this.ledewire_token) {
-            this.showAuthModal('purchase', { packetId, price, button });
+            this.showAuthModal('purchase', { tierId, price, button });
             return;
         }
 
         button.dataset.originalText = button.textContent;
 
         // For basic tier (free), skip payment processing
-        if (packetId === 'basic' || price === 'Free') {
-            await this.processFreeTier(button, packetId);
+        if (tierId === 'basic' || price === 'Free') {
+            await this.processFreeTier(button, tierId);
             return;
         }
 
@@ -1385,10 +1385,10 @@ class ChatResearchApp {
         }
 
         // Process purchase
-        await this.processPurchase(button, packetId, priceCents);
+        await this.processPurchase(button, tierId, priceCents);
     }
 
-    async processFreeTier(button, packetId) {
+    async processFreeTier(button, tierId) {
         button.disabled = true;
         button.textContent = 'Processing...';
         
@@ -1400,7 +1400,7 @@ class ChatResearchApp {
                     'Authorization': `Bearer ${this.ledewire_token}`
                 },
                 body: JSON.stringify({
-                    tier: packetId,
+                    tier: tierId,
                     query: this.currentQuery,
                     idempotency_key: this.generateIdempotencyKey()
                 })
@@ -1408,7 +1408,7 @@ class ChatResearchApp {
             
             if (response.ok) {
                 const result = await response.json();
-                this.handlePurchaseSuccess(button, packetId, result);
+                this.handlePurchaseSuccess(button, tierId, result);
             } else {
                 this.handlePurchaseError(button, await response.json());
             }
@@ -1417,13 +1417,13 @@ class ChatResearchApp {
         }
     }
 
-    async processPurchase(button, packetId, priceCents) {
+    async processPurchase(button, tierId, priceCents) {
         button.disabled = true;
         button.textContent = 'Processing...';
         
         try {
             // **MOCK PURCHASE MODE** - No real charges
-            const mockResult = await this.mockPurchaseConfirmation(packetId, priceCents);
+            const mockResult = await this.mockPurchaseConfirmation(tierId, priceCents);
             
             if (mockResult.success) {
                 // Mock wallet deduction
@@ -1438,7 +1438,7 @@ class ChatResearchApp {
                         'Authorization': `Bearer ${this.ledewire_token}`
                     },
                     body: JSON.stringify({
-                        tier: packetId,
+                        tier: tierId,
                         query: this.currentQuery,
                         idempotency_key: this.generateIdempotencyKey(),
                         mock_purchase: true
@@ -1447,7 +1447,7 @@ class ChatResearchApp {
                 
                 if (response.ok) {
                     const result = await response.json();
-                    this.handlePurchaseSuccess(button, packetId, result);
+                    this.handlePurchaseSuccess(button, tierId, result);
                 } else {
                     this.handlePurchaseError(button, await response.json());
                 }
@@ -1457,8 +1457,8 @@ class ChatResearchApp {
         }
     }
 
-    async mockPurchaseConfirmation(packetId, priceCents) {
-        console.log(`🧪 MOCK PURCHASE: ${packetId} for $${(priceCents/100).toFixed(2)}`);
+    async mockPurchaseConfirmation(tierId, priceCents) {
+        console.log(`🧪 MOCK PURCHASE: ${tierId} for $${(priceCents/100).toFixed(2)}`);
         
         // Simulate processing delay
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1466,20 +1466,20 @@ class ChatResearchApp {
         return {
             success: true,
             transaction_id: `mock_txn_${Date.now()}`,
-            content_id: `${packetId}_${this.currentQuery.substring(0, 20)}`
+            content_id: `${tierId}_${this.currentQuery.substring(0, 20)}`
         };
     }
 
-    handlePurchaseSuccess(button, packetId, result) {
+    handlePurchaseSuccess(button, tierId, result) {
         button.textContent = '✅ Purchased';
         button.classList.add('purchased');
-        this.purchasedItems.add(packetId);
+        this.purchasedItems.add(tierId);
         
         if (result.packet) {
             this.displayResearchPacket(result.packet);
         }
         
-        this.showSuccessToast(`${packetId.charAt(0).toUpperCase() + packetId.slice(1)} tier purchased!`);
+        this.showSuccessToast(`${tierId.charAt(0).toUpperCase() + tierId.slice(1)} tier purchased!`);
     }
 
     handlePurchaseError(button, error) {
@@ -1507,7 +1507,7 @@ class ChatResearchApp {
         this.pendingAction = null;
         
         if (action === 'purchase' && data) {
-            await this.handleResearchPacketPurchase(data.button, data.packetId, data.price);
+            await this.handleTierPurchase(data.button, data.tierId, data.price);
         } else if (action === 'unlock' && data) {
             await this.handleSourceUnlock(data.button, data.sourceId, data.price);
         } else if (action === 'download' && data) {
@@ -1968,7 +1968,7 @@ class ChatResearchApp {
                     } else if (action === 'download' && data) {
                         await this.handleSourceDownload(data.sourceId);
                     } else if (action === 'purchase' && data) {
-                        await this.handleResearchPacketPurchase(data.button, data.packetId, data.price);
+                        await this.handleTierPurchase(data.button, data.tierId, data.price);
                     }
                     this.pendingAction = null;
                 } else if (this.selectedTier && this.currentQuery) {
