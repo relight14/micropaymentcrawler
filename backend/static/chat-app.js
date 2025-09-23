@@ -64,7 +64,7 @@ class ChatResearchApp {
             authButton.removeEventListener('click', this.handleAuthButtonClick); // Remove any existing
             authButton.addEventListener('click', () => this.handleAuthButtonClick());
         }
-        if (authForm) authForm.addEventListener('submit', (e) => this.handleAuthSubmit(e));
+        // Remove broken form submission - using button handlers instead
         if (authToggleButton) authToggleButton.addEventListener('click', () => this.toggleAuthMode());
     }
 
@@ -1302,106 +1302,11 @@ class ChatResearchApp {
         this.pendingAction = null;
     }
 
-    toggleAuthMode() {
-        this.isLoginMode = !this.isLoginMode;
-        this.updateAuthModalMode();
-        this.clearAuthMessage();
-    }
+    // Removed broken toggleAuthMode - using working version below
 
-    updateAuthModalMode() {
-        const title = document.getElementById('authModalTitle');
-        const submitBtn = document.getElementById('authSubmitButton');
-        const toggleText = document.getElementById('authToggleText');
-        const toggleBtn = document.getElementById('authToggleButton');
-        const signupFields = document.getElementById('signupFields');
-        
-        if (this.isLoginMode) {
-            if (title) title.textContent = 'Login to LedeWire';
-            if (submitBtn) submitBtn.textContent = 'Login';
-            if (toggleText) toggleText.innerHTML = 'Don\'t have an account? ';
-            if (toggleBtn) toggleBtn.textContent = 'Sign Up';
-            if (signupFields) signupFields.style.display = 'none';
-        } else {
-            if (title) title.textContent = 'Sign Up for LedeWire';
-            if (submitBtn) submitBtn.textContent = 'Sign Up';
-            if (toggleText) toggleText.innerHTML = 'Already have an account? ';
-            if (toggleBtn) toggleBtn.textContent = 'Login';
-            if (signupFields) signupFields.style.display = 'block';
-        }
-    }
+    // Removed broken handleAuthSubmit - using working handleAuth below
 
-    async handleAuthSubmit(e) {
-        e.preventDefault();
-        
-        const email = document.getElementById('authEmail')?.value;
-        const password = document.getElementById('authPassword')?.value;
-        const name = document.getElementById('authName')?.value;
-        const submitBtn = document.getElementById('authSubmitButton');
-        
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = this.isLoginMode ? 'Logging in...' : 'Creating account...';
-        }
-        
-        try {
-            let result;
-            if (this.isLoginMode) {
-                result = await this.loginUser(email, password);
-            } else {
-                result = await this.signupUser(email, password, name);
-            }
-            
-            if (result.success) {
-                this.ledewire_token = result.access_token;
-                localStorage.setItem('ledewire_token', result.access_token);
-                
-                await this.updateWalletBalance();
-                this.closeAuthModal();
-                this.showSuccessToast(`${this.isLoginMode ? 'Login' : 'Account creation'} successful!`);
-                
-                if (this.pendingAction) {
-                    await this.executePendingAction();
-                }
-            }
-        } catch (error) {
-            this.showAuthMessage(error.message, 'error');
-        } finally {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = this.isLoginMode ? 'Login' : 'Sign Up';
-            }
-        }
-    }
-
-    async loginUser(email, password) {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Login failed');
-        }
-        
-        return await response.json();
-    }
-
-    async signupUser(email, password, name) {
-        const response = await fetch('/api/auth/signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, name })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Signup failed');
-        }
-        
-        return await response.json();
-    }
+    // Removed broken loginUser/signupUser - using working handleAuth below
 
     logout() {
         localStorage.removeItem('ledewire_token');
@@ -2014,7 +1919,7 @@ class ChatResearchApp {
         }
 
         try {
-            const endpoint = type === 'login' ? '/auth/login' : '/auth/signup';
+            const endpoint = type === 'login' ? '/api/auth/login' : '/api/auth/signup';
             const body = type === 'login' 
                 ? { email, password }
                 : { email, password, name };
@@ -2035,11 +1940,21 @@ class ChatResearchApp {
                 localStorage.setItem('ledewire_token', data.access_token);
                 document.getElementById('authModal').style.display = 'none';
                 
-                // Resume the original purchase flow with stored tier context
-                if (this.selectedTier && this.currentQuery) {
+                // Resume pending actions if any
+                if (this.pendingAction) {
+                    const { action, data } = this.pendingAction;
+                    if (action === 'tier_purchase' && data) {
+                        await this.handleTierPurchase(data.button, data.tierData, data.price, data.tierName);
+                    } else if (action === 'unlock' && data) {
+                        await this.handleSourceUnlock(data.button, data.sourceId, data.price);
+                    } else if (action === 'download' && data) {
+                        await this.handleSourceDownload(data.sourceId);
+                    } else if (action === 'purchase' && data) {
+                        await this.handleResearchPacketPurchase(data.button, data.packetId, data.price);
+                    }
+                    this.pendingAction = null;
+                } else if (this.selectedTier && this.currentQuery) {
                     this.checkWalletAndShowModal('tier');
-                } else {
-                    console.log('No pending tier purchase context after auth');
                 }
             } else {
                 throw new Error(data.detail || `${type} failed`);
