@@ -1,20 +1,25 @@
 class ChatResearchApp {
     constructor() {
-        this.currentMode = 'conversational'; // 'conversational' or 'deep_research'
+        this.currentMode = 'chat'; // 'chat' or 'research'
         this.apiBase = window.location.origin;
         this.authToken = localStorage.getItem('authToken');
         this.walletBalance = 0; // Initialize to prevent NaN display
         this.conversationHistory = [];
+        this.isDarkMode = localStorage.getItem('darkMode') === 'true';
         this.initializeEventListeners();
-        this.updateCharacterCount();
         this.initializeWalletDisplay();
+        this.initializeDarkMode();
+        this.updateModeDisplay();
     }
 
     initializeEventListeners() {
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
-        const modeToggle = document.getElementById('modeToggle');
         const clearButton = document.getElementById('clearButton');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const chatModeBtn = document.getElementById('chatModeBtn');
+        const researchModeBtn = document.getElementById('researchModeBtn');
+        const darkModeToggle = document.getElementById('darkModeToggle');
 
         // Chat functionality
         sendButton.addEventListener('click', () => this.sendMessage());
@@ -25,35 +30,41 @@ class ChatResearchApp {
             }
         });
 
-        // Mode toggle
-        modeToggle.addEventListener('click', () => this.toggleMode());
+        // Mode switching
+        if (chatModeBtn) chatModeBtn.addEventListener('click', () => this.setMode('chat'));
+        if (researchModeBtn) researchModeBtn.addEventListener('click', () => this.setMode('research'));
         
         // Clear conversation
         clearButton.addEventListener('click', () => this.clearConversation());
+        if (newChatBtn) newChatBtn.addEventListener('click', () => this.clearConversation());
 
-        // Enable/disable send button and character count
+        // Dark mode toggle
+        if (darkModeToggle) darkModeToggle.addEventListener('change', () => this.toggleDarkMode());
+
+        // Enable/disable send button
         chatInput.addEventListener('input', (e) => {
             sendButton.disabled = !e.target.value.trim();
+            this.updateInputPlaceholder();
             this.updateCharacterCount();
         });
-
-        // Auto-resize textarea
-        chatInput.addEventListener('input', () => this.autoResizeTextarea(chatInput));
     }
 
 
     updateCharacterCount() {
         const chatInput = document.getElementById('chatInput');
         const characterCount = document.querySelector('.character-count');
+        
+        if (!characterCount) return; // Guard for missing element
+        
         const count = chatInput.value.length;
         characterCount.textContent = `${count} / 2000`;
         
         if (count > 1800) {
-            characterCount.style.color = 'var(--error-color)';
+            characterCount.style.color = 'var(--destructive)';
         } else if (count > 1500) {
-            characterCount.style.color = 'var(--warning-color)';
+            characterCount.style.color = 'var(--accent)';
         } else {
-            characterCount.style.color = 'var(--text-secondary)';
+            characterCount.style.color = 'var(--muted-foreground)';
         }
     }
 
@@ -62,30 +73,70 @@ class ChatResearchApp {
         textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
     }
 
-    toggleMode() {
-        this.currentMode = this.currentMode === 'conversational' ? 'deep_research' : 'conversational';
+    setMode(mode) {
+        if (this.currentMode === mode) return;
+        
+        this.currentMode = mode;
         this.updateModeDisplay();
         
-        // Add mode change message to chat
-        const modeMessage = this.currentMode === 'deep_research' 
-            ? "🔬 Switched to Deep Research mode - I'll search licensed sources and provide detailed research findings with citations."
-            : "💬 Switched to Conversational mode - Let's explore your research interests together through natural conversation!";
+        // Add mode change message to chat if there's history
+        if (this.conversationHistory.length > 0) {
+            const modeMessage = this.currentMode === 'research' 
+                ? "🔍 Switched to Research mode - I'll find and license authoritative sources with verified information."
+                : "💬 Switched to Chat mode - Let's explore your interests through natural conversation.";
+            
+            this.addMessage('system', modeMessage);
+        }
+    }
+
+    initializeDarkMode() {
+        if (this.isDarkMode) {
+            document.documentElement.classList.add('dark');
+        }
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        if (darkModeToggle) {
+            darkModeToggle.checked = this.isDarkMode;
+        }
+    }
+
+    toggleDarkMode() {
+        this.isDarkMode = !this.isDarkMode;
+        localStorage.setItem('darkMode', this.isDarkMode.toString());
         
-        this.addMessage('system', modeMessage);
+        if (this.isDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }
+
+    updateInputPlaceholder() {
+        const chatInput = document.getElementById('chatInput');
+        const hasMessages = this.conversationHistory.length > 0;
+        
+        if (hasMessages) {
+            chatInput.placeholder = "Ask me anything...";
+        } else {
+            chatInput.placeholder = "🔎 Start your search...";
+        }
     }
 
     updateModeDisplay() {
-        const modeToggle = document.getElementById('modeToggle');
-        const modeIndicator = document.querySelector('.mode-indicator');
+        const chatModeBtn = document.getElementById('chatModeBtn');
+        const researchModeBtn = document.getElementById('researchModeBtn');
+        const modeDescription = document.getElementById('modeDescription');
         
-        if (this.currentMode === 'deep_research') {
-            modeToggle.textContent = 'Switch to Conversation';
-            modeIndicator.innerHTML = '🔍 Discovery Mode';
-            modeIndicator.className = 'mode-indicator research-mode';
-        } else {
-            modeToggle.textContent = 'Switch to Discovery Mode';
-            modeIndicator.innerHTML = '💬 Conversational Mode';
-            modeIndicator.className = 'mode-indicator conversation-mode';
+        // Update mode buttons
+        if (chatModeBtn && researchModeBtn) {
+            chatModeBtn.classList.toggle('active', this.currentMode === 'chat');
+            researchModeBtn.classList.toggle('active', this.currentMode === 'research');
+        }
+        
+        // Update mode description
+        if (modeDescription) {
+            modeDescription.textContent = this.currentMode === 'chat' 
+                ? 'Chat Mode - AI Conversations' 
+                : 'Research Mode - Find & License Sources';
         }
     }
 

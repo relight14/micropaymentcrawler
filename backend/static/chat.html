@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LedeWire AI Research Assistant</title>
+    <title>LedeWire Research Assistant</title>
     <link rel="icon" type="image/png" href="/static/ledewire-logo.png">
     <link rel="shortcut icon" type="image/png" href="/static/ledewire-logo.png">
     <link rel="apple-touch-icon" href="/static/ledewire-logo.png">
@@ -11,64 +11,96 @@
     <link rel="stylesheet" href="/static/link-styles.css">
     <link rel="stylesheet" href="/static/sources-preview.css">
 </head>
-<body>
+<body class="bg-background text-foreground">
     <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
+        <!-- Clean Header with Mode Switcher -->
+        <header class="modern-header">
             <div class="header-content">
                 <div class="logo-section">
                     <img src="/static/ledewire-logo.png" alt="LedeWire" class="logo-image">
                 </div>
+                
+                <!-- Mode Switcher -->
+                <div class="mode-switcher">
+                    <button id="chatModeBtn" class="mode-btn active">
+                        <span class="mode-icon">💬</span>
+                        <span>Chat</span>
+                    </button>
+                    <button id="researchModeBtn" class="mode-btn">
+                        <span class="mode-icon">🔍</span>
+                        <span>Research</span>
+                    </button>
+                </div>
+
+                <!-- Header Controls -->
                 <div class="header-controls">
                     <div class="wallet-display" id="walletDisplay" style="display: none;">
-                        💰 Balance: $<span id="walletBalance">0.00</span>
+                        💰 $<span id="walletBalance">0.00</span>
                     </div>
-                    <div class="mode-indicator conversation-mode">💬 Conversational Mode</div>
-                    <button id="modeToggle" class="mode-toggle">Switch to Deep Research</button>
-                    <button id="clearButton" class="clear-btn">Clear Chat</button>
+                    <div class="dark-mode-toggle">
+                        <span class="toggle-label">Dark</span>
+                        <label class="switch">
+                            <input type="checkbox" id="darkModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <button id="clearButton" class="header-btn">New Chat</button>
                 </div>
             </div>
         </header>
 
-        <!-- Chat Container -->
-        <div class="chat-container">
-            <div class="messages-container" id="messagesContainer">
-                <div class="welcome-message">
+        <!-- Chat Interface -->
+        <div class="chat-interface">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-title">
+                    <h2>LedeWire Research Assistant</h2>
+                    <p id="modeDescription">Chat Mode - AI Conversations</p>
+                </div>
+                <button id="newChatBtn" class="new-chat-btn" style="display: none;">
+                    <span class="refresh-icon">🔄</span>
+                    <span>New Chat</span>
+                </button>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="messages-area" id="messagesContainer">
+                <!-- Welcome Screen -->
+                <div class="welcome-screen" id="welcomeScreen">
                     <div class="welcome-content">
-                        <h2>Welcome to your AI Research Assistant! 🚀</h2>
-                        <p>I'm here to help you explore and research any topic. Choose your mode:</p>
-                        <div class="mode-explanation">
-                            <div class="mode-card">
-                                <h3>💬 Conversational Mode</h3>
-                                <p>Free exploration and discussion about your research interests. I'll help you refine your questions and discover new angles.</p>
-                            </div>
-                            <div class="mode-card">
-                                <h3>🔍 Discovery Mode</h3>
-                                <p>Find and preview licensed sources with real-time pricing. Unlock individual sources ($0.05-$0.25) or purchase research bundles with full analysis.</p>
-                            </div>
+                        <div class="welcome-icon">
+                            <span class="sparkle-icon">✨</span>
                         </div>
-                        <p><strong>Ask me anything to get started!</strong></p>
+                        <h1>Smarter Search Starts Here</h1>
+                        <h2>Tap into the world's most relevant, high-quality content — ethically licensed, expertly summarized, and available on demand.</h2>
+                        <p>Just ask a question — we'll find, license, and synthesize the best information on the web.</p>
+                        <p class="trust-tagline">Built with publishers in mind. Powered by LedeWire Wallets.</p>
                     </div>
                 </div>
             </div>
             
-            <!-- Chat Input -->
-            <div class="chat-input-container">
-                <div class="input-wrapper">
-                    <textarea 
-                        id="chatInput" 
-                        placeholder="Ask me about any research topic..."
-                        rows="3"
-                        maxlength="2000"
-                    ></textarea>
-                    <button id="sendButton" class="send-button" disabled>
+            <!-- Modern Input Area -->
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <input 
+                            type="text"
+                            id="chatInput" 
+                            placeholder="🔎 Start your search..."
+                            class="search-input"
+                        >
+                        <div class="input-controls">
+                            <button type="button" class="input-btn">
+                                <span>📎</span>
+                            </button>
+                            <button type="button" class="input-btn">
+                                <span>🎤</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="sendButton" class="send-btn" disabled>
                         <span class="send-icon">📤</span>
-                        Send
                     </button>
-                </div>
-                <div class="input-footer">
-                    <span class="character-count">0 / 2000</span>
-                    <span class="tip">Press Enter to send, Shift+Enter for new line</span>
                 </div>
             </div>
         </div>
