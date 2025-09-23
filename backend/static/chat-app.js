@@ -1026,7 +1026,7 @@ class ChatResearchApp {
     async clearConversation() {
         if (confirm('Clear the entire conversation? This cannot be undone.')) {
             try {
-                const response = await fetch(`${this.apiBase}/api/chat/clear-conversation`, {
+                const response = await fetch(`${this.apiBase}/api/chat/clear`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
