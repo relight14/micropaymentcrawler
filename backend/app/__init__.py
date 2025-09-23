@@ -31,10 +31,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # Rate limiting
-    limiter = Limiter(key_func=get_user_or_ip_key)
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # Rate limiting - temporarily disabled to fix 405 errors
+    # limiter = Limiter(key_func=get_user_or_ip_key)
+    # app.state.limiter = limiter
+    # app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     
     # Static files with no-cache
     static_dir = "static"
