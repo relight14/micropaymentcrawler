@@ -2068,6 +2068,9 @@ class ChatResearchApp {
                 localStorage.setItem('ledewire_token', data.access_token);
                 document.getElementById('authModal').style.display = 'none';
                 
+                // Update UI to show logged-in state immediately
+                await this.updateWalletBalance();
+                
                 // Resume pending actions if any
                 if (this.pendingAction) {
                     const { action, data } = this.pendingAction;
