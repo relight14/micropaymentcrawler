@@ -12,18 +12,29 @@ class TierType(str, Enum):
 
 
 class SourceCard(BaseModel):
-    """Source card model for research results"""
+    """Source card model for research results with Discovery Mode support"""
     id: str
     title: str
     url: str
     excerpt: str
     domain: str
+    
+    # Discovery Mode fields
+    unlock_price: float
+    is_unlocked: bool = False
+    
+    # Multi-protocol licensing support
+    licensing_protocol: Optional[str] = None  # "rsl", "tollbit", "cloudflare"
+    license_cost: Optional[float] = None  # Cost for ai-include license
+    licensing_cost: Optional[float] = None  # Alternative naming for backward compatibility
+    publisher_name: Optional[str] = None  # Publisher name from license terms
+    license_type: Optional[str] = None  # Type of license available
+    protocol_badge: Optional[str] = None  # UI badge text
+    requires_attribution: bool = False  # Whether attribution is required
+    
+    # Additional metadata
     is_academic: bool = False
     published_date: Optional[str] = None
-    licensing_protocol: Optional[str] = None
-    licensing_cost: Optional[float] = None
-    license_cost: Optional[float] = None  # Alternative naming
-    publisher_name: Optional[str] = None
     relevance_score: Optional[float] = None
 
 

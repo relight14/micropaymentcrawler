@@ -247,7 +247,7 @@ Include a mix of free and licensed sources when licensed sources offer significa
 Return only the numbers separated by commas, like: 0,3,7,12"""
 
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=100,
                 temperature=0.1,
                 messages=[{"role": "user", "content": prompt}]
@@ -286,7 +286,7 @@ Create a compelling research outline that shows:
 Keep it concise but compelling - make the user excited about what they'll discover."""
 
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=400,
                 temperature=0.6,
                 messages=[{"role": "user", "content": prompt}]
