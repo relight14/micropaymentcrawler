@@ -1,7 +1,9 @@
 import random
 import uuid
 import os
-from typing import List, Optional
+import asyncio
+import time
+from typing import List, Optional, Dict, Any
 from integrations.tavily import TavilyClient
 from schemas.domain import SourceCard
 from services.licensing.content_licensing import ContentLicenseService
@@ -27,6 +29,10 @@ class ContentCrawlerStub:
         # Initialize content licensing service and AI research service
         self.license_service = ContentLicenseService()
         self.ai_service = ContentPolishingService()
+        
+        # Simple in-memory cache with TTL (5 minutes)
+        self._cache = {}
+        self._cache_ttl = 300  # 5 minutes
         
         # Content quality factors that influence pricing
         self.quality_factors = {
@@ -59,6 +65,190 @@ class ContentCrawlerStub:
         
         # Fallback for compatibility
         self.sample_domains = self.domain_sets['academic']
+    
+    def _get_cache_key(self, query: str, count: int, budget_limit: Optional[float] = None) -> str:
+        """Generate cache key for query results"""
+        return f"search:{hash(query)}:{count}:{budget_limit or 0}"
+    
+    def _is_cache_valid(self, timestamp: float) -> bool:
+        """Check if cached result is still valid"""
+        return time.time() - timestamp < self._cache_ttl
+    
+    def _get_from_cache(self, cache_key: str) -> Optional[List[SourceCard]]:
+        """Retrieve results from cache if valid"""
+        if cache_key in self._cache:
+            cached_data, timestamp = self._cache[cache_key]
+            if self._is_cache_valid(timestamp):
+                return cached_data
+            else:
+                # Clean up expired cache entry
+                del self._cache[cache_key]
+        return None
+    
+    def _store_in_cache(self, cache_key: str, data: List[SourceCard]):
+        """Store results in cache with timestamp"""
+        self._cache[cache_key] = (data, time.time())
+    
+    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None) -> Dict[str, Any]:
+        """Generate sources with progressive loading - returns immediate results + enrichment promise"""
+        cache_key = self._get_cache_key(query, count, budget_limit)
+        
+        # Check cache first
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result:
+            return {
+                "sources": cached_result,
+                "stage": "complete",
+                "enrichment_needed": False
+            }
+        
+        if self.use_real_search and self.tavily_client:
+            return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key)
+        else:
+            # For mock data, return complete results immediately
+            sources = self._generate_mock_sources(query, count, budget_limit)
+            self._store_in_cache(cache_key, sources)
+            return {
+                "sources": sources,
+                "stage": "complete", 
+                "enrichment_needed": False
+            }
+    
+    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str) -> Dict[str, Any]:
+        """Generate sources progressively: immediate raw results + background enrichment"""
+        if not self.tavily_client:
+            return await self.generate_sources_progressive(query, count, budget_limit)
+        
+        try:
+            # Step 1: Get raw Tavily results immediately (this is fast)
+            tavily_query = query[:350] if len(query) > 350 else query
+            response = self.tavily_client.search(
+                query=tavily_query,
+                search_depth="advanced", 
+                max_results=min(count, 20),
+                include_answer=False,
+                include_images=False,
+                include_raw_content=False
+            )
+            
+            results = response.get('results', [])
+            
+            # Step 2: Create basic source cards immediately with Tavily data
+            immediate_sources = []
+            for i, result in enumerate(results[:count]):
+                try:
+                    domain = result['url'].split('/')[2]
+                except:
+                    domain = "unknown.com"
+                
+                source_id = str(uuid.uuid4())
+                # Use raw Tavily data initially with basic pricing
+                basic_price = self._calculate_basic_price(domain)
+                
+                source = SourceCard(
+                    id=source_id,
+                    title=result.get('title', f'Research Source {i+1}'),
+                    excerpt=result.get('content', 'Loading enhanced preview...')[:150],
+                    domain=domain,
+                    url=result.get('url', f'https://{domain}'),
+                    unlock_price=basic_price,
+                    is_unlocked=False
+                )
+                
+                # Check budget constraint
+                current_cost = sum(s.unlock_price or 0 for s in immediate_sources)
+                if budget_limit is None or (current_cost + source.unlock_price) <= budget_limit:
+                    immediate_sources.append(source)
+                else:
+                    break
+            
+            # Step 3: Start background enrichment (don't await - let it run async)
+            asyncio.create_task(self._enrich_sources_background(immediate_sources, query, cache_key))
+            
+            return {
+                "sources": immediate_sources,
+                "stage": "immediate",
+                "enrichment_needed": True
+            }
+            
+        except Exception as e:
+            print(f"Progressive Tavily generation error: {e}")
+            # Fallback to mock data
+            sources = self._generate_mock_sources(query, count, budget_limit)
+            return {
+                "sources": sources,
+                "stage": "complete",
+                "enrichment_needed": False
+            }
+    
+    def _calculate_basic_price(self, domain: str) -> float:
+        """Calculate basic price without expensive AI analysis"""
+        # Simple domain-based pricing for immediate results
+        if any(premium in domain for premium in ['nature.com', 'science.org', 'ieee.org']):
+            return round(random.uniform(0.25, 0.45), 2)
+        elif any(industry in domain for industry in ['mckinsey.com', 'deloitte.com', 'bcg.com']):
+            return round(random.uniform(0.30, 0.60), 2)
+        elif any(news in domain for news in ['wsj.com', 'ft.com', 'economist.com']):
+            return round(random.uniform(0.15, 0.35), 2)
+        else:
+            return round(random.uniform(0.10, 0.25), 2)
+    
+    async def _enrich_sources_background(self, sources: List[SourceCard], query: str, cache_key: str):
+        """Enrich sources with AI polishing and licensing in the background"""
+        try:
+            # Prepare raw sources for polishing  
+            raw_sources = []
+            for source in sources:
+                raw_sources.append({
+                    'url': source.url,
+                    'domain': source.domain, 
+                    'title': source.title,
+                    'snippet': source.excerpt
+                })
+            
+            # Step 1: Polish content with Claude (this is the slow part)
+            polished_sources = self.ai_service.polish_sources(query, raw_sources)
+            
+            # Step 2: Update sources with polished content and better pricing
+            for i, (source, polished) in enumerate(zip(sources, polished_sources)):
+                if polished:
+                    source.title = polished.get('title', source.title)
+                    source.excerpt = polished.get('excerpt', source.excerpt)
+                    # Recalculate price with AI insights
+                    source.unlock_price = self._calculate_tavily_price(
+                        {'title': source.title, 'url': source.url}, 
+                        source.domain
+                    )
+            
+            # Step 3: Add licensing info asynchronously 
+            await self._add_licensing_async(sources)
+            
+            # Step 4: Cache the enriched results
+            self._store_in_cache(cache_key, sources)
+            
+        except Exception as e:
+            print(f"Background enrichment error: {e}")
+            # Even if enrichment fails, we still have the basic results
+    
+    async def _add_licensing_async(self, sources: List[SourceCard]):
+        """Add licensing info to sources asynchronously"""
+        try:
+            # Process licensing for all sources concurrently (up to 5 at once to avoid rate limits)
+            async def add_single_license(source):
+                try:
+                    license_info = self._discover_licensing(source.url)
+                    if license_info:
+                        self._apply_licensing_info(source, license_info)
+                except Exception as e:
+                    print(f"Licensing error for {source.url}: {e}")
+            
+            # Process in batches of 5 to avoid overwhelming the licensing service
+            for i in range(0, len(sources), 5):
+                batch = sources[i:i+5]
+                await asyncio.gather(*[add_single_license(source) for source in batch], return_exceptions=True)
+                
+        except Exception as e:
+            print(f"Batch licensing error: {e}")
 
     def generate_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
         """Generate source cards using Tavily AI search or fallback to mock data.

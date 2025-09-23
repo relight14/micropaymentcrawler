@@ -21,8 +21,9 @@ async def analyze_research_query(request: ResearchRequest):
         max_sources = min(request.preferred_source_count or 15, 30)  # Cap at 30
         budget_limit = (request.max_budget_dollars or 10.0) * 0.75  # 75% for licensing
         
-        # Generate sources with budget constraints
-        sources = crawler.generate_sources(request.query, max_sources, budget_limit)
+        # Use progressive search for faster initial response
+        result = await crawler.generate_sources_progressive(request.query, max_sources, budget_limit)
+        sources = result["sources"]
         
         # Calculate costs and create response
         total_cost = sum(source.unlock_price or 0.0 for source in sources if source.unlock_price)
@@ -72,7 +73,9 @@ async def analyze_research_query(request: ResearchRequest):
             premium_source_count=len(premium_sources),
             research_summary=summary,
             sources=sources_response,
-            licensing_breakdown=licensing_breakdown
+            licensing_breakdown=licensing_breakdown,
+            enrichment_status=result.get("stage", "complete"),
+            enrichment_needed=result.get("enrichment_needed", False)
         )
         
     except Exception as e:

@@ -1047,7 +1047,71 @@ class ChatResearchApp {
         }
         
         const analysis = await response.json();
+        
+        // Check if this is a progressive response that needs enrichment
+        if (analysis.enrichment_needed && analysis.enrichment_status === 'immediate') {
+            // Mark this data as needing enrichment for UI indicators
+            analysis._progressive_loading = true;
+            
+            // Schedule an update check after enrichment should be complete (3 seconds)
+            setTimeout(() => this.checkAndUpdateEnrichment(query, tierType, analysis), 3000);
+        }
+        
         return { ...analysis, tierType, maxBudget, preferredSourceCount };
+    }
+    
+    async checkAndUpdateEnrichment(query, tierType, originalData) {
+        try {
+            // Re-fetch the results to get enriched content (use original params)
+            const maxBudget = originalData.maxBudget;
+            const preferredSourceCount = originalData.preferredSourceCount;
+            
+            const freshData = await this.analyzeQueryForTier(query, maxBudget, preferredSourceCount, tierType);
+            
+            // If enrichment is complete, update the UI
+            if (!freshData.enrichment_needed || freshData.enrichment_status === 'complete') {
+                this.updateTierCardWithEnrichedData(tierType, freshData);
+            }
+        } catch (error) {
+            console.log('Enrichment update failed (silent):', error);
+            // Don't show error to user - original data is still valid
+        }
+    }
+    
+    updateTierCardWithEnrichedData(tierType, enrichedData) {
+        // Find the tier card and update it with enriched data
+        const tierCard = document.querySelector(`[data-tier="${tierType}"]`);
+        if (!tierCard) return;
+        
+        // Update the research summary
+        const summaryEl = tierCard.querySelector('.research-summary');
+        if (summaryEl && enrichedData.research_summary) {
+            summaryEl.innerHTML = enrichedData.research_summary;
+        }
+        
+        // Update total cost display
+        const costEl = tierCard.querySelector('.tier-price');
+        if (costEl && enrichedData.total_estimated_cost) {
+            costEl.textContent = `$${enrichedData.total_estimated_cost.toFixed(2)}`;
+        }
+        
+        // Remove any loading indicators
+        const loadingIndicators = tierCard.querySelectorAll('.enrichment-loading');
+        loadingIndicators.forEach(indicator => indicator.remove());
+        
+        // Add subtle completion indicator
+        const header = tierCard.querySelector('.tier-header');
+        if (header && !header.querySelector('.enriched-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'enriched-badge';
+            badge.innerHTML = '✨ Enhanced';
+            badge.style.cssText = 'font-size: 0.8em; color: #059669; margin-left: 8px; opacity: 0; animation: fadeIn 0.5s ease-out forwards;';
+            header.appendChild(badge);
+            
+            // Remove badge after 4 seconds
+            setTimeout(() => badge.style.animation = 'fadeOut 0.5s ease-out forwards', 4000);
+            setTimeout(() => badge.remove(), 4500);
+        }
     }
 
     createTierCardsDisplay(query, tierResults) {

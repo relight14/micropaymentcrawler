@@ -2654,3 +2654,26 @@ input:checked + .slider:before {
         font-size: 1.5rem;
     }
 }
+
+/* Progressive Loading Animations */
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+.enrichment-loading {
+    font-size: 0.8em;
+    color: #6b7280;
+    font-style: italic;
+    animation: pulse 2s infinite;
+}
+
+.enriched-badge {
+    transition: all 0.3s ease;
+    display: inline-block;
+}

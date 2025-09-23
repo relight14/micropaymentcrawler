@@ -45,6 +45,9 @@ class DynamicResearchResponse(BaseModel):
     research_summary: str
     sources: List[Dict[str, Any]]
     licensing_breakdown: Dict[str, Any]
+    # Progressive loading fields
+    enrichment_status: Optional[str] = "complete"  # "immediate", "complete"
+    enrichment_needed: Optional[bool] = False
 
 
 # Purchase schemas
