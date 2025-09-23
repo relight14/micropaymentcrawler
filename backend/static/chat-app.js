@@ -15,6 +15,9 @@ class ChatResearchApp {
         this.initializeDarkMode();
         this.updateModeDisplay();
         this.initializeAuth();
+        
+        // Make app globally accessible for HTML event handlers
+        window.researchApp = this;
     }
 
     initializeEventListeners() {

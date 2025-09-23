@@ -37,7 +37,7 @@ def extract_bearer_token(authorization: str) -> str:
 async def login(request: LoginRequest):
     """Authenticate user with email and password"""
     try:
-        result = ledewire.login(request.email, request.password)
+        result = ledewire.authenticate_user(request.email, request.password)
         
         if "error" in result:
             # Handle API errors from LedeWire
@@ -46,7 +46,7 @@ async def login(request: LoginRequest):
         
         return AuthResponse(
             access_token=result["access_token"],
-            user_id=result["user_id"],
+            user_id=result.get("user_id", "unknown"),  # Handle missing user_id gracefully
             success=True,
             message="Login successful"
         )
@@ -64,7 +64,7 @@ async def login(request: LoginRequest):
 async def signup(request: SignupRequest):
     """Create new user account"""
     try:
-        result = ledewire.signup(request.email, request.password)
+        result = ledewire.signup_user(request.email, request.password, request.name)
         
         if "error" in result:
             error_msg = ledewire.handle_api_error(result)
@@ -79,7 +79,7 @@ async def signup(request: SignupRequest):
         
         return AuthResponse(
             access_token=result["access_token"],
-            user_id=result["user_id"], 
+            user_id=result.get("user_id", "unknown"),  # Handle missing user_id gracefully
             success=True,
             message="Account created successfully"
         )
