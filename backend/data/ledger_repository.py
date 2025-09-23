@@ -2,7 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 from typing import Optional, List, Dict
-from models import TierType, ResearchPacket
+from models import ResearchPacket
 
 class ResearchLedger:
     """
@@ -62,7 +62,7 @@ class ResearchLedger:
     
     def record_purchase(self, 
                        query: str, 
-                       tier: TierType, 
+                       tier: Optional[str], 
                        price: float, 
                        wallet_id: Optional[str], 
                        transaction_id: str,
@@ -76,7 +76,7 @@ class ResearchLedger:
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 query,
-                tier.value,
+                tier or "dynamic",
                 price,
                 wallet_id,
                 transaction_id,

@@ -12,7 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from utils.rate_limit import get_user_or_ip_key
 from utils.static import NoCacheStaticFiles
-from app.api.routes import auth, pricing, purchase, chat, sources, health
+from app.api.routes import auth, research, chat, sources, health
 
 
 def create_app() -> FastAPI:
@@ -54,8 +54,8 @@ def create_app() -> FastAPI:
     # Include API routes
     app.include_router(health.router, tags=["health"])  # Root level routes like /
     app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-    app.include_router(pricing.router, prefix="/api", tags=["pricing"])
-    app.include_router(purchase.router, prefix="/api/purchase", tags=["purchase"])
+    app.include_router(research.router, prefix="/api/research", tags=["research"])
+    # app.include_router(purchase.router, prefix="/api/purchase", tags=["purchase"])  # Temporarily disabled during tier removal
     app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
     app.include_router(sources.router, prefix="/api/sources", tags=["sources"])
     

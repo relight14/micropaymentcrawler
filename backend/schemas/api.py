@@ -5,12 +5,6 @@ from typing import Dict, Any, Optional, List
 from enum import Enum
 
 
-class TierType(str, Enum):
-    BASIC = "basic"
-    RESEARCH = "research"
-    PRO = "pro"
-
-
 # Authentication schemas
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -36,36 +30,37 @@ class WalletBalanceResponse(BaseModel):
     currency: str = "USD"
 
 
-# Pricing schemas
-class TiersRequest(BaseModel):
+# Dynamic Research schemas
+class ResearchRequest(BaseModel):
     query: str
+    max_budget_dollars: Optional[float] = 10.0  # User budget limit
+    preferred_source_count: Optional[int] = 15  # Desired number of sources
 
 
-class TierInfo(BaseModel):
-    tier: TierType
-    price: float
-    sources: int
-    includes_outline: bool
-    includes_insights: bool
-    description: str
-
-
-class TiersResponse(BaseModel):
+class DynamicResearchResponse(BaseModel):
     query: str
-    tiers: List[TierInfo]
+    total_estimated_cost: float
+    source_count: int
+    premium_source_count: int
+    research_summary: str
+    sources: List[Dict[str, Any]]
+    licensing_breakdown: Dict[str, Any]
 
 
 # Purchase schemas
 class PurchaseRequest(BaseModel):
     query: str
-    tier: TierType
+    selected_source_ids: Optional[List[str]] = None  # Specific sources to unlock
+    budget_limit_dollars: Optional[float] = None  # Total budget for research
     idempotency_key: Optional[str] = None
 
 
 class PurchaseResponse(BaseModel):
     success: bool
     message: str
-    packet: Optional[Dict[str, Any]] = None
+    research_package: Optional[Dict[str, Any]] = None
+    total_cost: float
+    sources_unlocked: int
     wallet_deduction: float
 
 

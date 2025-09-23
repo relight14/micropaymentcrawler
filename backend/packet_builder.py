@@ -1,63 +1,94 @@
 from typing import List, Optional
-from models import TierType, ResearchPacket, SourceCard
+from models import ResearchPacket, SourceCard
 from crawler_stub import ContentCrawlerStub
 
-class PacketBuilder:
+class DynamicPacketBuilder:
     """
-    Composes research packets with summaries, outlines, insights, and source cards.
-    Simulates intelligent content organization for MVP.
+    Composes research packets based on dynamic query analysis and source selection.
+    Eliminates fixed tiers in favor of intelligent content organization.
     """
     
     def __init__(self):
         self.crawler = ContentCrawlerStub()
     
-    def build_packet(self, query: str, tier: TierType) -> ResearchPacket:
-        """Build a complete research packet based on the selected tier."""
-        # Get tier configuration
-        config = self._get_tier_config(tier)
+    def build_research_package(self, query: str, selected_sources: List[SourceCard], 
+                              budget_used: float) -> ResearchPacket:
+        """Build a complete research package based on selected sources and budget."""
         
-        # Generate sources first - we need these for intelligent content generation
-        sources = self.crawler.generate_sources(query, config["sources"])
+        # Generate comprehensive summary using actual selected sources
+        summary = self._generate_dynamic_summary(query, selected_sources, budget_used)
         
-        # Generate summary using actual source analysis
-        summary = self._generate_summary(query, tier, sources)
+        # Determine what additional content to include based on source quality and budget
+        includes_outline = self._should_include_outline(selected_sources, budget_used)
+        includes_insights = self._should_include_insights(selected_sources, budget_used)
         
-        # Generate optional components based on tier, using real source data
-        outline = self._generate_outline(query, sources) if config["includes_outline"] else None
-        insights = self._generate_insights(query, sources) if config["includes_insights"] else None
+        # Generate optional components based on source analysis
+        outline = self._generate_outline(query, selected_sources) if includes_outline else None
+        insights = self._generate_insights(query, selected_sources) if includes_insights else None
         
         return ResearchPacket(
             query=query,
-            tier=tier,
+            tier=None,  # No fixed tier - dynamic package
             summary=summary,
             outline=outline,
             insights=insights,
-            sources=sources,
-            total_sources=len(sources)
+            sources=selected_sources,
+            total_sources=len(selected_sources),
+            total_cost=budget_used
         )
     
-    def _get_tier_config(self, tier: TierType) -> dict:
-        """Get configuration for each tier."""
-        configs = {
-            TierType.BASIC: {
-                "sources": 10,
-                "includes_outline": False,
-                "includes_insights": False
-            },
-            TierType.RESEARCH: {
-                "sources": 20,
-                "includes_outline": True,
-                "includes_insights": False
-            },
-            TierType.PRO: {
-                "sources": 40,
-                "includes_outline": True,
-                "includes_insights": True
-            }
-        }
-        return configs[tier]
+    def _should_include_outline(self, sources: List[SourceCard], budget: float) -> bool:
+        """Determine if outline should be included based on source quality and investment."""
+        # Include outline if we have substantial academic sources or significant budget
+        academic_sources = len([s for s in sources if any(domain in s.domain.lower() 
+                              for domain in ['arxiv', 'nature', 'science', 'ieee', 'pubmed', 'ncbi', '.edu'])])
+        return academic_sources >= 3 or budget >= 2.0 or len(sources) >= 15
     
-    def _generate_summary(self, query: str, tier: TierType, sources: List[SourceCard]) -> str:
+    def _should_include_insights(self, sources: List[SourceCard], budget: float) -> bool:
+        """Determine if strategic insights should be included based on source diversity and budget."""
+        # Include insights if we have diverse, high-value sources and sufficient budget
+        unique_domains = len(set(s.domain for s in sources))
+        premium_sources = len([s for s in sources if s.unlock_price and s.unlock_price > 0.20])
+        return unique_domains >= 6 and premium_sources >= 5 and budget >= 5.0
+    
+    def _generate_dynamic_summary(self, query: str, sources: List[SourceCard], budget: float) -> str:
+        """Generate a research summary that reflects the actual investment and source selection."""
+        # Analyze the actual sources selected
+        academic_sources = [s for s in sources if any(domain in s.domain.lower() 
+                          for domain in ['arxiv', 'nature', 'science', 'ieee', 'pubmed', 'ncbi'])]
+        tech_sources = [s for s in sources if any(domain in s.domain.lower() 
+                       for domain in ['microsoft', 'google', 'ibm', 'amazon', 'mit.edu'])]
+        premium_sources = [s for s in sources if s.unlock_price and s.unlock_price > 0.15]
+        
+        # Calculate investment metrics
+        avg_source_cost = budget / len(sources) if sources else 0
+        source_diversity = len(set(s.domain for s in sources))
+        
+        # Generate summary reflecting actual research depth
+        investment_tier = "premium" if budget > 5.0 else "enhanced" if budget > 2.0 else "standard"
+        
+        summary = f"""**Dynamic Research Analysis: {query}**
+
+This {investment_tier} research package represents a ${budget:.2f} investment in {len(sources)} carefully curated sources, selected specifically for your query through our dynamic pricing algorithm. The analysis includes {len(academic_sources)} peer-reviewed academic publications, {len(tech_sources)} industry research documents, and {len(premium_sources)} premium licensed sources.
+
+**Source Investment Analysis**
+Your research investment of ${budget:.2f} across {len(sources)} sources (avg: ${avg_source_cost:.2f} per source) reflects the true market value of this content. The selection spans {source_diversity} distinct domains, ensuring comprehensive coverage while respecting publisher licensing requirements.
+
+**Research Quality Indicators**  
+• Academic depth: {len(academic_sources)} peer-reviewed sources providing scholarly foundation
+• Industry relevance: {len(tech_sources)} technical and commercial publications for practical insights  
+• Premium content: {len(premium_sources)} high-value sources with enhanced licensing and full-text access
+• Source diversity: {source_diversity} domains ensuring multi-perspective analysis
+
+**Methodology & Approach**
+This analysis employs dynamic source selection based on query relevance, content quality, and licensing availability. Sources are evaluated using our proprietary quality scoring algorithm, with pricing reflecting actual publisher licensing costs and content exclusivity. The ethical micropayment model ensures fair compensation to content creators while providing you with the most valuable research synthesis available.
+
+**Value Proposition**
+Your ${budget:.2f} investment directly supports {len(sources)} publishers through ethical licensing while providing you with professional-grade research analysis typically available only through expensive academic databases or consulting services. This represents exceptional value for comprehensive, legally-licensed research content."""
+        
+        return summary.strip()
+    
+    def _generate_summary(self, query: str, tier: Optional[str], sources: List[SourceCard]) -> str:
         """Generate a research abstract-style summary analyzing real source content."""
         # Analyze source domains for credibility assessment
         academic_sources = [s for s in sources if any(domain in s.domain.lower() 

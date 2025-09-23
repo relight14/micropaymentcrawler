@@ -2,32 +2,6 @@ from pydantic import BaseModel
 from typing import List, Optional
 from enum import Enum
 
-class TierType(str, Enum):
-    BASIC = "basic"
-    RESEARCH = "research"
-    PRO = "pro"
-
-class TierInfo(BaseModel):
-    tier: TierType
-    price: float
-    sources: int
-    includes_outline: bool
-    includes_insights: bool
-    description: str
-
-class TiersRequest(BaseModel):
-    query: str
-
-class TiersResponse(BaseModel):
-    query: str
-    tiers: List[TierInfo]
-
-class PurchaseRequest(BaseModel):
-    query: str
-    tier: TierType
-    user_wallet_id: Optional[str] = None
-    idempotency_key: Optional[str] = None  # Prevent double-spending
-
 class SourceCard(BaseModel):
     id: str
     title: str
@@ -47,12 +21,13 @@ class SourceCard(BaseModel):
 
 class ResearchPacket(BaseModel):
     query: str
-    tier: TierType
+    tier: Optional[str] = None  # For backward compatibility, but not used in dynamic system
     summary: str
     outline: Optional[str] = None
     insights: Optional[str] = None
     sources: List[SourceCard]
     total_sources: int
+    total_cost: Optional[float] = None  # Dynamic cost of the package
     content_id: Optional[str] = None  # LedeWire content identifier
 
 class PurchaseResponse(BaseModel):

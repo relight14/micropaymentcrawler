@@ -930,17 +930,213 @@ class ChatResearchApp {
         return packetsSection;
     }
 
-    addResearchPacketListeners(resultsDiv) {
-        // Add click handlers for research packet purchases
+    addDynamicResearchListeners(resultsDiv) {
+        // Add click handlers for dynamic research purchases
         resultsDiv.addEventListener('click', async (e) => {
-            if (e.target.matches('.packet-cta') || e.target.closest('.packet-cta')) {
-                const btn = e.target.matches('.packet-cta') ? e.target : e.target.closest('.packet-cta');
-                const packetId = btn.dataset.packet;
-                const price = btn.dataset.price;
+            if (e.target.matches('.dynamic-purchase-btn') || e.target.closest('.dynamic-purchase-btn')) {
+                const btn = e.target.matches('.dynamic-purchase-btn') ? e.target : e.target.closest('.dynamic-purchase-btn');
+                const analysisData = JSON.parse(btn.dataset.analysis);
                 
-                await this.handleResearchPacketPurchase(btn, packetId, price);
+                await this.handleDynamicResearchPurchase(btn, analysisData);
             }
         });
+    }
+
+    async createDynamicResearchSection(query) {
+        const researchSection = document.createElement('div');
+        researchSection.className = 'dynamic-research-section';
+        
+        // Show loading state while fetching dynamic research analysis
+        researchSection.innerHTML = `
+            <div class="dynamic-research-header">
+                <h3>🔍 Analyzing Research Query: "${this.sanitizeText(query)}"</h3>
+                <p class="analysis-subtitle">Calculating optimal source selection and pricing...</p>
+            </div>
+            <div class="research-loading">
+                <div class="loading-spinner"></div>
+                <p>Analyzing web sources and licensing costs...</p>
+            </div>
+        `;
+        
+        try {
+            // Fetch dynamic research analysis from the new API
+            const response = await fetch('/api/research/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(this.authToken && { 'Authorization': `Bearer ${this.authToken}` })
+                },
+                body: JSON.stringify({
+                    query: query,
+                    max_budget_dollars: 10.0,
+                    preferred_source_count: 15
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Analysis failed: ${response.status}`);
+            }
+            
+            const analysis = await response.json();
+            
+            // Replace loading with dynamic research display
+            researchSection.innerHTML = this.createDynamicResearchDisplay(analysis);
+            
+        } catch (error) {
+            console.error('Dynamic research analysis failed:', error);
+            researchSection.innerHTML = `
+                <div class="research-error">
+                    <h3>⚠️ Research Analysis Unavailable</h3>
+                    <p>Unable to analyze research query at this time. Please try again later.</p>
+                    <button class="retry-analysis-btn" onclick="this.parentElement.parentElement.remove()">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+        
+        return researchSection;
+    }
+
+    createDynamicResearchDisplay(analysis) {
+        const avgSourcePrice = analysis.total_estimated_cost / analysis.source_count || 0;
+        
+        return `
+            <div class="dynamic-research-header">
+                <h3>📋 Research Package: "${this.sanitizeText(analysis.query)}"</h3>
+                <div class="research-metrics">
+                    <div class="metric">
+                        <span class="metric-value">${analysis.source_count}</span>
+                        <span class="metric-label">Quality Sources</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-value">${analysis.premium_source_count}</span>
+                        <span class="metric-label">Premium Licensed</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-value">$${analysis.total_estimated_cost.toFixed(2)}</span>
+                        <span class="metric-label">Total Investment</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-value">$${avgSourcePrice.toFixed(2)}</span>
+                        <span class="metric-label">Avg per Source</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="research-preview">
+                <div class="preview-content">
+                    ${analysis.research_summary.split('\n').map(line => `<p>${this.sanitizeText(line)}</p>`).join('')}
+                </div>
+            </div>
+            
+            <div class="licensing-breakdown">
+                <h4>🔐 Licensing Protocol Breakdown</h4>
+                <div class="protocol-list">
+                    ${Object.entries(analysis.licensing_breakdown).map(([protocol, data]) => `
+                        <div class="protocol-item">
+                            <div class="protocol-info">
+                                <span class="protocol-name">${this.sanitizeText(protocol.toUpperCase())}</span>
+                                <span class="protocol-count">${data.count} sources</span>
+                            </div>
+                            <div class="protocol-cost">$${data.total_cost.toFixed(2)}</div>
+                        </div>
+                    `).join('') || '<p class="no-licensing">No premium licensing required for this research</p>'}
+                </div>
+            </div>
+            
+            <div class="dynamic-purchase-actions">
+                <button class="dynamic-purchase-btn primary" data-analysis='${JSON.stringify(analysis).replace(/'/g, "&#39;")}'>
+                    🚀 Unlock Full Research Package - $${analysis.total_estimated_cost.toFixed(2)}
+                </button>
+                <div class="purchase-details">
+                    <p>✅ Ethically licensed from ${Object.keys(analysis.licensing_breakdown).length || 'multiple'} publisher protocols</p>
+                    <p>📊 Professional research analysis with ${analysis.source_count} verified sources</p>
+                    <p>💰 Dynamic pricing based on actual source value and licensing costs</p>
+                </div>
+            </div>
+        `;
+    }
+
+    async handleDynamicResearchPurchase(button, analysisData) {
+        // Check authentication first
+        if (!this.authToken) {
+            this.showAuthModal('dynamic_purchase', { analysisData, button });
+            return;
+        }
+
+        const totalCost = analysisData.total_estimated_cost;
+        const priceCents = Math.round(totalCost * 100);
+        
+        // Check sufficient funds
+        if (this.walletBalance < priceCents) {
+            this.showInsufficientFundsModal(priceCents);
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = '⏳ Processing Research Purchase...';
+        
+        try {
+            // **MOCK DYNAMIC PURCHASE** - Simulate purchase
+            const mockResult = await this.mockPurchaseConfirmation('dynamic_research', priceCents);
+            
+            if (mockResult.success) {
+                // Mock wallet deduction
+                this.walletBalance -= priceCents;
+                this.updateAuthDisplay(true);
+                
+                // Update button state
+                button.textContent = '✅ Research Package Unlocked!';
+                button.classList.add('purchased');
+                button.disabled = true;
+                
+                this.showSuccessToast(`Dynamic research package purchased for $${totalCost.toFixed(2)}!`);
+                
+                // Display research package preview (in a real system, this would show the full content)
+                this.displayDynamicResearchPackage(analysisData);
+            }
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = `🚀 Unlock Full Research Package - $${totalCost.toFixed(2)}`;
+            this.showErrorToast('Failed to purchase research package');
+        }
+    }
+
+    displayDynamicResearchPackage(analysisData) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Create elements safely to prevent XSS
+        const packageDiv = document.createElement('div');
+        packageDiv.className = 'dynamic-research-package-display';
+        
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'package-header';
+        
+        const titleH3 = document.createElement('h3');
+        titleH3.textContent = `📋 Dynamic Research Package: ${analysisData.query}`;
+        
+        const metaPara = document.createElement('p');
+        metaPara.className = 'package-meta';
+        metaPara.textContent = `Investment: $${analysisData.total_estimated_cost.toFixed(2)} • ${analysisData.source_count} Sources • Generated ${new Date().toLocaleString()}`;
+        
+        headerDiv.appendChild(titleH3);
+        headerDiv.appendChild(metaPara);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'package-content';
+        
+        // Display the research summary
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'research-summary';
+        summaryDiv.innerHTML = analysisData.research_summary.split('\n').map(line => `<p>${this.sanitizeText(line)}</p>`).join('');
+        
+        contentDiv.appendChild(summaryDiv);
+        
+        packageDiv.appendChild(headerDiv);
+        packageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(packageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     // Authentication Methods
@@ -1441,17 +1637,17 @@ class ChatResearchApp {
         resultsDiv.appendChild(researchHeader);
         resultsDiv.appendChild(resultsArea);
         
-        // Add Research Packets section (matching Figma design)
-        const packetsSection = this.createResearchPacketsSection(data.refined_query || 'your research');
-        resultsDiv.appendChild(packetsSection);
+        // Add Dynamic Research section (replacing old tier system)
+        const researchSection = await this.createDynamicResearchSection(data.refined_query || 'your research');
+        resultsDiv.appendChild(researchSection);
 
         const messagesContainer = document.getElementById('messagesContainer');
         messagesContainer.appendChild(resultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        // Add event listeners for source cards and research packets
+        // Add event listeners for source cards and dynamic research
         this.addSourceCardListeners(resultsDiv);
-        this.addResearchPacketListeners(resultsDiv);
+        this.addDynamicResearchListeners(resultsDiv);
     }
 
     async getTierPrice(tierName) {

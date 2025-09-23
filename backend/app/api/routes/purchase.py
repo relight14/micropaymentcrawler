@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Header
 from slowapi import Limiter
 from typing import Dict, Any
 
-from schemas.api import PurchaseRequest, PurchaseResponse, TierType
+from schemas.api import PurchaseRequest, PurchaseResponse
 from services.research.packet_builder import PacketBuilder
 from services.research.crawler import ContentCrawlerStub
 from data.ledger_repository import ResearchLedger
