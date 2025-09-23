@@ -216,19 +216,19 @@ async def get_tiers(request: TiersRequest):
             ),
             TierInfo(
                 tier=TierType.RESEARCH,
-                price=2.00,
+                price=0.99,
                 sources=20,
                 includes_outline=True,
                 includes_insights=False,
-                description="Premium licensed sources with structured insights and actionable recommendations"
+                description="Craving clarity on this topic? For $0.99, we'll ethically license and distill the web's most relevant sources into a single, powerful summary."
             ),
             TierInfo(
                 tier=TierType.PRO,
-                price=4.00,
+                price=1.99,
                 sources=40,
                 includes_outline=True,
                 includes_insights=True,
-                description="Comprehensive licensed research with competitive intelligence and strategic analysis"
+                description="Serious about answers? Our Pro tier delivers full-spectrum research — licensed sources, competitive intelligence, and strategic framing."
             )
         ]
         
@@ -261,8 +261,8 @@ async def get_licensing_summary(request: LicensingSummaryRequest):
         # Define budget constraints: 60% for licensing, 40% for margin
         tier_configs = {
             TierType.BASIC: {"price": 0.00, "max_sources": 10},
-            TierType.RESEARCH: {"price": 2.00, "max_sources": 20}, 
-            TierType.PRO: {"price": 4.00, "max_sources": 40}
+            TierType.RESEARCH: {"price": 0.99, "max_sources": 20}, 
+            TierType.PRO: {"price": 1.99, "max_sources": 40}
         }
         
         config = tier_configs[request.tier]
@@ -354,8 +354,8 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         # SERVER-SIDE PRICING: Budget-constrained source generation (60% for licensing, 40% margin)
         tier_configs = {
             TierType.BASIC: {"price": 0.00, "max_sources": 10},
-            TierType.RESEARCH: {"price": 2.00, "max_sources": 20}, 
-            TierType.PRO: {"price": 4.00, "max_sources": 40}
+            TierType.RESEARCH: {"price": 0.99, "max_sources": 20}, 
+            TierType.PRO: {"price": 1.99, "max_sources": 40}
         }
         
         config = tier_configs[request.tier]
