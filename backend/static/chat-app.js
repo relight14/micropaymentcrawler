@@ -1965,8 +1965,10 @@ class ChatResearchApp {
                     if (action === 'tier_purchase' && data) {
                         // Handle both old and new tier purchase formats
                         if (data.tierId) {
+                            // New format: convert tierId to expected parameters
                             await this.handleTierPurchase(data.button, data.tierId, data.price);
-                        } else {
+                        } else if (data.tierData) {
+                            // Legacy format: use original parameters
                             await this.handleTierPurchase(data.button, data.tierData, data.price, data.tierName);
                         }
                     } else if (action === 'unlock' && data) {
