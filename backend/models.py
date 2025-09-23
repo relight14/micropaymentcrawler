@@ -21,7 +21,6 @@ class SourceCard(BaseModel):
 
 class ResearchPacket(BaseModel):
     query: str
-    tier: Optional[str] = None  # For backward compatibility, but not used in dynamic system
     summary: str
     outline: Optional[str] = None
     insights: Optional[str] = None

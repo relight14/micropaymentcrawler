@@ -1,6 +1,6 @@
 # Overview
 
-This project is an AI-powered research tool MVP offering tiered research services with dynamic pricing. Users can submit complex research queries and purchase different levels of research packets (Basic, Research, Pro), which include varying numbers of sources, outlines, and insights. The application simulates content crawling and source unlocking, integrated with a wallet-based payment system. The business vision is to provide a competitive differentiator with "real data, not made up," ensuring authentic source validation and professional presentation.
+This project is an AI-powered research tool MVP offering dynamic research services with per-source pricing. Users can submit complex research queries and receive personalized research packages with variable pricing based on query complexity, source quality, and licensing costs. The application simulates content crawling and source unlocking, integrated with a wallet-based payment system. The business vision is to provide a competitive differentiator with "real data, not made up," ensuring authentic source validation and professional presentation with ethical micropayment compensation to publishers.
 
 # User Preferences
 
@@ -19,8 +19,8 @@ The frontend is a Single Page Application built with vanilla HTML/CSS/JavaScript
 - **Dual-Mode AI Experience**: Offers both a conversational AI mode (Anthropic Claude integration with state persistence) for research discovery and a deep research mode with licensed source access and dynamic pricing.
 
 ## Feature Specifications
-- **Tiered Research Services**: Basic (Free), Research ($2), and Pro ($4) tiers with varying numbers of sources and features. The Basic tier is free and bypasses payment processing but requires authentication.
-- **Dynamic Pricing**: Source unlocking costs are dynamically simulated and determined by AI relevance, with a 60/40 budget allocation for licensing and corporate margin.
+- **Dynamic Research Services**: Query-based research packages with variable pricing ($0.10-$10.00) determined by source count, quality factors, and licensing complexity. No fixed tiers - users pay for exactly what they need.
+- **Dynamic Pricing**: Source unlocking costs are dynamically calculated based on AI relevance scoring, quality factors (peer-reviewed: 1.5x, recent: 1.2x, citations: 1.4x), and licensing protocols, with a 60/40 budget allocation for licensing and corporate margin.
 - **Content Licensing**: A multi-protocol abstraction layer supports RSL, Tollbit, and Cloudflare licensing, with server-authoritative pricing and real license token issuance. Frontend displays protocol badges and cost breakdowns.
 - **Mock Mode**: A robust mock mode (`LEDEWIRE_USE_MOCK=true`) short-circuits LedeWire API methods for faster development, eliminating network calls and preventing production use.
 - **Wallet Integration**: Designed for secure integration with LedeWire for real-time wallet balance checks, purchase processing, and content access, including idempotency keys for fraud protection.

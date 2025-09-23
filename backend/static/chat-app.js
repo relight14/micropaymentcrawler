@@ -2,7 +2,7 @@ class ChatResearchApp {
     constructor() {
         this.currentMode = 'chat'; // 'chat' or 'research'
         this.apiBase = window.location.origin;
-        this.authToken = localStorage.getItem('ledewire_token');
+        this.ledewire_token = localStorage.getItem('ledewire_token');
         this.walletBalance = 0; // Initialize to prevent NaN display
         this.conversationHistory = [];
         this.isDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -190,8 +190,8 @@ class ChatResearchApp {
             };
             
             // Add auth token for research mode
-            if (this.currentMode === 'research' && this.authToken) {
-                headers['Authorization'] = `Bearer ${this.authToken}`;
+            if (this.currentMode === 'research' && this.ledewire_token) {
+                headers['Authorization'] = `Bearer ${this.ledewire_token}`;
             }
 
             const response = await fetch(`${this.apiBase}/api/chat`, {
@@ -207,8 +207,8 @@ class ChatResearchApp {
             if (response.status === 401 && this.currentMode === 'research') {
                 console.log('Token expired during research, clearing auth and showing login...');
                 this.hideTypingIndicator(); // Fix: ensure loading state is cleared
-                this.authToken = null;
-                localStorage.removeItem('authToken');
+                this.ledewire_token = null;
+                localStorage.removeItem('ledewire_token');
                 this.addMessage('assistant', 'Session expired. Please sign in to continue with research.');
                 this.showAuthModal();
                 return;
@@ -292,12 +292,12 @@ class ChatResearchApp {
             return;
         }
         
-        const tierName = this.formatTierName(packet.tier);
+        const packageTitle = "Dynamic Research Package";
         const totalSources = packet.total_sources || 0;
         const researchContent = `
             <div class="research-package-chat">
                 <div class="package-header">
-                    <h3>📋 ${this.escapeHtml(tierName)} Research Package</h3>
+                    <h3>📋 ${this.escapeHtml(packageTitle)}</h3>
                     <div class="package-meta">${totalSources} Licensed Sources</div>
                 </div>
                 
@@ -343,9 +343,6 @@ class ChatResearchApp {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    formatTierName(tier) {
-        return tier.charAt(0).toUpperCase() + tier.slice(1);
-    }
 
     formatResearchContent(text) {
         // Enhanced formatting for research content with sanitization
@@ -444,7 +441,7 @@ class ChatResearchApp {
                         ${licenseCost > 0 ? `<span class="license-fee">includes $${licenseCost.toFixed(2)} license</span>` : ''}
                         ${requiresAttribution ? '<span class="attribution-required">⚖️ Attribution required</span>' : ''}
                     </div>
-                    <button class="unlock-btn-chat licensed" onclick="chatApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${totalCost}, '${this.escapeHtml(title)}')">
+                    <button class="unlock-btn-chat licensed" onclick="window.researchApp.handleSourceUnlockInChat('${this.escapeHtml(sourceId)}', ${totalCost}, '${this.escapeHtml(title)}')">
                         🔓 Unlock & License
                     </button>
                 </div>
@@ -524,7 +521,7 @@ class ChatResearchApp {
     }
 
     async handleSourceUnlockInChat(sourceId, price, title) {
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             this.addMessage('system', 'Please log in to unlock premium sources.');
             return;
         }
@@ -552,7 +549,7 @@ class ChatResearchApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.authToken}`
+                    'Authorization': `Bearer ${this.ledewire_token}`
                 },
                 body: JSON.stringify({
                     source_id: sourceId,
@@ -562,8 +559,8 @@ class ChatResearchApp {
 
             if (response.status === 401) {
                 // Handle auth failure - clear token and show login
-                this.authToken = null;
-                localStorage.removeItem('authToken');
+                this.ledewire_token = null;
+                localStorage.removeItem('ledewire_token');
                 this.updateWalletDisplay();
                 this.addMessage('system', 'Session expired. Please log in to continue.');
                 // Re-enable button for retry after login
@@ -614,12 +611,12 @@ class ChatResearchApp {
     }
 
     async initializeWalletDisplay() {
-        if (this.authToken) {
+        if (this.ledewire_token) {
             try {
                 // Fetch current wallet balance
                 const response = await fetch(`${this.apiBase}/api/auth/wallet/balance`, {
                     headers: {
-                        'Authorization': `Bearer ${this.authToken}`
+                        'Authorization': `Bearer ${this.ledewire_token}`
                     }
                 });
                 
@@ -629,8 +626,8 @@ class ChatResearchApp {
                     this.updateWalletDisplay();
                 } else if (response.status === 401) {
                     // Token expired, clear it and prompt login
-                    this.authToken = null;
-                    localStorage.removeItem('authToken');
+                    this.ledewire_token = null;
+                    localStorage.removeItem('ledewire_token');
                     this.updateWalletDisplay();
                     console.log('Authentication expired during wallet balance fetch');
                 }
@@ -644,7 +641,7 @@ class ChatResearchApp {
         const walletDisplay = document.getElementById('walletDisplay');
         const walletBalance = document.getElementById('walletBalance');
         
-        if (this.authToken && this.walletBalance !== undefined) {
+        if (this.ledewire_token && this.walletBalance !== undefined) {
             walletDisplay.style.display = 'block';
             walletBalance.textContent = this.walletBalance.toFixed(2);
         } else {
@@ -772,7 +769,7 @@ class ChatResearchApp {
 
     async handleSourceUnlock(button, sourceId, price) {
         // Check authentication first
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             this.showAuthModal('unlock', { sourceId, price, button });
             return;
         }
@@ -812,7 +809,7 @@ class ChatResearchApp {
     }
 
     async handleSourceDownload(sourceId) {
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             this.showAuthModal('download', { sourceId });
             return;
         }
@@ -964,7 +961,7 @@ class ChatResearchApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(this.authToken && { 'Authorization': `Bearer ${this.authToken}` })
+                    ...(this.ledewire_token && { 'Authorization': `Bearer ${this.ledewire_token}` })
                 },
                 body: JSON.stringify({
                     query: query,
@@ -1060,7 +1057,7 @@ class ChatResearchApp {
 
     async handleDynamicResearchPurchase(button, analysisData) {
         // Check authentication first
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             this.showAuthModal('dynamic_purchase', { analysisData, button });
             return;
         }
@@ -1141,10 +1138,10 @@ class ChatResearchApp {
 
     // Authentication Methods
     initializeAuth() {
-        if (this.authToken) {
+        if (this.ledewire_token) {
             this.updateWalletBalance().catch(() => {
                 localStorage.removeItem('ledewire_token');
-                this.authToken = null;
+                this.ledewire_token = null;
                 this.updateAuthDisplay(false);
             });
         } else {
@@ -1177,11 +1174,11 @@ class ChatResearchApp {
     }
 
     async updateWalletBalance() {
-        if (!this.authToken) return;
+        if (!this.ledewire_token) return;
         
         try {
             const response = await fetch('/api/auth/wallet/balance', {
-                headers: { 'Authorization': `Bearer ${this.authToken}` }
+                headers: { 'Authorization': `Bearer ${this.ledewire_token}` }
             });
             
             if (response.ok) {
@@ -1274,7 +1271,7 @@ class ChatResearchApp {
             }
             
             if (result.success) {
-                this.authToken = result.access_token;
+                this.ledewire_token = result.access_token;
                 localStorage.setItem('ledewire_token', result.access_token);
                 
                 await this.updateWalletBalance();
@@ -1327,7 +1324,7 @@ class ChatResearchApp {
 
     logout() {
         localStorage.removeItem('ledewire_token');
-        this.authToken = null;
+        this.ledewire_token = null;
         this.walletBalance = 0;
         this.purchasedItems.clear();
         this.updateAuthDisplay(false);
@@ -1359,7 +1356,7 @@ class ChatResearchApp {
         this.currentQuery = this.getLastQuery();
         
         // Check authentication first
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             this.showAuthModal('purchase', { packetId, price, button });
             return;
         }
@@ -1394,7 +1391,7 @@ class ChatResearchApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.authToken}`
+                    'Authorization': `Bearer ${this.ledewire_token}`
                 },
                 body: JSON.stringify({
                     tier: packetId,
@@ -1432,7 +1429,7 @@ class ChatResearchApp {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.authToken}`
+                        'Authorization': `Bearer ${this.ledewire_token}`
                     },
                     body: JSON.stringify({
                         tier: packetId,
@@ -1530,7 +1527,7 @@ class ChatResearchApp {
         headerDiv.className = 'packet-header';
         
         const titleH3 = document.createElement('h3');
-        titleH3.textContent = `📋 Research Report: ${packet.tier}`;
+        titleH3.textContent = `📋 Dynamic Research Report`;
         
         const metaPara = document.createElement('p');
         metaPara.className = 'packet-meta';
@@ -1804,7 +1801,7 @@ class ChatResearchApp {
     }
 
     handlePurchaseFlow() {
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             // No authentication - show LedeWire auth modal
             this.showAuthModal();
         } else {
@@ -1943,9 +1940,9 @@ class ChatResearchApp {
             const data = await response.json();
             
             if (response.ok && data.access_token) {
-                this.authToken = data.access_token;
+                this.ledewire_token = data.access_token;
                 // Persist token to localStorage for future sessions
-                localStorage.setItem('authToken', data.access_token);
+                localStorage.setItem('ledewire_token', data.access_token);
                 document.getElementById('authModal').style.display = 'none';
                 
                 // Resume the original purchase flow with stored tier context
@@ -1970,7 +1967,7 @@ class ChatResearchApp {
             const response = await fetch(`${this.apiBase}/api/auth/wallet/balance`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${this.authToken}`,
+                    'Authorization': `Bearer ${this.ledewire_token}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -1978,8 +1975,8 @@ class ChatResearchApp {
             // Handle 401 responses - token is invalid/expired
             if (response.status === 401) {
                 console.log('Token expired or invalid, clearing auth and showing login...');
-                this.authToken = null;
-                localStorage.removeItem('authToken');
+                this.ledewire_token = null;
+                localStorage.removeItem('ledewire_token');
                 this.showAuthModal();
                 return;
             }
@@ -2119,7 +2116,7 @@ class ChatResearchApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.authToken}`
+                    'Authorization': `Bearer ${this.ledewire_token}`
                 },
                 body: JSON.stringify({
                     query: this.currentQuery,
@@ -2131,8 +2128,8 @@ class ChatResearchApp {
             // Handle 401 responses - token is invalid/expired
             if (response.status === 401) {
                 console.log('Token expired during purchase, clearing auth and showing login...');
-                this.authToken = null;
-                localStorage.removeItem('authToken');
+                this.ledewire_token = null;
+                localStorage.removeItem('ledewire_token');
                 // Fix: close wallet modal before showing auth modal
                 const walletModal = document.getElementById('walletModal');
                 if (walletModal) walletModal.style.display = 'none';
@@ -2247,7 +2244,7 @@ class ChatResearchApp {
 
     async purchaseResearch(query, cost) {
         // Check if user is authenticated
-        if (!this.authToken) {
+        if (!this.ledewire_token) {
             this.addMessage('system', 
                 `To purchase the full research package for "${query}" ($${cost.toFixed(2)}), please log in first. ` +
                 'This would integrate with the LedeWire wallet system for secure payments.'
