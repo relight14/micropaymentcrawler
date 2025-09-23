@@ -1364,7 +1364,7 @@ class ChatResearchApp {
         
         // Check authentication first
         if (!this.ledewire_token) {
-            this.showAuthModal('purchase', { tierId, price, button });
+            this.showAuthModal('tier_purchase', { tierId, price, button });
             return;
         }
 
@@ -1963,13 +1963,16 @@ class ChatResearchApp {
                 if (this.pendingAction) {
                     const { action, data } = this.pendingAction;
                     if (action === 'tier_purchase' && data) {
-                        await this.handleTierPurchase(data.button, data.tierData, data.price, data.tierName);
+                        // Handle both old and new tier purchase formats
+                        if (data.tierId) {
+                            await this.handleTierPurchase(data.button, data.tierId, data.price);
+                        } else {
+                            await this.handleTierPurchase(data.button, data.tierData, data.price, data.tierName);
+                        }
                     } else if (action === 'unlock' && data) {
                         await this.handleSourceUnlock(data.button, data.sourceId, data.price);
                     } else if (action === 'download' && data) {
                         await this.handleSourceDownload(data.sourceId);
-                    } else if (action === 'purchase' && data) {
-                        await this.handleTierPurchase(data.button, data.tierId, data.price);
                     }
                     this.pendingAction = null;
                 } else if (this.selectedTier && this.currentQuery) {
