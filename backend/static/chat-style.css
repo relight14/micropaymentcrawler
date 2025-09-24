@@ -362,6 +362,191 @@
     font-size: var(--text-xs);
 }
 
+/* Source Selection Checkbox */
+.source-selection {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.source-selection-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--foreground);
+}
+
+.source-selection-checkbox {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border);
+    border-radius: calc(var(--radius) - 4px);
+    background: var(--background);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    position: relative;
+}
+
+.source-selection-checkbox:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.source-selection-checkbox:checked::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--accent-foreground);
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.source-selection-checkbox:hover {
+    border-color: var(--accent);
+}
+
+.selection-text {
+    flex: 1;
+    font-weight: var(--font-weight-medium);
+}
+
+.selection-cost {
+    font-weight: var(--font-weight-semibold);
+    color: var(--accent);
+}
+
+/* Selected Sources List Styles */
+.selected-sources-list {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.no-sources-message {
+    text-align: center;
+    color: var(--muted-foreground);
+    font-style: italic;
+}
+
+.sources-summary h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--foreground);
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-semibold);
+}
+
+.sources-count {
+    margin: 0 0 1rem 0;
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+}
+
+.sources-compact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.compact-source-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--secondary);
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--border);
+}
+
+.source-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.source-publisher {
+    font-size: var(--text-xs);
+    color: var(--muted-foreground);
+    font-weight: var(--font-weight-medium);
+}
+
+.source-title {
+    font-size: var(--text-sm);
+    color: var(--foreground);
+    font-weight: var(--font-weight-medium);
+}
+
+.source-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.remove-source-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--muted-foreground);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.remove-source-btn:hover {
+    background: var(--destructive);
+    color: var(--destructive-foreground);
+    border-color: var(--destructive);
+}
+
+/* Build Report Button */
+.build-report-section {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.build-report-btn {
+    background: var(--accent);
+    color: var(--accent-foreground);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0.75rem 2rem;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 200px;
+}
+
+.build-report-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 90%, transparent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.build-report-btn:disabled {
+    background: var(--muted);
+    color: var(--muted-foreground);
+    border-color: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
 
 
 

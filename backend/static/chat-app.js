@@ -11,6 +11,7 @@ class ChatResearchApp {
         this.isLoginMode = true;
         this.pendingAction = null;
         this.currentResearchData = null; // Store research data for cross-tab usage
+        this.selectedSources = []; // Sources selected for report building with metadata
         this.initializeEventListeners();
         this.initializeWalletDisplay();
         this.initializeDarkMode();
@@ -185,6 +186,11 @@ class ChatResearchApp {
         if (welcomeMessage) {
             welcomeMessage.remove();
         }
+
+        // Clear selected sources on new query (fresh start)
+        this.selectedSources = [];
+        this.updateSourceSelectionUI();
+        this.updateReportBuilderDisplay();
 
         // Add user message to chat
         this.addMessage('user', message);
@@ -690,6 +696,131 @@ class ChatResearchApp {
         }
     }
 
+    // Source Selection Management Methods
+    toggleSourceSelection(sourceId, sourceData) {
+        const existingIndex = this.selectedSources.findIndex(s => s.id === sourceId);
+        
+        if (existingIndex >= 0) {
+            // Remove from selection
+            this.selectedSources.splice(existingIndex, 1);
+        } else {
+            // Add to selection with timestamp
+            this.selectedSources.push({
+                id: sourceId,
+                title: sourceData.title,
+                publisher: sourceData.publisher_name || sourceData.domain,
+                url: sourceData.url,
+                license_info: sourceData.license_info || sourceData.licensing_protocol,
+                cost: sourceData.license_cost || sourceData.unlock_price || 0,
+                excerpt: sourceData.excerpt || sourceData.snippet,
+                createdAt: new Date().toISOString()
+            });
+        }
+        
+        // Update UI state
+        this.updateSourceSelectionUI();
+        this.updateReportBuilderDisplay();
+    }
+
+    isSourceSelected(sourceId) {
+        return this.selectedSources.some(s => s.id === sourceId);
+    }
+
+    getSelectedSourcesTotal() {
+        return this.selectedSources.reduce((total, source) => total + (source.cost || 0), 0);
+    }
+
+    getSelectedSourcesCount() {
+        return this.selectedSources.length;
+    }
+
+    canAddMoreSources(tierType) {
+        const limits = { research: 25, pro: 40 };
+        const currentCount = this.getSelectedSourcesCount();
+        return currentCount < (limits[tierType] || 25);
+    }
+
+    updateSourceSelectionUI() {
+        // Update all checkboxes to reflect current selection state
+        document.querySelectorAll('.source-selection-checkbox').forEach(checkbox => {
+            const sourceId = checkbox.dataset.sourceId;
+            checkbox.checked = this.isSourceSelected(sourceId);
+        });
+    }
+
+    updateReportBuilderDisplay() {
+        // This will be called to update the Report Builder tab when selections change
+        if (this.currentMode === 'report') {
+            this.refreshReportBuilderView();
+        }
+    }
+
+    refreshReportBuilderView() {
+        // Update the selected sources display in Report Builder mode
+        const existingSourcesList = document.querySelector('.selected-sources-list');
+        if (existingSourcesList) {
+            existingSourcesList.replaceWith(this.createSelectedSourcesList());
+        }
+        
+        // Update build report button state
+        const buildReportButton = document.querySelector('.build-report-btn');
+        if (buildReportButton) {
+            const isDisabled = this.selectedSources.length === 0;
+            buildReportButton.disabled = isDisabled;
+            const total = this.getSelectedSourcesTotal();
+            buildReportButton.textContent = isDisabled 
+                ? 'Select sources to build report' 
+                : `Build Report ($${total.toFixed(2)} total)`;
+        }
+    }
+
+    createSelectedSourcesList() {
+        const div = document.createElement('div');
+        div.className = 'selected-sources-list';
+        
+        if (this.selectedSources.length === 0) {
+            div.innerHTML = `
+                <div class="no-sources-message">
+                    <p>No sources selected yet. Switch to Research mode to find and select sources for your report.</p>
+                </div>
+            `;
+            return div;
+        }
+        
+        const total = this.getSelectedSourcesTotal();
+        const count = this.getSelectedSourcesCount();
+        
+        div.innerHTML = `
+            <div class="sources-summary">
+                <h3>Selected Sources</h3>
+                <p class="sources-count">${count} source${count !== 1 ? 's' : ''} selected • $${total.toFixed(2)} total license cost</p>
+            </div>
+            <div class="sources-compact-list">
+                ${this.selectedSources.map(source => `
+                    <div class="compact-source-item" data-source-id="${source.id}">
+                        <div class="source-info">
+                            <span class="source-publisher">${source.publisher}</span>
+                            <span class="source-title">${source.title.length > 60 ? source.title.substring(0, 60) + '...' : source.title}</span>
+                        </div>
+                        <div class="source-meta">
+                            <span class="license-badge">${source.license_info || 'Free'}</span>
+                            <span class="source-cost">$${(source.cost || 0).toFixed(2)}</span>
+                            <button class="remove-source-btn" onclick="window.researchApp.removeSelectedSource('${source.id}')">×</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        return div;
+    }
+
+    removeSelectedSource(sourceId) {
+        this.selectedSources = this.selectedSources.filter(source => source.id !== sourceId);
+        this.updateSourceSelectionUI();
+        this.updateReportBuilderDisplay();
+    }
+
     updateSourceCardState(sourceId, isUnlocked) {
         const sourceCard = document.querySelector(`[data-source-id="${sourceId}"]`);
         if (sourceCard) {
@@ -786,6 +917,16 @@ class ChatResearchApp {
                                </button>`
                         }
                     </div>
+                    
+                    <div class="source-selection">
+                        <label class="source-selection-label">
+                            <input type="checkbox" class="source-selection-checkbox" 
+                                   data-source-id="${source.id || Date.now()}"
+                                   ${this.isSourceSelected(source.id || Date.now()) ? 'checked' : ''}>
+                            <span class="selection-text">Include in Report</span>
+                            <span class="selection-cost">$${(licensePrice || 0).toFixed(2)}</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         `;
@@ -804,6 +945,26 @@ class ChatResearchApp {
             if (e.target.matches('.btn-download') || e.target.closest('.btn-download')) {
                 const sourceId = e.target.closest('[data-source-id]')?.dataset.sourceId;
                 await this.handleSourceDownload(sourceId);
+            }
+        });
+
+        // Add change handlers for source selection checkboxes
+        resultsDiv.addEventListener('change', (e) => {
+            if (e.target.matches('.source-selection-checkbox')) {
+                const sourceId = e.target.dataset.sourceId;
+                const sourceCard = e.target.closest('[data-source-id]');
+                
+                // Extract source data from the card for selection
+                const sourceData = {
+                    id: sourceId,
+                    title: sourceCard.querySelector('.card-title')?.textContent || 'Untitled',
+                    publisher_name: sourceCard.querySelector('.card-meta')?.textContent?.split(' • ')[0] || 'Unknown',
+                    url: sourceCard.querySelector('.view-source-btn')?.onclick?.toString().match(/window\.open\('([^']+)'/)?.[1] || '#',
+                    license_cost: parseFloat(e.target.closest('.source-selection').querySelector('.selection-cost')?.textContent?.replace('$', '')) || 0,
+                    excerpt: sourceCard.querySelector('.card-summary')?.textContent || 'No preview available'
+                };
+                
+                this.toggleSourceSelection(sourceId, sourceData);
             }
         });
     }
@@ -1121,28 +1282,7 @@ class ChatResearchApp {
         
         return `
             <div class="tier-cards-container">
-                <div class="tier-card basic-tier">
-                    <div class="tier-icon">⭐</div>
-                    <div class="tier-header">
-                        <h4>Basic Tier</h4>
-                        <div class="tier-price">Free</div>
-                    </div>
-                    <div class="tier-description">
-                        ${basic.source_count} licensed premium sources found
-                    </div>
-                    <div class="tier-subtitle">
-                        Free research with quality sources and professional analysis
-                    </div>
-                    <ul class="tier-features">
-                        <li>✓ ${basic.source_count} licensed premium sources</li>
-                        <li>✓ Professional analysis</li>
-                        <li>✓ Quality source verification</li>
-                        <li>✓ Basic summarization</li>
-                    </ul>
-                    <button class="tier-cta btn-basic" data-tier-data='${JSON.stringify(basic).replace(/'/g, "&#39;")}' data-price="0.00" data-tier="basic">
-                        Get Started
-                    </button>
-                </div>
+                <!-- Basic tier hidden in Report Builder mode -->
                 
                 <div class="tier-card research-tier highlighted">
                     <div class="popular-badge">Most Popular</div>
@@ -1193,6 +1333,12 @@ class ChatResearchApp {
                         Unlock Pro
                     </button>
                 </div>
+            </div>
+            
+            <div class="build-report-section">
+                <button class="build-report-btn" disabled>
+                    Select sources to build report
+                </button>
             </div>
         `;
     }
@@ -1868,6 +2014,10 @@ class ChatResearchApp {
         
         tierCardsDiv.appendChild(builderHeader);
         
+        // Add selected sources list at the top
+        const selectedSourcesList = this.createSelectedSourcesList();
+        tierCardsDiv.appendChild(selectedSourcesList);
+        
         // Create tier cards with full analysis
         const tierCardsSection = await this.createTierCardsSection(researchData.refined_query || this.currentQuery);
         tierCardsDiv.appendChild(tierCardsSection);
@@ -2386,6 +2536,9 @@ class ChatResearchApp {
                         </div>
                     `;
                     this.conversationHistory = [];
+                    this.selectedSources = []; // Clear selected sources on new conversation
+                    this.updateSourceSelectionUI();
+                    this.updateReportBuilderDisplay();
                 } else {
                     throw new Error('Failed to clear conversation');
                 }
