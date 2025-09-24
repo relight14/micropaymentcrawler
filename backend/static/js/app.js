@@ -107,8 +107,10 @@ export class ChatResearchApp {
             // Show typing indicator
             this.uiManager.showTypingIndicator();
             
-            // Send to backend
-            const response = await this.apiService.sendMessage(message, this.appState.getMode());
+            // Send to backend with conversation context for research mode
+            const conversationContext = this.appState.getMode() === 'research' ? 
+                this.appState.getConversationHistory() : null;
+            const response = await this.apiService.sendMessage(message, this.appState.getMode(), conversationContext);
             
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();

@@ -35,6 +35,7 @@ class ResearchRequest(BaseModel):
     query: str
     max_budget_dollars: Optional[float] = 10.0  # User budget limit
     preferred_source_count: Optional[int] = 15  # Desired number of sources
+    conversation_context: Optional[List[Dict[str, str]]] = None  # Chat history for context
 
 
 class DynamicResearchResponse(BaseModel):

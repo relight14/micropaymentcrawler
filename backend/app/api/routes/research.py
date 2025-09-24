@@ -21,8 +21,16 @@ async def analyze_research_query(request: ResearchRequest):
         max_sources = min(request.preferred_source_count or 15, 30)  # Cap at 30
         budget_limit = (request.max_budget_dollars or 10.0) * 0.75  # 75% for licensing
         
+        # Enhance query with conversation context if available
+        enhanced_query = request.query
+        if request.conversation_context:
+            # Extract relevant context from recent conversation
+            context_text = _extract_conversation_context(request.conversation_context)
+            if context_text:
+                enhanced_query = f"{context_text} {request.query}"
+        
         # Use progressive search for faster initial response
-        result = await crawler.generate_sources_progressive(request.query, max_sources, budget_limit)
+        result = await crawler.generate_sources_progressive(enhanced_query, max_sources, budget_limit)
         sources = result["sources"]
         
         # Calculate costs and create response
@@ -80,6 +88,27 @@ async def analyze_research_query(request: ResearchRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing research query: {str(e)}")
+
+
+def _extract_conversation_context(conversation_history: List[Dict[str, str]]) -> str:
+    """Extract relevant context from conversation history for research enhancement."""
+    if not conversation_history or len(conversation_history) == 0:
+        return ""
+    
+    # Get recent user messages to understand the context
+    recent_context = []
+    for message in conversation_history[-6:]:  # Last 6 messages for context
+        if message.get('sender') == 'user' and message.get('content'):
+            content = message['content'].strip()
+            if len(content) > 10:  # Meaningful content
+                recent_context.append(content)
+    
+    if recent_context:
+        # Join recent user messages to provide context
+        context = " ".join(recent_context[-3:])  # Last 3 user messages
+        return f"Context from conversation about: {context}."
+    
+    return ""
 
 
 def _generate_research_preview(query: str, sources: List[Any]) -> str:

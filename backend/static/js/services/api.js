@@ -19,10 +19,10 @@ export class APIService {
         return headers;
     }
 
-    async sendMessage(message, mode) {
+    async sendMessage(message, mode, conversationContext = null) {
         // Use optimized research endpoint for research mode
         if (mode === 'research') {
-            return await this.analyzeResearchQuery(message);
+            return await this.analyzeResearchQuery(message, conversationContext);
         }
         
         // Use chat endpoint for other modes
@@ -52,16 +52,23 @@ export class APIService {
         };
     }
     
-    async analyzeResearchQuery(query) {
+    async analyzeResearchQuery(query, conversationContext = null) {
         // Call the optimized research endpoint with progressive loading
+        const requestBody = {
+            query,
+            max_budget_dollars: 10.0,
+            preferred_source_count: 15
+        };
+        
+        // Include conversation context if available to make research context-aware
+        if (conversationContext && conversationContext.length > 0) {
+            requestBody.conversation_context = conversationContext;
+        }
+        
         const response = await fetch(`${this.baseURL}/api/research/analyze`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
-            body: JSON.stringify({
-                query,
-                max_budget_dollars: 10.0,
-                preferred_source_count: 15
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
