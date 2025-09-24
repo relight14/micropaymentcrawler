@@ -3,7 +3,7 @@ HTML Research Packet Generator
 Creates clean, academic-style HTML reports with LedeWire branding.
 """
 from schemas.domain import ResearchPacket, SourceCard
-from typing import List
+from typing import List, Optional
 import html
 
 class HTMLPacketGenerator:
@@ -14,10 +14,14 @@ class HTMLPacketGenerator:
     def __init__(self):
         pass
     
-    def generate_html_packet(self, packet: ResearchPacket) -> str:
+    def generate_html_packet(self, packet: ResearchPacket, selected_sources: Optional[List[SourceCard]] = None) -> str:
         """
-        Generate complete HTML research packet.
+        Generate complete HTML research packet with optional selectedSources for citations.
+        If selected_sources is provided, uses those for inline citations and Sources Appendix.
         """
+        # Use selected sources if provided, otherwise fall back to packet sources
+        sources_to_use = selected_sources if selected_sources else packet.sources
+        
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,10 +32,10 @@ class HTMLPacketGenerator:
 </head>
 <body>
     {self._get_header(packet)}
-    {self._get_summary_section(packet)}
-    {self._get_outline_section(packet) if packet.outline else ''}
-    {self._get_insights_section(packet) if packet.insights else ''}
-    {self._get_sources_section(packet)}
+    {self._get_summary_section(packet, sources_to_use)}
+    {self._get_outline_section(packet, sources_to_use) if packet.outline else ''}
+    {self._get_insights_section(packet, sources_to_use) if packet.insights else ''}
+    {self._get_sources_appendix(sources_to_use)}
     {self._get_footer()}
 </body>
 </html>"""
@@ -161,6 +165,42 @@ class HTMLPacketGenerator:
             display: inline-block;
         }
         
+        .sources-appendix {
+            margin-top: 25px;
+        }
+        
+        .source-citation {
+            display: flex;
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+        
+        .citation-number {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-right: 15px;
+            font-size: 1.1em;
+            min-width: 30px;
+        }
+        
+        .citation-details {
+            flex: 1;
+        }
+        
+        .citation {
+            color: #3498db;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-decoration: none;
+        }
+        
+        .citation:hover {
+            text-decoration: underline;
+        }
+        
         .footer {
             text-align: center;
             padding-top: 30px;
@@ -199,52 +239,100 @@ class HTMLPacketGenerator:
         {f'<div class="content-id">Content ID: {packet.content_id}</div>' if packet.content_id else ''}
     </div>"""
     
-    def _get_summary_section(self, packet: ResearchPacket) -> str:
-        """Generate summary section."""
+    def _get_summary_section(self, packet: ResearchPacket, sources: Optional[List[SourceCard]] = None) -> str:
+        """Generate summary section with inline citations."""
+        summary_with_citations = self._add_inline_citations(packet.summary, sources, 1) if sources else html.escape(packet.summary)
+        
         return f"""<div class="content-section">
         <h2 class="section-title">Research Summary</h2>
-        <div class="summary-text">{html.escape(packet.summary)}</div>
+        <div class="summary-text">{summary_with_citations}</div>
     </div>"""
     
-    def _get_outline_section(self, packet: ResearchPacket) -> str:
-        """Generate outline section (Research and Pro tiers only)."""
+    def _get_outline_section(self, packet: ResearchPacket, sources: Optional[List[SourceCard]] = None) -> str:
+        """Generate outline section (Research and Pro tiers only) with inline citations."""
         if not packet.outline:
             return ""
         
+        outline_with_citations = self._add_inline_citations(packet.outline, sources) if sources else html.escape(packet.outline)
+        
         return f"""<div class="content-section">
         <h2 class="section-title">Research Outline</h2>
-        <div class="outline-text">{html.escape(packet.outline)}</div>
+        <div class="outline-text">{outline_with_citations}</div>
     </div>"""
     
-    def _get_insights_section(self, packet: ResearchPacket) -> str:
-        """Generate strategic insights section (Pro tier only)."""
+    def _get_insights_section(self, packet: ResearchPacket, sources: Optional[List[SourceCard]] = None) -> str:
+        """Generate strategic insights section (Pro tier only) with inline citations."""
         if not packet.insights:
             return ""
         
+        insights_with_citations = self._add_inline_citations(packet.insights, sources) if sources else html.escape(packet.insights)
+        
         return f"""<div class="content-section">
         <h2 class="section-title">Strategic Insights</h2>
-        <div class="insights-text">{html.escape(packet.insights)}</div>
+        <div class="insights-text">{insights_with_citations}</div>
     </div>"""
     
-    def _get_sources_section(self, packet: ResearchPacket) -> str:
-        """Generate sources section with individual source cards."""
+    def _get_sources_appendix(self, sources: Optional[List[SourceCard]]) -> str:
+        """Generate Sources Appendix with numbered citations."""
+        if not sources:
+            return ""
+            
         sources_html = ""
         
-        for source in packet.sources[:12]:  # Show first 12 sources in HTML
-            sources_html += f"""<div class="source-card">
-            <div class="source-title">{html.escape(source.title)}</div>
-            <div class="source-domain">{html.escape(source.domain)}</div>
-            <div class="source-excerpt">{html.escape(source.excerpt)}</div>
-            <div class="source-price">Unlock: ${source.unlock_price:.2f}</div>
+        for i, source in enumerate(sources, 1):
+            sources_html += f"""<div class="source-citation">
+            <div class="citation-number">[{i}]</div>
+            <div class="citation-details">
+                <div class="source-title">{html.escape(source.title)}</div>
+                <div class="source-domain">{html.escape(source.domain)}</div>
+                <div class="source-excerpt">{html.escape(source.excerpt)}</div>
+                <div class="source-price">License: ${source.unlock_price:.2f}</div>
+            </div>
         </div>"""
         
         return f"""<div class="content-section">
-        <h2 class="section-title">Research Sources ({packet.total_sources} total)</h2>
-        <p>Each source can be unlocked individually for detailed access via your LedeWire wallet.</p>
-        <div class="source-grid">
+        <h2 class="section-title">Sources</h2>
+        <p>The following {len(sources)} sources were used in this research report:</p>
+        <div class="sources-appendix">
             {sources_html}
         </div>
     </div>"""
+
+    def _add_inline_citations(self, text: str, sources: Optional[List[SourceCard]], start_citation: int = 1) -> str:
+        """Add inline citations [1], [2], [3] to text systematically."""
+        if not sources or not text:
+            return html.escape(text)
+        
+        # Escape the text first
+        escaped_text = html.escape(text)
+        
+        # Split into sentences for systematic citation placement
+        sentences = [s.strip() for s in escaped_text.replace('. ', '.|').split('|') if s.strip()]
+        
+        if not sentences:
+            return escaped_text
+        
+        # Add citations systematically - distribute evenly across sentences
+        cited_sentences = []
+        citations_to_add = min(len(sources), 3)  # Cap at 3 citations per section
+        
+        if len(sentences) >= citations_to_add:
+            # Distribute citations evenly across sentences
+            interval = len(sentences) // citations_to_add
+            for i, sentence in enumerate(sentences):
+                if i > 0 and i % interval == 0 and len([s for s in cited_sentences if '[' in s]) < citations_to_add:
+                    citation_num = start_citation + len([s for s in cited_sentences if '[' in s])
+                    sentence += f' <span class="citation">[{citation_num}]</span>'
+                cited_sentences.append(sentence)
+        else:
+            # More citations than sentences - add multiple per sentence
+            for i, sentence in enumerate(sentences):
+                citation_num = start_citation + i
+                if citation_num <= start_citation + len(sources) - 1:
+                    sentence += f' <span class="citation">[{citation_num}]</span>'
+                cited_sentences.append(sentence)
+        
+        return '. '.join(cited_sentences)
     
     def _get_footer(self) -> str:
         """Generate footer with LedeWire attribution."""
