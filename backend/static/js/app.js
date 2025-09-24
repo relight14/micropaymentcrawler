@@ -118,9 +118,17 @@ export class ChatResearchApp {
                 this.addMessage('assistant', response.content, response.metadata);
             }
             
-            // Handle research data
+            // Handle research data with progressive loading
             if (response.research_data) {
                 this.appState.setCurrentResearchData(response.research_data);
+                
+                // Display immediate source cards
+                this._displaySourceCards(response.research_data.sources);
+                
+                // If enrichment is needed, poll for updates
+                if (response.research_data.enrichment_needed) {
+                    this._pollForEnrichedResults(this.appState.getCurrentQuery());
+                }
             }
             
         } catch (error) {
@@ -569,8 +577,184 @@ export class ChatResearchApp {
         }, 3000);
     }
     
-    // Global methods for HTML event handlers
+    _displaySourceCards(sources) {
+        if (!sources || sources.length === 0) return;
+        
+        // Create sources grid container
+        const sourcesGrid = document.createElement('div');
+        sourcesGrid.className = 'sources-grid';
+        
+        sources.forEach(source => {
+            const isEnriching = source.enrichment_needed;
+            
+            // Create source card using safe DOM methods to prevent XSS
+            const sourceCard = document.createElement('div');
+            sourceCard.className = `source-card ${isEnriching ? 'source-enriching' : ''}`;
+            sourceCard.setAttribute('data-source-id', source.id);
+            
+            // Add enrichment indicator if needed
+            if (isEnriching) {
+                const indicator = document.createElement('div');
+                indicator.className = 'enrichment-indicator';
+                indicator.textContent = '⚡ Enhancing...';
+                sourceCard.appendChild(indicator);
+            }
+            
+            // Source header
+            const header = document.createElement('div');
+            header.className = 'source-header';
+            
+            const title = document.createElement('h4');
+            title.className = 'source-title';
+            title.textContent = source.title; // Safe text content
+            
+            const domain = document.createElement('span');
+            domain.className = 'source-domain';
+            domain.textContent = source.domain; // Safe text content
+            
+            header.appendChild(title);
+            header.appendChild(domain);
+            sourceCard.appendChild(header);
+            
+            // Source excerpt
+            const excerpt = document.createElement('p');
+            excerpt.className = 'source-excerpt';
+            excerpt.textContent = source.excerpt || 'Loading detailed excerpt...'; // Safe text content
+            sourceCard.appendChild(excerpt);
+            
+            // Source metadata
+            const metadata = document.createElement('div');
+            metadata.className = 'source-metadata';
+            
+            const price = document.createElement('span');
+            price.className = 'source-price';
+            price.textContent = `$${(source.unlock_price || 0).toFixed(2)}`;
+            
+            metadata.appendChild(price);
+            
+            if (source.licensing_protocol) {
+                const badge = document.createElement('span');
+                badge.className = 'licensing-badge';
+                badge.textContent = source.licensing_protocol;
+                metadata.appendChild(badge);
+            }
+            
+            sourceCard.appendChild(metadata);
+            
+            // Unlock button with safe event handler
+            const unlockBtn = document.createElement('button');
+            unlockBtn.className = 'unlock-btn';
+            unlockBtn.textContent = 'Unlock Source';
+            unlockBtn.addEventListener('click', async () => {
+                if (window.researchApp && window.researchApp.handleSourceUnlock) {
+                    // Disable button to prevent duplicate clicks
+                    unlockBtn.disabled = true;
+                    unlockBtn.textContent = 'Processing...';
+                    
+                    try {
+                        await window.researchApp.handleSourceUnlock(unlockBtn, source.id, source.unlock_price || 0);
+                        // Button will be updated by handleSourceUnlock on success
+                    } catch (error) {
+                        // Re-enable button on error
+                        unlockBtn.disabled = false;
+                        unlockBtn.textContent = 'Unlock Source';
+                        console.error('Source unlock failed:', error);
+                    }
+                } else {
+                    console.error('Research app or method not found');
+                }
+            });
+            
+            sourceCard.appendChild(unlockBtn);
+            sourcesGrid.appendChild(sourceCard);
+        });
+        
+        // Create wrapper message  
+        const messageDiv = document.createElement('div');
+        const headerText = document.createElement('strong');
+        headerText.textContent = `🔍 Found ${sources.length} sources for your research:`;
+        messageDiv.appendChild(headerText);
+        messageDiv.appendChild(document.createElement('br'));
+        messageDiv.appendChild(document.createElement('br'));
+        messageDiv.appendChild(sourcesGrid);
+        
+        this.addMessage('assistant', messageDiv.outerHTML);
+    }
+    
+    async _pollForEnrichedResults(query) {
+        if (!query) return;
+        
+        // Poll every 5 seconds for up to 30 seconds to get enriched results
+        let attempts = 0;
+        const maxAttempts = 6;
+        
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            
+            try {
+                const result = await this.apiService.analyzeQueryForTier(query, 10.0, 15);
+                
+                // If enrichment is complete, update the source cards
+                if (!result.enrichment_needed || result.enrichment_status === 'complete') {
+                    this._updateSourceCards(result.sources);
+                    clearInterval(pollInterval);
+                    return;
+                }
+                
+                // Stop polling after max attempts
+                if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    console.log('Stopped polling for enriched results after max attempts');
+                }
+                
+            } catch (error) {
+                console.error('Error polling for enriched results:', error);
+                clearInterval(pollInterval);
+            }
+        }, 5000);
+    }
+    
+    _updateSourceCards(enrichedSources) {
+        enrichedSources.forEach(source => {
+            const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
+            if (!sourceCard) return;
+            
+            // Remove loading indicators
+            sourceCard.classList.remove('source-enriching');
+            const loadingIndicator = sourceCard.querySelector('.enrichment-indicator');
+            if (loadingIndicator) loadingIndicator.remove();
+            
+            // Update content with enriched data
+            const titleEl = sourceCard.querySelector('.source-title');
+            if (titleEl && source.title) titleEl.textContent = source.title;
+            
+            const excerptEl = sourceCard.querySelector('.source-excerpt');
+            if (excerptEl && source.excerpt) excerptEl.textContent = source.excerpt;
+            
+            const priceEl = sourceCard.querySelector('.source-price');
+            if (priceEl && source.unlock_price) priceEl.textContent = `$${source.unlock_price.toFixed(2)}`;
+            
+            // Add licensing badge if available
+            if (source.licensing_protocol) {
+                const metadataDiv = sourceCard.querySelector('.source-metadata');
+                if (metadataDiv && !metadataDiv.querySelector('.licensing-badge')) {
+                    const licensingBadge = document.createElement('span');
+                    licensingBadge.className = 'licensing-badge';
+                    licensingBadge.textContent = source.licensing_protocol;
+                    metadataDiv.appendChild(licensingBadge);
+                }
+            }
+        });
+        
+        // Show completion message
+        this._showToast('Source enrichment complete! Updated with enhanced details.', 'success');
+    }
+    
+    // Global methods for HTML event handlers (legacy support)
     async handleSourceUnlockInChat(sourceId, price, title) {
+        // This method is kept for backward compatibility but should not be used
+        // New code should call handleSourceUnlock directly with the button reference
+        console.warn('handleSourceUnlockInChat is deprecated - use handleSourceUnlock directly');
         return this.handleSourceUnlock(null, sourceId, price);
     }
 
@@ -581,7 +765,8 @@ export class ChatResearchApp {
     }
 }
 
-// Initialize the app when DOM is ready
+// Initialize the app when DOM is ready  
 document.addEventListener('DOMContentLoaded', () => {
-    window.researchApp = new ChatResearchApp();
+    window.app = new ChatResearchApp();
+    window.researchApp = window.app; // For backward compatibility
 });

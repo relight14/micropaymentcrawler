@@ -20,6 +20,12 @@ export class APIService {
     }
 
     async sendMessage(message, mode) {
+        // Use optimized research endpoint for research mode
+        if (mode === 'research') {
+            return await this.analyzeResearchQuery(message);
+        }
+        
+        // Use chat endpoint for other modes
         const response = await fetch(`${this.baseURL}/api/chat`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
@@ -31,6 +37,41 @@ export class APIService {
         }
         
         return await response.json();
+    }
+    
+    async analyzeResearchQuery(query) {
+        // Call the optimized research endpoint with progressive loading
+        const response = await fetch(`${this.baseURL}/api/research/analyze`, {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({
+                query,
+                max_budget_dollars: 10.0,
+                preferred_source_count: 15
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Research analysis failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        // Transform research response to match expected chat format
+        return {
+            content: result.research_summary,
+            research_data: {
+                sources: result.sources,
+                total_cost: result.total_estimated_cost,
+                enrichment_status: result.enrichment_status,
+                enrichment_needed: result.enrichment_needed
+            },
+            metadata: {
+                source_count: result.source_count,
+                premium_source_count: result.premium_source_count,
+                licensing_breakdown: result.licensing_breakdown
+            }
+        };
     }
 
     async clearConversation() {

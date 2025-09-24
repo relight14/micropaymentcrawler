@@ -2960,3 +2960,119 @@ input:checked + .slider:before {
     transition: all 0.3s ease;
     display: inline-block;
 }
+
+/* Source Card Progressive Loading Styles */
+.sources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.source-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.source-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.source-card.source-enriching {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, var(--card) 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+.enrichment-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #f59e0b;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    animation: pulse 2s infinite;
+}
+
+.source-header {
+    margin-bottom: 12px;
+}
+
+.source-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: var(--foreground);
+}
+
+.source-domain {
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+    background: var(--muted);
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.source-excerpt {
+    color: var(--foreground);
+    line-height: 1.5;
+    margin: 12px 0;
+    font-size: 0.9rem;
+}
+
+.source-metadata {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+}
+
+.source-price {
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.licensing-badge {
+    background: var(--primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.unlock-btn {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.unlock-btn:hover {
+    background: var(--primary-hover, #1d4ed8);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .sources-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .source-card {
+        padding: 14px;
+    }
+}
