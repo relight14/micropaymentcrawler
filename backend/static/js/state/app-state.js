@@ -91,7 +91,8 @@ export class AppState {
 
     getSelectedSourcesTotal() {
         return this.selectedSources.reduce((total, source) => {
-            return total + (source.price || 0);
+            // Use unlock_price which is the actual field in source data
+            return total + (source.unlock_price || source.price || 0);
         }, 0);
     }
 

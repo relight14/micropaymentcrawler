@@ -919,17 +919,35 @@ export class ChatResearchApp {
 
     updateSourceSelectionUI() {
         const selectedSources = this.appState.getSelectedSources();
+        const selectedIds = new Set(selectedSources.map(s => s.id));
         
-        // Update all checkbox states
-        selectedSources.forEach(source => {
-            const checkbox = document.querySelector(`[data-source-id="${source.id}"] .source-selection-checkbox`);
-            if (checkbox) checkbox.checked = true;
+        // Update ALL checkbox states to match actual selection state
+        const allCheckboxes = document.querySelectorAll('.source-selection-checkbox');
+        allCheckboxes.forEach(checkbox => {
+            const sourceCard = checkbox.closest('[data-source-id]');
+            if (sourceCard) {
+                const sourceId = sourceCard.getAttribute('data-source-id');
+                const isSelected = selectedIds.has(sourceId);
+                checkbox.checked = isSelected;
+                
+                // Visual feedback for selected cards
+                if (isSelected) {
+                    sourceCard.style.borderColor = 'var(--primary)';
+                    sourceCard.style.backgroundColor = 'var(--primary-light, #f0f9ff)';
+                } else {
+                    sourceCard.style.borderColor = '';
+                    sourceCard.style.backgroundColor = '';
+                }
+            }
         });
         
         // Update report builder if in report mode
         if (this.appState.getMode() === 'report') {
             this.displayReportBuilderResults();
         }
+        
+        // Update selection count display if needed
+        console.log(`Sources selected: ${selectedSources.length}`);
     }
 }
 
