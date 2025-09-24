@@ -195,7 +195,7 @@ class HTMLPacketGenerator:
         return f"""<div class="header">
         <img src="/static/ledewire-logo.png" alt="LedeWire" class="logo">
         <h1 class="title">{html.escape(packet.query)}</h1>
-        <div class="tier-badge">{packet.tier.value} Research</div>
+        <div class="tier-badge">{packet.tier.value if packet.tier else "Dynamic"} Research</div>
         {f'<div class="content-id">Content ID: {packet.content_id}</div>' if packet.content_id else ''}
     </div>"""
     
