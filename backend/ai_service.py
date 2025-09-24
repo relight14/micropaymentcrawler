@@ -7,9 +7,9 @@ import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import anthropic
-from content_licensing import ContentLicenseService
-from crawler_stub import ContentCrawlerStub
-from models import TierType
+from services.licensing.content_licensing import ContentLicenseService
+from services.research.crawler import ContentCrawlerStub
+from schemas.domain import TierType
 
 class AIResearchService:
     """Unified AI service for conversational and deep research modes"""

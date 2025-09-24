@@ -40,12 +40,15 @@ class SourceCard(BaseModel):
 
 class ResearchPacket(BaseModel):
     """Research packet model containing sources and analysis"""
-    content_id: str
     query: str
-    tier: TierType
+    summary: str  # Essential field for research content
     sources: List[SourceCard]
+    total_sources: int  # For UI display
+    # Optional fields
+    tier: Optional[TierType] = None  # Support for dynamic packages
     outline: Optional[str] = None
     insights: Optional[str] = None
-    total_cost: float
+    total_cost: Optional[float] = None
+    content_id: Optional[str] = None  # LedeWire content identifier
     licensing_summary: Optional[Dict[str, Any]] = None
-    created_at: str
+    created_at: Optional[str] = None

@@ -1,6 +1,6 @@
 from typing import List, Optional
-from models import ResearchPacket, SourceCard
-from crawler_stub import ContentCrawlerStub
+from schemas.domain import ResearchPacket, SourceCard
+from services.research.crawler import ContentCrawlerStub
 
 class DynamicPacketBuilder:
     """
@@ -28,12 +28,12 @@ class DynamicPacketBuilder:
         
         return ResearchPacket(
             query=query,
-            tier=None,  # No fixed tier - dynamic package
             summary=summary,
-            outline=outline,
-            insights=insights,
             sources=selected_sources,
             total_sources=len(selected_sources),
+            tier=None,  # No fixed tier - dynamic package
+            outline=outline,
+            insights=insights,
             total_cost=budget_used
         )
     

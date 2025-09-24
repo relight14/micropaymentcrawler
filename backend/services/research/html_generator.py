@@ -2,7 +2,7 @@
 HTML Research Packet Generator
 Creates clean, academic-style HTML reports with LedeWire branding.
 """
-from models import ResearchPacket, SourceCard
+from schemas.domain import ResearchPacket, SourceCard
 from typing import List
 import html
 

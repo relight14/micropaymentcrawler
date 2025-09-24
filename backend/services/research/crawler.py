@@ -450,7 +450,7 @@ class ContentCrawlerStub:
         base_cost = random.uniform(0.05, 0.30)
         
         # Import LicenseTerms for proper object creation
-        from content_licensing import LicenseTerms
+        from services.licensing.content_licensing import LicenseTerms
         
         terms = LicenseTerms(
             protocol=protocol,
@@ -707,7 +707,7 @@ class ContentCrawlerStub:
         protocol = random.choice(protocols)
         
         # Mock license terms based on protocol
-        from content_licensing import LicenseTerms
+        from services.licensing.content_licensing import LicenseTerms
         
         price_ranges = {
             'rsl': (0.03, 0.08),

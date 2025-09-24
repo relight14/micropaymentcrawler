@@ -2,7 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 from typing import Optional, List, Dict
-from models import ResearchPacket
+from schemas.domain import ResearchPacket
 
 class ResearchLedger:
     """
