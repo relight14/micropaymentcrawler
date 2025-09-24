@@ -480,37 +480,91 @@ class ContentCrawlerStub:
         return content[:max_length].rsplit(' ', 1)[0] + "..."
     
     def _calculate_tavily_price(self, result: dict, domain: str) -> float:
-        """Calculate dynamic pricing for Tavily results based on content quality."""
-        base_price = 0.10
+        """Calculate transparent pricing for sources based on realistic licensing costs."""
+        
+        # Many sources should be FREE - start with no cost
+        if self._should_be_free_source(domain):
+            return 0.0
+        
+        # Determine realistic licensing cost based on domain type and content quality
+        if self._is_premium_domain(domain):
+            # Premium sources: $0.15-$0.35
+            base_price = 0.15
+            quality_multiplier = self._get_quality_multiplier(result, domain)
+            final_price = base_price * quality_multiplier
+            return round(min(0.35, max(0.15, final_price)), 2)
+        elif self._is_academic_domain(domain):
+            # Academic sources: $0.05-$0.20  
+            base_price = 0.05
+            quality_multiplier = self._get_quality_multiplier(result, domain)
+            final_price = base_price * quality_multiplier
+            return round(min(0.20, max(0.05, final_price)), 2)
+        else:
+            # Standard sources: $0.03-$0.12
+            base_price = 0.03
+            quality_multiplier = self._get_quality_multiplier(result, domain)
+            final_price = base_price * quality_multiplier
+            return round(min(0.12, max(0.03, final_price)), 2)
+    
+    def _should_be_free_source(self, domain: str) -> bool:
+        """Determine if a source should be free based on domain type."""
+        free_domains = [
+            'wikipedia.org', 'github.com', 'docs.python.org', 'mozilla.org',
+            'apache.org', 'gnu.org', 'opensource.org', 'freecodecamp.org',
+            'stackoverflow.com', 'reddit.com', 'medium.com', 'dev.to'
+        ]
+        
+        # Government and educational domains are often free
+        free_patterns = ['.gov', '.edu', '.org']
+        
+        # Check exact matches
+        if any(free_domain in domain for free_domain in free_domains):
+            return True
+            
+        # Check patterns (40% chance for .org, 60% for .gov/.edu)
+        if domain.endswith('.gov') or domain.endswith('.edu'):
+            return random.random() < 0.6
+        elif domain.endswith('.org'):
+            return random.random() < 0.4
+            
+        # 30% chance for other domains to be free
+        return random.random() < 0.3
+    
+    def _is_premium_domain(self, domain: str) -> bool:
+        """Check if domain is premium/paid content."""
+        premium_domains = [
+            'wsj.com', 'ft.com', 'economist.com', 'bloomberg.com',
+            'mckinsey.com', 'deloitte.com', 'gartner.com', 'forrester.com'
+        ]
+        return any(premium in domain for premium in premium_domains)
+    
+    def _is_academic_domain(self, domain: str) -> bool:
+        """Check if domain is academic/research."""
+        academic_domains = [
+            'arxiv.org', 'nature.com', 'science.org', 'ieee.org', 'pubmed',
+            'springer.com', 'wiley.com', 'elsevier.com'
+        ]
+        return any(academic in domain for academic in academic_domains)
+    
+    def _get_quality_multiplier(self, result: dict, domain: str) -> float:
+        """Get quality-based price multiplier (1.0-2.5)."""
         multiplier = 1.0
         
-        # Quality factors based on content
-        content = result.get('content', '').lower()
         title = result.get('title', '').lower()
+        content = result.get('content', '').lower()
         
-        # Academic/research domains get higher pricing
-        academic_domains = ['arxiv.org', 'nature.com', 'science.org', 'ieee.org', 'pubmed']
-        if any(domain_part in domain for domain_part in academic_domains):
-            multiplier *= 1.5
-        
-        # Longer, more detailed content
-        if len(content) > 1000:
+        # Research quality indicators
+        if any(keyword in title for keyword in ['peer-reviewed', 'research', 'study', 'analysis']):
             multiplier *= 1.3
         
-        # Research keywords in title
-        research_keywords = ['study', 'research', 'analysis', 'findings', 'methodology']
-        if any(keyword in title for keyword in research_keywords):
+        if len(content) > 1000:  # Substantial content
             multiplier *= 1.2
-        
-        # Calculate final price
-        final_price = base_price * multiplier
-        
-        # Random variation for realism
-        variation = random.uniform(0.8, 1.2)
-        final_price *= variation
-        
-        # Ensure within bounds
-        return round(max(0.10, min(2.00, final_price)), 2)
+            
+        # Citations or methodology mentioned
+        if any(keyword in content for keyword in ['citation', 'methodology', 'findings', 'conclusion']):
+            multiplier *= 1.15
+            
+        return min(2.5, multiplier)
     
     def _extract_key_topics(self, query: str) -> List[str]:
         """Extract key topics from long query text."""
@@ -683,23 +737,19 @@ class ContentCrawlerStub:
         terms = license_info['terms']
         protocol = terms.protocol
         
-        source.licensing_protocol = protocol
-        source.license_cost = terms.ai_include_price
+        source.licensing_protocol = protocol.upper() if protocol else None
+        source.licensing_cost = terms.ai_include_price
         source.publisher_name = terms.publisher
         source.license_type = "ai-include"
         source.requires_attribution = terms.requires_attribution
         
-        # Set protocol badge for UI
-        protocol_badges = {
-            'rsl': '🔒 RSL Licensed',
-            'tollbit': '⚡ Tollbit Access',
-            'cloudflare': '☁️ CF Licensed'
-        }
-        source.protocol_badge = protocol_badges.get(protocol, f'📋 {protocol.upper()} Licensed')
-        
-        # Update unlock price to include license cost if applicable
-        if source.license_cost:
-            source.unlock_price += source.license_cost
+        # Use ONLY the actual licensing cost as the unlock price for transparency
+        # This replaces any previous pricing calculation
+        if source.licensing_cost and source.licensing_cost > 0:
+            source.unlock_price = source.licensing_cost
+        else:
+            # If no licensing cost, this should be a free source
+            source.unlock_price = 0.0
     
     def _generate_mock_licensing(self, domain: str):
         """Generate mock licensing info for demonstration"""
