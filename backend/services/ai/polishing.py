@@ -120,11 +120,19 @@ Return your response as JSON in this exact format:
         
         # Parse Claude's response
         import json
+        import re
         try:
             # Handle Anthropic response format properly
             response_text = self._extract_response_text(response)
             
-            result = json.loads(response_text)
+            # Extract JSON from response text that may contain extra text
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                json_text = json_match.group(0)
+            else:
+                json_text = response_text
+            
+            result = json.loads(json_text)
             polished = result.get('polished_sources', [])
             
             # Merge polished content back into raw sources
@@ -138,8 +146,8 @@ Return your response as JSON in this exact format:
             
             return raw_sources
             
-        except json.JSONDecodeError:
-            print("Failed to parse Claude JSON response, using fallback")
+        except (json.JSONDecodeError, AttributeError) as e:
+            print(f"Failed to parse Claude JSON response: {e}, using fallback")
             return self._fallback_polish(raw_sources)
     
     def _fallback_polish(self, raw_sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

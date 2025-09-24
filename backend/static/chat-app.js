@@ -762,15 +762,21 @@ class ChatResearchApp {
             existingSourcesList.replaceWith(this.createSelectedSourcesList());
         }
         
-        // Update build report button state
+        // Update build report button state with tier information
         const buildReportButton = document.querySelector('.build-report-btn');
         if (buildReportButton) {
-            const isDisabled = this.selectedSources.length === 0;
+            const sourceCount = this.selectedSources.length;
+            const isDisabled = sourceCount === 0;
             buildReportButton.disabled = isDisabled;
-            const total = this.getSelectedSourcesTotal();
-            buildReportButton.textContent = isDisabled 
-                ? 'Select sources to build report' 
-                : `Build Report ($${total.toFixed(2)} total)`;
+            
+            if (isDisabled) {
+                buildReportButton.textContent = 'Select sources to build report';
+            } else {
+                // Determine tier based on source count
+                const recommendedTier = sourceCount > 25 ? 'Pro' : 'Research';
+                const tierPrice = sourceCount > 25 ? 1.99 : 0.99;
+                buildReportButton.textContent = `Build ${recommendedTier} Report (${sourceCount} sources) - $${tierPrice.toFixed(2)}`;
+            }
         }
     }
 
@@ -1175,6 +1181,9 @@ class ChatResearchApp {
                 pro: proResult
             });
             
+            // Add event listeners for tier buttons
+            this.addTierButtonListeners(tierSection);
+            
         } catch (error) {
             console.error('Tier analysis failed:', error);
             tierSection.innerHTML = `
@@ -1341,6 +1350,64 @@ class ChatResearchApp {
                 </button>
             </div>
         `;
+    }
+
+    addTierButtonListeners(container) {
+        // Add click listeners for tier purchase buttons
+        const tierButtons = container.querySelectorAll('.tier-cta');
+        tierButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tierData = JSON.parse(button.dataset.tierData);
+                const price = parseFloat(button.dataset.price);
+                const tierName = button.dataset.tier;
+                
+                this.handleTierPurchase(button, tierData, price, tierName);
+            });
+        });
+
+        // Add click listener for Build Report button
+        const buildReportBtn = container.querySelector('.build-report-btn');
+        if (buildReportBtn) {
+            buildReportBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!buildReportBtn.disabled) {
+                    this.handleBuildReport();
+                }
+            });
+        }
+    }
+
+    handleBuildReport() {
+        if (this.selectedSources.length === 0) {
+            this.showErrorToast('Please select sources to build a report');
+            return;
+        }
+
+        // Calculate pricing based on selected sources and tier limits
+        const totalCost = this.getSelectedSourcesTotal();
+        const sourceCount = this.selectedSources.length;
+        
+        // Determine appropriate tier based on source count
+        let recommendedTier = 'research';
+        let tierPrice = 0.99;
+        
+        if (sourceCount > 25) {
+            recommendedTier = 'pro';
+            tierPrice = 1.99;
+        }
+        
+        // Show confirmation modal or proceed with purchase
+        this.showBuildReportConfirmation(recommendedTier, tierPrice, totalCost, sourceCount);
+    }
+
+    showBuildReportConfirmation(tierName, tierPrice, totalCost, sourceCount) {
+        const confirmMessage = `Build ${tierName.charAt(0).toUpperCase() + tierName.slice(1)} report with ${sourceCount} selected sources for $${tierPrice.toFixed(2)}?`;
+        
+        if (confirm(confirmMessage)) {
+            // Mock the report building process
+            this.showSuccessToast(`${tierName.charAt(0).toUpperCase() + tierName.slice(1)} report with ${sourceCount} sources is being generated!`);
+        }
     }
 
     async handleTierPurchase(button, tierData, price, tierName) {
