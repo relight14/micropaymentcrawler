@@ -136,19 +136,23 @@ export class ChatResearchApp {
 
         this.uiManager.updateModeDisplay();
         
-        // Add mode change message if there's history
-        if (this.appState.getConversationHistory().length > 0) {
-            const modeMessages = {
-                'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation.",
-                'research': "🔍 Switched to Research mode - I'll find and license authoritative sources.",
-                'report': "📊 Switched to Report Builder - Ready to create comprehensive research packages."
-            };
-            this.addMessage('system', modeMessages[mode]);
-        }
-
-        // Handle special mode logic
+        // Handle mode-specific UI changes
         if (mode === 'report' && this.appState.getCurrentResearchData()) {
             this.displayReportBuilderResults();
+        } else {
+            // Restore chat messages for non-report modes
+            this._restoreChatMessages();
+            
+            // Add mode change message if there's history
+            if (this.appState.getConversationHistory().length > 0) {
+                const modeMessages = {
+                    'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation.",
+                    'research': "🔍 Switched to Research mode - I'll find and license authoritative sources."
+                };
+                if (modeMessages[mode]) {
+                    this.addMessage('system', modeMessages[mode]);
+                }
+            }
         }
     }
 
@@ -295,7 +299,7 @@ export class ChatResearchApp {
         }
     }
 
-    async handleTierPurchase(button, tierId, price) {
+    async handleTierPurchase(button, tierId, price, query = "Research Query") {
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
                 type: 'tier_purchase', 
@@ -308,8 +312,8 @@ export class ChatResearchApp {
         }
 
         try {
-            const result = await this.apiService.purchaseTier(tierId, price);
-            this.addMessage('system', `Research tier purchased successfully!`);
+            const result = await this.apiService.purchaseTier(tierId, price, query);
+            this._showToast(`Research tier purchased successfully!`, 'success');
             this.appState.addPurchasedItem(tierId);
             
             // Update UI
@@ -323,7 +327,7 @@ export class ChatResearchApp {
             
         } catch (error) {
             console.error('Error purchasing tier:', error);
-            this.addMessage('system', `Failed to purchase tier: ${error.message}`);
+            this._showToast(`Failed to purchase tier: ${error.message}`, 'error');
         }
     }
 
@@ -332,7 +336,185 @@ export class ChatResearchApp {
         const researchData = data || this.appState.getCurrentResearchData();
         if (!researchData) return;
         
-        this.addMessage('system', 'Report Builder results would be displayed here.');
+        // Generate Report Builder UI WITHOUT expensive packet building operations
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Hide existing messages but don't clear them
+        const existingMessages = messagesContainer.querySelectorAll('.message, .welcome-screen');
+        existingMessages.forEach(msg => msg.style.display = 'none');
+        
+        // Remove any existing report builder UI
+        const existingReportBuilder = messagesContainer.querySelector('.report-builder-interface');
+        if (existingReportBuilder) {
+            existingReportBuilder.remove();
+        }
+        
+        // Create Report Builder UI
+        const reportBuilderDiv = document.createElement('div');
+        reportBuilderDiv.className = 'report-builder-interface';
+        reportBuilderDiv.appendChild(this._generateReportBuilderDOM());
+        
+        messagesContainer.appendChild(reportBuilderDiv);
+        
+        // Add event listeners to purchase buttons
+        this._attachTierPurchaseListeners();
+    }
+
+    _generateReportBuilderDOM() {
+        const selectedSources = this.appState.getSelectedSources();
+        const sourceCount = selectedSources.length;
+        const totalCost = this.appState.getSelectedSourcesTotal();
+        
+        const containerDiv = document.createElement('div');
+        containerDiv.className = 'tier-cards-section';
+        
+        // Header
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'tier-cards-header';
+        const headerTitle = document.createElement('h3');
+        headerTitle.textContent = 'Choose Your Research Package';
+        const headerDesc = document.createElement('p');
+        headerDesc.textContent = 'Select the perfect research tier for your needs. Report generation begins after purchase confirmation.';
+        headerDiv.appendChild(headerTitle);
+        headerDiv.appendChild(headerDesc);
+        containerDiv.appendChild(headerDiv);
+        
+        // Selected sources (if any)
+        if (sourceCount > 0) {
+            const sourcesSection = document.createElement('div');
+            sourcesSection.className = 'selected-sources-section';
+            
+            const sourcesTitle = document.createElement('h3');
+            sourcesTitle.textContent = `Selected Sources (${sourceCount})`;
+            sourcesSection.appendChild(sourcesTitle);
+            
+            const sourcesList = document.createElement('div');
+            sourcesList.className = 'sources-list';
+            
+            selectedSources.slice(0, 5).forEach(source => {
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'source-item';
+                
+                const titleSpan = document.createElement('span');
+                titleSpan.className = 'source-title';
+                titleSpan.textContent = source.title; // Safe text content
+                
+                const priceSpan = document.createElement('span');
+                priceSpan.className = 'source-price';
+                priceSpan.textContent = source.price ? `$${source.price.toFixed(2)}` : 'Free';
+                
+                sourceItem.appendChild(titleSpan);
+                sourceItem.appendChild(priceSpan);
+                sourcesList.appendChild(sourceItem);
+            });
+            
+            if (sourceCount > 5) {
+                const moreDiv = document.createElement('div');
+                moreDiv.className = 'source-item-more';
+                moreDiv.textContent = `... and ${sourceCount - 5} more sources`;
+                sourcesList.appendChild(moreDiv);
+            }
+            
+            const totalDiv = document.createElement('div');
+            totalDiv.className = 'sources-total';
+            totalDiv.textContent = `Total Source Cost: $${totalCost.toFixed(2)}`;
+            
+            sourcesSection.appendChild(sourcesList);
+            sourcesSection.appendChild(totalDiv);
+            containerDiv.appendChild(sourcesSection);
+        }
+        
+        // Tier cards
+        const cardsContainer = document.createElement('div');
+        cardsContainer.className = 'tier-cards-container';
+        
+        // Research tier
+        cardsContainer.appendChild(this._createTierCard('research', '🔬', 'Research Package', '$2.00',
+            'Professional summary and analysis with source compilation',
+            ['✓ Professional summary and analysis', '✓ Source compilation and citations', '✓ Ready for download'],
+            'Purchase Research Package', true));
+            
+        // Pro tier
+        cardsContainer.appendChild(this._createTierCard('pro', '⭐', 'Pro Package', '$4.00',
+            'Everything in Research plus strategic insights and executive formatting',
+            ['✓ Everything in Research Package', '✓ Strategic insights and recommendations', 
+             '✓ Executive summary format', '✓ Enhanced formatting and presentation'],
+            'Purchase Pro Package', false));
+        
+        containerDiv.appendChild(cardsContainer);
+        
+        // Note
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'tier-cards-note';
+        noteDiv.textContent = '💡 Report generation will begin only after purchase confirmation.';
+        containerDiv.appendChild(noteDiv);
+        
+        return containerDiv;
+    }
+    
+    _createTierCard(tier, icon, title, price, description, features, buttonText, highlighted) {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = highlighted ? 'tier-card highlighted' : 'tier-card';
+        cardDiv.dataset.tier = tier;
+        
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'tier-icon';
+        iconDiv.textContent = icon;
+        
+        const titleH4 = document.createElement('h4');
+        titleH4.textContent = title;
+        
+        const priceDiv = document.createElement('div');
+        priceDiv.className = 'tier-price';
+        priceDiv.textContent = price;
+        
+        const descP = document.createElement('p');
+        descP.className = 'tier-description';
+        descP.textContent = description;
+        
+        const featuresList = document.createElement('ul');
+        featuresList.className = 'tier-features';
+        features.forEach(feature => {
+            const li = document.createElement('li');
+            li.textContent = feature;
+            featuresList.appendChild(li);
+        });
+        
+        const button = document.createElement('button');
+        button.className = 'tier-purchase-btn';
+        button.dataset.tier = tier;
+        button.dataset.price = price.replace('$', '');
+        button.textContent = buttonText;
+        
+        cardDiv.appendChild(iconDiv);
+        cardDiv.appendChild(titleH4);
+        cardDiv.appendChild(priceDiv);
+        cardDiv.appendChild(descP);
+        cardDiv.appendChild(featuresList);
+        cardDiv.appendChild(button);
+        
+        return cardDiv;
+    }
+    
+    _attachTierPurchaseListeners() {
+        const purchaseButtons = document.querySelectorAll('.tier-purchase-btn');
+        purchaseButtons.forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const tier = e.target.dataset.tier;
+                const price = parseFloat(e.target.dataset.price);
+                const query = this.appState.getCurrentQuery() || "Research Query";
+                
+                e.target.textContent = 'Processing...';
+                e.target.disabled = true;
+                
+                try {
+                    await this.handleTierPurchase(e.target, tier, price, query);
+                } catch (error) {
+                    e.target.textContent = `Purchase ${tier === 'research' ? 'Research' : 'Pro'} Package`;
+                    e.target.disabled = false;
+                }
+            });
+        });
     }
 
     updateSourceSelectionUI() {
@@ -345,6 +527,48 @@ export class ChatResearchApp {
         console.log('Report builder display updated');
     }
 
+    _restoreChatMessages() {
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Remove report builder UI
+        const reportBuilder = messagesContainer.querySelector('.report-builder-interface');
+        if (reportBuilder) {
+            reportBuilder.remove();
+        }
+        
+        // Properly restore hidden messages by removing inline display style
+        const hiddenMessages = messagesContainer.querySelectorAll('.message, .welcome-screen');
+        hiddenMessages.forEach(msg => {
+            msg.style.removeProperty('display'); // Properly restore display
+        });
+    }
+    
+    _showToast(message, type = 'info') {
+        // Simple toast implementation - could be enhanced
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+    
     // Global methods for HTML event handlers
     async handleSourceUnlockInChat(sourceId, price, title) {
         return this.handleSourceUnlock(null, sourceId, price);
