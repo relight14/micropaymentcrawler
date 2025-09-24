@@ -62,7 +62,11 @@ export class APIService {
         
         // Include conversation context if available to make research context-aware
         if (conversationContext && conversationContext.length > 0) {
-            requestBody.conversation_context = conversationContext;
+            // Transform conversation objects to simple format expected by backend
+            requestBody.conversation_context = conversationContext.map(msg => ({
+                sender: msg.sender,
+                content: msg.content
+            }));
         }
         
         const response = await fetch(`${this.baseURL}/api/research/analyze`, {
