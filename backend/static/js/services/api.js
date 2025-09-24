@@ -47,14 +47,13 @@ export class APIService {
     }
 
     async analyzeQueryForTier(query, maxBudget, preferredSourceCount, tierType) {
-        const response = await fetch(`${this.baseURL}/api/research/analyze-tier`, {
+        const response = await fetch(`${this.baseURL}/api/research/analyze`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify({
                 query,
-                max_budget: maxBudget,
-                preferred_source_count: preferredSourceCount,
-                tier_type: tierType
+                max_budget_dollars: maxBudget,
+                preferred_source_count: preferredSourceCount
             })
         });
 
@@ -66,7 +65,7 @@ export class APIService {
     }
 
     async unlockSource(sourceId, price) {
-        const response = await fetch(`${this.baseURL}/api/research/unlock`, {
+        const response = await fetch(`${this.baseURL}/api/sources/unlock-source`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify({
@@ -82,13 +81,14 @@ export class APIService {
         return await response.json();
     }
 
-    async purchaseTier(tierId, price) {
-        const response = await fetch(`${this.baseURL}/api/research/purchase`, {
+    async purchaseTier(tierId, price, query = "Research Query") {
+        const response = await fetch(`${this.baseURL}/api/purchase`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify({
-                tier_id: tierId,
-                price_cents: Math.round(price * 100)
+                query,
+                tier: tierId,
+                idempotency_key: null
             })
         });
 

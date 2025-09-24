@@ -72,7 +72,7 @@ export class AuthService {
         }
 
         try {
-            const response = await fetch(`${this.baseURL}/api/wallet/balance`, {
+            const response = await fetch(`${this.baseURL}/api/auth/balance`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
@@ -90,7 +90,7 @@ export class AuthService {
             }
 
             const data = await response.json();
-            this.walletBalance = data.balance || 0;
+            this.walletBalance = (data.balance_cents || 0) / 100;
             return this.walletBalance;
         } catch (error) {
             console.error('Error updating wallet balance:', error);
