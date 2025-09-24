@@ -36,7 +36,20 @@ export class APIService {
             throw new Error(`API request failed: ${response.statusText}`);
         }
         
-        return await response.json();
+        const result = await response.json();
+        
+        // Transform chat response to match expected frontend format
+        return {
+            content: result.response, // Chat endpoint returns 'response', frontend expects 'content'
+            metadata: {
+                mode: result.mode,
+                conversation_length: result.conversation_length,
+                sources: result.sources,
+                licensing_summary: result.licensing_summary,
+                total_cost: result.total_cost,
+                refined_query: result.refined_query
+            }
+        };
     }
     
     async analyzeResearchQuery(query) {
