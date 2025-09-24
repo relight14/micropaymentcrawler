@@ -411,7 +411,7 @@ export class ChatResearchApp {
                 
                 const priceSpan = document.createElement('span');
                 priceSpan.className = 'source-price';
-                priceSpan.textContent = source.price ? `$${source.price.toFixed(2)}` : 'Free';
+                priceSpan.textContent = (source.unlock_price || source.price) ? `$${(source.unlock_price || source.price).toFixed(2)}` : 'Free';
                 
                 sourceItem.appendChild(titleSpan);
                 sourceItem.appendChild(priceSpan);
