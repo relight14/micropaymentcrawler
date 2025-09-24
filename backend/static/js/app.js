@@ -389,63 +389,26 @@ export class ChatResearchApp {
         headerDiv.appendChild(headerDesc);
         containerDiv.appendChild(headerDiv);
         
-        // Selected sources (if any)
+        // Compact selected sources summary (if any)
         if (sourceCount > 0) {
-            const sourcesSection = document.createElement('div');
-            sourcesSection.className = 'selected-sources-section';
-            
-            const sourcesTitle = document.createElement('h3');
-            sourcesTitle.textContent = `Selected Sources (${sourceCount})`;
-            sourcesSection.appendChild(sourcesTitle);
-            
-            const sourcesList = document.createElement('div');
-            sourcesList.className = 'sources-list';
-            
-            selectedSources.slice(0, 5).forEach(source => {
-                const sourceItem = document.createElement('div');
-                sourceItem.className = 'source-item';
-                
-                const titleSpan = document.createElement('span');
-                titleSpan.className = 'source-title';
-                titleSpan.textContent = source.title; // Safe text content
-                
-                const priceSpan = document.createElement('span');
-                priceSpan.className = 'source-price';
-                priceSpan.textContent = (source.unlock_price || source.price) ? `$${(source.unlock_price || source.price).toFixed(2)}` : 'Free';
-                
-                sourceItem.appendChild(titleSpan);
-                sourceItem.appendChild(priceSpan);
-                sourcesList.appendChild(sourceItem);
-            });
-            
-            if (sourceCount > 5) {
-                const moreDiv = document.createElement('div');
-                moreDiv.className = 'source-item-more';
-                moreDiv.textContent = `... and ${sourceCount - 5} more sources`;
-                sourcesList.appendChild(moreDiv);
-            }
-            
-            const totalDiv = document.createElement('div');
-            totalDiv.className = 'sources-total';
-            totalDiv.textContent = `Total Source Cost: $${totalCost.toFixed(2)}`;
-            
-            sourcesSection.appendChild(sourcesList);
-            sourcesSection.appendChild(totalDiv);
-            containerDiv.appendChild(sourcesSection);
+            const sourcesCompact = document.createElement('div');
+            sourcesCompact.className = 'selected-sources-compact';
+            sourcesCompact.textContent = `${sourceCount} sources selected • $${totalCost.toFixed(2)} total license cost`;
+            containerDiv.appendChild(sourcesCompact);
         }
         
         // Tier cards
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'tier-cards-container';
         
-        // Research tier
-        cardsContainer.appendChild(this._createTierCard('research', '🔬', 'Research Package', '$2.00',
+        // Research tier ($0.99 as per plan)
+        cardsContainer.appendChild(this._createTierCard('research', '🔬', 'Research Package', '$0.99',
             'Professional summary and analysis with source compilation',
             ['✓ Professional summary and analysis', '✓ Source compilation and citations', '✓ Ready for download'],
             'Purchase Research Package', true));
             
-        // Pro tier
-        cardsContainer.appendChild(this._createTierCard('pro', '⭐', 'Pro Package', '$4.00',
+        // Pro tier ($1.99 as per plan)
+        cardsContainer.appendChild(this._createTierCard('pro', '⭐', 'Pro Package', '$1.99',
             'Everything in Research plus strategic insights and executive formatting',
             ['✓ Everything in Research Package', '✓ Strategic insights and recommendations', 
              '✓ Executive summary format', '✓ Enhanced formatting and presentation'],
