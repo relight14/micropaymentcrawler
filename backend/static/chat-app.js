@@ -1182,7 +1182,7 @@ class ChatResearchApp {
             });
             
             // Add event listeners for tier buttons
-            this.addTierButtonListeners(tierSection);
+            this.addTierCardListeners(tierSection);
             
         } catch (error) {
             console.error('Tier analysis failed:', error);
@@ -1352,7 +1352,7 @@ class ChatResearchApp {
         `;
     }
 
-    addTierButtonListeners(container) {
+    addTierCardListeners(container) {
         // Add click listeners for tier purchase buttons
         const tierButtons = container.querySelectorAll('.tier-cta');
         tierButtons.forEach(button => {
