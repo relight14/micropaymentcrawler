@@ -9,14 +9,20 @@ Preferred communication style: Simple, everyday language.
 # System Architecture
 
 ## UI/UX Decisions
-The frontend is a Single Page Application built with vanilla HTML/CSS/JavaScript, utilizing a component-based, event-driven design. It features a responsive, clean, and modern interface with tier selection cards and dynamic content loading. UI elements include story cards with quotes and descriptions for source articles, professional presentation for search results, and transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️).
+The frontend is a Single Page Application built with vanilla HTML/CSS/JavaScript, featuring a clean, modular ES6 architecture. It delivers a responsive, modern interface with tier selection cards and dynamic content loading. UI elements include story cards with quotes and descriptions for source articles, professional presentation for search results, and transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️).
 
 ## Technical Implementations
-- **Frontend**: Vanilla HTML/CSS/JavaScript with a `ResearchApp` controller for interactions. It dynamically fetches pricing from the backend, uses cache-busting headers for static assets, and implements an optimistic authentication system with robust 401 handling for a superior user experience.
-- **Backend**: Built with FastAPI, using a modular design for API routes, Pydantic schemas for validation, and separate modules for simulated crawling, ledger tracking, and packet building. It supports CORS and integrates a budget-constrained pricing model for source generation.
-- **Content Generation**: A hybrid pipeline uses Tavily for discovering real, clickable URLs and Claude for polishing raw search snippets into professional excerpts and titles. It includes licensing detection and graceful fallbacks for API unavailability.
-- **Authentication**: Implemented an optimistic authentication approach that handles 401 errors gracefully, resumes transactions, and clears tokens securely. It supports both email/password login and signup via LedeWire.
-- **Dual-Mode AI Experience**: Offers both a conversational AI mode (Anthropic Claude integration with state persistence) for research discovery and a deep research mode with licensed source access and dynamic pricing.
+- **Frontend**: Completely refactored modular architecture with clean separation of concerns:
+  - `js/app.js` - Main application controller (330 lines, pure coordination)
+  - `js/services/api.js` - Backend communication with proper authentication headers
+  - `js/services/auth.js` - Authentication and wallet management
+  - `js/state/app-state.js` - Centralized state management with immutable patterns
+  - `js/components/ui-manager.js` - Pure UI logic and DOM manipulation
+  - `js/utils/helpers.js` - Reusable utility functions
+- **Backend**: Built with FastAPI using unified service architecture under `services/` directory with consolidated modules for AI processing (`services/ai/`), content licensing (`services/licensing/`), and research operations (`services/research/`). Uses `schemas/domain.py` as single source of truth for data models.
+- **Content Generation**: Hybrid pipeline uses Tavily for discovering real URLs and Claude for content polishing, with licensing detection and graceful API fallbacks.
+- **Authentication**: Secure authentication with proper JWT token management, LedeWire integration, and optimistic authentication flows with robust 401 handling.
+- **Dual-Mode AI Experience**: Conversational AI mode and deep research mode with licensed source access and dynamic pricing.
 
 ## Feature Specifications
 - **Dynamic Research Services**: Query-based research packages with variable pricing ($0.10-$10.00) determined by source count, quality factors, and licensing complexity. No fixed tiers - users pay for exactly what they need.
