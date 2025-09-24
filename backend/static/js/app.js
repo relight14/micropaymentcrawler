@@ -588,7 +588,7 @@ export class ChatResearchApp {
         
         sources.forEach((source, index) => {
             const sourceCard = document.createElement('div');
-            sourceCard.className = 'source-card-chat'; // Use original card CSS class
+            sourceCard.className = 'source-card'; // Use Figma-styled card class
             sourceCard.setAttribute('data-source-id', source.id);
             
             // Add licensing styling classes
@@ -631,97 +631,61 @@ export class ChatResearchApp {
             });
             
             const checkboxText = document.createElement('span');
-            checkboxText.textContent = 'Select for Report';
+            checkboxText.textContent = 'Add to Report';
             
             checkboxLabel.appendChild(checkbox);
             checkboxLabel.appendChild(checkboxText);
             selectionDiv.appendChild(checkboxLabel);
             sourceCard.appendChild(selectionDiv);
 
-            // Article badge and publication info
+            // Article badge and publication info using existing CSS classes
             const headerTop = document.createElement('div');
-            headerTop.className = 'source-header-top';
-            headerTop.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;';
+            headerTop.className = 'source-header';
             
             const articleBadge = document.createElement('span');
-            articleBadge.className = 'article-badge';
-            articleBadge.style.cssText = 'background: #e5e7eb; color: #374151; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;';
+            articleBadge.className = 'source-type-badge';
             articleBadge.textContent = 'Article';
             
-            // Licensing protocol badge
-            if (source.licensing_protocol) {
-                const protocolBadge = document.createElement('span');
-                protocolBadge.className = 'licensing-protocol-badge';
-                protocolBadge.style.cssText = 'padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; margin-left: 4px;';
-                
-                // Style based on protocol
-                const protocolStyles = {
-                    'rsl': 'background: #fee2e2; color: #dc2626;',
-                    'tollbit': 'background: #fef3c7; color: #d97706;', 
-                    'cloudflare': 'background: #dbeafe; color: #2563eb;'
-                };
-                protocolBadge.style.cssText += protocolStyles[source.licensing_protocol] || 'background: #f3f4f6; color: #6b7280;';
-                
-                const protocolNames = {
-                    'rsl': 'RSL 🔒',
-                    'tollbit': 'TOLLBIT ⚡',
-                    'cloudflare': 'Cloudflare ☁️'
-                };
-                protocolBadge.textContent = protocolNames[source.licensing_protocol] || source.licensing_protocol.toUpperCase();
-                
-                const badgeContainer = document.createElement('div');
-                badgeContainer.appendChild(articleBadge);
-                badgeContainer.appendChild(protocolBadge);
-                headerTop.appendChild(badgeContainer);
+            // License badge using existing CSS classes
+            const licenseBadge = document.createElement('span');
+            licenseBadge.className = 'license-badge';
+            
+            if (source.unlock_price && source.unlock_price > 0) {
+                licenseBadge.classList.add('license-paid');
+                if (source.licensing_protocol) {
+                    const protocolNames = {
+                        'rsl': 'RSL 🔒',
+                        'tollbit': 'TOLLBIT ⚡',
+                        'cloudflare': 'Cloudflare ☁️'
+                    };
+                    licenseBadge.textContent = `${protocolNames[source.licensing_protocol] || source.licensing_protocol.toUpperCase()} $${source.unlock_price.toFixed(2)}`;
+                } else {
+                    licenseBadge.textContent = `paid $${source.unlock_price.toFixed(2)}`;
+                }
             } else {
-                const badgeContainer = document.createElement('div');
-                const freeBadge = document.createElement('span');
-                freeBadge.style.cssText = 'background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; margin-left: 4px;';
-                freeBadge.textContent = 'FREE';
-                
-                badgeContainer.appendChild(articleBadge);
-                badgeContainer.appendChild(freeBadge);
-                headerTop.appendChild(badgeContainer);
+                licenseBadge.classList.add('license-free');
+                licenseBadge.textContent = 'free';
             }
             
-            // Price display
-            const priceSpan = document.createElement('span');
-            priceSpan.className = 'source-price-display';
-            priceSpan.style.cssText = 'font-weight: 600; color: var(--primary, #2563eb);';
-            if (source.unlock_price && source.unlock_price > 0) {
-                priceSpan.textContent = `PAID $${source.unlock_price.toFixed(2)}`;
-            } else {
-                priceSpan.textContent = 'FREE';
-                priceSpan.style.color = '#16a34a';
-            }
-            headerTop.appendChild(priceSpan);
+            const badgeContainer = document.createElement('div');
+            badgeContainer.className = 'source-badges';
+            badgeContainer.appendChild(articleBadge);
+            badgeContainer.appendChild(licenseBadge);
+            headerTop.appendChild(badgeContainer);
+            
             
             sourceCard.appendChild(headerTop);
 
             // Title
             const title = document.createElement('h3');
             title.className = 'source-title';
-            title.style.cssText = 'font-size: 1.1rem; font-weight: 600; margin: 0 0 8px 0; line-height: 1.3; color: var(--foreground);';
             title.textContent = source.title;
             sourceCard.appendChild(title);
 
-            // Domain and publication date
-            const metaInfo = document.createElement('div');
-            metaInfo.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.85rem; color: var(--muted-foreground);';
-            
-            const domainSpan = document.createElement('span');
-            domainSpan.textContent = source.domain;
-            metaInfo.appendChild(domainSpan);
-            
-            if (source.published_date) {
-                const separator = document.createElement('span');
-                separator.textContent = '•';
-                metaInfo.appendChild(separator);
-                
-                const dateSpan = document.createElement('span');
-                dateSpan.textContent = source.published_date;
-                metaInfo.appendChild(dateSpan);
-            }
+            // Meta info using existing CSS class
+            const metaInfo = document.createElement('p');
+            metaInfo.className = 'source-meta';
+            metaInfo.textContent = `${source.domain} • ${new Date().toLocaleDateString()}`;
             
             sourceCard.appendChild(metaInfo);
 
@@ -745,10 +709,9 @@ export class ChatResearchApp {
             
             sourceCard.appendChild(ratingDiv);
 
-            // Content preview/excerpt
+            // Content preview/excerpt using existing CSS class
             const excerpt = document.createElement('p');
             excerpt.className = 'source-excerpt';
-            excerpt.style.cssText = 'color: var(--foreground); line-height: 1.5; margin: 12px 0; font-size: 0.9rem; text-align: left;';
             excerpt.textContent = source.excerpt || 'Content preview will be available after unlocking this source.';
             sourceCard.appendChild(excerpt);
 
