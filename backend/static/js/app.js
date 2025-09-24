@@ -309,7 +309,7 @@ export class ChatResearchApp {
         }
     }
 
-    async handleTierPurchase(button, tierId, price, query = "Research Query") {
+    async handleTierPurchase(button, tierId, price, query = "Research Query", useSelectedSources = false) {
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
                 type: 'tier_purchase', 
@@ -322,8 +322,22 @@ export class ChatResearchApp {
         }
 
         try {
-            const result = await this.apiService.purchaseTier(tierId, price, query);
-            this._showToast(`Research tier purchased successfully!`, 'success');
+            let result;
+            if (useSelectedSources) {
+                // Use selectedSources[] instead of all research results
+                const selectedSources = this.appState.getSelectedSources();
+                if (selectedSources.length === 0) {
+                    this._showToast('Please select sources first', 'error');
+                    return;
+                }
+                result = await this.apiService.purchaseTier(tierId, price, query, selectedSources);
+                this._showToast(`Report generated with ${selectedSources.length} selected sources!`, 'success');
+            } else {
+                // Normal tier purchase with all sources
+                result = await this.apiService.purchaseTier(tierId, price, query);
+                this._showToast(`Research tier purchased successfully!`, 'success');
+            }
+            
             this.appState.addPurchasedItem(tierId);
             
             // Update UI
@@ -416,6 +430,37 @@ export class ChatResearchApp {
         
         containerDiv.appendChild(cardsContainer);
         
+        // Build Report button (only if sources are selected)
+        if (sourceCount > 0) {
+            const buildReportDiv = document.createElement('div');
+            buildReportDiv.className = 'build-report-section';
+            
+            const buildButton = document.createElement('button');
+            buildButton.className = 'build-report-btn';
+            buildButton.dataset.tier = 'research';
+            buildButton.dataset.price = '0.99';
+            buildButton.textContent = `Build Report with ${sourceCount} Selected Sources`;
+            buildButton.addEventListener('click', async (e) => {
+                const tier = e.target.dataset.tier;
+                const price = parseFloat(e.target.dataset.price);
+                const query = this.appState.getCurrentQuery() || "Selected Sources Research";
+                
+                e.target.textContent = 'Processing...';
+                e.target.disabled = true;
+                
+                try {
+                    // Use existing handleTierPurchase but with selectedSources flag
+                    await this.handleTierPurchase(e.target, tier, price, query, true);
+                } catch (error) {
+                    e.target.textContent = `Build Report with ${sourceCount} Selected Sources`;
+                    e.target.disabled = false;
+                }
+            });
+            
+            buildReportDiv.appendChild(buildButton);
+            containerDiv.appendChild(buildReportDiv);
+        }
+        
         // Note
         const noteDiv = document.createElement('div');
         noteDiv.className = 'tier-cards-note';
@@ -499,6 +544,7 @@ export class ChatResearchApp {
         // Placeholder for report builder display updates
         console.log('Report builder display updated');
     }
+
 
     _restoreChatMessages() {
         const messagesContainer = document.getElementById('messagesContainer');
