@@ -407,7 +407,20 @@ export class ChatResearchApp {
         if (sourceCount > 0) {
             const sourcesCompact = document.createElement('div');
             sourcesCompact.className = 'selected-sources-compact';
-            sourcesCompact.textContent = `${sourceCount} sources selected • $${totalCost.toFixed(2)} total license cost`;
+            
+            // Budget validation
+            const budgetWarning = this._checkBudgetWarning(totalCost);
+            
+            if (budgetWarning) {
+                sourcesCompact.innerHTML = `
+                    <div class="sources-summary">${sourceCount} sources selected • $${totalCost.toFixed(2)} total license cost</div>
+                    <div class="budget-warning">${budgetWarning}</div>
+                `;
+                sourcesCompact.classList.add('has-warning');
+            } else {
+                sourcesCompact.textContent = `${sourceCount} sources selected • $${totalCost.toFixed(2)} total license cost`;
+            }
+            
             containerDiv.appendChild(sourcesCompact);
         }
         
@@ -920,6 +933,28 @@ export class ChatResearchApp {
         
         // Update selection count display if needed
         console.log(`Sources selected: ${selectedSources.length}`);
+    }
+
+    _checkBudgetWarning(totalCost) {
+        const researchBudget = 0.99;
+        const proBudget = 1.99;
+        const warningThreshold = 0.8; // 80% of budget
+        
+        // Check Pro tier budget first (higher threshold)
+        if (totalCost >= proBudget) {
+            return `⚠️ Selected sources exceed Pro budget ($${proBudget.toFixed(2)})`;
+        } else if (totalCost >= proBudget * warningThreshold) {
+            return `⚠️ Selected sources approaching Pro budget limit ($${proBudget.toFixed(2)})`;
+        }
+        
+        // Check Research tier budget
+        if (totalCost >= researchBudget) {
+            return `⚠️ Selected sources exceed Research budget ($${researchBudget.toFixed(2)})`;
+        } else if (totalCost >= researchBudget * warningThreshold) {
+            return `⚠️ Selected sources approaching Research budget limit ($${researchBudget.toFixed(2)})`;
+        }
+        
+        return null; // No warning needed
     }
 }
 
