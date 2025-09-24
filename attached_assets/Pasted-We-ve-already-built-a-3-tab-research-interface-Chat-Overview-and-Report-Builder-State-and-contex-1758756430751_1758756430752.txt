@@ -1,0 +1,84 @@
+We’ve already built a 3-tab research interface: Chat, Overview, and Report Builder. State and context are shared across all three tabs (the app remembers the user’s query and history). Now we want to extend the Report Builder tab with the following features:
+Requirements
+Add to Report button on each source card
+
+
+In the Research tab, we want to add to each story card an “Add to Report” checkbox.
+
+
+When clicked, the source metadata (title, publisher, URL, license info, cost, summary) should be stored in a selectedSources[] state object.
+
+
+Users should also be able to deselect/remove sources from this state.
+
+
+Compact list of selected sources in Report Builder tab
+
+
+When the user toggles into the Report Builder tab, display a concise list view at the top.
+
+
+This list should not re-render the full story cards; it should show just:
+
+
+Publisher + article title (truncated)
+
+
+License badge + cost
+
+
+Remove (X) icon to deselect
+
+
+Show a running total: “3 sources selected · $0.40 total license cost”.  Keep pricing for the reports the same as what we currently have (Research for $0.99 and Pro for $1.99) and let user select as many sources as possible until they hit our max  cost for each tier.  Keep the pricing logic exactly the same as we currently have it, with the only change being the user selects the source material up until the max permitted.  
+
+
+Re-use existing Report Option cards
+
+
+Below the source list, display the already-built report option cards (e.g., Research, Pro).  Let’s hide the “Free” option and only display the Research and Pro options.  
+
+
+These should stay visually consistent with the current UI - DO NOT GENERATE NEW CARDS, JUST REPURPOSE THE EXISTING CARDS.
+
+
+The system should display a  “Build Report,” button below the sources.  When that “build report” button is clicked, the system should generate the chosen report only from selectedSources[].
+
+
+Inline citations in reports
+
+
+I’m attaching figma files to give you the design of how we want the reports to render.  
+The “Research” report will be an outline: 
+- Layout: clean, academic style.
+- Header bar: Report title placeholder, date, and user query string at the top.
+- Section 1: “Executive Summary” block with a short paragraph placeholder.
+- Section 2: “Research Outline” with bulleted hierarchical structure (Level 1 bullets, Level 2 indents).
+- Section 3: “Key Sources” list at the bottom, each with:
+   - Publisher name
+   - Article title
+   - License badge (RSL / Tollbit / Cloudflare)
+   - Cost (e.g. $0.15)
+The “Pro” Report will be more of a Research Report
+- Layout: briefing / analyst style.
+- Header bar: Report title placeholder, date, and user query string at the top.
+- Section 1: “Executive Summary” block with 3 short paragraph placeholders.
+- Section 2: “Main Body” with 3–4 subsections, each subsection has:
+   - Subheading
+   - 1–2 paragraph text placeholders
+- Section 3: “Conclusion” block with a paragraph placeholder.
+- Section 4: “Sources Appendix” table at the bottom with columns for Publisher, Title, Protocol Badge, Cost.
+When generating a report (Research or Pro), insert inline markers [1], [2], [3] tied to the order of sources in selectedSources[].
+
+
+At the bottom, render the “Sources” section using the same compact format (Publisher, Title, License badge, Cost).
+
+
+Technical Notes
+Maintain shared context across all three tabs (no resets).
+
+
+Use existing report generation logic, but pass selectedSources[] as the input set instead of all results.
+
+
+Keep the UI lean — this should feel like a cart → checkout → report flow.
