@@ -24,8 +24,8 @@ export class UIManager {
         // Element selectors - configurable for testability
         this.selectors = {
             messagesContainer: options.messagesContainer || '#messagesContainer',
-            chatInput: options.chatInput || '#chatInput',
-            sendButton: options.sendButton || '#sendButton',
+            chatInput: options.chatInput || '#newChatInput',
+            sendButton: options.sendButton || '#newSendButton',
             ...options.selectors
         };
         
