@@ -44,14 +44,19 @@ class SourceCard {
      * @returns {HTMLElement} Complete source card element
      */
     create(source, options = {}) {
+        console.log(`🎨 SOURCE CARD: create() called for source:`, source);
+        console.log(`🎨 SOURCE CARD: options:`, options);
+        
         // Defensive check for missing source.id
         if (!source || !source.id) {
-            console.error('Invalid source object - missing ID:', source);
+            console.error('❌ SOURCE CARD: Invalid source object - missing ID:', source);
             const errorCard = document.createElement('div');
             errorCard.className = 'source-card error';
             errorCard.textContent = 'Invalid source data';
             return errorCard;
         }
+        
+        console.log(`✅ SOURCE CARD: Creating card for source ID: ${source.id}`);
         
         const {
             showCheckbox = true,
@@ -59,10 +64,12 @@ class SourceCard {
             className = 'source-card'
         } = options;
 
+        console.log(`🎨 SOURCE CARD: Creating main card container...`);
         // Main card container
         const sourceCard = document.createElement('div');
         sourceCard.className = className;
         sourceCard.setAttribute('data-source-id', source.id);
+        console.log(`✅ SOURCE CARD: Main container created with class '${className}' and ID '${source.id}'`);
 
         // Source header with title and badges
         const header = this._createHeader(source);
