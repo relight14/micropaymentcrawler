@@ -25,6 +25,9 @@ async def get_enrichment_status(cache_key: str):
             enriched_sources = getattr(crawler, '_cache', {}).get(cache_key)
         
         if enriched_sources:
+            # Sort enriched sources by relevance score (highest first)
+            enriched_sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+            
             return {
                 "status": "ready",
                 "sources": [
@@ -115,6 +118,9 @@ async def analyze_research_query(request: ResearchRequest):
         # Generate research summary (currently sync, but may need async if AI-enhanced)
         # TODO: Consider async if adding GPT-assisted summaries or complex processing
         summary = _generate_research_preview(request.query, sources)
+        
+        # Sort sources by relevance score (highest first)
+        sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
         
         # Convert sources to response format
         sources_response = []
