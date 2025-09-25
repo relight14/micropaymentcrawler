@@ -6,6 +6,7 @@ from slowapi import Limiter
 from typing import Dict, Any
 
 from schemas.api import PurchaseRequest, PurchaseResponse
+from schemas.domain import TierType
 from services.research.packet_builder import PacketBuilder
 from services.research.crawler import ContentCrawlerStub
 from data.ledger_repository import ResearchLedger
