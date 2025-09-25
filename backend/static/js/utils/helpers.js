@@ -4,13 +4,20 @@
  */
 
 /**
- * Extract a compelling quote from text excerpt
+ * Extract a compelling quote from text excerpt with fallback
  */
 export function extractCompellingQuote(excerpt) {
-    if (!excerpt || excerpt.length < 50) return null;
+    if (!excerpt || excerpt.length < 50) {
+        // Fallback: return first 100 chars if excerpt is too short
+        return excerpt ? truncateText(excerpt, 100) : null;
+    }
     
     const sentences = excerpt.split(/[.!?]+/).filter(s => s.trim().length > 20);
-    if (sentences.length === 0) return null;
+    
+    // Fallback: if no good sentences found, return first 100 chars
+    if (sentences.length === 0) {
+        return truncateText(excerpt, 100);
+    }
     
     // Find the most "compelling" sentence (heuristic-based)
     let bestSentence = sentences[0];
@@ -33,18 +40,54 @@ export function extractCompellingQuote(excerpt) {
         }
     }
     
-    return bestSentence.trim() + (bestSentence.includes('.') ? '' : '...');
+    // Final fallback: if no compelling sentence found, use first 100 chars
+    const result = bestSentence.trim();
+    if (!result || bestScore === 0) {
+        return truncateText(excerpt, 100);
+    }
+    
+    return result + (result.includes('.') ? '' : '...');
 }
 
 /**
- * Create source description from excerpt and quote
+ * Create source description from excerpt and quote with fuzzy matching
  */
 export function createSourceDescription(excerpt, quote) {
     if (!excerpt) return "No preview available for this source.";
     
     let description = excerpt;
-    if (quote && excerpt.includes(quote.replace('...', ''))) {
-        description = excerpt.replace(quote.replace('...', ''), '').trim();
+    
+    // Safer quote removal with fuzzy matching
+    if (quote) {
+        // Clean the quote for matching (remove ellipsis and extra whitespace)
+        const cleanQuote = quote.replace(/\.{3,}/g, '').replace(/\s+/g, ' ').trim();
+        
+        // Try multiple matching strategies
+        if (cleanQuote.length > 10) {
+            // Strategy 1: Exact match (after cleaning)
+            if (excerpt.includes(cleanQuote)) {
+                description = excerpt.replace(cleanQuote, '').trim();
+            }
+            // Strategy 2: Partial match (first 80% of quote)
+            else {
+                const partialQuote = cleanQuote.substring(0, Math.floor(cleanQuote.length * 0.8));
+                if (partialQuote.length > 10 && excerpt.includes(partialQuote)) {
+                    description = excerpt.replace(partialQuote, '').trim();
+                }
+            }
+        }
+        
+        // Clean up any remaining artifacts from quote removal
+        description = description
+            .replace(/^[\s,.;:-]+/, '')  // Remove leading punctuation
+            .replace(/[\s,.;:-]+$/, '')  // Remove trailing punctuation
+            .trim();
+    }
+    
+    // Ensure we have meaningful content
+    if (!description || description.length < 20) {
+        // If quote removal left too little, use original excerpt
+        description = excerpt;
     }
     
     if (description.length > 150) {
