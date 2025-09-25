@@ -31,7 +31,7 @@ class LedeWireAPI:
         # Load credentials from secure environment variables
         self.api_key = api_key or os.getenv("LEDEWIRE_API_KEY")
         self.api_secret = os.getenv("LEDEWIRE_API_SECRET")
-        self.api_base = "https://api-staging.ledewire.com/v1"
+        self.api_base = "https://api.ledewire.com/v1"
         
         # Note: API key/secret only required for API key authentication endpoint
         # Email/password auth and other buyer flows work without API credentials
@@ -47,11 +47,13 @@ class LedeWireAPI:
         )
         self.session.mount('https://', HTTPAdapter(max_retries=retry_strategy))
         
-        # Set default headers (NO API KEY HEADERS - those are only for specific endpoints)
+        # Set default headers with proper security headers
         self.session.headers.update({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'User-Agent': 'LedeWire-Client/1.0'
+            'User-Agent': 'LedeWire-Client/1.0',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cache-Control': 'no-cache'
         })
     
     # Authentication Methods
@@ -62,19 +64,45 @@ class LedeWireAPI:
         Authenticate user and return JWT token.
         """
         try:
+            # Create request with proper headers for LedeWire API
+            request_data = {
+                "email": email,
+                "password": password
+            }
+            
+            # Log the request details for debugging
+            logger.info(f"Authentication request to: {self.api_base}/auth/login/email")
+            logger.info(f"Request headers: {dict(self.session.headers)}")
+            logger.info(f"Request data: email={email}")
+            
             response = self.session.post(
                 f"{self.api_base}/auth/login/email",
-                json={
-                    "email": email,
-                    "password": password
-                },
-                timeout=10
+                json=request_data,
+                timeout=10,
+                headers={
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'LedeWire-Client/1.0'
+                }
             )
+            
+            # Log response details
+            logger.info(f"Authentication response status: {response.status_code}")
+            logger.info(f"Authentication response headers: {dict(response.headers)}")
+            
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            logger.info(f"Authentication successful for {email}")
+            return result
         except requests.RequestException as e:
+            # Log authentication error details
+            logger.error(f"Authentication failed for {email}: {str(e)}")
+            
             # PRODUCTION: Re-raise with proper HTTP status
             if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response text: {e.response.text}")
+                
                 if e.response.status_code == 401:
                     raise requests.HTTPError("Invalid credentials", response=e.response)
                 elif e.response.status_code == 400:
