@@ -75,17 +75,13 @@ export class ChatResearchApp {
 
         // Chat functionality
         if (sendButton) {
-            console.log("🎨 CRITICAL: Adding click listener to sendButton", sendButton);
-            sendButton.addEventListener('click', () => {
-                console.log("🚀 BUTTON CLICKED! sendMessage() about to fire");
+                sendButton.addEventListener('click', () => {
                 this.sendMessage();
             });
         }
         if (chatInput) {
             chatInput.addEventListener('keypress', (e) => {
-                console.log("⌨️ KEY PRESSED:", e.key);
                 if (e.key === 'Enter' && !e.shiftKey) {
-                    console.log("🚀 ENTER PRESSED! sendMessage() about to fire");
                     e.preventDefault();
                     this.sendMessage();
                 }
@@ -127,7 +123,6 @@ export class ChatResearchApp {
     }
 
     async sendMessage() {
-        console.log("🚨 SENDMESSAGE() FIRED! This proves event handlers work!");
         const chatInput = document.getElementById('newChatInput');
         const message = chatInput?.value?.trim();
         console.log("📝 Message to send:", message);

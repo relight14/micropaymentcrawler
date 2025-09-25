@@ -108,28 +108,18 @@ export class UIManager {
 
     // Message display with error handling
     addMessageToChat(message) {
-        console.log(`📝 UI MANAGER: addMessageToChat called with:`, message);
         
         if (!this.messagesContainer) {
             console.error(`❌ UI MANAGER: No messagesContainer found!`);
             return;
         }
-        console.log(`✅ UI MANAGER: messagesContainer found`);
 
-        console.log(`📝 UI MANAGER: Creating message div...`);
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender}`;
-        console.log(`📝 UI MANAGER: Setting message HTML content...`);
         messageDiv.innerHTML = this.formatMessageHTML(message);
-        console.log(`✅ UI MANAGER: Message div created with class: ${messageDiv.className}`);
         
-        console.log(`📝 UI MANAGER: Appending message to container...`);
         this.messagesContainer.appendChild(messageDiv);
-        console.log(`✅ UI MANAGER: Message appended to container`);
-        
-        console.log(`📝 UI MANAGER: Scrolling to bottom...`);
         this.scrollToBottom();
-        console.log(`✅ UI MANAGER: addMessageToChat completed`);
         
         return messageDiv;
     }
