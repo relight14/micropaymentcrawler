@@ -12,6 +12,7 @@ import { debounce } from './utils/helpers.js';
 
 export class ChatResearchApp {
     constructor() {
+        console.log("✅ ChatResearchApp constructor running");
         // Initialize services and state (dependency injection)
         this.authService = new AuthService();
         this.apiService = new APIService(this.authService);
@@ -55,9 +56,14 @@ export class ChatResearchApp {
     }
 
     initializeEventListeners() {
+        console.log("🔧 initializeEventListeners() starting");
         // Get DOM elements
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
+        
+        // Debug DOM elements
+        console.log("chatInput:", chatInput);
+        console.log("sendButton:", sendButton);
         const clearButton = document.getElementById('clearButton');
         const newChatBtn = document.getElementById('newChatBtn');
         const chatModeBtn = document.getElementById('chatModeBtn');
@@ -1100,12 +1106,22 @@ export class ChatResearchApp {
 
 // Initialize the app when DOM is ready  
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("🚀 DOMContentLoaded fired - attempting app initialization");
     // Ensure only one instance exists
     if (!window.LedeWire?.researchApp) {
-        window.app = new ChatResearchApp();
-        // Legacy global only if not already set (avoid conflicts)
-        if (!window.researchApp) {
-            window.researchApp = window.app;
+        try {
+            console.log("📦 Creating new ChatResearchApp instance...");
+            window.app = new ChatResearchApp();
+            console.log("✅ ChatResearchApp created successfully:", window.app);
+            // Legacy global only if not already set (avoid conflicts)
+            if (!window.researchApp) {
+                window.researchApp = window.app;
+            }
+        } catch (e) {
+            console.error("🚨 App initialization failed:", e);
+            console.error("Stack trace:", e.stack);
         }
+    } else {
+        console.log("⚠️ App instance already exists, skipping initialization");
     }
 });
