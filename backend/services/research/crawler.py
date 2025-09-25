@@ -108,17 +108,27 @@ class ContentCrawlerStub:
                     domain = "unknown.com"
                 
                 source_id = str(uuid.uuid4())
+                title = result.get('title', f'Research Source {i+1}')
+                
+                # Generate relevance score immediately for star ratings
+                base_score = max(0.2, 1.0 - (i * 0.08))  # Position decay
+                random_factor = random.uniform(-0.15, 0.15)  # Variety
+                query_bonus = 0.2 if query.lower() in title.lower() else 0.0  # Query matching
+                domain_bonus = 0.15 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0  # Authority
+                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + random_factor))
+                
                 # Start with free pricing - real licensing discovery will set authentic prices
                 source = SourceCard(
                     id=source_id,
-                    title=result.get('title', f'Research Source {i+1}'),
+                    title=title,
                     excerpt=result.get('content', 'Loading enhanced summary...')[:150],
                     domain=domain,
                     url=result.get('url', f'https://{domain}'),
                     unlock_price=0.0,  # Will be set by licensing discovery
                     is_unlocked=False,
                     licensing_protocol=None,  # Will be set by licensing discovery 
-                    licensing_cost=None
+                    licensing_cost=None,
+                    relevance_score=relevance_score  # Add relevance score immediately
                 )
                 
                 # Check budget constraint
