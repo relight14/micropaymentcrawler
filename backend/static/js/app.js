@@ -135,6 +135,9 @@ export class ChatResearchApp {
                 this.appState.getConversationHistory() : null;
             const response = await this.apiService.sendMessage(message, this.appState.getMode(), conversationContext);
             
+            // 1. PIPELINE TRACE: Log raw response
+            console.log('🔍 PIPELINE TRACE: Search response handler called');
+            console.log('📦 PIPELINE TRACE: Raw response received:', response);
             
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();
@@ -147,8 +150,16 @@ export class ChatResearchApp {
             
             // Handle research data with progressive loading
             if (response.research_data) {
+                // 2. PIPELINE TRACE: Log research data
+                console.log('📋 PIPELINE TRACE: Research data found:', response.research_data);
+                console.log('📊 PIPELINE TRACE: Sources array:', response.research_data?.sources);
+                console.log('📏 PIPELINE TRACE: Sources length:', response.research_data?.sources?.length);
                 
                 this.appState.setCurrentResearchData(response.research_data);
+                
+                // 3. PIPELINE TRACE: Before calling _displaySourceCards
+                console.log('🎯 PIPELINE TRACE: About to call _displaySourceCards()');
+                console.log('🎯 PIPELINE TRACE: Sources parameter:', response.research_data.sources);
                 
                 // Display immediate source cards
                 this._displaySourceCards(response.research_data.sources);
@@ -860,10 +871,21 @@ export class ChatResearchApp {
     }
     
     async _displaySourceCards(sources) {
+        // 4. PIPELINE TRACE: Method entry point
+        console.log('🎨 DISPLAY METHOD: _displaySourceCards() ENTRY POINT');
+        console.log('🎨 DISPLAY METHOD: Sources parameter received:', sources);
+        console.log('🎨 DISPLAY METHOD: Sources type:', typeof sources);
+        console.log('🎨 DISPLAY METHOD: Sources is array?', Array.isArray(sources));
+        console.log('🎨 DISPLAY METHOD: Sources length:', sources?.length);
         
         if (!sources || sources.length === 0) {
+            console.log('❌ DISPLAY METHOD: Early return - no sources');
+            console.log('❌ DISPLAY METHOD: sources value:', sources);
+            console.log('❌ DISPLAY METHOD: sources.length:', sources?.length);
             return;
         }
+        
+        console.log('✅ DISPLAY METHOD: Validation passed, proceeding to create cards');
         
         // Wait for SourceCard to be available
         if (!window.SourceCard) {
