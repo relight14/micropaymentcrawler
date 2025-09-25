@@ -1,0 +1,58 @@
+Looking at your UIManager class, here's what stands out:
+🔴 Issues & Redundancies:
+1. Redundant HTML Sanitization (Performance Hit)
+javascript// You're doing this twice - inefficient!
+const escaped = this.escapeHtml(text);        // First sanitization
+// ... formatting ...
+return this.sanitizeHtml(formatted);          // Second sanitization
+Fix: Choose one approach - either escape first OR sanitize after, not both.
+2. Dead Code - Legacy Sources Method
+javascriptformatSourcesHTML(sources) {
+    // This entire method is useless now
+    return '<div class="legacy-sources-removed">Sources rendered by SourceCard component</div>';
+}
+Fix: Delete this method entirely.
+3. Unsafe HTML Injection Risk
+javascript// This bypasses all your security measures!
+if (text.includes('<div class="sources-preview-section">')) {
+    return text; // RAW HTML - no sanitization!
+}
+Fix: Use a proper HTML flag or whitelist approach instead of string detection.
+4. Inconsistent Element Caching
+javascript// Some elements cached in constructor:
+this.chatInput = document.querySelector(this.selectors.chatInput);
+
+// Others queried every time:
+const characterCount = document.querySelector('.character-count'); // In updateCharacterCount()
+const walletBalance = document.getElementById('walletBalance');    // In updateWalletDisplay()
+Fix: Cache all frequently used elements in constructor.
+5. Configuration Overkill
+javascript// This is over-engineered for simple thresholds:
+this.CONFIG = {
+    CHARACTER_WARNING_THRESHOLD: 1800,
+    CHARACTER_SOFT_THRESHOLD: 1500,
+    // ... etc
+};
+Fix: Just use constants - you're not changing these dynamically.
+🟡 Minor Issues:
+6. Redundant Safety Checks
+javascript// You check this in multiple places:
+if (!this.messagesContainer) return;
+7. Unused Options Pattern
+The options parameter suggests flexibility you're not actually using.
+✅ What's Good:
+
+Clean separation of concerns
+Good error handling overall
+Proper DOM element caching (mostly)
+Readable method structure
+
+🚀 Quick Fixes:
+
+Delete formatSourcesHTML() method
+Pick one sanitization approach in formatMessage()
+Cache characterCount and walletBalance elements
+Replace the HTML detection with a proper isHtml flag
+Simplify the CONFIG object to basic constants
+
+The file is generally well-structured, just has some performance redundancies and dead code that can be cleaned up!RetryClaude does not have the ability to run the code it generates yet.Claude can make mistakes. Please double-check responses.

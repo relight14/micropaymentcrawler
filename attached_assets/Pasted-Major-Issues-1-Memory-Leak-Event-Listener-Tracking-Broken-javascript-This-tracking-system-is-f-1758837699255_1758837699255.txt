@@ -1,0 +1,86 @@
+Major Issues:
+1. Memory Leak - Event Listener Tracking Broken
+javascript// This tracking system is fundamentally flawed:
+this.eventListeners.set(checkbox, { type: 'change', handler: changeHandler });
+
+// Problem: You're using DOM elements as Map keys
+// When elements are removed from DOM, they stay in memory via this Map
+Fix: Use WeakMap or track by element ID/selector instead.
+2. Redundant State Management
+javascript// You're doing the same selection logic in multiple places:
+_handleSelectionChange() { /* selection logic */ }
+updateSelectionStates() { /* same selection logic */ }
+clearSelections() { /* more selection logic */ }
+Fix: Create a single _syncSelectionState(sourceId, isSelected) method.
+3. Inefficient DOM Queries
+javascript// These run on every update - expensive!
+updateSelectionStates() {
+    const checkboxes = document.querySelectorAll('.source-selection-checkbox'); // Every checkbox
+    checkboxes.forEach(checkbox => {
+        const sourceCard = checkbox.closest('[data-source-id]'); // More DOM walking
+    });
+}
+Fix: Cache elements or use event delegation instead.
+4. Race Condition Risk
+javascript// Removing/adding event listeners without proper cleanup
+if (currentHandler) {
+    checkbox.removeEventListener('change', currentHandler);
+}
+checkbox.checked = isSelected;
+if (currentHandler) {
+    checkbox.addEventListener('change', currentHandler); // Race condition possible
+}
+🟡 Minor Redundancies:
+5. Duplicate Null Checks
+javascript// You check source.id in multiple methods:
+if (!source || !source.id) { /* error handling */ }
+// This pattern repeats 4+ times
+6. Similar Badge Logic
+javascript_shouldShowRSLDemo(source) { /* domain checking */ }
+_shouldShowCloudflareDemo(source) { /* similar domain checking */ }
+Fix: Create generic _shouldShowDemoBadge(source, patterns) method.
+7. Redundant Button Creation
+javascript_createActionButton() { /* complex button logic */ }
+_updateActionButton() { /* similar button logic */ }
+🟢 Positive Aspects:
+
+Good separation of concerns
+Comprehensive error handling
+Smart diff-based updates
+Event cleanup attempt (though flawed)
+
+🚀 Quick Fixes:
+1. Fix Memory Leak:
+javascript// Replace Map with WeakMap:
+this.eventListeners = new WeakMap();
+
+// Or track by ID:
+this.eventListeners = new Map(); // sourceId -> handler
+2. Consolidate Selection Logic:
+javascript_syncSelectionState(sourceId, isSelected) {
+    // Single method handles all selection state changes
+    const checkbox = document.querySelector(`[data-source-id="${sourceId}"] .source-selection-checkbox`);
+    const card = document.querySelector(`[data-source-id="${sourceId}"]`);
+    
+    if (checkbox) checkbox.checked = isSelected;
+    if (card) card.classList.toggle('selected', isSelected);
+    
+    // Update appState
+    if (isSelected) {
+        this.appState?.toggleSourceSelection(sourceId, source);
+    } else {
+        this.appState?.removeSelectedSource(sourceId);
+    }
+}
+3. Use Event Delegation:
+javascript// Instead of tracking individual listeners, use delegation:
+constructor() {
+    document.addEventListener('change', this.handleDelegatedChange.bind(this));
+}
+
+handleDelegatedChange(e) {
+    if (e.target.matches('.source-selection-checkbox')) {
+        // Handle checkbox change
+    }
+}
+The component is well-structured but has some performance and memory management issues that should be addressed for production use.

@@ -6,13 +6,11 @@ export class UIManager {
     constructor(appState, options = {}) {
         this.appState = appState;
         
-        // Configuration constants
-        this.CONFIG = {
-            CHARACTER_WARNING_THRESHOLD: 1800,
-            CHARACTER_SOFT_THRESHOLD: 1500,
-            MAX_TEXTAREA_HEIGHT: 150,
-            CHARACTER_LIMIT: 2000
-        };
+        // Simple constants - no need for CONFIG object
+        this.CHARACTER_WARNING_THRESHOLD = 1800;
+        this.CHARACTER_SOFT_THRESHOLD = 1500;
+        this.MAX_TEXTAREA_HEIGHT = 150;
+        this.CHARACTER_LIMIT = 2000;
         
         // Mode descriptions - configurable
         this.modeDescriptions = options.modeDescriptions || {
@@ -29,10 +27,12 @@ export class UIManager {
             ...options.selectors
         };
         
-        // Cache DOM elements
+        // Cache DOM elements consistently
         this.messagesContainer = document.querySelector(this.selectors.messagesContainer);
         this.chatInput = document.querySelector(this.selectors.chatInput);
         this.sendButton = document.querySelector(this.selectors.sendButton);
+        this.characterCount = document.querySelector('.character-count');
+        this.walletBalance = document.getElementById('walletBalance');
     }
 
     // Mode display management
@@ -75,34 +75,32 @@ export class UIManager {
         this.chatInput.placeholder = placeholders[this.appState.getMode()] || placeholders['chat'];
     }
 
-    // Character count management with configurable thresholds
+    // Character count management with cached elements
     updateCharacterCount() {
-        const characterCount = document.querySelector('.character-count');
-        if (!characterCount || !this.chatInput) return;
+        if (!this.characterCount || !this.chatInput) return;
         
         const count = this.chatInput.value.length;
-        characterCount.textContent = `${count} / ${this.CONFIG.CHARACTER_LIMIT}`;
+        this.characterCount.textContent = `${count} / ${this.CHARACTER_LIMIT}`;
         
-        if (count > this.CONFIG.CHARACTER_WARNING_THRESHOLD) {
-            characterCount.style.color = 'var(--destructive)';
-        } else if (count > this.CONFIG.CHARACTER_SOFT_THRESHOLD) {
-            characterCount.style.color = 'var(--accent)';
+        if (count > this.CHARACTER_WARNING_THRESHOLD) {
+            this.characterCount.style.color = 'var(--destructive)';
+        } else if (count > this.CHARACTER_SOFT_THRESHOLD) {
+            this.characterCount.style.color = 'var(--accent)';
         } else {
-            characterCount.style.color = 'var(--muted-foreground)';
+            this.characterCount.style.color = 'var(--muted-foreground)';
         }
     }
 
     autoResizeTextarea(textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, this.CONFIG.MAX_TEXTAREA_HEIGHT) + 'px';
+        textarea.style.height = Math.min(textarea.scrollHeight, this.MAX_TEXTAREA_HEIGHT) + 'px';
     }
 
-    // Wallet display management
+    // Wallet display management with cached element
     updateWalletDisplay(balance = 0) {
-        const walletBalance = document.getElementById('walletBalance');
-        if (walletBalance) {
+        if (this.walletBalance) {
             const safeBalance = Number(balance) || 0;
-            walletBalance.textContent = `$${safeBalance.toFixed(2)}`;
+            this.walletBalance.textContent = `$${safeBalance.toFixed(2)}`;
         }
     }
 
@@ -167,27 +165,22 @@ export class UIManager {
         return senderMap[sender] || sender;
     }
 
-    formatMessage(text) {
-        // Check if this is HTML content (like source cards) that should not be escaped
-        if (text.includes('<div class="sources-preview-section">') || 
-            text.includes('<div class="source-card">')) {
-            // This is HTML content that should be rendered as-is
+    formatMessage(text, isHtml = false) {
+        // Handle trusted HTML content
+        if (isHtml) {
             return text;
         }
         
-        // Secure approach: escape first, then apply formatting
+        // Single sanitization pass: escape first, then apply formatting
         const escaped = this.escapeHtml(text);
         
-        // Apply formatting to escaped content (safer than regex on raw input)
-        const formatted = escaped
+        // Apply formatting to escaped content
+        return escaped
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`(.*?)`/g, '<code>$1</code>')
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>');
-            
-        // Final sanitization pass (belt and suspenders)
-        return this.sanitizeHtml(formatted);
     }
 
     formatMessageMetadata(metadata) {
@@ -205,10 +198,6 @@ export class UIManager {
         return `<div class="research-packet">${packet.summary || 'Research completed'}</div>`;
     }
 
-    formatSourcesHTML(sources) {
-        // LEGACY TEMPLATE REMOVED - SourceCard component handles all rendering
-        return '<div class="legacy-sources-removed">Sources rendered by SourceCard component</div>';
-    }
 
     // Typing indicator
     showTypingIndicator() {
