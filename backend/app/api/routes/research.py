@@ -120,7 +120,8 @@ async def analyze_research_query(request: ResearchRequest):
                 "quality_score": getattr(source, 'quality_score', 0.8)
             })
         
-        return DynamicResearchResponse(
+        # Create response with progressive flow information
+        response = DynamicResearchResponse(
             query=request.query,
             total_estimated_cost=round(total_cost, 2),
             source_count=len(sources),
@@ -131,6 +132,16 @@ async def analyze_research_query(request: ResearchRequest):
             enrichment_status=result.get("stage", "complete"),
             enrichment_needed=result.get("enrichment_needed", False)
         )
+        
+        # Add progressive flow fields to response
+        if result.get("stage"):
+            response.stage = result["stage"]
+        if result.get("cache_key"):
+            response.cache_key = result["cache_key"]
+        if result.get("timestamp"):
+            response.timestamp = result["timestamp"]
+            
+        return response
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing research query: {str(e)}")

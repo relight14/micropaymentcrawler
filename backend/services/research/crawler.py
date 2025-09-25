@@ -174,7 +174,8 @@ class ContentCrawlerStub:
                 "sources": immediate_sources,
                 "stage": "skeleton",
                 "enrichment_needed": True,
-                "cache_key": cache_key  # Frontend can poll for updates
+                "cache_key": cache_key,  # Frontend can poll for updates
+                "timestamp": int(time.time())  # Fix #3: Force frontend refresh
             }
             
         except Exception as e:
@@ -225,13 +226,22 @@ class ContentCrawlerStub:
                 })
             
             print(f"🎨 Starting free Claude discovery summaries...")
-            polished_sources = self.ai_service.polish_sources(query, raw_sources)
             
-            # Update sources with polished content
-            for i, (source, polished) in enumerate(zip(sources, polished_sources)):
-                if polished:
-                    source.title = polished.get('title', source.title)
-                    source.excerpt = polished.get('excerpt', source.excerpt)
+            # Fix #1: Use run_in_executor to prevent blocking the event loop
+            loop = asyncio.get_event_loop()
+            polished_sources = await loop.run_in_executor(
+                None,  # Use default threadpool
+                self.ai_service.polish_sources,
+                query,
+                raw_sources
+            )
+            
+            # Fix #2: Match by URL instead of index to prevent mismatch
+            for polished in polished_sources:
+                matching = next((s for s in sources if s.url == polished.get('url')), None)
+                if matching and polished:
+                    matching.title = polished.get('title', matching.title)
+                    matching.excerpt = polished.get('excerpt', matching.excerpt)
             
             print(f"✅ Free Claude summarization completed")
             

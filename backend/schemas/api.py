@@ -49,6 +49,9 @@ class DynamicResearchResponse(BaseModel):
     # Progressive loading fields
     enrichment_status: Optional[str] = "complete"  # "immediate", "complete"
     enrichment_needed: Optional[bool] = False
+    stage: Optional[str] = None  # "skeleton", "complete"
+    cache_key: Optional[str] = None  # For polling enriched results
+    timestamp: Optional[int] = None  # For cache versioning
 
 
 # Purchase schemas
