@@ -101,7 +101,7 @@ export class UIManager {
     updateWalletDisplay(balance = 0) {
         const walletBalance = document.getElementById('walletBalance');
         if (walletBalance) {
-            const safeBalance = typeof balance === 'number' ? balance : 0;
+            const safeBalance = Number(balance) || 0;
             walletBalance.textContent = `$${safeBalance.toFixed(2)}`;
         }
     }

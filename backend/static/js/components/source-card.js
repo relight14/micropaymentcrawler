@@ -244,7 +244,7 @@ class SourceCard {
         if (protocol === 'tollbit' && cost > 0) {
             // Real Tollbit pricing confirmed
             badge.classList.add('license-paid');
-            badge.textContent = `⚡ TOLLBIT $${cost.toFixed(2)}`;
+            badge.textContent = `⚡ TOLLBIT $${Number(cost || 0).toFixed(2)}`;
             
         } else if (protocol === 'rsl' || this._shouldShowRSLDemo(source)) {
             // RSL demo badge for platform potential
@@ -322,7 +322,7 @@ class SourceCard {
         // Rating text
         const ratingText = document.createElement('span');
         ratingText.className = 'rating-text';
-        ratingText.textContent = `${roundedScore.toFixed(1)}/5`;
+        ratingText.textContent = `${Number(roundedScore || 0).toFixed(1)}/5`;
         rating.appendChild(ratingText);
 
         return rating;
@@ -496,7 +496,7 @@ class SourceCard {
             this.eventListeners.set(button, { type: 'click', handler: downloadHandler });
         } else {
             button.className = 'unlock-btn';
-            const costText = cost > 0 ? ` $${cost.toFixed(2)}` : '';
+            const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
             button.innerHTML = `🔓 <span>Unlock${costText}</span>`;
             const unlockHandler = () => this._handleUnlock(source);
             button.addEventListener('click', unlockHandler);
@@ -521,7 +521,7 @@ class SourceCard {
             actionBtn.innerHTML = '📄 <span>Download</span>';
         } else {
             actionBtn.className = 'unlock-btn';
-            const costText = cost > 0 ? ` $${cost.toFixed(2)}` : '';
+            const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
             actionBtn.innerHTML = `🔓 <span>Unlock${costText}</span>`;
         }
     }

@@ -436,11 +436,14 @@ export class ChatResearchApp {
                     initials.textContent = userInitials;
                     console.log('Set initials to:', userInitials);
                 }
-                if (balance) {
-                    const walletBalance = this.authService.getWalletBalance() || 0;
-                    const safeBalance = typeof walletBalance === 'number' ? walletBalance : 0;
+                if (balance && this.authService.isAuthenticated()) {
+                    const walletBalance = this.authService.getWalletBalance();
+                    const safeBalance = Number(walletBalance) || 0;
                     balance.textContent = `$${safeBalance.toFixed(2)}`;
                     console.log('Set balance to:', safeBalance);
+                } else if (balance) {
+                    // Hide balance for unauthenticated users
+                    balance.textContent = '$0.00';
                 }
                 
                 // Add dropdown functionality
@@ -684,12 +687,12 @@ export class ChatResearchApp {
             
             if (budgetWarning) {
                 sourcesCompact.innerHTML = `
-                    <div class="sources-summary">${sourceCount} sources selected • $${totalCost.toFixed(2)} total license cost</div>
+                    <div class="sources-summary">${sourceCount} sources selected • $${Number(totalCost || 0).toFixed(2)} total license cost</div>
                     <div class="budget-warning">${budgetWarning}</div>
                 `;
                 sourcesCompact.classList.add('has-warning');
             } else {
-                sourcesCompact.textContent = `${sourceCount} sources selected • $${totalCost.toFixed(2)} total license cost`;
+                sourcesCompact.textContent = `${sourceCount} sources selected • $${Number(totalCost || 0).toFixed(2)} total license cost`;
             }
             
             containerDiv.appendChild(sourcesCompact);
@@ -1007,7 +1010,7 @@ export class ChatResearchApp {
             
             const priceEl = sourceCard.querySelector('.source-price');
             if (priceEl && source.unlock_price) {
-                const safePrice = typeof source.unlock_price === 'number' ? source.unlock_price : 0;
+                const safePrice = Number(source.unlock_price) || 0;
                 priceEl.textContent = `$${safePrice.toFixed(2)}`;
             }
             
@@ -1081,16 +1084,16 @@ export class ChatResearchApp {
         
         // Check Pro tier budget first (higher threshold)
         if (totalCost >= proBudget) {
-            return `⚠️ Selected sources exceed Pro budget ($${proBudget.toFixed(2)})`;
+            return `⚠️ Selected sources exceed Pro budget ($${Number(proBudget || 0).toFixed(2)})`;
         } else if (totalCost >= proBudget * warningThreshold) {
-            return `⚠️ Selected sources approaching Pro budget limit ($${proBudget.toFixed(2)})`;
+            return `⚠️ Selected sources approaching Pro budget limit ($${Number(proBudget || 0).toFixed(2)})`;
         }
         
         // Check Research tier budget
         if (totalCost >= researchBudget) {
-            return `⚠️ Selected sources exceed Research budget ($${researchBudget.toFixed(2)})`;
+            return `⚠️ Selected sources exceed Research budget ($${Number(researchBudget || 0).toFixed(2)})`;
         } else if (totalCost >= researchBudget * warningThreshold) {
-            return `⚠️ Selected sources approaching Research budget limit ($${researchBudget.toFixed(2)})`;
+            return `⚠️ Selected sources approaching Research budget limit ($${Number(researchBudget || 0).toFixed(2)})`;
         }
         
         return null; // No warning needed
