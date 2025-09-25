@@ -104,8 +104,21 @@ class SourceCard {
     /**
      * Handle progressive enrichment updates
      */
-    handleEnrichmentUpdate(enrichmentData) {
-        const { cacheKey, sources } = enrichmentData;
+    handleEnrichmentUpdate(event) {
+        console.log('🔍 Enrichment event received:', event);
+        
+        if (!event || !event.detail) {
+            console.error('❌ No enrichment event detail received');
+            return;
+        }
+        
+        const { cacheKey, sources } = event.detail;
+        
+        if (!sources || !Array.isArray(sources)) {
+            console.error('❌ Invalid sources data:', event.detail);
+            return;
+        }
+        
         console.log(`🎨 Updating ${sources.length} cards with enriched content...`);
         
         sources.forEach(enrichedSource => {
