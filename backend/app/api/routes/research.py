@@ -12,6 +12,41 @@ router = APIRouter()
 # Initialize crawler for dynamic research
 crawler = ContentCrawlerStub()
 
+@router.get("/enrichment/{cache_key}")
+async def get_enrichment_status(cache_key: str):
+    """Poll for enriched results after skeleton cards are returned"""
+    try:
+        # Check if enriched results are available in cache
+        enriched_sources = crawler._get_from_cache(cache_key)
+        
+        if enriched_sources:
+            return {
+                "status": "ready",
+                "sources": [
+                    {
+                        "id": source.id,
+                        "title": source.title,
+                        "excerpt": source.excerpt,
+                        "domain": source.domain,
+                        "url": source.url,
+                        "unlock_price": source.unlock_price,
+                        "licensing_protocol": source.licensing_protocol,
+                        "licensing_cost": source.licensing_cost,
+                        "enrichment_status": "complete"
+                    } for source in enriched_sources
+                ]
+            }
+        else:
+            return {
+                "status": "processing",
+                "message": "Enrichment in progress..."
+            }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": f"Enrichment failed: {str(e)}"
+        }
+
 
 @router.post("/analyze", response_model=DynamicResearchResponse)
 async def analyze_research_query(request: ResearchRequest):

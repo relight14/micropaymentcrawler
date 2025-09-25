@@ -5,7 +5,7 @@ integrations = ["python_anthropic:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["libxcrypt"]
+packages = ["libxcrypt", "jq"]
 
 [workflows]
 runButton = "Project"
@@ -58,6 +58,10 @@ externalPort = 3003
 [[ports]]
 localPort = 40673
 externalPort = 6800
+
+[[ports]]
+localPort = 42461
+externalPort = 8099
 
 [[ports]]
 localPort = 42479

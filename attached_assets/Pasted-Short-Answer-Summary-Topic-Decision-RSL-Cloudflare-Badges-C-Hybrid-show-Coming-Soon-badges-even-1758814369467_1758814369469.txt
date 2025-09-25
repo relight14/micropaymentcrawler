@@ -1,0 +1,138 @@
+Short Answer Summary
+Topic	Decision
+RSL/Cloudflare Badges	C: Hybrid — show “Coming Soon” badges even if not actively licensed (demo mode)
+Progressive Rendering Scope	Hybrid — improve backend flow now, upgrade frontend incrementally
+Content Quality Ranking	Not MVP critical — skip for now, revisit after user behavior data
+Purchase Integration	Mock it — show pricing, simulate flow, no real transactions
+🧩 1. RSL/Cloudflare Badge Strategy
+
+Should we show badges even when there's no live licensing response?
+
+✅ Go with Option C: Hybrid
+
+Tollbit → real pricing and badge only when license is confirmed
+
+Cloudflare / RSL → always show "Coming Soon" badge (light gray or dimmed style)
+
+Add tooltip: "Publisher uses RSL — licensing not yet active on this platform"
+
+Why:
+
+Builds credibility: Shows you’re protocol-aware, not scraping
+
+Sets up a future unlock path for users
+
+Signals to publishers that they’re supported
+
+⚙️ 2. Progressive Rendering Scope
+
+Should we go all-in on frontend refactor?
+
+✅ Use a Hybrid Approach
+
+Start with backend enhancements and light frontend tweaks:
+
+Phase 1 (Now):
+
+Tavily result → render immediately as "skeleton" card
+
+Claude → updates card.description
+
+Licensing → updates card.badge, card.price
+
+Frontend Mini Plan:
+
+Add updateCard(cardId, newData) method
+
+Cards initially show loading... state
+
+Animate update on description and badge arrival
+
+Why:
+
+Gets you most of the perceived speed benefit
+
+Keeps engineering risk low for MVP
+
+🧠 3. Content Quality Ranking
+
+Do we prioritize licensed content over public content?
+
+❌ Not MVP Critical
+
+Skip this for now — your search engine (Tavily + Claude + relevance filter) is already strong.
+
+Instead:
+
+Always render licensed content with a visual badge boost
+
+Keep fallback sources as-is
+
+Later, once user data rolls in, we can:
+
+Add behavioral boosting (“most clicked by researchers”)
+
+Refactor the ranking model
+
+💳 4. Billing Integration Depth
+
+Do we integrate real wallet transactions?
+
+✅ Mock Purchase Flow
+
+For MVP:
+
+Step	What it Does
+Click “Unlock”	Shows fake modal: “You would be charged $0.25 to unlock”
+Click “Build Report”	Simulate token spend, show confirmation
+Wallet UI	Static balance + “Demo Mode” banner
+
+Add this to UI:
+
+💡 This is a preview of how licensed content access will work. Real payments coming soon.
+
+Why:
+
+Lets users explore full flow
+
+Keeps you compliant (no payment = no licensing issues)
+
+Easier to test publisher UX without risk
+
+✂️ Things You Can Defer
+
+If you're worried about over-engineering the MVP, here's what can wait:
+
+Relevance scoring algorithms
+
+Tiered license pricing logic
+
+Fully dynamic inline citation linking
+
+Wallet transaction ledger
+
+Account linking / persistent purchase records
+
+✅ Recommended Build Stack (MVP)
+Layer	Feature
+Backend	Tavily search → render
+Backend	Claude summary (async)
+Backend	Licensing discovery (async)
+Frontend	Basic card with update hook
+Frontend	Badge + price injection
+Frontend	Modal for fake unlock / build report
+UI Copy	“Coming Soon” messages, ethical access CTAs
+Analytics	Track query, card views, unlock clicks (no ID required yet)
+Final Word — This MVP Is Viable
+
+This is a strong and realistic MVP. You're:
+
+Respecting licensing boundaries
+
+Offering free value up front
+
+Laying groundwork for real micropayments
+
+Sending a credible signal to both users and publishers
+
+You don’t need a perfect backend or visual polish — just a clear value proposition, a few working demos, and mock flows to show where it’s going.

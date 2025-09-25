@@ -1,0 +1,96 @@
+Progressive Rendering Flow — Best Practice
+Step 1: Immediate Raw Result Rendering (on Tavily response)
+
+As soon as Tavily (or your base crawler) returns the initial results, render basic cards immediately.
+
+Include:
+
+Title
+
+Publisher/domain
+
+Excerpt/snippet
+
+“Loading summary…” placeholder
+
+“Checking license…” placeholder
+
+Store each result in an enrichmentQueue.
+
+state.results = tavilyResults.map(result => ({
+  ...result,
+  summary: null,
+  license: null,
+  enriched: false
+}));
+
+Step 2: Parallel Enrichment (non-blocking)
+🔧 Strategy:
+
+Kick off two separate async enrichment jobs per result, in parallel:
+
+getPolishedSummary(result.url)
+
+checkLicense(result.url)
+
+These must not block rendering.
+
+You can batch these, but ensure they're updating the state incrementally as they complete.
+
+Step 3: Incremental State Updates
+
+As each result completes its summary and/or license check, update only that card’s state (not the full results array).
+
+Use a stable id or url key to match and patch.
+
+updateCardState(result.url, {
+  summary: polishedText,
+  license: { type: 'tollbit', price: '$0.25' },
+  enriched: true
+});
+
+
+This avoids the classic React anti-pattern of rerendering the entire list with every enrichment step.
+
+Step 4: Conditional UI Rendering
+
+Your component should re-render individual cards based on availability of:
+
+✅ summary → swap “Loading…” with Claude output
+
+✅ license → show badge and unlock price
+
+Use visual placeholders or a shimmer loader to make this feel smooth.
+
+🧪 Troubleshooting: If Cards Weren’t Refreshing Previously…
+Possible causes:
+Issue	Fix
+🔁 State object being overwritten instead of patched	Use immutable update helpers (map, find, splice) with care
+❌ useEffect or watch not tied to state change	Ensure your component watches summary or license for changes
+🧵 Async promises not awaited properly	Use Promise.allSettled() and attach results explicitly to card IDs
+🧊 React batching update bugs	Use flushSync (if needed) or a key prop that forces card updates
+🧠 Suggested Sequence (Code Pseudostructure)
+// Step 1: Render initial cards
+results.map(result => renderCard({
+  title: result.title,
+  excerpt: result.snippet,
+  summary: 'Loading...',
+  license: 'Checking...',
+}));
+
+// Step 2: Start enrichment
+results.forEach(result => {
+  getPolishedSummary(result.url).then(summary => updateCard(result.url, { summary }));
+  checkLicense(result.url).then(license => updateCard(result.url, { license }));
+});
+
+🔄 Optional: useReducer for Cleaner Updates
+
+If you're using React and seeing weird stale state bugs, consider using useReducer to handle updates more deterministically.
+
+TL;DR
+
+✅ Render fast.
+🚀 Enrich in parallel.
+🔄 Patch state incrementally.
+🧼 Let each card react to its own updates.

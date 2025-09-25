@@ -146,11 +146,13 @@ class ContentCrawlerStub:
                 source = SourceCard(
                     id=source_id,
                     title=result.get('title', f'Research Source {i+1}'),
-                    excerpt=result.get('content', 'Loading enhanced preview...')[:150],
+                    excerpt=result.get('content', 'Loading enhanced summary...')[:150],
                     domain=domain,
                     url=result.get('url', f'https://{domain}'),
-                    unlock_price=0.0,  # Free by default, real licensing sets authentic price
-                    is_unlocked=False
+                    unlock_price=0.0,  # Will be set by licensing discovery
+                    is_unlocked=False,
+                    licensing_protocol=None,  # Will be set by licensing discovery 
+                    licensing_cost=None
                 )
                 
                 # Check budget constraint
@@ -160,18 +162,19 @@ class ContentCrawlerStub:
                 else:
                     break
             
-            # Step 3: Run licensing discovery immediately (essential for badges/pricing)
-            print(f"🔍 Running immediate licensing discovery for {len(immediate_sources)} sources...")
-            await self._add_licensing_async(immediate_sources)
-            print(f"✅ Immediate licensing discovery completed")
+            # Step 3: Return skeleton cards immediately (NO BLOCKING)
+            print(f"🚀 Returning {len(immediate_sources)} skeleton cards immediately...")
             
-            # Step 4: Start background content polishing only (don't await)
-            asyncio.create_task(self._polish_sources_background(immediate_sources, query, cache_key))
+            # Step 4: Start background enrichment (licensing + content polishing) 
+            asyncio.create_task(self._enrich_sources_progressive(
+                immediate_sources, query, cache_key
+            ))
             
             return {
                 "sources": immediate_sources,
-                "stage": "immediate_with_licensing",
-                "enrichment_needed": True
+                "stage": "skeleton",
+                "enrichment_needed": True,
+                "cache_key": cache_key  # Frontend can poll for updates
             }
             
         except Exception as e:
@@ -186,8 +189,30 @@ class ContentCrawlerStub:
     
     # Removed _calculate_basic_price - now using real licensing discovery only
     
-    async def _polish_sources_background(self, sources: List[SourceCard], query: str, cache_key: str):
-        """Polish sources with AI content enhancement in the background"""
+    async def _enrich_sources_progressive(self, sources: List[SourceCard], query: str, cache_key: str):
+        """Progressive enrichment: licensing discovery + Claude polishing in parallel"""
+        try:
+            print(f"🔍 Starting progressive enrichment for {len(sources)} sources...")
+            
+            # Run licensing and Claude in parallel for maximum speed
+            licensing_task = asyncio.create_task(self._add_licensing_async(sources))
+            claude_task = asyncio.create_task(self._polish_sources_claude(sources, query))
+            
+            # Wait for both to complete
+            await asyncio.gather(licensing_task, claude_task, return_exceptions=True)
+            
+            print(f"✅ Progressive enrichment completed")
+            
+            # Cache the final enriched results 
+            self._store_in_cache(cache_key, sources)
+            print(f"💾 Enriched sources cached with key: {cache_key}")
+            
+        except Exception as e:
+            print(f"❌ Progressive enrichment error: {e}")
+            # Sources are still usable with basic Tavily data
+    
+    async def _polish_sources_claude(self, sources: List[SourceCard], query: str):
+        """Polish sources with Claude summarization (free discovery phase)"""
         try:
             # Prepare raw sources for polishing  
             raw_sources = []
@@ -199,7 +224,7 @@ class ContentCrawlerStub:
                     'snippet': source.excerpt
                 })
             
-            print(f"🎨 Starting AI content polishing...")
+            print(f"🎨 Starting free Claude discovery summaries...")
             polished_sources = self.ai_service.polish_sources(query, raw_sources)
             
             # Update sources with polished content
@@ -208,15 +233,11 @@ class ContentCrawlerStub:
                     source.title = polished.get('title', source.title)
                     source.excerpt = polished.get('excerpt', source.excerpt)
             
-            print(f"✅ AI content polishing completed")
-            
-            # Cache the final enriched results
-            self._store_in_cache(cache_key, sources)
-            print(f"💾 Background enrichment completed and cached")
+            print(f"✅ Free Claude summarization completed")
             
         except Exception as e:
-            print(f"❌ Background content polishing error: {e}")
-            # Even if polishing fails, we still have sources with licensing
+            print(f"❌ Claude polishing error: {e}")
+            # Continue anyway - licensing is more important
     
     async def _add_licensing_async(self, sources: List[SourceCard]):
         """Add licensing info to sources asynchronously"""

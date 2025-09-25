@@ -1,0 +1,103 @@
+We're building a micropayment-enabled search tool that supports ethical content licensing through protocols like Tollbit, Cloudflare, and RSL. Our architecture already includes Claude summarization, story card rendering, and protocol metadata stubs.
+
+Now, we want to optimize the query execution sequence and enrichment flow to deliver a smooth, responsive user experience that prioritizes high-quality, licenseable content.
+
+🧠 Key Objectives:
+
+Optimize for both speed and relevance
+
+Prefer licensed content over unlicensed when possible
+
+Ensure high-value sources (e.g., medical journals) rank above low-quality content (e.g., Wikipedia, Quora)
+
+Render story cards progressively to improve perceived performance
+
+🔁 Ideal Query-to-Card Flow:
+Step 1: Initial Query Handling
+
+Immediately query Tavily (or search provider) with the user’s input
+
+Set retrieval config to boost high-trust domains (.edu, .org, .gov, known publications)
+
+De-prioritize known low-quality content (e.g., wikipedia.org, quora.com, reddit.com)
+
+Step 2: Fast Rendering (Progressive Disclosure)
+
+As soon as sources are returned:
+
+Begin rendering basic story cards (title, publisher, excerpt, link)
+
+These appear even before Claude summarization or licensing resolution is complete
+
+Show a “polishing” animation or badge to indicate content enrichment is in progress
+
+Step 3: Claude Summarization
+
+Run summarization immediately on unlocked or assumed-public sources
+
+If a source is paywalled or unknown:
+
+Delay summarization until licensing check is complete
+
+If licensing is available and the user has credits, proceed
+
+If not, display teaser with unlock option
+
+Step 4: Licensing Check (Non-Blocking, Parallelized)
+
+In the background, run protocol-based licensing discovery for each source:
+
+Check Tollbit (most likely to return pricing + license metadata)
+
+If not found, check Cloudflare licensing detection
+
+Lastly, check RSL fallback
+
+Licensing result attached to each source as:
+
+license_info: {
+  protocol: 'Tollbit' | 'Cloudflare' | 'RSL' | 'None',
+  price: number | null,
+  license_status: 'licensed' | 'unlicensed' | 'coming_soon'
+}
+
+
+Show badge once available (e.g., “🔒 Tollbit License — $0.15 to unlock” or “🛠️ Coming Soon via RSL”)
+
+Step 5: Final Card Enhancement
+
+Update each card progressively:
+
+Show Claude-enhanced summary
+
+Add license badge and pricing CTA (if applicable)
+
+For unlicensed content, display fallback: “Preview Only – License not yet available”
+
+⚖️ Relevance vs. Licensing Strategy:
+
+When ranking or displaying story cards, follow this order of precedence:
+
+High Relevance + Licensed (e.g., academic article that can be unlocked)
+
+High Relevance + Public/Open (e.g., .edu PDF that is free)
+
+Medium Relevance + Licensed (e.g., paywalled op-ed from major outlet)
+
+Medium Relevance + Public/Open
+
+Low Relevance + Licensed
+
+Low Relevance + Unlicensed
+
+Use scoring logic to boost licensed and trusted content even if it's not the absolute top match — aim to bias toward ethical, high-quality sources without sacrificing core search accuracy.
+
+💡 UX Notes for Implementation
+
+Only show one license badge per source (based on first successful protocol match)
+
+Use subtle loading states for licensing and Claude updates (avoid blocking UX)
+
+Allow users to toggle “licensed only” filter
+
+Cache licensing results per URL for 24h to improve speed on repeated queries
