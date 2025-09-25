@@ -112,6 +112,18 @@
     position: relative;
 }
 
+/* Progressive loading state */
+.source-card.skeleton-loading {
+    background: linear-gradient(90deg, #f3f4f6 25%, #ffffff 50%, #f3f4f6 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 2s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
 .source-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
@@ -206,6 +218,62 @@
     background: rgba(251, 191, 36, 0.1);
     border: 1px solid rgba(251, 191, 36, 0.3);
     color: var(--text-primary);
+}
+
+/* Progressive and hybrid badge styles */
+.license-loading {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+    animation: pulse 2s infinite;
+}
+
+.license-demo {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+    position: relative;
+}
+
+.license-demo::after {
+    content: "DEMO";
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background-color: #ec4899;
+    color: white;
+    font-size: 6px;
+    padding: 1px 2px;
+    border-radius: 2px;
+    line-height: 1;
+}
+
+/* Update animations */
+.content-updated {
+    animation: contentFlash 0.6s ease-out;
+}
+
+.badge-updated {
+    animation: badgeSlideIn 0.5s ease-out;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes contentFlash {
+    0% { background-color: #fef3c7; }
+    100% { background-color: transparent; }
+}
+
+@keyframes badgeSlideIn {
+    0% { 
+        transform: scale(0.8) translateY(-10px);
+        opacity: 0;
+    }
+    100% { 
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
 }
 
 /* =============================================================================

@@ -53,7 +53,7 @@ export class APIService {
     }
     
     async analyzeResearchQuery(query, conversationContext = null) {
-        // Call the optimized research endpoint with progressive loading
+        // Step 1: Get skeleton cards immediately
         const requestBody = {
             query,
             max_budget_dollars: 10.0,
@@ -81,6 +81,14 @@ export class APIService {
 
         const result = await response.json();
         
+        // Step 2: If progressive flow, start polling for enriched results
+        if (result.stage === 'skeleton' && result.cache_key) {
+            console.log('🚀 Skeleton cards received, starting progressive enrichment...');
+            
+            // Start polling for enriched results in background
+            this._pollForEnrichment(result.cache_key);
+        }
+        
         // Transform research response to match expected chat format
         return {
             content: result.research_summary,
@@ -88,7 +96,9 @@ export class APIService {
                 sources: result.sources,
                 total_cost: result.total_estimated_cost,
                 enrichment_status: result.enrichment_status,
-                enrichment_needed: result.enrichment_needed
+                enrichment_needed: result.enrichment_needed,
+                stage: result.stage,  // For progressive flow tracking
+                cache_key: result.cache_key  // For polling
             },
             metadata: {
                 source_count: result.source_count,
@@ -96,6 +106,58 @@ export class APIService {
                 licensing_breakdown: result.licensing_breakdown
             }
         };
+    }
+    
+    // Progressive enrichment polling
+    async _pollForEnrichment(cacheKey, maxAttempts = 10) {
+        console.log(`📡 Starting enrichment polling for cache key: ${cacheKey.substring(0, 20)}...`);
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s between polls
+                
+                const response = await fetch(`${this.baseURL}/api/research/enrichment/${encodeURIComponent(cacheKey)}`, {
+                    method: 'GET',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    console.log(`⚠️ Polling attempt ${attempt} failed: ${response.statusText}`);
+                    continue;
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'ready' && result.sources) {
+                    console.log(`✅ Enrichment complete! Updated ${result.sources.length} sources`);
+                    
+                    // Emit enrichment complete event for UI to handle
+                    this._emitEnrichmentUpdate(cacheKey, result.sources);
+                    return;
+                    
+                } else if (result.status === 'error') {
+                    console.log(`❌ Enrichment failed: ${result.message}`);
+                    return;
+                    
+                } else {
+                    console.log(`🔄 Polling attempt ${attempt}: ${result.status}`);
+                }
+                
+            } catch (error) {
+                console.log(`❌ Polling error attempt ${attempt}: ${error.message}`);
+            }
+        }
+        
+        console.log(`⏰ Enrichment polling timed out after ${maxAttempts} attempts`);
+    }
+    
+    // Event system for progressive updates
+    _emitEnrichmentUpdate(cacheKey, enrichedSources) {
+        const event = new CustomEvent('enrichmentComplete', {
+            detail: { cacheKey, sources: enrichedSources }
+        });
+        window.dispatchEvent(event);
+        console.log(`📢 Emitted enrichmentComplete event for ${enrichedSources.length} sources`);
     }
 
     async clearConversation() {

@@ -16,6 +16,11 @@ class SourceCard {
     constructor(appState) {
         this.appState = appState;
         this.selectedSources = new Set();
+        
+        // Listen for progressive enrichment updates
+        window.addEventListener('enrichmentComplete', (event) => {
+            this.handleEnrichmentUpdate(event.detail);
+        });
     }
 
     /**
@@ -58,7 +63,73 @@ class SourceCard {
             sourceCard.appendChild(actions);
         }
 
+        // Add skeleton loading indicator if enrichment is pending
+        if (source.unlock_price === 0 && !source.licensing_protocol) {
+            sourceCard.classList.add('skeleton-loading');
+        }
+        
         return sourceCard;
+    }
+    
+    /**
+     * Handle progressive enrichment updates
+     */
+    handleEnrichmentUpdate(enrichmentData) {
+        const { cacheKey, sources } = enrichmentData;
+        console.log(`🎨 Updating ${sources.length} cards with enriched content...`);
+        
+        sources.forEach(enrichedSource => {
+            this.updateCard(enrichedSource);
+        });
+    }
+    
+    /**
+     * Update an existing source card with enriched data
+     */
+    updateCard(enrichedSource) {
+        const cardElement = document.querySelector(`[data-source-id="${enrichedSource.id}"]`);
+        if (!cardElement) {
+            console.log(`⚠️ Card not found for source ID: ${enrichedSource.id}`);
+            return;
+        }
+        
+        console.log(`🔄 Updating card: ${enrichedSource.title}`);
+        
+        // Remove skeleton loading state
+        cardElement.classList.remove('skeleton-loading');
+        
+        // Update title if enhanced by Claude
+        const titleElement = cardElement.querySelector('.source-title');
+        if (titleElement && enrichedSource.title !== titleElement.textContent) {
+            titleElement.textContent = enrichedSource.title;
+            titleElement.classList.add('content-updated'); // Visual feedback
+        }
+        
+        // Update excerpt if enhanced by Claude
+        const excerptElement = cardElement.querySelector('.source-excerpt');
+        if (excerptElement && enrichedSource.excerpt) {
+            excerptElement.textContent = enrichedSource.excerpt;
+            excerptElement.classList.add('content-updated'); // Visual feedback
+        }
+        
+        // Update badges with new licensing information
+        const badgesContainer = cardElement.querySelector('.source-badges');
+        if (badgesContainer) {
+            // Remove old license badge
+            const oldLicenseBadge = badgesContainer.querySelector('.license-badge');
+            if (oldLicenseBadge) {
+                oldLicenseBadge.remove();
+            }
+            
+            // Add new license badge with enriched data
+            if (enrichedSource.licensing_protocol || enrichedSource.unlock_price > 0) {
+                const newLicenseBadge = this._createLicenseBadge(enrichedSource);
+                newLicenseBadge.classList.add('badge-updated'); // Visual feedback
+                badgesContainer.appendChild(newLicenseBadge);
+            }
+        }
+        
+        console.log(`✅ Card updated: ${enrichedSource.title}`);
     }
 
     /**
@@ -116,35 +187,66 @@ class SourceCard {
     }
 
     /**
-     * Create license badge with appropriate styling
+     * Create license badge with HYBRID strategy:
+     * - Tollbit: Real pricing when confirmed, otherwise no badge
+     * - RSL/Cloudflare: Always "Coming Soon" for demo potential  
+     * - Free sources: Show as FREE
      */
     _createLicenseBadge(source) {
         const badge = document.createElement('span');
         badge.className = 'license-badge';
         
-        const licenseType = source.license_type || source.licensing_protocol || 'free';
+        const protocol = source.licensing_protocol;
         const cost = source.unlock_price || source.licensing_cost || 0;
         
-        // Determine badge style and content
-        if (cost === 0 || licenseType === 'free') {
-            badge.classList.add('license-free');
-            badge.textContent = 'FREE';
-        } else if (cost < 1.0) {
+        // HYBRID BADGE STRATEGY
+        if (protocol === 'tollbit' && cost > 0) {
+            // Real Tollbit pricing confirmed
             badge.classList.add('license-paid');
-            badge.textContent = `PAID $${cost.toFixed(2)}`;
+            badge.textContent = `⚡ TOLLBIT $${cost.toFixed(2)}`;
+            
+        } else if (protocol === 'rsl' || this._shouldShowRSLDemo(source)) {
+            // RSL demo badge for platform potential
+            badge.classList.add('license-demo');
+            badge.textContent = '🔒 RSL Coming Soon';
+            
+        } else if (protocol === 'cloudflare' || this._shouldShowCloudflareDemo(source)) {
+            // Cloudflare demo badge for platform potential
+            badge.classList.add('license-demo');
+            badge.textContent = '☁️ Cloudflare Coming Soon';
+            
+        } else if (cost === 0) {
+            // Free discovery content
+            badge.classList.add('license-free');
+            badge.textContent = 'FREE DISCOVERY';
+            
         } else {
-            badge.classList.add('license-premium');
-            badge.textContent = `PREMIUM $${cost.toFixed(2)}`;
-        }
-
-        // Add protocol emoji if available  
-        const protocol = source.licensing_protocol;
-        if (protocol) {
-            const emoji = this._getProtocolEmoji(protocol);
-            badge.textContent = `${emoji} ${badge.textContent}`;
+            // Loading state during skeleton phase
+            badge.classList.add('license-loading');
+            badge.textContent = '⏳ Checking licensing...';
         }
 
         return badge;
+    }
+    
+    /**
+     * Determine if source should show RSL demo badge
+     */
+    _shouldShowRSLDemo(source) {
+        // Show RSL demo for academic/research domains
+        const domain = source.domain || '';
+        return domain.includes('edu') || domain.includes('research') || 
+               domain.includes('journal') || domain.includes('academic');
+    }
+    
+    /**
+     * Determine if source should show Cloudflare demo badge  
+     */
+    _shouldShowCloudflareDemo(source) {
+        // Show Cloudflare demo for major publisher domains
+        const domain = source.domain || '';
+        return domain.includes('nytimes') || domain.includes('wsj') || 
+               domain.includes('economist') || domain.includes('reuters');
     }
 
     /**
@@ -153,7 +255,7 @@ class SourceCard {
     _getProtocolEmoji(protocol) {
         const emojiMap = {
             'rsl': '🔒',
-            'tollbit': '⚡',
+            'tollbit': '⚡', 
             'cloudflare': '☁️'
         };
         return emojiMap[protocol.toLowerCase()] || '';
