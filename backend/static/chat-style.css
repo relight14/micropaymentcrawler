@@ -273,13 +273,6 @@
     font-size: var(--text-xs);
 }
 
-.star-filled {
-    color: #fbbf24;
-}
-
-.star-empty {
-    color: #d1d5db;
-}
 
 .rating-text {
     font-size: var(--text-xs);

@@ -87,7 +87,7 @@ class SourceCard {
         sourceCard.appendChild(header);
 
         // Rating (if available)
-        if (source.rating || source.quality_score) {
+        if (source.rating || source.quality_score || source.relevance_score) {
             const rating = this._createRating(source);
             sourceCard.appendChild(rating);
         }

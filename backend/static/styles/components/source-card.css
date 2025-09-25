@@ -298,11 +298,17 @@
     color: #fbbf24;
 }
 
+.star.partial {
+    color: #fbbf24;
+    opacity: 0.7;
+}
+
 .star.empty {
     color: #d1d5db;
 }
 
-.rating-text {
+.rating-text,
+.rating-number {
     font-size: 0.75rem;
     color: var(--muted-foreground);
     margin-left: 0.25rem;
