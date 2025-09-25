@@ -3,11 +3,36 @@
  * Extracted from the monolithic ChatResearchApp
  */
 export class UIManager {
-    constructor(appState) {
+    constructor(appState, options = {}) {
         this.appState = appState;
-        this.messagesContainer = document.getElementById('messagesContainer');
-        this.chatInput = document.getElementById('chatInput');
-        this.sendButton = document.getElementById('sendButton');
+        
+        // Configuration constants
+        this.CONFIG = {
+            CHARACTER_WARNING_THRESHOLD: 1800,
+            CHARACTER_SOFT_THRESHOLD: 1500,
+            MAX_TEXTAREA_HEIGHT: 150,
+            CHARACTER_LIMIT: 2000
+        };
+        
+        // Mode descriptions - configurable
+        this.modeDescriptions = options.modeDescriptions || {
+            'chat': '💬 Conversational AI mode - Explore topics through natural dialogue',
+            'research': '🔍 Research mode - Find and license authoritative sources',
+            'report': '📊 Report Builder - Create comprehensive research packages'
+        };
+        
+        // Element selectors - configurable for testability
+        this.selectors = {
+            messagesContainer: options.messagesContainer || '#messagesContainer',
+            chatInput: options.chatInput || '#chatInput',
+            sendButton: options.sendButton || '#sendButton',
+            ...options.selectors
+        };
+        
+        // Cache DOM elements
+        this.messagesContainer = document.querySelector(this.selectors.messagesContainer);
+        this.chatInput = document.querySelector(this.selectors.chatInput);
+        this.sendButton = document.querySelector(this.selectors.sendButton);
     }
 
     // Mode display management
@@ -31,12 +56,7 @@ export class UIManager {
         }
 
         if (modeDescription) {
-            const descriptions = {
-                'chat': '💬 Conversational AI mode - Explore topics through natural dialogue',
-                'research': '🔍 Research mode - Find and license authoritative sources',
-                'report': '📊 Report Builder - Create comprehensive research packages'
-            };
-            modeDescription.textContent = descriptions[this.appState.getMode()] || descriptions['chat'];
+            modeDescription.textContent = this.modeDescriptions[this.appState.getMode()] || this.modeDescriptions['chat'];
         }
 
         this.updateInputPlaceholder();
@@ -55,17 +75,17 @@ export class UIManager {
         this.chatInput.placeholder = placeholders[this.appState.getMode()] || placeholders['chat'];
     }
 
-    // Character count management
+    // Character count management with configurable thresholds
     updateCharacterCount() {
         const characterCount = document.querySelector('.character-count');
         if (!characterCount || !this.chatInput) return;
         
         const count = this.chatInput.value.length;
-        characterCount.textContent = `${count} / 2000`;
+        characterCount.textContent = `${count} / ${this.CONFIG.CHARACTER_LIMIT}`;
         
-        if (count > 1800) {
+        if (count > this.CONFIG.CHARACTER_WARNING_THRESHOLD) {
             characterCount.style.color = 'var(--destructive)';
-        } else if (count > 1500) {
+        } else if (count > this.CONFIG.CHARACTER_SOFT_THRESHOLD) {
             characterCount.style.color = 'var(--accent)';
         } else {
             characterCount.style.color = 'var(--muted-foreground)';
@@ -74,7 +94,7 @@ export class UIManager {
 
     autoResizeTextarea(textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+        textarea.style.height = Math.min(textarea.scrollHeight, this.CONFIG.MAX_TEXTAREA_HEIGHT) + 'px';
     }
 
     // Wallet display management
@@ -85,7 +105,7 @@ export class UIManager {
         }
     }
 
-    // Message display
+    // Message display with error handling
     addMessageToChat(message) {
         if (!this.messagesContainer) return;
 
@@ -94,16 +114,26 @@ export class UIManager {
         messageDiv.innerHTML = this.formatMessageHTML(message);
         
         this.messagesContainer.appendChild(messageDiv);
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        this.scrollToBottom();
         
         return messageDiv;
     }
 
     formatMessageHTML(message) {
-        const timeString = message.timestamp.toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
+        // Safe timestamp handling with fallback
+        let timeString = '--:--';
+        try {
+            if (message.timestamp) {
+                const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp);
+                timeString = timestamp.toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+        } catch (error) {
+            console.warn('Invalid timestamp in message:', message.timestamp, error);
+            timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
         
         let html = `
             <div class="message-content">
@@ -133,13 +163,19 @@ export class UIManager {
     }
 
     formatMessage(text) {
-        // Basic markdown-like formatting with sanitization
-        return this.sanitizeHtml(text
+        // Secure approach: escape first, then apply formatting
+        const escaped = this.escapeHtml(text);
+        
+        // Apply formatting to escaped content (safer than regex on raw input)
+        const formatted = escaped
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`(.*?)`/g, '<code>$1</code>')
             .replace(/\n\n/g, '</p><p>')
-            .replace(/\n/g, '<br>'));
+            .replace(/\n/g, '<br>');
+            
+        // Final sanitization pass (belt and suspenders)
+        return this.sanitizeHtml(formatted);
     }
 
     formatMessageMetadata(metadata) {
@@ -183,7 +219,7 @@ export class UIManager {
         `;
         
         this.messagesContainer.appendChild(typingDiv);
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        this.scrollToBottom();
     }
 
     hideTypingIndicator() {
@@ -207,7 +243,13 @@ export class UIManager {
         `;
     }
 
-    // Utility methods
+    // Utility methods with helper for scroll behavior
+    scrollToBottom() {
+        if (this.messagesContainer) {
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        }
+    }
+    
     sanitizeHtml(text) {
         const allowedTags = ['strong', 'em', 'code', 'br', 'p'];
         const div = document.createElement('div');
