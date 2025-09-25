@@ -1,4 +1,20 @@
-/* Modern Source Cards - Matching React SourceCard component */
+/**
+ * SourceCard Component Styles
+ * OWNER: Frontend team
+ * SINGLE SOURCE OF TRUTH for all source card styling
+ * 
+ * This file consolidates all source-related CSS from:
+ * - chat-style.css
+ * - sources-preview.css  
+ * - link-styles.css
+ *
+ * DO NOT add source card styles to other CSS files!
+ */
+
+/* =============================================================================
+   CONTAINER & LAYOUT
+   ============================================================================= */
+
 .sources-preview-section {
     margin: 1.5rem 0;
     background: var(--card);
@@ -34,9 +50,11 @@
     margin: 0;
 }
 
-/* Licensing summary styling */
+/* =============================================================================
+   LICENSING SUMMARY
+   ============================================================================= */
+
 .licensing-summary {
-    background: var(--accent);
     background: linear-gradient(135deg, #fff7d1 0%, #fff38D 100%);
     padding: 1.5rem;
     border-bottom: 1px solid var(--border);
@@ -79,30 +97,10 @@
     border: 1px solid #f97316;
 }
 
-.preview-header p {
-    margin: 0 0 16px 0;
-    color: #64748b;
-    font-size: 14px;
-}
+/* =============================================================================
+   SOURCE CARD
+   ============================================================================= */
 
-.sources-preview-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 16px;
-    margin-bottom: 12px;
-}
-
-.more-sources-hint {
-    text-align: center;
-    color: #64748b;
-    font-style: italic;
-    font-size: 14px;
-    margin: 0;
-    padding-top: 12px;
-    border-top: 1px solid #e2e8f0;
-}
-
-/* Modern Source Card Styling */
 .source-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -111,6 +109,7 @@
     margin-bottom: 1rem;
     transition: all 0.15s ease;
     box-shadow: var(--shadow-sm);
+    position: relative;
 }
 
 .source-card:hover {
@@ -122,6 +121,16 @@
 .source-card:last-child {
     margin-bottom: 0;
 }
+
+/* Selected state styling */
+.source-card.selected {
+    border-color: var(--primary) !important;
+    background-color: var(--primary-light, #f0f9ff) !important;
+}
+
+/* =============================================================================
+   SOURCE HEADER
+   ============================================================================= */
 
 .source-header {
     display: flex;
@@ -162,6 +171,10 @@
     white-space: nowrap;
 }
 
+/* =============================================================================
+   LICENSING BADGES
+   ============================================================================= */
+
 .license-badge {
     padding: 0.25rem 0.5rem;
     border-radius: var(--radius);
@@ -184,6 +197,20 @@
     background: rgba(245, 158, 11, 0.1);
     color: #d97706;
 }
+
+/* Enhanced licensing badges from link-styles.css */
+.license-badge.enhanced {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--text-primary);
+}
+
+/* =============================================================================
+   SOURCE CONTENT
+   ============================================================================= */
 
 .source-rating {
     display: flex;
@@ -219,12 +246,33 @@
     font-size: 0.875rem;
 }
 
+/* =============================================================================
+   SOURCE ACTIONS (Buttons + Checkbox)
+   ============================================================================= */
+
 .source-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
 }
+
+.source-actions__left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.source-actions__right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* =============================================================================
+   ACTION BUTTONS
+   ============================================================================= */
 
 .view-source-btn {
     display: flex;
@@ -279,7 +327,71 @@
     opacity: 1;
 }
 
-/* Upsell message styling */
+/* =============================================================================
+   SOURCE SELECTION (Checkbox for Report Builder)
+   ============================================================================= */
+
+.source-selection {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.source-selection-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    user-select: none;
+}
+
+.source-selection-checkbox {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border);
+    border-radius: calc(var(--radius) - 4px);
+    background: var(--background);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    appearance: none;
+    flex-shrink: 0;
+}
+
+.source-selection-checkbox:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.source-selection-checkbox:checked::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--accent-foreground);
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.source-selection-checkbox:hover {
+    border-color: var(--accent);
+}
+
+.selection-text {
+    flex: 1;
+}
+
+/* =============================================================================
+   UPSELL MESSAGE
+   ============================================================================= */
+
 .upsell-message {
     margin: 1.5rem 0;
     text-align: center;
@@ -294,10 +406,45 @@
     max-width: 600px;
 }
 
-.upsell-content h4 {
-    margin: 0;
-    color: #1e40af;
-    font-size: 1.125rem;
-    font-weight: var(--font-weight-medium);
-    line-height: 1.4;
+/* =============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .source-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    
+    .source-actions__left,
+    .source-actions__right {
+        justify-content: center;
+    }
+    
+    .source-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .source-badges {
+        align-self: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .licensing-counts {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .source-card {
+        padding: 1rem;
+    }
+    
+    .source-actions__left,
+    .source-actions__right {
+        flex-direction: column;
+        width: 100%;
+    }
 }

@@ -814,206 +814,51 @@ export class ChatResearchApp {
     _displaySourceCards(sources) {
         if (!sources || sources.length === 0) return;
         
-        // Create the original 2-column source cards grid using secure DOM methods
+        // Initialize the SourceCard component with app state
+        if (!this.sourceCardComponent) {
+            this.sourceCardComponent = new SourceCard(this.appState);
+            
+            // Listen for component events
+            document.addEventListener('sourceUnlockRequested', (e) => {
+                this.handleSourceUnlock(null, e.detail.source.id, e.detail.source.unlock_price);
+            });
+            
+            document.addEventListener('sourceDownloadRequested', (e) => {
+                window.open(e.detail.source.url, '_blank');
+            });
+            
+            document.addEventListener('sourceSelectionChanged', (e) => {
+                // Event is handled internally by the component
+            });
+        }
+        
+        // Create the source cards grid using the component
         const sourcesGrid = document.createElement('div');
-        sourcesGrid.className = 'source-cards-grid'; // Use original grid CSS class
+        sourcesGrid.className = 'source-cards-grid';
         
         sources.forEach((source, index) => {
-            const sourceCard = document.createElement('div');
-            sourceCard.className = 'source-card'; // Use Figma-styled card class
-            sourceCard.setAttribute('data-source-id', source.id);
+            // Add enrichment status to source data
+            const sourceData = {
+                ...source,
+                is_enriching: index < 5,  // First 5 sources are still enhancing
+                source_type: 'Article',
+                rating: source.relevance_score ? Math.min(5, Math.max(3, Math.round(source.relevance_score * 5))) : 4
+            };
             
-            // Add licensing styling classes
-            if (source.licensing_protocol) {
-                sourceCard.classList.add('licensed');
-            } else {
-                sourceCard.classList.add('unlicensed');
-            }
+            // Create source card using the component
+            const sourceCard = this.sourceCardComponent.create(sourceData, {
+                showCheckbox: true,
+                showActions: true
+            });
             
-            // Add enrichment indicator for sources that may be enriched later
-            if (index < 5) { 
+            // Add enrichment indicator for sources that are still enhancing
+            if (sourceData.is_enriching) {
                 sourceCard.classList.add('source-enriching');
                 const indicator = document.createElement('div');
                 indicator.className = 'enrichment-indicator';
                 indicator.textContent = '⚡ Enhancing...';
-                sourceCard.appendChild(indicator);
+                sourceCard.insertBefore(indicator, sourceCard.firstChild);
             }
-
-            // Selection checkbox for Report Builder
-            const selectionDiv = document.createElement('div');
-            selectionDiv.className = 'source-selection';
-            
-            const checkboxLabel = document.createElement('label');
-            checkboxLabel.className = 'source-selection-label';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'source-selection-checkbox';
-            checkbox.checked = this.appState.isSourceSelected(source.id);
-            checkbox.addEventListener('change', () => {
-                this.toggleSourceSelection(source.id, source);
-                // Visual feedback
-                if (checkbox.checked) {
-                    sourceCard.style.borderColor = 'var(--primary)';
-                    sourceCard.style.backgroundColor = 'var(--primary-light, #f0f9ff)';
-                } else {
-                    sourceCard.style.borderColor = '';
-                    sourceCard.style.backgroundColor = '';
-                }
-            });
-            
-            const checkboxText = document.createElement('span');
-            checkboxText.textContent = 'Add to Report';
-            
-            checkboxLabel.appendChild(checkbox);
-            checkboxLabel.appendChild(checkboxText);
-            selectionDiv.appendChild(checkboxLabel);
-            sourceCard.appendChild(selectionDiv);
-
-            // Article badge and publication info using existing CSS classes
-            const headerTop = document.createElement('div');
-            headerTop.className = 'source-header';
-            
-            const articleBadge = document.createElement('span');
-            articleBadge.className = 'source-type-badge';
-            articleBadge.textContent = 'Article';
-            
-            // License badge using existing CSS classes
-            const licenseBadge = document.createElement('span');
-            licenseBadge.className = 'license-badge';
-            
-            if (source.unlock_price && source.unlock_price > 0) {
-                licenseBadge.classList.add('license-paid');
-                if (source.licensing_protocol) {
-                    const protocolNames = {
-                        'rsl': 'RSL 🔒',
-                        'tollbit': 'TOLLBIT ⚡',
-                        'cloudflare': 'Cloudflare ☁️'
-                    };
-                    licenseBadge.textContent = `${protocolNames[source.licensing_protocol] || source.licensing_protocol.toUpperCase()} $${source.unlock_price.toFixed(2)}`;
-                } else {
-                    licenseBadge.textContent = `paid $${source.unlock_price.toFixed(2)}`;
-                }
-            } else {
-                licenseBadge.classList.add('license-free');
-                licenseBadge.textContent = 'free';
-            }
-            
-            const badgeContainer = document.createElement('div');
-            badgeContainer.className = 'source-badges';
-            badgeContainer.appendChild(articleBadge);
-            badgeContainer.appendChild(licenseBadge);
-            headerTop.appendChild(badgeContainer);
-            
-            
-            sourceCard.appendChild(headerTop);
-
-            // Title
-            const title = document.createElement('h3');
-            title.className = 'source-title';
-            title.textContent = source.title;
-            sourceCard.appendChild(title);
-
-            // Meta info using existing CSS class
-            const metaInfo = document.createElement('p');
-            metaInfo.className = 'source-meta';
-            metaInfo.textContent = `${source.domain} • ${new Date().toLocaleDateString()}`;
-            
-            sourceCard.appendChild(metaInfo);
-
-            // Star rating (mock but authentic looking)
-            const ratingDiv = document.createElement('div');
-            ratingDiv.className = 'star-rating';
-            ratingDiv.style.cssText = 'display: flex; align-items: center; gap: 4px; margin-bottom: 12px;';
-            
-            const rating = source.relevance_score ? Math.min(5, Math.max(3, Math.round(source.relevance_score * 5))) : 4;
-            for (let i = 0; i < 5; i++) {
-                const star = document.createElement('span');
-                star.textContent = i < rating ? '★' : '☆';
-                star.style.cssText = `color: ${i < rating ? '#fbbf24' : '#d1d5db'}; font-size: 0.9rem;`;
-                ratingDiv.appendChild(star);
-            }
-            
-            const ratingText = document.createElement('span');
-            ratingText.style.cssText = 'margin-left: 4px; font-size: 0.8rem; color: var(--muted-foreground);';
-            ratingText.textContent = `(${rating}/5)`;
-            ratingDiv.appendChild(ratingText);
-            
-            sourceCard.appendChild(ratingDiv);
-
-            // Content preview/excerpt using existing CSS class
-            const excerpt = document.createElement('p');
-            excerpt.className = 'source-excerpt';
-            excerpt.textContent = source.excerpt || 'Content preview will be available after unlocking this source.';
-            sourceCard.appendChild(excerpt);
-
-            // Action buttons
-            const actionsDiv = document.createElement('div');
-            actionsDiv.style.cssText = 'display: flex; gap: 8px; margin-top: 16px;';
-            
-            // View Source link (authentic URLs)
-            const viewSourceLink = document.createElement('a');
-            viewSourceLink.href = source.url;
-            viewSourceLink.target = '_blank';
-            viewSourceLink.rel = 'noopener noreferrer';
-            viewSourceLink.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--foreground); text-decoration: none; font-size: 0.85rem; transition: all 0.2s;';
-            viewSourceLink.addEventListener('mouseenter', () => {
-                viewSourceLink.style.backgroundColor = 'var(--muted)';
-            });
-            viewSourceLink.addEventListener('mouseleave', () => {
-                viewSourceLink.style.backgroundColor = 'transparent';
-            });
-            
-            const linkIcon = document.createElement('span');
-            linkIcon.textContent = '🔗';
-            linkIcon.style.fontSize = '0.8rem';
-            viewSourceLink.appendChild(linkIcon);
-            
-            const linkText = document.createElement('span');
-            linkText.textContent = 'View Source';
-            viewSourceLink.appendChild(linkText);
-            
-            actionsDiv.appendChild(viewSourceLink);
-
-            // Download/Unlock button
-            if (source.unlock_price && source.unlock_price > 0) {
-                const unlockButton = document.createElement('button');
-                unlockButton.className = 'unlock-btn';
-                unlockButton.style.cssText = 'flex: 1; padding: 8px 16px; background: #16a34a; color: white; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-size: 0.85rem;';
-                unlockButton.textContent = `Unlock $${source.unlock_price.toFixed(2)}`;
-                unlockButton.addEventListener('mouseenter', () => {
-                    unlockButton.style.backgroundColor = '#15803d';
-                    unlockButton.style.transform = 'translateY(-1px)';
-                });
-                unlockButton.addEventListener('mouseleave', () => {
-                    unlockButton.style.backgroundColor = '#16a34a';
-                    unlockButton.style.transform = 'translateY(0)';
-                });
-                unlockButton.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.handleSourceUnlock(unlockButton, source.id, source.unlock_price);
-                });
-                actionsDiv.appendChild(unlockButton);
-            } else {
-                const downloadButton = document.createElement('button');
-                downloadButton.className = 'download-btn';
-                downloadButton.style.cssText = 'flex: 1; padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-size: 0.85rem;';
-                downloadButton.textContent = '📥 Download';
-                downloadButton.addEventListener('mouseenter', () => {
-                    downloadButton.style.transform = 'translateY(-1px)';
-                });
-                downloadButton.addEventListener('mouseleave', () => {
-                    downloadButton.style.transform = 'translateY(0)';
-                });
-                downloadButton.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Open source URL since it's free
-                    window.open(source.url, '_blank');
-                });
-                actionsDiv.appendChild(downloadButton);
-            }
-            
-            sourceCard.appendChild(actionsDiv);
             sourcesGrid.appendChild(sourceCard);
         });
         
