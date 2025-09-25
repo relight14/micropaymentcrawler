@@ -184,34 +184,44 @@ class ContentCrawlerStub:
     async def _enrich_sources_background(self, sources: List[SourceCard], query: str, cache_key: str):
         """Enrich sources with AI polishing and licensing in the background"""
         try:
-            # Prepare raw sources for polishing  
-            raw_sources = []
-            for source in sources:
-                raw_sources.append({
-                    'url': source.url,
-                    'domain': source.domain, 
-                    'title': source.title,
-                    'snippet': source.excerpt
-                })
-            
-            # Step 1: Polish content with Claude (this is the slow part)
-            polished_sources = self.ai_service.polish_sources(query, raw_sources)
-            
-            # Step 2: Update sources with polished content and better pricing
-            for i, (source, polished) in enumerate(zip(sources, polished_sources)):
-                if polished:
-                    source.title = polished.get('title', source.title)
-                    source.excerpt = polished.get('excerpt', source.excerpt)
-                    # Real licensing discovery will set authentic pricing in _add_licensing_async
-            
-            # Step 3: Add licensing info asynchronously 
+            # Step 1: ALWAYS run licensing discovery first (most important for real pricing)
+            print(f"🔍 Starting licensing discovery for {len(sources)} sources...")
             await self._add_licensing_async(sources)
+            print(f"✅ Licensing discovery completed")
             
-            # Step 4: Cache the enriched results
+            # Step 2: Try AI content polishing (optional enhancement)
+            try:
+                # Prepare raw sources for polishing  
+                raw_sources = []
+                for source in sources:
+                    raw_sources.append({
+                        'url': source.url,
+                        'domain': source.domain, 
+                        'title': source.title,
+                        'snippet': source.excerpt
+                    })
+                
+                print(f"🎨 Starting AI content polishing...")
+                polished_sources = self.ai_service.polish_sources(query, raw_sources)
+                
+                # Update sources with polished content
+                for i, (source, polished) in enumerate(zip(sources, polished_sources)):
+                    if polished:
+                        source.title = polished.get('title', source.title)
+                        source.excerpt = polished.get('excerpt', source.excerpt)
+                
+                print(f"✅ AI content polishing completed")
+                
+            except Exception as polish_error:
+                print(f"⚠️ AI polishing failed (but licensing succeeded): {polish_error}")
+                # Continue anyway - licensing is more important than polishing
+            
+            # Step 3: Cache the enriched results
             self._store_in_cache(cache_key, sources)
+            print(f"💾 Background enrichment completed and cached")
             
         except Exception as e:
-            print(f"Background enrichment error: {e}")
+            print(f"❌ Background enrichment error: {e}")
             # Even if enrichment fails, we still have the basic results
     
     async def _add_licensing_async(self, sources: List[SourceCard]):
