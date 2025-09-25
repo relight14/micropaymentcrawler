@@ -18,13 +18,11 @@ class ContentCrawlerStub:
     def __init__(self):
         # Initialize Tavily client
         api_key = os.environ.get("TAVILY_API_KEY")
-        if api_key:
-            self.tavily_client = TavilyClient(api_key=api_key)
-            self.use_real_search = True
-        else:
-            self.tavily_client = None
-            self.use_real_search = False
-            print("Warning: TAVILY_API_KEY not found, falling back to mock data")
+        if not api_key:
+            raise ValueError("TAVILY_API_KEY environment variable is required")
+        
+        self.tavily_client = TavilyClient(api_key=api_key)
+        self.use_real_search = True
         
         # Initialize content licensing service and AI research service
         self.license_service = ContentLicenseService()
@@ -43,28 +41,6 @@ class ContentCrawlerStub:
             "premium_journal": 1.6
         }
         
-        # Diverse domains for realistic source variety
-        self.domain_sets = {
-            'academic': [
-                "arxiv.org", "nature.com", "science.org", "ieee.org", "acm.org",
-                "researchgate.net", "jstor.org", "springer.com", "wiley.com",
-                "sciencedirect.com", "plos.org", "pubmed.ncbi.nlm.nih.gov"
-            ],
-            'industry': [
-                "mckinsey.com", "deloitte.com", "pwc.com", "bcg.com", "accenture.com",
-                "gartner.com", "forrester.com", "idc.com", "frost.com"
-            ],
-            'news': [
-                "reuters.com", "bloomberg.com", "wsj.com", "ft.com", "economist.com",
-                "techcrunch.com", "wired.com", "spectrum.ieee.org", "mit.edu"
-            ],
-            'government': [
-                "energy.gov", "nist.gov", "nsf.gov", "doe.gov", "epa.gov"
-            ]
-        }
-        
-        # Fallback for compatibility
-        self.sample_domains = self.domain_sets['academic']
     
     def _get_cache_key(self, query: str, count: int, budget_limit: Optional[float] = None) -> str:
         """Generate cache key for query results"""
@@ -102,17 +78,7 @@ class ContentCrawlerStub:
                 "enrichment_needed": False
             }
         
-        if self.use_real_search and self.tavily_client:
-            return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key)
-        else:
-            # For mock data, return complete results immediately
-            sources = self._generate_mock_sources(query, count, budget_limit)
-            self._store_in_cache(cache_key, sources)
-            return {
-                "sources": sources,
-                "stage": "complete", 
-                "enrichment_needed": False
-            }
+        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key)
     
     async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str) -> Dict[str, Any]:
         """Generate sources progressively: immediate raw results + background enrichment"""
@@ -180,11 +146,10 @@ class ContentCrawlerStub:
             
         except Exception as e:
             print(f"Progressive Tavily generation error: {e}")
-            # Fallback to mock data
-            sources = self._generate_mock_sources(query, count, budget_limit)
+            # Return empty results on error
             return {
-                "sources": sources,
-                "stage": "complete",
+                "sources": [],
+                "stage": "error",
                 "enrichment_needed": False
             }
     
@@ -277,15 +242,12 @@ class ContentCrawlerStub:
             count: Maximum number of sources to generate
             budget_limit: Maximum budget for licensing costs (60% of tier price)
         """
-        if self.use_real_search:
-            return self._generate_tavily_sources(query, count, budget_limit)
-        else:
-            return self._generate_mock_sources(query, count, budget_limit)
+        return self._generate_tavily_sources(query, count, budget_limit)
     
     def _generate_tavily_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
         """Generate source cards using hybrid Tavily discovery + Claude polish approach."""
         if not self.tavily_client:
-            return self._generate_mock_sources(query, count)
+            return []
             
         try:
             # Step 1: Tavily URL Discovery with query length truncation
@@ -327,16 +289,31 @@ class ContentCrawlerStub:
                 source_id = str(uuid.uuid4())
                 url = polished.get('url', f'https://{polished.get("domain", "unknown.com")}')
                 domain = polished.get('domain', 'unknown.com')
+                title = polished.get('title', f'Research Source {i+1}')
+                
+                # Generate relevance score (0.2-1.0 range for better distribution)
+                base_score = max(0.2, 1.0 - (i * 0.08))  # More aggressive position decay
+                
+                # Add some randomness for variety (±0.15)
+                random_factor = random.uniform(-0.15, 0.15)
+                
+                # Bonuses for quality indicators
+                query_bonus = 0.2 if query.lower() in title.lower() else 0.0
+                domain_bonus = 0.15 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0
+                
+                # Calculate final score with more spread
+                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + random_factor))
                 
                 # Start with free source - real licensing will set authentic price
                 source = SourceCard(
                     id=source_id,
-                    title=polished.get('title', f'Research Source {i+1}'),
+                    title=title,
                     excerpt=polished.get('excerpt', 'No preview available'),
                     domain=domain,
                     url=url,
                     unlock_price=0.0,  # Free by default, real licensing sets authentic price
-                    is_unlocked=False
+                    is_unlocked=False,
+                    relevance_score=relevance_score
                 )
                 
                 # Step 5: Real licensing detection on actual URL
@@ -353,78 +330,13 @@ class ContentCrawlerStub:
                 else:
                     break  # Budget exceeded, stop generating sources
             
-            # Fill with mock data if needed
-            if len(sources) < count and (budget_limit is None or self._calculate_total_cost(sources) < budget_limit):
-                remaining = count - len(sources)
-                remaining_budget = budget_limit - self._calculate_total_cost(sources) if budget_limit else None
-                mock_sources = self._generate_mock_sources(query, remaining, remaining_budget)
-                sources.extend(mock_sources)
-            
             return sources
             
         except Exception as e:
             print(f"Hybrid Tavily+Claude generation error: {e}")
-            # Fallback to mock data on error
-            return self._generate_mock_sources(query, count, budget_limit)
+            # Return empty list on error - no mock fallback
+            return []
     
-    def _generate_mock_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
-        """Generate diverse, compelling mock source cards."""
-        sources = []
-        current_cost = 0.0
-        
-        # Ensure variety by cycling through domain types
-        domain_types = list(self.domain_sets.keys())
-        
-        for i in range(count):
-            # Cycle through domain types for variety
-            domain_type = domain_types[i % len(domain_types)]
-            domain = random.choice(self.domain_sets[domain_type])
-            
-            # Generate title and excerpt for this specific source
-            title = self._generate_title(query, i)
-            excerpt = self._generate_excerpt(query, title)
-            
-            # Start with free pricing - real licensing discovery will set authentic costs
-            unlock_price = 0.0
-            
-            # Check if adding this source would exceed budget
-            if budget_limit is not None and (current_cost + unlock_price) > budget_limit:
-                break
-                
-            # Generate more varied relevance scores (0.2-1.0 range for better distribution)
-            base_score = max(0.2, 1.0 - (i * 0.08))  # More aggressive position decay
-            
-            # Add some randomness for variety (±0.15)
-            random_factor = random.uniform(-0.15, 0.15)
-            
-            # Bonuses for quality indicators
-            query_bonus = 0.2 if query.lower() in title.lower() else 0.0
-            domain_bonus = 0.15 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0
-            
-            # Calculate final score with more spread
-            relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + random_factor))
-            
-            source = SourceCard(
-                id=str(uuid.uuid4()),
-                title=title,
-                excerpt=excerpt,
-                domain=domain,
-                url=f'https://{domain}/research/{str(uuid.uuid4())[:8]}',  # Generate mock URL
-                unlock_price=unlock_price,
-                is_unlocked=False,
-                relevance_score=relevance_score
-            )
-            
-            # Try real licensing discovery first
-            license_info = self._discover_licensing(source.url)
-            if license_info:
-                self._apply_licensing_info(source, license_info)
-            # If no real licensing found, this source stays free (unlock_price = 0.0)
-            
-            sources.append(source)
-            current_cost += source.unlock_price  # Use actual licensing cost after discovery
-        
-        return sources
     
     # Removed _calculate_unlock_price_by_type - real licensing APIs determine authentic pricing
     
