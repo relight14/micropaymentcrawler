@@ -173,12 +173,13 @@ class TollbitProtocolHandler(ProtocolHandler):
         self.agent_name = "ResearchTool-1.0"
         
     def check_source(self, url: str) -> Optional[LicenseTerms]:
-        """Check for Tollbit licensing availability without minting tokens"""
-        # Domain-based discovery works without API key
+        """Check for Tollbit licensing availability and get real pricing from API"""
+        if not self.api_key:
+            print("Warning: TOLLBIT_API_KEY not available for pricing discovery")
+            return None
             
         try:
-            # Instead of minting during discovery, check if domain is in Tollbit network
-            # This is safer and avoids costs during discovery
+            # First check if this domain is potentially in Tollbit network
             domain = urlparse(url).netloc
             
             # Known Tollbit partner domains (based on their documentation)
@@ -192,17 +193,18 @@ class TollbitProtocolHandler(ProtocolHandler):
             clean_domain = domain.replace('www.', '')
             
             if any(clean_domain.endswith(d) for d in known_tollbit_domains):
-                # For known domains, return licensing terms
-                # Pricing will be determined at mint time
-                return LicenseTerms(
-                    protocol="tollbit",
-                    ai_include_price=0.05,  # Default rate, will be updated during purchase
-                    purchase_price=0.20,
-                    currency="USD",
-                    publisher=self._extract_publisher(url),
-                    permits_ai_include=True,
-                    permits_search=True
-                )
+                # For known domains, get real pricing from Tollbit API
+                pricing_data = self._check_pricing(url)
+                if pricing_data:
+                    return LicenseTerms(
+                        protocol="tollbit",
+                        ai_include_price=pricing_data.get('ai_include_price', 0.05),
+                        purchase_price=pricing_data.get('purchase_price', 0.20),
+                        currency="USD",
+                        publisher=self._extract_publisher(url),
+                        permits_ai_include=True,
+                        permits_search=True
+                    )
                 
         except Exception as e:
             print(f"Tollbit check failed for {url}: {e}")
@@ -236,6 +238,67 @@ class TollbitProtocolHandler(ProtocolHandler):
             
         return None
     
+    def _check_pricing(self, target_url: str) -> Optional[Dict]:
+        """Check real Tollbit pricing using official API endpoint"""
+        if not self.api_key:
+            return None
+            
+        try:
+            # Use correct Tollbit rate endpoint from documentation
+            # GET /dev/v1/rate/<content_path>
+            from urllib.parse import quote
+            encoded_url = quote(target_url, safe='')
+            rate_endpoint = f"{self.base_url}/dev/v1/rate/{encoded_url}"
+            
+            headers = {
+                'Authorization': f'Bearer {self.api_key}',
+                'User-Agent': self.agent_name,
+                'Content-Type': 'application/json'
+            }
+            
+            try:
+                response = requests.get(
+                    rate_endpoint,
+                    headers=headers,
+                    timeout=5  # Shorter timeout for discovery
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"✅ Real Tollbit pricing discovered for {target_url}: {data}")
+                    
+                    # Handle array response format from documentation
+                    if isinstance(data, list) and len(data) > 0:
+                        rate_data = data[0]
+                        # Convert micros to dollars (1 USD = 1,000,000 micros)
+                        price_micros = rate_data.get('priceMicros', 50000)  # Default 50k micros = $0.05
+                        price_usd = price_micros / 1000000.0
+                        
+                        return {
+                            'ai_include_price': price_usd,
+                            'purchase_price': price_usd * 4,  # Estimate purchase as 4x include
+                            'currency': rate_data.get('currency', 'USD'),
+                            'license_path': rate_data.get('licensePath'),
+                            'license_type': rate_data.get('licenseType', 'ON_DEMAND_LICENSE')
+                        }
+                else:
+                    print(f"Tollbit rate API response: {response.status_code} - {response.text[:200]}")
+                    
+            except requests.RequestException as e:
+                print(f"Tollbit rate API request failed: {e}")
+            
+            # For MVP, fallback to reasonable pricing when API unavailable
+            print(f"🔄 Tollbit rate API not accessible, using fallback pricing for {target_url}")
+            return {
+                'ai_include_price': 0.05,  # Standard fallback
+                'purchase_price': 0.20,
+                'currency': 'USD'
+            }
+                
+        except Exception as e:
+            print(f"Tollbit pricing discovery error: {e}")
+            return None
+
     def _mint_token(self, target_url: str) -> Optional[Dict]:
         """Mint a Tollbit token using their official API"""
         if not self.api_key:

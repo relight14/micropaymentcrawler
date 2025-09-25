@@ -62,6 +62,16 @@ async def analyze_research_query(request: ResearchRequest):
         # Convert sources to response format
         sources_response = []
         for source in sources:
+            # Format licensing data for frontend compatibility
+            licensing = None
+            if source.licensing_protocol:
+                licensing = {
+                    "protocol": source.licensing_protocol.lower(),
+                    "cost": source.licensing_cost,
+                    "publisher": getattr(source, 'publisher_name', None),
+                    "license_type": getattr(source, 'license_type', 'ai-include')
+                }
+            
             sources_response.append({
                 "id": source.id,
                 "title": source.title,
@@ -69,8 +79,9 @@ async def analyze_research_query(request: ResearchRequest):
                 "excerpt": source.excerpt,
                 "url": source.url,
                 "unlock_price": source.unlock_price,
-                "licensing_protocol": source.licensing_protocol,
+                "licensing_protocol": source.licensing_protocol,  # Keep for backward compatibility
                 "licensing_cost": source.licensing_cost,
+                "licensing": licensing,  # New format for frontend
                 "quality_score": getattr(source, 'quality_score', 0.8)
             })
         
