@@ -179,32 +179,26 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            # First check if this domain is potentially in Tollbit network
+            # Check ALL sources against Tollbit API first 
+            # This ensures comprehensive coverage until we have a solid database
             domain = urlparse(url).netloc
+            print(f"🎯 Checking Tollbit API for: {domain}")
             
-            # Known Tollbit partner domains (based on their documentation)
-            known_tollbit_domains = [
-                'time.com', 'forbes.com', 'apnews.com', 'reuters.com',
-                'wsj.com', 'nytimes.com', 'washingtonpost.com',
-                'bloomberg.com', 'ft.com', 'economist.com'
-            ]
-            
-            # Remove www. prefix for comparison
-            clean_domain = domain.replace('www.', '')
-            
-            if any(clean_domain.endswith(d) for d in known_tollbit_domains):
-                # For known domains, get real pricing from Tollbit API
-                pricing_data = self._check_pricing(url)
-                if pricing_data:
-                    return LicenseTerms(
-                        protocol="tollbit",
-                        ai_include_price=pricing_data.get('ai_include_price', 0.05),
-                        purchase_price=pricing_data.get('purchase_price', 0.20),
-                        currency="USD",
-                        publisher=self._extract_publisher(url),
-                        permits_ai_include=True,
-                        permits_search=True
-                    )
+            # Try to get real pricing from Tollbit API for any domain
+            pricing_data = self._check_pricing(url)
+            if pricing_data:
+                print(f"✅ Tollbit pricing found for {domain}: ${pricing_data.get('ai_include_price', 0.05)}")
+                return LicenseTerms(
+                    protocol="tollbit",
+                    ai_include_price=pricing_data.get('ai_include_price', 0.05),
+                    purchase_price=pricing_data.get('purchase_price', 0.20),
+                    currency="USD",
+                    publisher=self._extract_publisher(url),
+                    permits_ai_include=True,
+                    permits_search=True
+                )
+            else:
+                print(f"❌ No Tollbit pricing available for {domain}")
                 
         except Exception as e:
             print(f"Tollbit check failed for {url}: {e}")
