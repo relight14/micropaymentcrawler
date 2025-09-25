@@ -178,6 +178,13 @@ export class UIManager {
     }
 
     formatMessage(text) {
+        // Check if this is HTML content (like source cards) that should not be escaped
+        if (text.includes('<div class="sources-preview-section">') || 
+            text.includes('<div class="source-card">')) {
+            // This is HTML content that should be rendered as-is
+            return text;
+        }
+        
         // Secure approach: escape first, then apply formatting
         const escaped = this.escapeHtml(text);
         
