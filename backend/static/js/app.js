@@ -185,7 +185,19 @@ export class ChatResearchApp {
     addMessage(sender, content, metadata = null) {
         const message = this.appState.addMessage(sender, content, metadata);
         this.uiManager.addMessageToChat(message);
+        
+        // Hide welcome screen after first message is sent
+        this.hideWelcomeScreen();
+        
         return message;
+    }
+    
+    hideWelcomeScreen() {
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen && welcomeScreen.style.display !== 'none') {
+            welcomeScreen.style.display = 'none';
+            console.log('Welcome screen hidden after first message');
+        }
     }
 
     async clearConversation() {
