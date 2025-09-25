@@ -41,10 +41,12 @@ export class AuthService {
 
         const data = await response.json();
         this.setToken(data.access_token);
-        this.walletBalance = data.wallet_balance || 0;
         
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
+        
+        // Get wallet balance after login
+        await this.updateWalletBalance();
         
         return data;
     }
@@ -63,10 +65,12 @@ export class AuthService {
 
         const data = await response.json();
         this.setToken(data.access_token);
-        this.walletBalance = data.wallet_balance || 0;
         
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
+        
+        // Get wallet balance after login
+        await this.updateWalletBalance();
         
         return data;
     }
