@@ -122,8 +122,8 @@ class SourceCard {
         const badge = document.createElement('span');
         badge.className = 'license-badge';
         
-        const licenseType = source.license_type || source.licensing?.protocol || 'free';
-        const cost = source.unlock_price || source.licensing?.cost || 0;
+        const licenseType = source.license_type || source.licensing_protocol || 'free';
+        const cost = source.unlock_price || source.licensing_cost || 0;
         
         // Determine badge style and content
         if (cost === 0 || licenseType === 'free') {
@@ -137,8 +137,8 @@ class SourceCard {
             badge.textContent = `PREMIUM $${cost.toFixed(2)}`;
         }
 
-        // Add protocol emoji if available
-        const protocol = source.licensing?.protocol;
+        // Add protocol emoji if available  
+        const protocol = source.licensing_protocol;
         if (protocol) {
             const emoji = this._getProtocolEmoji(protocol);
             badge.textContent = `${emoji} ${badge.textContent}`;
