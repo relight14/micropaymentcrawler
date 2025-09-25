@@ -177,6 +177,16 @@ class LedeWireAPI:
         GET /v1/wallet/balance
         Get user's current wallet balance.
         """
+        from backend.utils.config import is_mock_mode
+        
+        # Mock mode: return mock wallet balance
+        if is_mock_mode():
+            return {
+                "balance_cents": 50000,  # $500.00 mock balance
+                "balance_usd": 500.00,
+                "currency": "USD"
+            }
+            
         try:
             response = self.session.get(
                 f"{self.api_base}/wallet/balance",
