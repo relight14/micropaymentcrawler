@@ -322,6 +322,7 @@ class SourceCard {
 
         // Get relevance score and normalize to 1-5 scale with 1 decimal precision
         const rawScore = source.relevance_score || source.rating || source.quality_score;
+        console.log(`⭐ RATING DEBUG: Source ${source.id || 'unknown'} - relevance_score: ${source.relevance_score}, rating: ${source.rating}, quality_score: ${source.quality_score}, rawScore: ${rawScore}`);
         let normalizedScore;
         
         if (rawScore === null || rawScore === undefined) {
@@ -343,6 +344,7 @@ class SourceCard {
         
         // Add hover tooltip with decimal precision
         rating.title = `Relevance: ${normalizedScore.toFixed(1)}/5`;
+        console.log(`⭐ RATING DEBUG: Source ${source.id || 'unknown'} - Final normalizedScore: ${normalizedScore.toFixed(1)}`);
         
         // Create star elements with partial star support
         for (let i = 0; i < maxStars; i++) {
