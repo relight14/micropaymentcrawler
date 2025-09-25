@@ -371,11 +371,21 @@ export class ChatResearchApp {
                 const initials = document.getElementById('userInitials');
                 const balance = document.getElementById('userBalance');
                 
+                console.log('Updating profile UI:', {
+                    userInfo: this.authService.getUserInfo(),
+                    initials: this.authService.getUserInitials(),
+                    balance: this.authService.getWalletBalance()
+                });
+                
                 if (initials) {
-                    initials.textContent = this.authService.getUserInitials();
+                    const userInitials = this.authService.getUserInitials();
+                    initials.textContent = userInitials;
+                    console.log('Set initials to:', userInitials);
                 }
                 if (balance) {
-                    balance.textContent = `$${this.authService.getWalletBalance().toFixed(2)}`;
+                    const walletBalance = this.authService.getWalletBalance();
+                    balance.textContent = `$${walletBalance.toFixed(2)}`;
+                    console.log('Set balance to:', walletBalance);
                 }
                 
                 // Add dropdown functionality
@@ -393,23 +403,33 @@ export class ChatResearchApp {
         const dropdownMenu = document.getElementById('dropdownMenu');
         const logoutItem = document.getElementById('logoutItem');
         
+        console.log('Setting up profile dropdown:', { profileButton, dropdownMenu, logoutItem });
+        
         if (profileButton && dropdownMenu) {
+            // Remove any existing listeners to avoid duplicates
+            profileButton.replaceWith(profileButton.cloneNode(true));
+            const newProfileButton = document.getElementById('profileButton');
+            
             // Toggle dropdown on profile button click
-            profileButton.addEventListener('click', (e) => {
+            newProfileButton.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
+                console.log('Profile button clicked, toggling dropdown');
                 dropdownMenu.classList.toggle('show');
             });
             
             // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (!profileButton.contains(e.target)) {
+                if (!newProfileButton.contains(e.target)) {
                     dropdownMenu.classList.remove('show');
                 }
             });
         }
         
         if (logoutItem) {
-            logoutItem.addEventListener('click', () => {
+            logoutItem.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Logout clicked');
                 this.handleLogout();
             });
         }
