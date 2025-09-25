@@ -594,9 +594,9 @@
 
 /* Authentication Button */
 .auth-btn {
-    background: linear-gradient(135deg, #FFD700, #FFC107);
-    color: #fff38D;
-    border: 1px solid #FFD700;
+    background: #fff38D !important;
+    color: white !important;
+    border: 1px solid #fff38D !important;
     border-radius: calc(var(--radius) - 2px);
     padding: 0.5rem 1rem;
     font-size: var(--text-sm);
@@ -606,9 +606,8 @@
 }
 
 .auth-btn:hover {
-    background: linear-gradient(135deg, #FFC107, #FF9800);
+    background: #f5e65c !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3);
 }
 
 
@@ -2283,8 +2282,8 @@ input:checked + .slider:before {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: linear-gradient(135deg, #87CEEB, #6BB6D6);
-    color: #dae6ef;
+    background: #dae6ef !important;
+    color: white !important;
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -2295,9 +2294,8 @@ input:checked + .slider:before {
 }
 
 .profile-btn:hover {
-    background: linear-gradient(135deg, #6BB6D6, #5AA5C5);
+    background: #c8d7e3 !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(135, 206, 235, 0.3);
 }
 
 .user-initials {
