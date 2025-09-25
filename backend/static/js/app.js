@@ -19,8 +19,14 @@ export class ChatResearchApp {
         // Initialize the application
         this.initializeApp();
         
-        // Make app globally accessible for HTML event handlers
-        window.researchApp = this;
+        // Make app globally accessible for HTML event handlers (namespaced for safety)
+        if (!window.LedeWire) window.LedeWire = {};
+        window.LedeWire.researchApp = this;
+        
+        // Legacy global for backward compatibility (TODO: remove in production)
+        if (!window.researchApp) {
+            window.researchApp = this;
+        }
     }
 
     async initializeApp() {
@@ -135,9 +141,11 @@ export class ChatResearchApp {
                 // Display immediate source cards
                 this._displaySourceCards(response.research_data.sources);
                 
-                // If enrichment is needed, poll for updates
+                // If enrichment is needed, let the progressive system handle updates
+                // Note: Backend handles progressive enrichment via cache polling automatically
                 if (response.research_data.enrichment_needed) {
-                    this._pollForEnrichedResults(this.appState.getCurrentQuery());
+                    console.log('🔄 Progressive enrichment in progress...'); 
+                    // Polling is handled by backend progressive system, no client polling needed
                 }
             }
             
@@ -1005,6 +1013,12 @@ export class ChatResearchApp {
 
 // Initialize the app when DOM is ready  
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new ChatResearchApp();
-    window.researchApp = window.app; // For backward compatibility
+    // Ensure only one instance exists
+    if (!window.LedeWire?.researchApp) {
+        window.app = new ChatResearchApp();
+        // Legacy global only if not already set (avoid conflicts)
+        if (!window.researchApp) {
+            window.researchApp = window.app;
+        }
+    }
 });

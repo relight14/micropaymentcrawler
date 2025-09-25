@@ -208,15 +208,22 @@ export class APIService {
         return await response.json();
     }
 
-    async purchaseTier(tierId, price, query = "Research Query") {
+    async purchaseTier(tierId, price, query = "Research Query", selectedSources = null) {
+        const requestBody = {
+            query,
+            tier: tierId,
+            idempotency_key: null
+        };
+        
+        // Include selected sources if provided (for custom report generation)
+        if (selectedSources && selectedSources.length > 0) {
+            requestBody.selected_source_ids = selectedSources.map(source => source.id);
+        }
+        
         const response = await fetch(`${this.baseURL}/api/purchase`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
-            body: JSON.stringify({
-                query,
-                tier: tierId,
-                idempotency_key: null
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
