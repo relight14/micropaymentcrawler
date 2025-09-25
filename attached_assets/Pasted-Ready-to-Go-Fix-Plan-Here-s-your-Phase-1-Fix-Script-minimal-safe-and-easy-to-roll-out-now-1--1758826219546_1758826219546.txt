@@ -1,0 +1,85 @@
+Ready-to-Go Fix Plan
+
+Here’s your Phase 1 Fix Script — minimal, safe, and easy to roll out now:
+
+1. ✅ Wait for CSS Load (before rendering cards)
+
+If source-card.css is lazy-loaded, ensure it's fully applied before card injection:
+
+function waitForCSSLoad(href) {
+  return new Promise((resolve) => {
+    const check = () => {
+      for (let sheet of document.styleSheets) {
+        if (sheet.href && sheet.href.includes(href)) {
+          resolve(true);
+          return;
+        }
+      }
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+
+Then, call before rendering cards:
+
+await waitForCSSLoad('source-card.css');
+renderSourceCards();
+
+2. ✅ Force Reflow After Insertion (CSS refresh)
+
+Sometimes the DOM renders before styles apply — trigger reflow manually:
+
+function forceStyleReapply(element) {
+  element.style.display = 'none';
+  // Trigger reflow
+  void element.offsetHeight;
+  element.style.display = '';
+}
+
+
+Apply to each card:
+
+const card = renderSingleSourceCard(source);
+forceStyleReapply(card);
+container.appendChild(card);
+
+3. ✅ Add !important to Critical Styles (temporary)
+
+If you're still seeing default browser styles (e.g. gray borders, Times New Roman):
+
+Add this to source-card.css for critical elements:
+
+.source-card {
+  background-color: var(--card) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-md) !important;
+  font-family: var(--font-sans, sans-serif) !important;
+}
+
+4. ✅ CSS Reset for .source-card (optional)
+
+Strip all inherited styles at the top of source-card.css:
+
+.source-card, .source-card * {
+  all: unset;
+  display: revert;
+  box-sizing: border-box;
+}
+
+
+Use cautiously — only if the app’s global styles are leaking badly.
+
+🧪 Final QA Checklist
+✅ Check	Detail
+Cards show up immediately with full styles	No FOUC (Flash of Unstyled Content)
+Cards have background, border-radius, shadows, correct font	Confirm .source-card styles applied
+Rating stars & buttons look styled	CSS not blocked
+Skeleton cards animate	Confirm transitions load post-CSS
+No default browser styles leaking in	e.g., blue links, serif fonts, etc.
+✅ You're Good to Proceed
+
+Let me know if you want help writing a reusable wrapper like renderWithCSSReady(container, renderFn) — but you’re fully set to implement Phase 1 now.
+
+Green light. 🚦

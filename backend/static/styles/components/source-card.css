@@ -102,14 +102,15 @@
    ============================================================================= */
 
 .source-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    margin-bottom: 1rem;
-    transition: all 0.15s ease;
-    box-shadow: var(--shadow-sm);
-    position: relative;
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 1.25rem !important;
+    margin-bottom: 1rem !important;
+    transition: all 0.15s ease !important;
+    box-shadow: var(--shadow-sm) !important;
+    position: relative !important;
+    font-family: var(--font-sans, sans-serif) !important;
 }
 
 /* Progressive loading state */

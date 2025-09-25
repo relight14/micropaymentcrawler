@@ -151,7 +151,7 @@ export class ChatResearchApp {
                 this.appState.setCurrentResearchData(response.research_data);
                 
                 // Display immediate source cards
-                this._displaySourceCards(response.research_data.sources);
+                await this._displaySourceCards(response.research_data.sources);
                 
                 // If enrichment is needed, let the progressive system handle updates
                 // Note: Backend handles progressive enrichment via cache polling automatically
@@ -859,12 +859,14 @@ export class ChatResearchApp {
         }, 3000);
     }
     
-    _displaySourceCards(sources) {
+    async _displaySourceCards(sources) {
         
         if (!sources || sources.length === 0) {
             return;
         }
         
+        // Wait for CSS to fully load before rendering
+        await this._waitForCSSLoad('source-card.css');
         
         // Initialize the SourceCard component with app state  
         if (!this.sourceCardComponent) {
@@ -906,6 +908,8 @@ export class ChatResearchApp {
                 showActions: true
             });
             
+            // Force style reapply to ensure CSS is applied
+            this._forceStyleReapply(sourceCard);
             
             // Source card is ready to display with real backend data
             sourcesGrid.appendChild(sourceCard);
@@ -921,6 +925,30 @@ export class ChatResearchApp {
         messageDiv.appendChild(sourcesGrid);
         
         this.addMessage('assistant', messageDiv.outerHTML);
+    }
+    
+    // Helper method to wait for CSS to load
+    _waitForCSSLoad(href) {
+        return new Promise((resolve) => {
+            const check = () => {
+                for (let sheet of document.styleSheets) {
+                    if (sheet.href && sheet.href.includes(href)) {
+                        resolve(true);
+                        return;
+                    }
+                }
+                setTimeout(check, 50);
+            };
+            check();
+        });
+    }
+    
+    // Helper method to force style reapplication
+    _forceStyleReapply(element) {
+        element.style.display = 'none';
+        // Trigger reflow
+        void element.offsetHeight;
+        element.style.display = '';
     }
     
     async _pollForEnrichedResults(query) {
