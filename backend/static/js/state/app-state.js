@@ -4,12 +4,20 @@
  */
 export class AppState {
     constructor() {
-        // Core state
+        // Configuration constants for maintainability
+        this.TIER_LIMITS = {
+            basic: 3,
+            research: 8, 
+            pro: 15,
+            default: 3
+        };
+        
+        // Core state with persistence
         this.currentMode = 'chat';
-        this.conversationHistory = [];
-        this.selectedSources = [];
+        this.conversationHistory = this._loadFromStorage('conversationHistory', []);
+        this.selectedSources = this._loadFromStorage('selectedSources', []);
         this.currentResearchData = null;
-        this.purchasedItems = new Set();
+        this.purchasedItems = new Set(this._loadFromStorage('purchasedItems', []));
         this.pendingAction = null;
         
         // UI state
@@ -35,17 +43,52 @@ export class AppState {
         return this.currentMode;
     }
 
-    // Conversation management
+    // Persistence helpers
+    _loadFromStorage(key, defaultValue) {
+        try {
+            const stored = sessionStorage.getItem(`appState_${key}`);
+            return stored ? JSON.parse(stored) : defaultValue;
+        } catch (error) {
+            console.warn(`Failed to load ${key} from storage:`, error);
+            return defaultValue;
+        }
+    }
+    
+    _saveToStorage(key, value) {
+        try {
+            sessionStorage.setItem(`appState_${key}`, JSON.stringify(value));
+        } catch (error) {
+            console.warn(`Failed to save ${key} to storage:`, error);
+        }
+    }
+
+    // Conversation management with deduplication
     addMessage(sender, content, metadata = null) {
+        const messageId = `${sender}_${Date.now()}_${content.substring(0, 50)}`;
+        
+        // Dedupe: check if similar message exists recently (last 3 messages)
+        const recentMessages = this.conversationHistory.slice(-3);
+        const isDuplicate = recentMessages.some(msg => 
+            msg.sender === sender && 
+            msg.content === content &&
+            Date.now() - new Date(msg.timestamp).getTime() < 5000 // Within 5 seconds
+        );
+        
+        if (isDuplicate) {
+            console.warn('Duplicate message prevented:', content.substring(0, 100));
+            return this.conversationHistory[this.conversationHistory.length - 1];
+        }
+        
         const message = {
-            id: Date.now() + Math.random(),
+            id: messageId,
             sender,
             content,
             metadata,
             timestamp: new Date()
         };
         
-        this.conversationHistory.push(message);
+        this.conversationHistory = [...this.conversationHistory, message]; // Immutable update
+        this._saveToStorage('conversationHistory', this.conversationHistory);
         return message;
     }
 
@@ -54,25 +97,34 @@ export class AppState {
         this.selectedSources = [];
         this.currentResearchData = null;
         this.pendingAction = null;
+        
+        // Clear persisted state
+        this._saveToStorage('conversationHistory', []);
+        this._saveToStorage('selectedSources', []);
     }
 
     getConversationHistory() {
         return [...this.conversationHistory]; // Return copy
     }
 
-    // Source management
+    // Source management with immutable updates
     toggleSourceSelection(sourceId, sourceData) {
         const existingIndex = this.selectedSources.findIndex(s => s.id === sourceId);
         
         if (existingIndex >= 0) {
-            this.selectedSources.splice(existingIndex, 1);
+            // Immutable removal
+            this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
+            this._saveToStorage('selectedSources', this.selectedSources);
             return false; // Deselected
         } else {
-            this.selectedSources.push({
+            // Immutable addition
+            const newSource = {
                 id: sourceId,
                 ...sourceData,
                 selectedAt: new Date()
-            });
+            };
+            this.selectedSources = [...this.selectedSources, newSource];
+            this._saveToStorage('selectedSources', this.selectedSources);
             return true; // Selected
         }
     }
@@ -91,18 +143,26 @@ export class AppState {
 
     getSelectedSourcesTotal() {
         return this.selectedSources.reduce((total, source) => {
-            // Use unlock_price which is the actual field in source data
-            return total + (source.unlock_price || source.price || 0);
+            // Use nullish coalescing to properly handle 0 values
+            const price = source.unlock_price ?? source.price ?? 0;
+            return total + price;
         }, 0);
     }
 
     removeSelectedSource(sourceId) {
         this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
+        this._saveToStorage('selectedSources', this.selectedSources);
     }
 
     canAddMoreSources(tierType) {
-        const limits = { basic: 3, research: 8, pro: 15 };
-        return this.selectedSources.length < (limits[tierType] || 3);
+        // Guard against invalid tierType with warning
+        if (!tierType || typeof tierType !== 'string') {
+            console.warn('Invalid tierType provided to canAddMoreSources:', tierType);
+            tierType = 'basic'; // Safe fallback
+        }
+        
+        const limit = this.TIER_LIMITS[tierType.toLowerCase()] ?? this.TIER_LIMITS.default;
+        return this.selectedSources.length < limit;
     }
 
     // Dark mode management
@@ -132,13 +192,23 @@ export class AppState {
         return this.currentResearchData;
     }
 
-    // Purchased items tracking
+    // Purchased items tracking with persistence
     addPurchasedItem(itemId) {
         this.purchasedItems.add(itemId);
+        this._saveToStorage('purchasedItems', Array.from(this.purchasedItems));
     }
 
     isPurchased(itemId) {
         return this.purchasedItems.has(itemId);
+    }
+    
+    clearPurchasedItems() {
+        this.purchasedItems.clear();
+        this._saveToStorage('purchasedItems', []);
+    }
+    
+    getPurchasedItems() {
+        return Array.from(this.purchasedItems);
     }
 
     // Auth mode management
