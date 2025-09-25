@@ -285,13 +285,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             except requests.RequestException as e:
                 print(f"Tollbit rate API request failed: {e}")
             
-            # For MVP, fallback to reasonable pricing when API unavailable
-            print(f"🔄 Tollbit rate API not accessible, using fallback pricing for {target_url}")
-            return {
-                'ai_include_price': 0.05,  # Standard fallback
-                'purchase_price': 0.20,
-                'currency': 'USD'
-            }
+            # NO FALLBACK - only return real pricing data
+            print(f"🔄 Tollbit rate API not accessible for {target_url} - no licensing available")
+            return None
                 
         except Exception as e:
             print(f"Tollbit pricing discovery error: {e}")
@@ -332,13 +328,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             except requests.RequestException as e:
                 print(f"Tollbit API connection failed: {e}")
             
-            # For MVP, if real API is not accessible, return mock data
-            print(f"Tollbit API not accessible, using mock token for MVP")
-            return {
-                'token': f"tollbit_mock_{uuid.uuid4().hex[:16]}",
-                'cost': 0.05,
-                'expires_in': 21600  # 6 hours
-            }
+            # NO MOCK TOKENS - only return real tokens
+            print(f"Tollbit API not accessible for {target_url} - no token available")
+            return None
                 
         except Exception as e:
             print(f"Tollbit API error: {e}")
