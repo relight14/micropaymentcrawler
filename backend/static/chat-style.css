@@ -595,7 +595,7 @@
 /* Authentication Button */
 .auth-btn {
     background: #fff38D !important;
-    color: white !important;
+    color: black !important;
     border: 1px solid #fff38D !important;
     border-radius: calc(var(--radius) - 2px);
     padding: 0.5rem 1rem;
@@ -2283,7 +2283,7 @@ input:checked + .slider:before {
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     background: #dae6ef !important;
-    color: white !important;
+    color: black !important;
     border: none;
     border-radius: 8px;
     cursor: pointer;
