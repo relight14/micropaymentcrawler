@@ -8,8 +8,7 @@ import { AppState } from './state/app-state.js';
 import { UIManager } from './components/ui-manager.js';
 import { debounce } from './utils/helpers.js';
 
-// Import SourceCard component (loaded as global, make available to module)
-const SourceCard = window.SourceCard;
+// SourceCard will be loaded globally - access it dynamically when needed
 
 export class ChatResearchApp {
     constructor() {
@@ -837,9 +836,14 @@ export class ChatResearchApp {
     _displaySourceCards(sources) {
         if (!sources || sources.length === 0) return;
         
-        // Initialize the SourceCard component with app state
+        // Initialize the SourceCard component with app state  
         if (!this.sourceCardComponent) {
-            this.sourceCardComponent = new SourceCard(this.appState);
+            // Access SourceCard from global scope (loaded via script tag)
+            if (!window.SourceCard) {
+                console.error('SourceCard not loaded yet - script tag must load first');
+                return;
+            }
+            this.sourceCardComponent = new window.SourceCard(this.appState);
             
             // Listen for component events
             document.addEventListener('sourceUnlockRequested', (e) => {
