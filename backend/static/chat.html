@@ -41,7 +41,24 @@
                     <div class="wallet-display" id="walletDisplay" style="display: none;">
                         💰 <span class="wallet-balance">$0.00</span>
                     </div>
-                    <button id="authButton" class="auth-btn">Login</button>
+                    
+                    <!-- Authentication Button/Profile Dropdown -->
+                    <div class="auth-container">
+                        <button id="loginButton" class="auth-btn">Login</button>
+                        <div id="profileDropdown" class="profile-dropdown" style="display: none;">
+                            <button class="profile-btn" id="profileButton">
+                                <span class="user-initials" id="userInitials">U</span>
+                                <span class="user-balance" id="userBalance">$0.00</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu" id="dropdownMenu">
+                                <div class="dropdown-item" id="logoutItem">
+                                    <span>Logout</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="dark-mode-toggle">
                         <span class="toggle-label">Dark</span>
                         <label class="switch">

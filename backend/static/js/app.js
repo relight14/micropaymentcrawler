@@ -50,7 +50,7 @@ export class ChatResearchApp {
         const researchModeBtn = document.getElementById('researchModeBtn');
         const reportModeBtn = document.getElementById('reportModeBtn');
         const darkModeToggle = document.getElementById('darkModeToggle');
-        const authButton = document.getElementById('authButton');
+        const loginButton = document.getElementById('loginButton');
         const authToggleButton = document.getElementById('authToggleButton');
 
         // Chat functionality
@@ -86,8 +86,16 @@ export class ChatResearchApp {
         }
 
         // Authentication
-        if (authButton) authButton.addEventListener('click', () => this.handleAuthButtonClick());
+        if (loginButton) loginButton.addEventListener('click', () => this.handleAuthButtonClick());
         if (authToggleButton) authToggleButton.addEventListener('click', () => this.toggleAuthMode());
+        
+        // Check if user is already authenticated on page load
+        if (this.authService.isAuthenticated()) {
+            this.updateAuthButton();
+            this.authService.updateWalletBalance().then(() => {
+                this.updateAuthButton(); // Update again with fresh balance
+            });
+        }
     }
 
     async sendMessage() {
@@ -350,10 +358,72 @@ export class ChatResearchApp {
     }
 
     updateAuthButton() {
-        const authButton = document.getElementById('loginButton');
-        if (authButton && this.authService.isAuthenticated()) {
-            authButton.textContent = `${this.authService.getWalletBalance()}`;
-            authButton.style.backgroundColor = '#4CAF50';
+        const loginButton = document.getElementById('loginButton');
+        const profileDropdown = document.getElementById('profileDropdown');
+        
+        if (this.authService.isAuthenticated()) {
+            // Hide login button, show profile dropdown
+            if (loginButton) loginButton.style.display = 'none';
+            if (profileDropdown) {
+                profileDropdown.style.display = 'block';
+                
+                // Update profile display
+                const initials = document.getElementById('userInitials');
+                const balance = document.getElementById('userBalance');
+                
+                if (initials) {
+                    initials.textContent = this.authService.getUserInitials();
+                }
+                if (balance) {
+                    balance.textContent = `$${this.authService.getWalletBalance().toFixed(2)}`;
+                }
+                
+                // Add dropdown functionality
+                this.setupProfileDropdown();
+            }
+        } else {
+            // Show login button, hide profile dropdown
+            if (loginButton) loginButton.style.display = 'block';
+            if (profileDropdown) profileDropdown.style.display = 'none';
+        }
+    }
+
+    setupProfileDropdown() {
+        const profileButton = document.getElementById('profileButton');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        const logoutItem = document.getElementById('logoutItem');
+        
+        if (profileButton && dropdownMenu) {
+            // Toggle dropdown on profile button click
+            profileButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdownMenu.classList.toggle('show');
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!profileButton.contains(e.target)) {
+                    dropdownMenu.classList.remove('show');
+                }
+            });
+        }
+        
+        if (logoutItem) {
+            logoutItem.addEventListener('click', () => {
+                this.handleLogout();
+            });
+        }
+    }
+
+    handleLogout() {
+        this.authService.logout();
+        this.updateAuthButton();
+        this.addMessage('system', 'You have been logged out successfully.');
+        
+        // Hide wallet display
+        const walletDisplay = document.getElementById('walletDisplay');
+        if (walletDisplay) {
+            walletDisplay.style.display = 'none';
         }
     }
 
@@ -363,16 +433,16 @@ export class ChatResearchApp {
     }
 
     updateAuthModeDisplay() {
-        const authButton = document.getElementById('authButton');
+        const loginButton = document.getElementById('loginButton');
         const authToggleButton = document.getElementById('authToggleButton');
         const authTitle = document.getElementById('authTitle');
         
         if (this.appState.isInLoginMode()) {
-            if (authButton) authButton.textContent = 'Login';
+            if (loginButton) loginButton.textContent = 'Login';
             if (authToggleButton) authToggleButton.textContent = 'Need an account? Sign up';
             if (authTitle) authTitle.textContent = 'Login to LedeWire';
         } else {
-            if (authButton) authButton.textContent = 'Sign Up';
+            if (loginButton) loginButton.textContent = 'Sign Up';
             if (authToggleButton) authToggleButton.textContent = 'Have an account? Login';
             if (authTitle) authTitle.textContent = 'Create LedeWire Account';
         }
