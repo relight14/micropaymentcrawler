@@ -199,8 +199,71 @@ export class ChatResearchApp {
 
     // Authentication methods
     async handleAuthButtonClick() {
-        const type = this.appState.isInLoginMode() ? 'login' : 'signup';
-        await this.handleAuth(type);
+        this.showAuthModal();
+    }
+
+    showAuthModal() {
+        // Remove any existing modal
+        const existingModal = document.getElementById('authModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal HTML
+        const isLogin = this.appState.isInLoginMode();
+        const modalHTML = `
+            <div id="authModal" class="modal-overlay">
+                <div class="modal-content auth-modal">
+                    <div class="modal-header">
+                        <h2 id="authTitle">${isLogin ? 'Login to LedeWire' : 'Create LedeWire Account'}</h2>
+                        <button class="modal-close" onclick="document.getElementById('authModal').remove()">×</button>
+                    </div>
+                    <p>${isLogin ? 'Access your wallet and research history' : 'Join LedeWire to access premium research features'}</p>
+                    <form class="auth-form" id="authForm">
+                        <input type="email" id="authEmail" placeholder="Email address" required>
+                        <input type="password" id="authPassword" placeholder="Password" required>
+                        <button type="submit" class="auth-btn" id="authSubmitBtn">
+                            ${isLogin ? 'Login' : 'Sign Up'}
+                        </button>
+                    </form>
+                    <button type="button" class="auth-toggle-btn" id="authToggleButton">
+                        ${isLogin ? 'Need an account? Sign up' : 'Have an account? Login'}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Add event listeners
+        const authForm = document.getElementById('authForm');
+        const authToggleButton = document.getElementById('authToggleButton');
+
+        if (authForm) {
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const type = this.appState.isInLoginMode() ? 'login' : 'signup';
+                await this.handleAuth(type);
+            });
+        }
+
+        if (authToggleButton) {
+            authToggleButton.addEventListener('click', () => {
+                this.toggleAuthMode();
+                this.showAuthModal(); // Refresh modal with new mode
+            });
+        }
+
+        // Close modal when clicking outside
+        const modalOverlay = document.getElementById('authModal');
+        if (modalOverlay) {
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    modalOverlay.remove();
+                }
+            });
+        }
     }
 
     async handleAuth(type) {
@@ -215,6 +278,13 @@ export class ChatResearchApp {
             return;
         }
 
+        // Disable submit button during processing
+        const submitBtn = document.getElementById('authSubmitBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+        }
+
         try {
             let result;
             if (type === 'login') {
@@ -226,6 +296,15 @@ export class ChatResearchApp {
             this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             this.addMessage('system', `Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`);
             
+            // Close the auth modal
+            const authModal = document.getElementById('authModal');
+            if (authModal) {
+                authModal.remove();
+            }
+            
+            // Update button text to show logged in state
+            this.updateAuthButton();
+            
             // Execute any pending action
             if (this.appState.getPendingAction()) {
                 await this.executePendingAction();
@@ -234,6 +313,13 @@ export class ChatResearchApp {
         } catch (error) {
             console.error(`${type} error:`, error);
             this.addMessage('system', `${type === 'login' ? 'Login' : 'Signup'} failed: ${error.message}`);
+            
+            // Re-enable submit button on error
+            const submitBtn = document.getElementById('authSubmitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = type === 'login' ? 'Login' : 'Sign Up';
+            }
         }
     }
 
