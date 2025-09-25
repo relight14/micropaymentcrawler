@@ -262,16 +262,22 @@ class TollbitProtocolHandler(ProtocolHandler):
                     # Handle array response format from documentation
                     if isinstance(data, list) and len(data) > 0:
                         rate_data = data[0]
+                        # Extract price information from nested structure
+                        price_info = rate_data.get('price', {})
+                        license_info = rate_data.get('license', {})
+                        
                         # Convert micros to dollars (1 USD = 1,000,000 micros)
-                        price_micros = rate_data.get('priceMicros', 50000)  # Default 50k micros = $0.05
+                        price_micros = price_info.get('priceMicros', 50000)  # Default 50k micros = $0.05
                         price_usd = price_micros / 1000000.0
+                        
+                        print(f"🎯 REAL PRICING: {price_micros} micros = ${price_usd:.3f} USD")
                         
                         return {
                             'ai_include_price': price_usd,
                             'purchase_price': price_usd * 4,  # Estimate purchase as 4x include
-                            'currency': rate_data.get('currency', 'USD'),
-                            'license_path': rate_data.get('licensePath'),
-                            'license_type': rate_data.get('licenseType', 'ON_DEMAND_LICENSE')
+                            'currency': price_info.get('currency', 'USD'),
+                            'license_path': license_info.get('licensePath'),
+                            'license_type': license_info.get('licenseType', 'ON_DEMAND_LICENSE')
                         }
                 else:
                     print(f"Tollbit rate API response: {response.status_code} - {response.text[:200]}")
