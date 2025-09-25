@@ -15,12 +15,26 @@
 class SourceCard {
     constructor(appState) {
         this.appState = appState;
-        this.selectedSources = new Set();
+        this.eventListeners = new Map(); // Track listeners for cleanup
+        
+        // Bind enrichment handler for proper cleanup
+        this.handleEnrichmentUpdate = this.handleEnrichmentUpdate.bind(this);
         
         // Listen for progressive enrichment updates
-        window.addEventListener('enrichmentComplete', (event) => {
-            this.handleEnrichmentUpdate(event.detail);
+        window.addEventListener('enrichmentComplete', this.handleEnrichmentUpdate);
+    }
+    
+    /**
+     * Cleanup method to remove event listeners
+     */
+    destroy() {
+        window.removeEventListener('enrichmentComplete', this.handleEnrichmentUpdate);
+        
+        // Clean up all tracked event listeners
+        this.eventListeners.forEach((listener, element) => {
+            element.removeEventListener(listener.type, listener.handler);
         });
+        this.eventListeners.clear();
     }
 
     /**
@@ -30,6 +44,15 @@ class SourceCard {
      * @returns {HTMLElement} Complete source card element
      */
     create(source, options = {}) {
+        // Defensive check for missing source.id
+        if (!source || !source.id) {
+            console.error('Invalid source object - missing ID:', source);
+            const errorCard = document.createElement('div');
+            errorCard.className = 'source-card error';
+            errorCard.textContent = 'Invalid source data';
+            return errorCard;
+        }
+        
         const {
             showCheckbox = true,
             showActions = true,
@@ -84,9 +107,15 @@ class SourceCard {
     }
     
     /**
-     * Update an existing source card with enriched data
+     * Update an existing source card with enriched data using diff-based patching
      */
     updateCard(enrichedSource) {
+        // Defensive check for missing source.id
+        if (!enrichedSource || !enrichedSource.id) {
+            console.error('Invalid enriched source - missing ID:', enrichedSource);
+            return;
+        }
+        
         const cardElement = document.querySelector(`[data-source-id="${enrichedSource.id}"]`);
         if (!cardElement) {
             console.log(`⚠️ Card not found for source ID: ${enrichedSource.id}`);
@@ -95,34 +124,39 @@ class SourceCard {
         
         console.log(`🔄 Updating card: ${enrichedSource.title}`);
         
-        // Remove skeleton loading state
-        cardElement.classList.remove('skeleton-loading');
-        
-        // Update title if enhanced by Claude
-        const titleElement = cardElement.querySelector('.source-title');
-        if (titleElement && enrichedSource.title !== titleElement.textContent) {
-            titleElement.textContent = enrichedSource.title;
-            titleElement.classList.add('content-updated'); // Visual feedback
-        }
-        
-        // Update excerpt if enhanced by Claude
-        const excerptElement = cardElement.querySelector('.source-excerpt');
-        if (excerptElement && enrichedSource.excerpt) {
-            excerptElement.textContent = enrichedSource.excerpt;
-            excerptElement.classList.add('content-updated'); // Visual feedback
-        }
-        
-        // Update badges with new licensing information
-        const badgesContainer = cardElement.querySelector('.source-badges');
-        if (badgesContainer) {
-            // Remove old license badge
-            const oldLicenseBadge = badgesContainer.querySelector('.license-badge');
-            if (oldLicenseBadge) {
-                oldLicenseBadge.remove();
+        // Batch DOM updates to prevent flickering
+        requestAnimationFrame(() => {
+            // Remove skeleton loading state
+            cardElement.classList.remove('skeleton-loading');
+            
+            // Diff-based title update
+            const titleElement = cardElement.querySelector('.source-title');
+            if (titleElement && enrichedSource.title && enrichedSource.title !== titleElement.textContent) {
+                titleElement.textContent = enrichedSource.title;
+                titleElement.classList.add('content-updated'); // Visual feedback
             }
             
-            // Add new license badge with enriched data
-            if (enrichedSource.licensing_protocol || enrichedSource.unlock_price > 0) {
+            // Diff-based excerpt update
+            const excerptElement = cardElement.querySelector('.source-excerpt');
+            if (excerptElement && enrichedSource.excerpt && enrichedSource.excerpt !== excerptElement.textContent) {
+                excerptElement.textContent = enrichedSource.excerpt;
+                excerptElement.classList.add('content-updated'); // Visual feedback
+            }
+            
+            // Update action button with fresh state
+            this._updateActionButton(cardElement, enrichedSource);
+            
+            // Update badges with new licensing information
+            const badgesContainer = cardElement.querySelector('.source-badges');
+            if (badgesContainer) {
+                // Remove old license badge
+                const oldLicenseBadge = badgesContainer.querySelector('.license-badge');
+                if (oldLicenseBadge) {
+                    oldLicenseBadge.remove();
+                }
+                
+                // Add new license badge with enriched data
+                if (enrichedSource.licensing_protocol || enrichedSource.unlock_price > 0) {
                 const newLicenseBadge = this._createLicenseBadge(enrichedSource);
                 newLicenseBadge.classList.add('badge-updated'); // Visual feedback
                 badgesContainer.appendChild(newLicenseBadge);
@@ -250,7 +284,7 @@ class SourceCard {
 
 
     /**
-     * Create rating display
+     * Create rating display with half-star support
      */
     _createRating(source) {
         const rating = document.createElement('div');
@@ -258,19 +292,30 @@ class SourceCard {
 
         const score = source.rating || source.relevance_score || source.quality_score || 0;
         const maxStars = 5;
+        const roundedScore = Math.round(score * 2) / 2; // Round to nearest 0.5
         
-        // Create star elements
+        // Create star elements with half-star support
         for (let i = 0; i < maxStars; i++) {
             const star = document.createElement('span');
-            star.className = i < score ? 'star filled' : 'star empty';
-            star.textContent = '★';
+            
+            if (i < Math.floor(roundedScore)) {
+                star.className = 'star filled';
+                star.textContent = '★';
+            } else if (i === Math.floor(roundedScore) && roundedScore % 1 === 0.5) {
+                star.className = 'star half';
+                star.textContent = '⭐'; // Half star emoji
+            } else {
+                star.className = 'star empty';
+                star.textContent = '☆';
+            }
+            
             rating.appendChild(star);
         }
 
         // Rating text
         const ratingText = document.createElement('span');
         ratingText.className = 'rating-text';
-        ratingText.textContent = `${score.toFixed(1)}/5`;
+        ratingText.textContent = `${roundedScore.toFixed(1)}/5`;
         rating.appendChild(ratingText);
 
         return rating;
@@ -325,7 +370,7 @@ class SourceCard {
     }
 
     /**
-     * Create checkbox for report selection
+     * Create checkbox for report selection with proper event cleanup
      */
     _createCheckbox(source) {
         const selection = document.createElement('div');
@@ -337,11 +382,21 @@ class SourceCard {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.className = 'source-selection-checkbox';
+        
+        // Use appState as single source of truth (eliminate state drift)
         checkbox.checked = this.appState?.isSourceSelected(source.id) || false;
         
-        // Event handler for selection
-        checkbox.addEventListener('change', (e) => {
+        // Create stable event handler
+        const changeHandler = (e) => {
             this._handleSelectionChange(source, e.target.checked);
+        };
+        
+        checkbox.addEventListener('change', changeHandler);
+        
+        // Track listener for cleanup
+        this.eventListeners.set(checkbox, {
+            type: 'change',
+            handler: changeHandler
         });
         
         const text = document.createElement('span');
@@ -356,26 +411,29 @@ class SourceCard {
     }
 
     /**
-     * Handle checkbox selection change
+     * Handle checkbox selection change - sync with appState only
      */
     _handleSelectionChange(source, isSelected) {
+        if (!source || !source.id) {
+            console.error('Invalid source in selection change:', source);
+            return;
+        }
+        
         const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
         
         if (isSelected) {
-            this.selectedSources.add(source.id);
             if (sourceCard) {
                 sourceCard.classList.add('selected');
             }
-            // Update app state
-            if (this.appState?.addSelectedSource) {
-                this.appState.addSelectedSource(source);
+            // Use appState as single source of truth
+            if (this.appState?.toggleSourceSelection) {
+                this.appState.toggleSourceSelection(source.id, source);
             }
         } else {
-            this.selectedSources.delete(source.id);
             if (sourceCard) {
                 sourceCard.classList.remove('selected');
             }
-            // Update app state
+            // Remove from appState
             if (this.appState?.removeSelectedSource) {
                 this.appState.removeSelectedSource(source.id);
             }
@@ -383,7 +441,11 @@ class SourceCard {
 
         // Dispatch custom event for other components
         const event = new CustomEvent('sourceSelectionChanged', {
-            detail: { source, isSelected, totalSelected: this.selectedSources.size }
+            detail: { 
+                source, 
+                isSelected, 
+                totalSelected: this.appState?.getSelectedSourcesCount() || 0
+            }
         });
         document.dispatchEvent(event);
     }
@@ -411,10 +473,10 @@ class SourceCard {
     }
 
     /**
-     * Create unlock/download action button
+     * Create unlock/download action button with fresh state
      */
     _createActionButton(source) {
-        const cost = source.unlock_price || 0;  // Simplified: unlock_price is primary source
+        const cost = source.unlock_price || 0;
         const isUnlocked = source.is_unlocked || false;
         
         const button = document.createElement('button');
@@ -422,15 +484,39 @@ class SourceCard {
         if (isUnlocked) {
             button.className = 'download-btn unlock-btn';
             button.innerHTML = '📄 <span>Download</span>';
-            button.addEventListener('click', () => this._handleDownload(source));
+            const downloadHandler = () => this._handleDownload(source);
+            button.addEventListener('click', downloadHandler);
+            this.eventListeners.set(button, { type: 'click', handler: downloadHandler });
         } else {
             button.className = 'unlock-btn';
             const costText = cost > 0 ? ` $${cost.toFixed(2)}` : '';
             button.innerHTML = `🔓 <span>Unlock${costText}</span>`;
-            button.addEventListener('click', () => this._handleUnlock(source));
+            const unlockHandler = () => this._handleUnlock(source);
+            button.addEventListener('click', unlockHandler);
+            this.eventListeners.set(button, { type: 'click', handler: unlockHandler });
         }
         
         return button;
+    }
+    
+    /**
+     * Update action button with fresh state data
+     */
+    _updateActionButton(cardElement, freshSource) {
+        const actionBtn = cardElement.querySelector('.unlock-btn');
+        if (!actionBtn || !freshSource) return;
+        
+        const cost = freshSource.unlock_price || 0;
+        const isUnlocked = freshSource.is_unlocked || false;
+        
+        if (isUnlocked) {
+            actionBtn.className = 'download-btn unlock-btn';
+            actionBtn.innerHTML = '📄 <span>Download</span>';
+        } else {
+            actionBtn.className = 'unlock-btn';
+            const costText = cost > 0 ? ` $${cost.toFixed(2)}` : '';
+            actionBtn.innerHTML = `🔓 <span>Unlock${costText}</span>`;
+        }
     }
 
     /**
@@ -464,19 +550,28 @@ class SourceCard {
     }
 
     /**
-     * Update all checkboxes to match current selection state
+     * Update all checkboxes to match appState (single source of truth)
      */
-    updateSelectionStates(selectedSourceIds = []) {
+    updateSelectionStates() {
         const checkboxes = document.querySelectorAll('.source-selection-checkbox');
-        const selectedSet = new Set(selectedSourceIds);
         
         checkboxes.forEach(checkbox => {
             const sourceCard = checkbox.closest('[data-source-id]');
             if (sourceCard) {
                 const sourceId = sourceCard.getAttribute('data-source-id');
-                const isSelected = selectedSet.has(sourceId);
+                const isSelected = this.appState?.isSourceSelected(sourceId) || false;
+                
+                // Prevent event firing during programmatic update
+                const currentHandler = this.eventListeners.get(checkbox)?.handler;
+                if (currentHandler) {
+                    checkbox.removeEventListener('change', currentHandler);
+                }
                 
                 checkbox.checked = isSelected;
+                
+                if (currentHandler) {
+                    checkbox.addEventListener('change', currentHandler);
+                }
                 
                 if (isSelected) {
                     sourceCard.classList.add('selected');
@@ -485,27 +580,27 @@ class SourceCard {
                 }
             }
         });
-        
-        this.selectedSources = selectedSet;
     }
 
     /**
-     * Get all currently selected sources
+     * Get all currently selected sources from appState
      */
     getSelectedSources() {
-        return Array.from(this.selectedSources);
+        return this.appState?.getSelectedSources() || [];
     }
 
     /**
-     * Clear all selections
+     * Clear all selections via appState
      */
     clearSelections() {
-        this.selectedSources.clear();
-        this.updateSelectionStates([]);
+        if (this.appState?.clearConversation) {
+            this.appState.clearConversation();
+        }
+        this.updateSelectionStates();
     }
 
     /**
-     * Render multiple source cards in a container
+     * Render multiple source cards with smart updates to preserve scroll position
      */
     renderSourceGrid(sources, containerId, options = {}) {
         const container = document.getElementById(containerId);
@@ -514,14 +609,45 @@ class SourceCard {
             return;
         }
 
-        // Clear existing content
-        container.innerHTML = '';
-
-        // Create source cards
-        sources.forEach(source => {
-            const card = this.create(source, options);
-            container.appendChild(card);
-        });
+        // Preserve scroll position
+        const scrollTop = container.scrollTop;
+        
+        // Smart update: only clear if sources are completely different
+        const existingCards = container.querySelectorAll('[data-source-id]');
+        const existingIds = Array.from(existingCards).map(card => card.getAttribute('data-source-id'));
+        const newIds = sources.map(source => source.id).filter(Boolean);
+        
+        const needsFullRender = !this._arraysEqual(existingIds, newIds);
+        
+        if (needsFullRender) {
+            // Full re-render needed
+            container.innerHTML = '';
+            
+            // Create source cards
+            sources.forEach(source => {
+                if (source && source.id) {
+                    const card = this.create(source, options);
+                    container.appendChild(card);
+                }
+            });
+            
+            // Restore scroll position
+            container.scrollTop = scrollTop;
+        } else {
+            // Update existing cards in place
+            sources.forEach(source => {
+                if (source && source.id) {
+                    this.updateCard(source);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Helper to compare arrays for equality
+     */
+    _arraysEqual(a, b) {
+        return a.length === b.length && a.every((val, i) => val === b[i]);
     }
 }
 
