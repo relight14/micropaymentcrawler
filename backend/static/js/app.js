@@ -405,7 +405,7 @@ export class ChatResearchApp {
                     console.log('Set initials to:', userInitials);
                 }
                 if (balance) {
-                    const walletBalance = this.authService.getWalletBalance();
+                    const walletBalance = this.authService.getWalletBalance() || 0;
                     balance.textContent = `$${walletBalance.toFixed(2)}`;
                     console.log('Set balance to:', walletBalance);
                 }
@@ -429,8 +429,8 @@ export class ChatResearchApp {
         
         if (profileButton && dropdownMenu) {
             // Remove any existing listeners to avoid duplicates
-            profileButton.replaceWith(profileButton.cloneNode(true));
-            const newProfileButton = document.getElementById('profileButton');
+            const newProfileButton = profileButton.cloneNode(true);
+            profileButton.parentNode.replaceChild(newProfileButton, profileButton);
             
             // Toggle dropdown on profile button click
             newProfileButton.addEventListener('click', (e) => {
