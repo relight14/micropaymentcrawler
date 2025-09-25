@@ -37,6 +37,7 @@ async def get_enrichment_status(cache_key: str):
                         "unlock_price": source.unlock_price,
                         "licensing_protocol": source.licensing_protocol,
                         "licensing_cost": source.licensing_cost,
+                        "relevance_score": source.relevance_score,
                         "enrichment_status": "complete"
                     } for source in enriched_sources
                 ]
@@ -130,6 +131,7 @@ async def analyze_research_query(request: ResearchRequest):
             
             sources_response.append({
                 "id": source.id,
+                "relevance_score": source.relevance_score,
                 "title": source.title,
                 "domain": source.domain,
                 "excerpt": source.excerpt,
