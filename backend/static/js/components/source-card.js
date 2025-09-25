@@ -235,31 +235,19 @@ class SourceCard {
     _shouldShowRSLDemo(source) {
         // Show RSL demo for academic/research domains
         const domain = source.domain || '';
-        return domain.includes('edu') || domain.includes('research') || 
-               domain.includes('journal') || domain.includes('academic');
+        return domain.endsWith('.edu') || domain.endsWith('.edu/') ||
+               /\b(research|journal|academic)\b/i.test(domain);
     }
     
     /**
      * Determine if source should show Cloudflare demo badge  
      */
     _shouldShowCloudflareDemo(source) {
-        // Show Cloudflare demo for major publisher domains
+        // Show Cloudflare demo for major publisher domains  
         const domain = source.domain || '';
-        return domain.includes('nytimes') || domain.includes('wsj') || 
-               domain.includes('economist') || domain.includes('reuters');
+        return /\b(nytimes|wsj|economist|reuters)\b/i.test(domain);
     }
 
-    /**
-     * Get emoji for licensing protocol
-     */
-    _getProtocolEmoji(protocol) {
-        const emojiMap = {
-            'rsl': '🔒',
-            'tollbit': '⚡', 
-            'cloudflare': '☁️'
-        };
-        return emojiMap[protocol.toLowerCase()] || '';
-    }
 
     /**
      * Create rating display
@@ -426,7 +414,7 @@ class SourceCard {
      * Create unlock/download action button
      */
     _createActionButton(source) {
-        const cost = source.unlock_price || source.licensing?.cost || 0;
+        const cost = source.unlock_price || 0;  // Simplified: unlock_price is primary source
         const isUnlocked = source.is_unlocked || false;
         
         const button = document.createElement('button');
