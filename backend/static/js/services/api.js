@@ -6,6 +6,14 @@ export class APIService {
     constructor(authService) {
         this.baseURL = window.location.origin;
         this.authService = authService;
+        
+        // Configurable polling parameters (browser-safe, future: move to window.CONFIG)
+        this.config = {
+            POLL_INTERVAL_MS: window.CONFIG?.POLL_INTERVAL_MS || 2000,
+            MAX_POLL_ATTEMPTS: window.CONFIG?.MAX_POLL_ATTEMPTS || 10,
+            RETRY_ATTEMPTS: window.CONFIG?.API_RETRY_ATTEMPTS || 3,
+            RETRY_BASE_DELAY: window.CONFIG?.API_RETRY_BASE_DELAY || 1000
+        };
     }
 
     getAuthHeaders() {
@@ -109,12 +117,13 @@ export class APIService {
     }
     
     // Progressive enrichment polling
-    async _pollForEnrichment(cacheKey, maxAttempts = 10) {
+    async _pollForEnrichment(cacheKey, maxAttempts = null) {
+        const attempts = maxAttempts || this.config.MAX_POLL_ATTEMPTS;
         console.log(`📡 Starting enrichment polling for cache key: ${cacheKey.substring(0, 20)}...`);
         
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        for (let attempt = 1; attempt <= attempts; attempt++) {
             try {
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s between polls
+                await new Promise(resolve => setTimeout(resolve, this.config.POLL_INTERVAL_MS));
                 
                 const response = await fetch(`${this.baseURL}/api/research/enrichment/${encodeURIComponent(cacheKey)}`, {
                     method: 'GET',
@@ -148,16 +157,21 @@ export class APIService {
             }
         }
         
-        console.log(`⏰ Enrichment polling timed out after ${maxAttempts} attempts`);
+        console.log(`⏰ Enrichment polling timed out after ${attempts} attempts`);
     }
     
-    // Event system for progressive updates
+    // Event system for progressive updates with error boundary
     _emitEnrichmentUpdate(cacheKey, enrichedSources) {
-        const event = new CustomEvent('enrichmentComplete', {
-            detail: { cacheKey, sources: enrichedSources }
-        });
-        window.dispatchEvent(event);
-        console.log(`📢 Emitted enrichmentComplete event for ${enrichedSources.length} sources`);
+        try {
+            const event = new CustomEvent('enrichmentComplete', {
+                detail: { cacheKey, sources: enrichedSources }
+            });
+            window.dispatchEvent(event);
+            console.log(`📢 Emitted enrichmentComplete event for ${enrichedSources.length} sources`);
+        } catch (error) {
+            console.error('❌ Failed to emit enrichment update event:', error);
+            // Continue gracefully - don't let event dispatch failures break the flow
+        }
     }
 
     async clearConversation() {
@@ -192,20 +206,14 @@ export class APIService {
     }
 
     async unlockSource(sourceId, price) {
-        const response = await fetch(`${this.baseURL}/api/sources/unlock-source`, {
+        return await this._fetchWithRetry(`${this.baseURL}/api/sources/unlock-source`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify({
                 source_id: sourceId,
                 price_cents: Math.round(price * 100)
             })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Source unlock failed: ${response.statusText}`);
-        }
-
-        return await response.json();
+        }, 'Source unlock failed');
     }
 
     async purchaseTier(tierId, price, query = "Research Query", selectedSources = null) {
@@ -220,16 +228,45 @@ export class APIService {
             requestBody.selected_source_ids = selectedSources.map(source => source.id);
         }
         
-        const response = await fetch(`${this.baseURL}/api/purchase`, {
+        return await this._fetchWithRetry(`${this.baseURL}/api/purchase`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            throw new Error(`Tier purchase failed: ${response.statusText}`);
+        }, 'Tier purchase failed');
+    }
+    
+    // Retry logic with exponential backoff
+    async _fetchWithRetry(url, options, errorPrefix = 'Request failed') {
+        for (let attempt = 1; attempt <= this.config.RETRY_ATTEMPTS; attempt++) {
+            try {
+                const response = await fetch(url, options);
+                
+                if (!response.ok) {
+                    // Don't retry 4xx errors (client errors) except 408 (timeout)
+                    if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+                        throw new Error(`${errorPrefix}: ${response.statusText}`);
+                    }
+                    
+                    // Retry on 5xx errors and 408
+                    if (attempt === this.config.RETRY_ATTEMPTS) {
+                        throw new Error(`${errorPrefix}: ${response.statusText}`);
+                    }
+                    
+                    console.log(`⚠️ ${errorPrefix} attempt ${attempt} failed: ${response.statusText}. Retrying...`);
+                } else {
+                    return await response.json();
+                }
+                
+            } catch (error) {
+                if (attempt === this.config.RETRY_ATTEMPTS) {
+                    throw error;
+                }
+                console.log(`❌ ${errorPrefix} attempt ${attempt} error: ${error.message}. Retrying...`);
+            }
+            
+            // Exponential backoff: wait longer between retries
+            const delay = this.config.RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
-
-        return await response.json();
     }
 }
