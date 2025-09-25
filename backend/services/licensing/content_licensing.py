@@ -244,11 +244,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            # Use correct Tollbit rate endpoint from documentation
-            # GET /dev/v1/rate/<content_path>
-            from urllib.parse import quote
-            encoded_url = quote(target_url, safe='')
-            rate_endpoint = f"{self.base_url}/dev/v1/rate/{encoded_url}"
+            # Use correct Tollbit rate endpoint from documentation  
+            # GET /dev/v1/rate/<content_path> where content_path is the plain URL
+            rate_endpoint = f"{self.base_url}/dev/v1/rate/{target_url}"
             
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
