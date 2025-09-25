@@ -168,7 +168,8 @@ class SourceCard {
                     newLicenseBadge.classList.add('badge-updated'); // Visual feedback
                     badgesContainer.appendChild(newLicenseBadge);
                 }
-        }
+            }
+        });
         
         console.log(`✅ Card updated: ${enrichedSource.title}`);
     }
