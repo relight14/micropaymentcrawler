@@ -322,35 +322,40 @@ class SourceCard {
         const rating = document.createElement('div');
         rating.className = 'source-rating';
 
-        // Get relevance score and normalize to 1-5 scale
+        // Get relevance score and normalize to 1-5 scale with 1 decimal precision
         const rawScore = source.relevance_score || source.rating || source.quality_score;
         let normalizedScore;
         
         if (rawScore === null || rawScore === undefined) {
-            normalizedScore = 1; // Default to 1 star if no score
+            normalizedScore = 1.0; // Default to 1.0 if no score
         } else if (rawScore <= 1.0) {
-            // Assume 0-1 scale, convert to 1-5
-            normalizedScore = Math.max(1, Math.round(rawScore * 5));
+            // Assume 0-1 scale, convert to 1-5 with decimals
+            normalizedScore = Math.max(1.0, Math.round((rawScore * 5) * 10) / 10);
         } else if (rawScore <= 5.0) {
             // Assume already 0-5 scale
-            normalizedScore = Math.max(1, Math.round(rawScore));
+            normalizedScore = Math.max(1.0, Math.round(rawScore * 10) / 10);
         } else {
             // Assume 0-100 scale, convert to 1-5
-            normalizedScore = Math.max(1, Math.round((rawScore / 100) * 5));
+            normalizedScore = Math.max(1.0, Math.round(((rawScore / 100) * 5) * 10) / 10);
         }
         
         const maxStars = 5;
+        const filledStars = Math.floor(normalizedScore);
+        const hasPartialStar = (normalizedScore % 1) >= 0.3; // Show partial star if >= 0.3
         
-        // Add hover tooltip
-        rating.title = `Relevance: ${normalizedScore}/5`;
+        // Add hover tooltip with decimal precision
+        rating.title = `Relevance: ${normalizedScore.toFixed(1)}/5`;
         
-        // Create star elements (no half-stars, round to nearest integer)
+        // Create star elements with partial star support
         for (let i = 0; i < maxStars; i++) {
             const star = document.createElement('span');
             
-            if (i < normalizedScore) {
+            if (i < filledStars) {
                 star.className = 'star filled';
                 star.textContent = '⭐️';
+            } else if (i === filledStars && hasPartialStar) {
+                star.className = 'star partial';
+                star.textContent = '⭐'; // Different emoji for partial
             } else {
                 star.className = 'star empty';
                 star.textContent = '☆';
@@ -358,6 +363,12 @@ class SourceCard {
             
             rating.appendChild(star);
         }
+        
+        // Add numeric rating display
+        const ratingNumber = document.createElement('span');
+        ratingNumber.className = 'rating-number';
+        ratingNumber.textContent = `${normalizedScore.toFixed(1)}`;
+        rating.appendChild(ratingNumber);
 
         return rating;
     }
