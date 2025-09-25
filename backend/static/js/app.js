@@ -8,6 +8,9 @@ import { AppState } from './state/app-state.js';
 import { UIManager } from './components/ui-manager.js';
 import { debounce } from './utils/helpers.js';
 
+// Import SourceCard component (loaded as global, make available to module)
+const SourceCard = window.SourceCard;
+
 export class ChatResearchApp {
     constructor() {
         // Initialize services and state (dependency injection)
