@@ -58,8 +58,8 @@ export class ChatResearchApp {
     initializeEventListeners() {
         console.log("🔧 initializeEventListeners() starting");
         // Get DOM elements
-        const chatInput = document.getElementById('chatInput');
-        const sendButton = document.getElementById('sendButton');
+        const chatInput = document.getElementById('newChatInput');
+        const sendButton = document.getElementById('newSendButton');
         
         // Debug DOM elements
         console.log("chatInput:", chatInput);
@@ -128,7 +128,7 @@ export class ChatResearchApp {
 
     async sendMessage() {
         console.log("🚨 SENDMESSAGE() FIRED! This proves event handlers work!");
-        const chatInput = document.getElementById('chatInput');
+        const chatInput = document.getElementById('newChatInput');
         const message = chatInput?.value?.trim();
         console.log("📝 Message to send:", message);
         
