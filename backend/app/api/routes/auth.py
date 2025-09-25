@@ -91,6 +91,31 @@ async def signup(request: SignupRequest):
         raise HTTPException(status_code=500, detail="Account creation service unavailable")
 
 
+@router.post("/refresh")
+async def refresh_token(request: dict):
+    """Refresh access token using refresh token"""
+    try:
+        refresh_token = request.get("refresh_token")
+        if not refresh_token:
+            raise HTTPException(status_code=400, detail="Refresh token required")
+            
+        # Use LedeWire API to refresh token
+        result = ledewire.refresh_access_token(refresh_token)
+        
+        return {
+            "access_token": result["access_token"],
+            "refresh_token": result.get("refresh_token", refresh_token),
+            "token_type": result.get("token_type", "Bearer"),
+            "expires_in": result.get("expires_in", 3600)
+        }
+    except requests.HTTPError as e:
+        if "Invalid or expired refresh token" in str(e):
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+        else:
+            print(f"Token refresh error: {str(e)}")
+            raise HTTPException(status_code=503, detail="Unable to refresh token")
+
+
 @router.get("/balance", response_model=WalletBalanceResponse)
 # @limiter.limit("10/minute")
 async def get_wallet_balance(authorization: str = Header(None, alias="Authorization")):

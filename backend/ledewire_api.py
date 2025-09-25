@@ -144,6 +144,42 @@ class LedeWireAPI:
                     raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
             else:
                 raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+
+    def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
+        """
+        POST /v1/auth/refresh
+        Refresh access token using refresh token.
+        """
+        from backend.utils.config import is_mock_mode
+        
+        # Mock mode: return mock refresh response
+        if is_mock_mode():
+            return {
+                "access_token": "mock_access_token_" + str(uuid.uuid4())[:8],
+                "refresh_token": refresh_token,  # Keep same refresh token
+                "token_type": "Bearer",
+                "expires_in": 3600
+            }
+            
+        try:
+            response = self.session.post(
+                f"{self.api_base}/auth/refresh",
+                json={"refresh_token": refresh_token},
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            # PRODUCTION: Re-raise with proper HTTP status
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code == 401:
+                    raise requests.HTTPError("Invalid or expired refresh token", response=e.response)
+                elif e.response.status_code == 400:
+                    raise requests.HTTPError("Invalid refresh request", response=e.response)
+                else:
+                    raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+            else:
+                raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
     
     # User Methods
     

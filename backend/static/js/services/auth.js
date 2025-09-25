@@ -6,6 +6,7 @@ export class AuthService {
     constructor() {
         this.baseURL = window.location.origin;
         this.token = localStorage.getItem('ledewire_token');
+        this.refreshToken = localStorage.getItem('ledewire_refresh_token');
         this.walletBalance = 0;
     }
 
@@ -17,6 +18,15 @@ export class AuthService {
         return this.token;
     }
 
+    setTokens(accessToken, refreshToken) {
+        this.token = accessToken;
+        this.refreshToken = refreshToken;
+        localStorage.setItem('ledewire_token', accessToken);
+        if (refreshToken) {
+            localStorage.setItem('ledewire_refresh_token', refreshToken);
+        }
+    }
+
     setToken(token) {
         this.token = token;
         localStorage.setItem('ledewire_token', token);
@@ -24,7 +34,9 @@ export class AuthService {
 
     clearToken() {
         this.token = null;
+        this.refreshToken = null;
         localStorage.removeItem('ledewire_token');
+        localStorage.removeItem('ledewire_refresh_token');
     }
 
     async login(email, password) {
@@ -40,7 +52,7 @@ export class AuthService {
         }
 
         const data = await response.json();
-        this.setToken(data.access_token);
+        this.setTokens(data.access_token, data.refresh_token);
         
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
@@ -64,13 +76,38 @@ export class AuthService {
         }
 
         const data = await response.json();
-        this.setToken(data.access_token);
+        this.setTokens(data.access_token, data.refresh_token);
         
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
         
         // Get wallet balance after login
         await this.updateWalletBalance();
+        
+        return data;
+    }
+
+    async refreshAccessToken() {
+        if (!this.refreshToken) {
+            throw new Error('No refresh token available');
+        }
+
+        const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: this.refreshToken })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Token refresh failed');
+        }
+
+        const data = await response.json();
+        this.setTokens(data.access_token, data.refresh_token);
+        
+        // Update user info with new token
+        this.userInfo = this.decodeJWT(data.access_token);
         
         return data;
     }
@@ -90,6 +127,29 @@ export class AuthService {
             });
 
             if (response.status === 401) {
+                // Try to refresh token before logging out
+                if (this.refreshToken) {
+                    try {
+                        await this.refreshAccessToken();
+                        // Retry the wallet balance request with new token
+                        const retryResponse = await fetch(`${this.baseURL}/api/auth/balance`, {
+                            headers: { 
+                                'Authorization': `Bearer ${this.token}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (retryResponse.ok) {
+                            const data = await retryResponse.json();
+                            this.walletBalance = (data.balance_cents || 0) / 100;
+                            return this.walletBalance;
+                        }
+                    } catch (refreshError) {
+                        console.log('Token refresh failed, logging out:', refreshError.message);
+                    }
+                }
+                
+                // If refresh failed or no refresh token, log out
                 this.clearToken();
                 this.walletBalance = 0;
                 return 0;
