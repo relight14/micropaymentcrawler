@@ -72,10 +72,10 @@ async def analyze_research_query(request: ResearchRequest):
         total_cost = sum(source.unlock_price or 0.0 for source in sources if source.unlock_price)
         premium_sources = [s for s in sources if s.unlock_price and s.unlock_price > 0.15]
         
-        # Create licensing breakdown
+        # Create licensing breakdown with None-safe handling
         licensing_breakdown = {}
         for source in sources:
-            if source.licensing_protocol and source.licensing_cost:
+            if source.licensing_protocol and source.licensing_cost is not None:
                 protocol = source.licensing_protocol
                 if protocol not in licensing_breakdown:
                     licensing_breakdown[protocol] = {
@@ -102,7 +102,7 @@ async def analyze_research_query(request: ResearchRequest):
             if source.licensing_protocol:
                 licensing = {
                     "protocol": source.licensing_protocol.lower(),
-                    "cost": source.licensing_cost,
+                    "cost": source.licensing_cost if source.licensing_cost is not None else 0.0,
                     "publisher": getattr(source, 'publisher_name', None),
                     "license_type": getattr(source, 'license_type', 'ai-include')
                 }
@@ -170,13 +170,26 @@ def _extract_conversation_context(conversation_history: List[Dict[str, str]]) ->
 
 def _generate_research_preview(query: str, sources: List[Any]) -> str:
     """Generate a preview of what the full research package would contain."""
-    academic_count = len([s for s in sources if any(domain in s.domain.lower() 
-                         for domain in ['arxiv', 'nature', 'science', 'ieee', 'pubmed', 'ncbi', '.edu'])])
-    tech_count = len([s for s in sources if any(domain in s.domain.lower() 
-                     for domain in ['microsoft', 'google', 'ibm', 'amazon', 'openai', 'apple'])])
+    # Defensive handling for empty or malformed sources
+    if not sources or len(sources) == 0:
+        return f"**Research Preview: {query}**\n\nNo sources found for this query. Please try a different search term or adjust your budget."
     
-    premium_count = len([s for s in sources if s.unlock_price and s.unlock_price > 0.15])
-    avg_price = sum(s.unlock_price or 0 for s in sources) / len(sources) if sources else 0
+    try:
+        academic_count = len([s for s in sources if hasattr(s, 'domain') and s.domain and
+                             any(domain in s.domain.lower() for domain in ['arxiv', 'nature', 'science', 'ieee', 'pubmed', 'ncbi', '.edu'])])
+        tech_count = len([s for s in sources if hasattr(s, 'domain') and s.domain and
+                         any(domain in s.domain.lower() for domain in ['microsoft', 'google', 'ibm', 'amazon', 'openai', 'apple'])])
+        
+        premium_count = len([s for s in sources if hasattr(s, 'unlock_price') and s.unlock_price and s.unlock_price > 0.15])
+        
+        # Safe average calculation with fallback
+        valid_prices = [s.unlock_price for s in sources if hasattr(s, 'unlock_price') and s.unlock_price is not None]
+        avg_price = sum(valid_prices) / len(valid_prices) if valid_prices else 0.0
+        
+    except Exception as e:
+        # Fallback for any unexpected data structure issues
+        academic_count = tech_count = premium_count = 0
+        avg_price = 0.0
     
     return f"""**Research Preview: {query}**
 
