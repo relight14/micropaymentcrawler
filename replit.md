@@ -12,13 +12,15 @@ Preferred communication style: Simple, everyday language.
 The frontend is a Single Page Application built with vanilla HTML/CSS/JavaScript, featuring a clean, modular ES6 architecture. It delivers a responsive, modern interface with tier selection cards and dynamic content loading. UI elements include story cards with quotes and descriptions for source articles, professional presentation for search results, and transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️).
 
 ## Technical Implementations
-- **Frontend**: Completely refactored modular architecture with clean separation of concerns:
-  - `js/app.js` - Main application controller (330 lines, pure coordination)
+- **Frontend**: Frontend-Consolidated architecture with single source of truth for components:
+  - `js/app.js` - Main application controller (pure coordination)
   - `js/services/api.js` - Backend communication with proper authentication headers
   - `js/services/auth.js` - Authentication and wallet management
   - `js/state/app-state.js` - Centralized state management with immutable patterns
   - `js/components/ui-manager.js` - Pure UI logic and DOM manipulation
+  - `js/components/source-card.js` - **Single source of truth** for all source card generation and interaction logic
   - `js/utils/helpers.js` - Reusable utility functions
+  - `styles/components/source-card.css` - **Consolidated CSS** for all source card styling, eliminating conflicts between multiple CSS files
 - **Backend**: Built with FastAPI using unified service architecture under `services/` directory with consolidated modules for AI processing (`services/ai/`), content licensing (`services/licensing/`), and research operations (`services/research/`). Uses `schemas/domain.py` as single source of truth for data models.
 - **Content Generation**: Hybrid pipeline uses Tavily for discovering real URLs and Claude for content polishing, with licensing detection and graceful API fallbacks.
 - **Authentication**: Secure authentication with proper JWT token management, LedeWire integration, and optimistic authentication flows with robust 401 handling.
