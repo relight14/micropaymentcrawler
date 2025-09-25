@@ -895,12 +895,26 @@ export class ChatResearchApp {
             });
         }
         
-        // Create the source cards grid using the component
-        const sourcesGrid = document.createElement('div');
-        sourcesGrid.className = 'source-cards-grid';
+        // Create the DOM structure that CSS expects
+        const container = document.createElement('div');
+        container.className = 'sources-preview-section';
         
+        // Create header section
+        const header = document.createElement('div');
+        header.className = 'preview-header';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Sources Found';
+        
+        const subtitle = document.createElement('p');
+        subtitle.textContent = `Found ${sources.length} sources for your research`;
+        
+        header.appendChild(title);
+        header.appendChild(subtitle);
+        container.appendChild(header);
+        
+        // Create individual source cards
         sources.forEach((source, index) => {
-            
             // Use source data as-is from backend
             const sourceData = {
                 ...source
@@ -913,19 +927,11 @@ export class ChatResearchApp {
             });
             
             // Source card is ready to display with real backend data
-            sourcesGrid.appendChild(sourceCard);
+            container.appendChild(sourceCard);
         });
         
-        // Create wrapper message with original formatting
-        const messageDiv = document.createElement('div');
-        const headerText = document.createElement('strong');
-        headerText.textContent = `🔍 Found ${sources.length} sources for your research:`;
-        messageDiv.appendChild(headerText);
-        messageDiv.appendChild(document.createElement('br'));
-        messageDiv.appendChild(document.createElement('br'));
-        messageDiv.appendChild(sourcesGrid);
-        
-        this.addMessage('assistant', messageDiv.outerHTML);
+        // Add the properly structured container to the chat
+        this.addMessage('assistant', container.outerHTML);
     }
     
     async _pollForEnrichedResults(query) {
