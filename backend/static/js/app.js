@@ -35,12 +35,18 @@ export class ChatResearchApp {
         try {
             this.initializeEventListeners();
             this.uiManager.updateModeDisplay();
-            this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            // Safe wallet display update - only if user is authenticated
+            if (this.authService.isAuthenticated()) {
+                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            }
             
             // Update wallet balance if authenticated
             if (this.authService.isAuthenticated()) {
                 await this.authService.updateWalletBalance();
+                // Safe wallet display update - only if user is authenticated
+            if (this.authService.isAuthenticated()) {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            }
             }
         } catch (error) {
             console.error('Error initializing app:', error);
@@ -349,7 +355,10 @@ export class ChatResearchApp {
                 result = await this.authService.signup(email, password);
             }
             
-            this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            // Safe wallet display update - only if user is authenticated
+            if (this.authService.isAuthenticated()) {
+                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            }
             this.addMessage('system', `Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`);
             
             // Close the auth modal
@@ -406,8 +415,9 @@ export class ChatResearchApp {
                 }
                 if (balance) {
                     const walletBalance = this.authService.getWalletBalance() || 0;
-                    balance.textContent = `$${walletBalance.toFixed(2)}`;
-                    console.log('Set balance to:', walletBalance);
+                    const safeBalance = typeof walletBalance === 'number' ? walletBalance : 0;
+                    balance.textContent = `$${safeBalance.toFixed(2)}`;
+                    console.log('Set balance to:', safeBalance);
                 }
                 
                 // Add dropdown functionality
@@ -533,7 +543,10 @@ export class ChatResearchApp {
             }
             
             await this.authService.updateWalletBalance();
-            this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            // Safe wallet display update - only if user is authenticated
+            if (this.authService.isAuthenticated()) {
+                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            }
             
         } catch (error) {
             console.error('Error unlocking source:', error);
@@ -579,7 +592,10 @@ export class ChatResearchApp {
             }
             
             await this.authService.updateWalletBalance();
-            this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            // Safe wallet display update - only if user is authenticated
+            if (this.authService.isAuthenticated()) {
+                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            }
             
         } catch (error) {
             console.error('Error purchasing tier:', error);
@@ -942,7 +958,10 @@ export class ChatResearchApp {
             if (excerptEl && source.excerpt) excerptEl.textContent = source.excerpt;
             
             const priceEl = sourceCard.querySelector('.source-price');
-            if (priceEl && source.unlock_price) priceEl.textContent = `$${source.unlock_price.toFixed(2)}`;
+            if (priceEl && source.unlock_price) {
+                const safePrice = typeof source.unlock_price === 'number' ? source.unlock_price : 0;
+                priceEl.textContent = `$${safePrice.toFixed(2)}`;
+            }
             
             // Add licensing badge if available
             if (source.licensing_protocol) {
