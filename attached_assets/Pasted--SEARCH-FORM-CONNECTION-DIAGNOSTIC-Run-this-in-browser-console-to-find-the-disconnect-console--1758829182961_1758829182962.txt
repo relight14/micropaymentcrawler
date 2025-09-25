@@ -1,0 +1,71 @@
+// SEARCH FORM CONNECTION DIAGNOSTIC
+// Run this in browser console to find the disconnect
+
+console.log('🔍 SEARCH FORM DIAGNOSTIC STARTING...');
+
+// 1. CHECK IF SEARCH FORM EXISTS
+const searchForm = document.getElementById('search-form');
+const searchInput = document.getElementById('search-input');
+const searchButton = document.getElementById('search-button');
+const submitButton = document.querySelector('button[type="submit"]');
+
+console.log('📋 FORM ELEMENTS FOUND:');
+console.log('Search form:', searchForm);
+console.log('Search input:', searchInput);  
+console.log('Search button:', searchButton);
+console.log('Submit button:', submitButton);
+
+// 2. CHECK EVENT LISTENERS
+if (searchForm) {
+    console.log('✅ Form found - checking event listeners...');
+    console.log('Form onsubmit:', searchForm.onsubmit);
+    console.log('Form submit listeners:', getEventListeners ? getEventListeners(searchForm) : 'Use Dev Tools');
+} else {
+    console.log('❌ NO SEARCH FORM FOUND');
+}
+
+if (searchButton) {
+    console.log('✅ Button found - checking event listeners...');
+    console.log('Button onclick:', searchButton.onclick);
+    console.log('Button listeners:', getEventListeners ? getEventListeners(searchButton) : 'Use Dev Tools');
+} else {
+    console.log('❌ NO SEARCH BUTTON FOUND');
+}
+
+// 3. CHECK FOR sendMessage FUNCTION
+if (typeof sendMessage === 'function') {
+    console.log('✅ sendMessage function exists');
+} else if (typeof window.sendMessage === 'function') {
+    console.log('✅ window.sendMessage function exists');
+} else {
+    console.log('❌ sendMessage function NOT FOUND');
+}
+
+// 4. TEST MANUAL TRIGGER
+console.log('🧪 TESTING MANUAL TRIGGER:');
+try {
+    if (typeof sendMessage === 'function') {
+        console.log('Attempting to call sendMessage directly...');
+        sendMessage();
+    } else if (window.sendMessage) {
+        console.log('Attempting to call window.sendMessage directly...');
+        window.sendMessage();
+    } else {
+        console.log('❌ Cannot test - sendMessage not accessible');
+    }
+} catch (error) {
+    console.log('❌ Error calling sendMessage:', error);
+}
+
+// 5. SEARCH FOR ALL FORMS AND BUTTONS
+console.log('🔎 ALL FORMS ON PAGE:');
+document.querySelectorAll('form').forEach((form, i) => {
+    console.log(`Form ${i}:`, form, 'ID:', form.id, 'Class:', form.className);
+});
+
+console.log('🔎 ALL BUTTONS ON PAGE:');
+document.querySelectorAll('button').forEach((btn, i) => {
+    console.log(`Button ${i}:`, btn.textContent, 'ID:', btn.id, 'onclick:', btn.onclick);
+});
+
+console.log('🔍 DIAGNOSTIC COMPLETE');
