@@ -198,38 +198,22 @@ def _generate_research_preview(query: str, sources: List[Any]) -> str:
     try:
         academic_count = len([s for s in sources if hasattr(s, 'domain') and s.domain and
                              any(domain in s.domain.lower() for domain in ['arxiv', 'nature', 'science', 'ieee', 'pubmed', 'ncbi', '.edu'])])
-        tech_count = len([s for s in sources if hasattr(s, 'domain') and s.domain and
-                         any(domain in s.domain.lower() for domain in ['microsoft', 'google', 'ibm', 'amazon', 'openai', 'apple'])])
+        licensed_count = len([s for s in sources if hasattr(s, 'unlock_price') and s.unlock_price and s.unlock_price > 0])
+        unlicensed_count = len(sources) - licensed_count
         
-        premium_count = len([s for s in sources if hasattr(s, 'unlock_price') and s.unlock_price and s.unlock_price > 0.15])
-        
-        # Safe average calculation with fallback
-        valid_prices = [s.unlock_price for s in sources if hasattr(s, 'unlock_price') and s.unlock_price is not None]
-        avg_price = sum(valid_prices) / len(valid_prices) if valid_prices else 0.0
+        # Count industry analysis and trusted reports
+        industry_count = len([s for s in sources if hasattr(s, 'domain') and s.domain and
+                             any(domain in s.domain.lower() for domain in ['industry', 'market', 'report', 'insights', 'research', 'news', 'tech'])])
         
     except Exception as e:
         # Fallback for any unexpected data structure issues
-        academic_count = tech_count = premium_count = 0
-        avg_price = 0.0
+        academic_count = licensed_count = unlicensed_count = industry_count = 0
     
     return f"""**Research Preview: {query}**
 
-This dynamic research package analyzes {len(sources)} carefully selected sources, including {academic_count} academic publications and {tech_count} industry research documents. Our AI-powered analysis identifies the most relevant and valuable sources based on your specific query.
+We've pulled together {len(sources)} high-quality sources matched to your query ({licensed_count} licensed, {unlicensed_count} unlicensed) including {academic_count} academic papers, {industry_count} industry analysis, and trusted reports. Each card below includes a quote, summary, and licensing details if available.
 
-**Source Quality Overview:**
-• {premium_count} premium sources with enhanced licensing and full-text access
-• Average source value: ${avg_price:.2f} (reflecting content quality and exclusivity)
-• Multi-protocol licensing ensuring ethical publisher compensation
-• Real-time relevance scoring and quality assessment
-
-**What You'll Receive:**
-• Comprehensive analysis synthesizing all unlocked sources
-• Professional research summary with key findings
-• Direct access to licensed content with proper citations
-• Publisher-approved excerpts and insights
-• Dynamic pricing based on actual source value and licensing costs
-
-*This preview represents a fraction of the insights available in the full research package. Unlock sources to access complete analysis and citations.*"""
+Tap to preview. Unlock what matters."""
 
 
 @router.get("/sources/{source_id}")
