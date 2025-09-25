@@ -142,16 +142,14 @@ class ContentCrawlerStub:
                     domain = "unknown.com"
                 
                 source_id = str(uuid.uuid4())
-                # Use raw Tavily data initially with basic pricing
-                basic_price = self._calculate_basic_price(domain)
-                
+                # Start with free pricing - real licensing discovery will set authentic prices
                 source = SourceCard(
                     id=source_id,
                     title=result.get('title', f'Research Source {i+1}'),
                     excerpt=result.get('content', 'Loading enhanced preview...')[:150],
                     domain=domain,
                     url=result.get('url', f'https://{domain}'),
-                    unlock_price=basic_price,
+                    unlock_price=0.0,  # Free by default, real licensing sets authentic price
                     is_unlocked=False
                 )
                 
@@ -181,17 +179,7 @@ class ContentCrawlerStub:
                 "enrichment_needed": False
             }
     
-    def _calculate_basic_price(self, domain: str) -> float:
-        """Calculate basic price without expensive AI analysis"""
-        # Simple domain-based pricing for immediate results
-        if any(premium in domain for premium in ['nature.com', 'science.org', 'ieee.org']):
-            return round(random.uniform(0.25, 0.45), 2)
-        elif any(industry in domain for industry in ['mckinsey.com', 'deloitte.com', 'bcg.com']):
-            return round(random.uniform(0.30, 0.60), 2)
-        elif any(news in domain for news in ['wsj.com', 'ft.com', 'economist.com']):
-            return round(random.uniform(0.15, 0.35), 2)
-        else:
-            return round(random.uniform(0.10, 0.25), 2)
+    # Removed _calculate_basic_price - now using real licensing discovery only
     
     async def _enrich_sources_background(self, sources: List[SourceCard], query: str, cache_key: str):
         """Enrich sources with AI polishing and licensing in the background"""
@@ -214,11 +202,7 @@ class ContentCrawlerStub:
                 if polished:
                     source.title = polished.get('title', source.title)
                     source.excerpt = polished.get('excerpt', source.excerpt)
-                    # Recalculate price with AI insights
-                    source.unlock_price = self._calculate_tavily_price(
-                        {'title': source.title, 'url': source.url}, 
-                        source.domain
-                    )
+                    # Real licensing discovery will set authentic pricing in _add_licensing_async
             
             # Step 3: Add licensing info asynchronously 
             await self._add_licensing_async(sources)
@@ -309,16 +293,14 @@ class ContentCrawlerStub:
                 url = polished.get('url', f'https://{polished.get("domain", "unknown.com")}')
                 domain = polished.get('domain', 'unknown.com')
                 
-                # Calculate pricing 
-                unlock_price = self._calculate_tavily_price({'title': polished.get('title', ''), 'url': url}, domain)
-                
+                # Start with free source - real licensing will set authentic price
                 source = SourceCard(
                     id=source_id,
                     title=polished.get('title', f'Research Source {i+1}'),
                     excerpt=polished.get('excerpt', 'No preview available'),
                     domain=domain,
                     url=url,
-                    unlock_price=unlock_price,
+                    unlock_price=0.0,  # Free by default, real licensing sets authentic price
                     is_unlocked=False
                 )
                 
@@ -364,8 +346,8 @@ class ContentCrawlerStub:
             title = self._generate_title(query, i)
             excerpt = self._generate_excerpt(query, title)
             
-            # Calculate realistic pricing based on domain type
-            unlock_price = self._calculate_unlock_price_by_type(domain, domain_type)
+            # Start with free pricing - real licensing discovery will set authentic costs
+            unlock_price = 0.0
             
             # Check if adding this source would exceed budget
             if budget_limit is not None and (current_cost + unlock_price) > budget_limit:
@@ -381,89 +363,22 @@ class ContentCrawlerStub:
                 is_unlocked=False
             )
             
-            # Assign licensing protocols based on domain type  
-            licensing_protocol = self._get_licensing_protocol(domain_type)
-            if licensing_protocol:
-                mock_license_info = self._generate_new_mock_licensing(domain, licensing_protocol)
-                if mock_license_info:
-                    self._apply_licensing_info(source, mock_license_info)
+            # Try real licensing discovery first
+            license_info = self._discover_licensing(source.url)
+            if license_info:
+                self._apply_licensing_info(source, license_info)
+            # If no real licensing found, this source stays free (unlock_price = 0.0)
             
             sources.append(source)
-            current_cost += unlock_price
+            current_cost += source.unlock_price  # Use actual licensing cost after discovery
         
         return sources
     
-    def _calculate_unlock_price_by_type(self, domain: str, domain_type: str) -> float:
-        """Calculate pricing based on domain type and prestige."""
-        base_prices = {
-            'academic': random.uniform(0.15, 0.35),
-            'industry': random.uniform(0.20, 0.50),
-            'news': random.uniform(0.10, 0.25),
-            'government': random.uniform(0.05, 0.20)
-        }
-        
-        base_price = base_prices.get(domain_type, 0.15)
-        
-        # Premium domain multipliers
-        premium_multipliers = {
-            'nature.com': 2.0, 'science.org': 1.8, 'ieee.org': 1.6,
-            'mckinsey.com': 1.7, 'deloitte.com': 1.5, 'gartner.com': 1.6,
-            'wsj.com': 1.4, 'economist.com': 1.3, 'bloomberg.com': 1.3
-        }
-        
-        multiplier = premium_multipliers.get(domain, 1.0)
-        final_price = base_price * multiplier
-        
-        # Add realistic variation
-        final_price *= random.uniform(0.8, 1.2)
-        
-        return round(max(0.10, min(2.00, final_price)), 2)
+    # Removed _calculate_unlock_price_by_type - real licensing APIs determine authentic pricing
     
-    def _get_licensing_protocol(self, domain_type: str) -> Optional[str]:
-        """Assign licensing protocols based on domain type."""
-        protocol_weights = {
-            'academic': {'rsl': 0.4, 'tollbit': 0.3, 'cloudflare': 0.2, None: 0.1},
-            'industry': {'tollbit': 0.5, 'cloudflare': 0.3, 'rsl': 0.1, None: 0.1},
-            'news': {'cloudflare': 0.6, 'tollbit': 0.2, 'rsl': 0.1, None: 0.1},
-            'government': {None: 0.8, 'rsl': 0.1, 'tollbit': 0.1, 'cloudflare': 0.0}
-        }
-        
-        weights = protocol_weights.get(domain_type, {'rsl': 0.3, 'tollbit': 0.3, 'cloudflare': 0.3, None: 0.1})
-        
-        # Use weighted random selection
-        rand = random.random()
-        cumulative = 0.0
-        
-        for protocol, weight in weights.items():
-            cumulative += weight
-            if rand <= cumulative:
-                return protocol
-        
-        # Fallback
-        return None
+    # Removed _get_licensing_protocol - real licensing discovery determines protocols
     
-    def _generate_new_mock_licensing(self, domain: str, protocol: Optional[str] = None) -> Optional[dict]:
-        """Generate mock licensing information for sources."""
-        if not protocol:
-            protocol = random.choice(['rsl', 'tollbit', 'cloudflare'])
-        
-        base_cost = random.uniform(0.05, 0.30)
-        
-        # Import LicenseTerms for proper object creation
-        from services.licensing.content_licensing import LicenseTerms
-        
-        terms = LicenseTerms(
-            protocol=protocol,
-            ai_include_price=round(base_cost, 2),
-            publisher=self._get_publisher_name(domain),
-            permits_ai_include=True,
-            requires_attribution=random.choice([True, False])
-        )
-        
-        return {
-            'protocol': protocol,
-            'terms': terms
-        }
+    # Removed _generate_new_mock_licensing - now using real ContentLicenseService
     
     def _get_publisher_name(self, domain: str) -> str:
         """Generate publisher name from domain."""
@@ -479,92 +394,15 @@ class ContentCrawlerStub:
             return content
         return content[:max_length].rsplit(' ', 1)[0] + "..."
     
-    def _calculate_tavily_price(self, result: dict, domain: str) -> float:
-        """Calculate transparent pricing for sources based on realistic licensing costs."""
-        
-        # Many sources should be FREE - start with no cost
-        if self._should_be_free_source(domain):
-            return 0.0
-        
-        # Determine realistic licensing cost based on domain type and content quality
-        if self._is_premium_domain(domain):
-            # Premium sources: $0.15-$0.35
-            base_price = 0.15
-            quality_multiplier = self._get_quality_multiplier(result, domain)
-            final_price = base_price * quality_multiplier
-            return round(min(0.35, max(0.15, final_price)), 2)
-        elif self._is_academic_domain(domain):
-            # Academic sources: $0.05-$0.20  
-            base_price = 0.05
-            quality_multiplier = self._get_quality_multiplier(result, domain)
-            final_price = base_price * quality_multiplier
-            return round(min(0.20, max(0.05, final_price)), 2)
-        else:
-            # Standard sources: $0.03-$0.12
-            base_price = 0.03
-            quality_multiplier = self._get_quality_multiplier(result, domain)
-            final_price = base_price * quality_multiplier
-            return round(min(0.12, max(0.03, final_price)), 2)
+    # Removed fake pricing - now using real licensing discovery via ContentLicenseService
     
-    def _should_be_free_source(self, domain: str) -> bool:
-        """Determine if a source should be free based on domain type."""
-        free_domains = [
-            'wikipedia.org', 'github.com', 'docs.python.org', 'mozilla.org',
-            'apache.org', 'gnu.org', 'opensource.org', 'freecodecamp.org',
-            'stackoverflow.com', 'reddit.com', 'medium.com', 'dev.to'
-        ]
-        
-        # Government and educational domains are often free
-        free_patterns = ['.gov', '.edu', '.org']
-        
-        # Check exact matches
-        if any(free_domain in domain for free_domain in free_domains):
-            return True
-            
-        # Check patterns (40% chance for .org, 60% for .gov/.edu)
-        if domain.endswith('.gov') or domain.endswith('.edu'):
-            return random.random() < 0.6
-        elif domain.endswith('.org'):
-            return random.random() < 0.4
-            
-        # 30% chance for other domains to be free
-        return random.random() < 0.3
+    # Removed fake free source detection - real licensing handles this
     
-    def _is_premium_domain(self, domain: str) -> bool:
-        """Check if domain is premium/paid content."""
-        premium_domains = [
-            'wsj.com', 'ft.com', 'economist.com', 'bloomberg.com',
-            'mckinsey.com', 'deloitte.com', 'gartner.com', 'forrester.com'
-        ]
-        return any(premium in domain for premium in premium_domains)
+    # Removed fake premium domain detection - real licensing handles this
     
-    def _is_academic_domain(self, domain: str) -> bool:
-        """Check if domain is academic/research."""
-        academic_domains = [
-            'arxiv.org', 'nature.com', 'science.org', 'ieee.org', 'pubmed',
-            'springer.com', 'wiley.com', 'elsevier.com'
-        ]
-        return any(academic in domain for academic in academic_domains)
+    # Removed fake academic domain detection - real licensing handles this
     
-    def _get_quality_multiplier(self, result: dict, domain: str) -> float:
-        """Get quality-based price multiplier (1.0-2.5)."""
-        multiplier = 1.0
-        
-        title = result.get('title', '').lower()
-        content = result.get('content', '').lower()
-        
-        # Research quality indicators
-        if any(keyword in title for keyword in ['peer-reviewed', 'research', 'study', 'analysis']):
-            multiplier *= 1.3
-        
-        if len(content) > 1000:  # Substantial content
-            multiplier *= 1.2
-            
-        # Citations or methodology mentioned
-        if any(keyword in content for keyword in ['citation', 'methodology', 'findings', 'conclusion']):
-            multiplier *= 1.15
-            
-        return min(2.5, multiplier)
+    # Removed fake quality multiplier - real licensing APIs determine authentic pricing
     
     def _extract_key_topics(self, query: str) -> List[str]:
         """Extract key topics from long query text."""
@@ -751,35 +589,7 @@ class ContentCrawlerStub:
             # If no licensing cost, this should be a free source
             source.unlock_price = 0.0
     
-    def _generate_mock_licensing(self, domain: str):
-        """Generate mock licensing info for demonstration"""
-        protocols = ['rsl', 'tollbit', 'cloudflare']
-        protocol = random.choice(protocols)
-        
-        # Mock license terms based on protocol
-        from services.licensing.content_licensing import LicenseTerms
-        
-        price_ranges = {
-            'rsl': (0.03, 0.08),
-            'tollbit': (0.02, 0.05), 
-            'cloudflare': (0.05, 0.12)
-        }
-        
-        min_price, max_price = price_ranges[protocol]
-        license_price = round(random.uniform(min_price, max_price), 2)
-        
-        terms = LicenseTerms(
-            protocol=protocol,
-            ai_include_price=license_price,
-            publisher=f"{domain} Publisher",
-            permits_ai_include=True,
-            requires_attribution=random.choice([True, False])
-        )
-        
-        return {
-            'protocol': protocol,
-            'terms': terms
-        }
+    # Removed fake licensing generation - now using real ContentLicenseService
     
     def get_estimated_cost(self, query: str, source_count: int) -> float:
         """Estimate total unlock cost for sources (for tier pricing)."""
