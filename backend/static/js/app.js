@@ -349,6 +349,14 @@ export class ChatResearchApp {
         }
     }
 
+    updateAuthButton() {
+        const authButton = document.getElementById('loginButton');
+        if (authButton && this.authService.isAuthenticated()) {
+            authButton.textContent = `${this.authService.getWalletBalance()}`;
+            authButton.style.backgroundColor = '#4CAF50';
+        }
+    }
+
     toggleAuthMode() {
         this.appState.setLoginMode(!this.appState.isInLoginMode());
         this.updateAuthModeDisplay();
