@@ -2283,7 +2283,7 @@ input:checked + .slider:before {
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     background: #dae6ef !important;
-    color: black !important;
+    color: white !important;
     border: none;
     border-radius: 8px;
     cursor: pointer;
