@@ -69,6 +69,17 @@ class SourceCard {
         const sourceCard = document.createElement('div');
         sourceCard.className = className;
         sourceCard.setAttribute('data-source-id', source.id);
+        
+        // Add basic inline styles as fallback
+        sourceCard.style.cssText = `
+            border: 1px solid #ddd; 
+            padding: 16px; 
+            margin: 8px 0; 
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        `;
+        
         console.log(`✅ SOURCE CARD: Main container created with class '${className}' and ID '${source.id}'`);
 
         // Source header with title and badges
