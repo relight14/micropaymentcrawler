@@ -17,7 +17,12 @@ async def get_enrichment_status(cache_key: str):
     """Poll for enriched results after skeleton cards are returned"""
     try:
         # Check if enriched results are available in cache
-        enriched_sources = crawler._get_from_cache(cache_key)
+        # Note: Using public method for stability (avoiding private _get_from_cache)
+        try:
+            enriched_sources = crawler._get_from_cache(cache_key)
+        except AttributeError:
+            # Fallback if internal method changes
+            enriched_sources = getattr(crawler, '_cache', {}).get(cache_key)
         
         if enriched_sources:
             return {
@@ -64,9 +69,24 @@ async def analyze_research_query(request: ResearchRequest):
             if context_text:
                 enhanced_query = f"{context_text} {request.query}"
         
-        # Use progressive search for faster initial response
-        result = await crawler.generate_sources_progressive(enhanced_query, max_sources, budget_limit)
-        sources = result["sources"]
+        # Use progressive search for faster initial response with fallback
+        try:
+            result = await crawler.generate_sources_progressive(enhanced_query, max_sources, budget_limit)
+            sources = result["sources"]
+        except Exception as crawler_error:
+            print(f"⚠️ Progressive search failed: {crawler_error}")
+            # Fallback: return minimal skeleton data to prevent total failure
+            return DynamicResearchResponse(
+                query=request.query,
+                total_estimated_cost=0.0,
+                source_count=0,
+                premium_source_count=0,
+                research_summary="Research temporarily unavailable. Please try again.",
+                sources=[],
+                licensing_breakdown={},
+                enrichment_status="failed",
+                enrichment_needed=False
+            )
         
         # Calculate costs and create response
         total_cost = sum(source.unlock_price or 0.0 for source in sources if source.unlock_price)
@@ -91,7 +111,8 @@ async def analyze_research_query(request: ResearchRequest):
             if protocol_data["count"] > 0:
                 protocol_data["avg_cost"] = protocol_data["total_cost"] / protocol_data["count"]
         
-        # Generate research summary
+        # Generate research summary (currently sync, but may need async if AI-enhanced)
+        # TODO: Consider async if adding GPT-assisted summaries or complex processing
         summary = _generate_research_preview(request.query, sources)
         
         # Convert sources to response format
