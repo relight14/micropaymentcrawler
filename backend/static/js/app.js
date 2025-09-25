@@ -214,21 +214,36 @@ export class ChatResearchApp {
         const modalHTML = `
             <div id="authModal" class="modal-overlay">
                 <div class="modal-content auth-modal">
-                    <div class="modal-header">
-                        <h2 id="authTitle">${isLogin ? 'Login to LedeWire' : 'Create LedeWire Account'}</h2>
-                        <button class="modal-close" onclick="document.getElementById('authModal').remove()">×</button>
+                    <div class="auth-modal-header">
+                        <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
+                        <h2 id="authTitle">${isLogin ? 'Welcome back!' : 'Create Account'}</h2>
+                        <p>${isLogin ? 'Sign in to access your wallet' : 'Join LedeWire to access premium features'}</p>
+                        <button class="modal-close" onclick="document.getElementById('authModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
-                    <p>${isLogin ? 'Access your wallet and research history' : 'Join LedeWire to access premium research features'}</p>
-                    <form class="auth-form" id="authForm">
-                        <input type="email" id="authEmail" placeholder="Email address" required>
-                        <input type="password" id="authPassword" placeholder="Password" required>
-                        <button type="submit" class="auth-btn" id="authSubmitBtn">
-                            ${isLogin ? 'Login' : 'Sign Up'}
-                        </button>
-                    </form>
-                    <button type="button" class="auth-toggle-btn" id="authToggleButton">
-                        ${isLogin ? 'Need an account? Sign up' : 'Have an account? Login'}
-                    </button>
+                    <div class="auth-modal-content">
+                        <form class="auth-form" id="authForm">
+                            <div class="auth-form-group">
+                                <label for="authEmail">Email *</label>
+                                <input type="email" id="authEmail" placeholder="" required>
+                            </div>
+                            <div class="auth-form-group">
+                                <label for="authPassword">Password *</label>
+                                <input type="password" id="authPassword" placeholder="" required>
+                            </div>
+                            <button type="submit" class="auth-btn" id="authSubmitBtn">
+                                ${isLogin ? 'Log In' : 'Sign Up'}
+                            </button>
+                        </form>
+                        <div class="auth-links">
+                            ${isLogin ? '<a href="#" class="auth-link" id="forgotPasswordLink">Forgot Password?</a>' : ''}
+                            <a href="#" class="auth-link" id="authToggleButton">
+                                ${isLogin ? 'Need an account? Sign up' : 'Have an account? Log in'}
+                            </a>
+                        </div>
+                    </div>
+                    <div class="auth-modal-footer">
+                        Powered by LedeWire
+                    </div>
                 </div>
             </div>
         `;
@@ -249,9 +264,20 @@ export class ChatResearchApp {
         }
 
         if (authToggleButton) {
-            authToggleButton.addEventListener('click', () => {
+            authToggleButton.addEventListener('click', (e) => {
+                e.preventDefault();
                 this.toggleAuthMode();
                 this.showAuthModal(); // Refresh modal with new mode
+            });
+        }
+
+        // Add forgot password link handler
+        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+        if (forgotPasswordLink) {
+            forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // TODO: Implement forgot password functionality
+                this.addMessage('system', 'Forgot password functionality coming soon. Please contact support for assistance.');
             });
         }
 
