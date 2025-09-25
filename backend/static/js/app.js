@@ -837,12 +837,9 @@ export class ChatResearchApp {
         sourcesGrid.className = 'source-cards-grid';
         
         sources.forEach((source, index) => {
-            // Add enrichment status to source data
+            // Use source data as-is from backend
             const sourceData = {
-                ...source,
-                is_enriching: index < 5,  // First 5 sources are still enhancing
-                source_type: 'Article',
-                rating: source.relevance_score ? Math.min(5, Math.max(3, Math.round(source.relevance_score * 5))) : 4
+                ...source
             };
             
             // Create source card using the component
@@ -851,14 +848,7 @@ export class ChatResearchApp {
                 showActions: true
             });
             
-            // Add enrichment indicator for sources that are still enhancing
-            if (sourceData.is_enriching) {
-                sourceCard.classList.add('source-enriching');
-                const indicator = document.createElement('div');
-                indicator.className = 'enrichment-indicator';
-                indicator.textContent = '⚡ Enhancing...';
-                sourceCard.insertBefore(indicator, sourceCard.firstChild);
-            }
+            // Source card is ready to display with real backend data
             sourcesGrid.appendChild(sourceCard);
         });
         
