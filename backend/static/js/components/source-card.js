@@ -683,10 +683,13 @@ class SourceCard {
     }
 }
 
-// Export for use in other modules
+// Ensure global availability immediately
+window.SourceCard = SourceCard;
+
+// Also expose for modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = SourceCard;
 }
 
-// Global reference for backward compatibility
-window.SourceCard = SourceCard;
+// Dispatch ready event for modules that need to wait
+document.dispatchEvent(new CustomEvent('SourceCardReady'));

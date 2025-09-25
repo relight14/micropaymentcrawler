@@ -859,19 +859,26 @@ export class ChatResearchApp {
         }, 3000);
     }
     
-    _displaySourceCards(sources) {
+    async _displaySourceCards(sources) {
         
         if (!sources || sources.length === 0) {
             return;
         }
         
+        // Wait for SourceCard to be available
+        if (!window.SourceCard) {
+            console.log('Waiting for SourceCard to load...');
+            await new Promise(resolve => {
+                if (window.SourceCard) {
+                    resolve();
+                    return;
+                }
+                document.addEventListener('SourceCardReady', resolve, { once: true });
+            });
+        }
+        
         // Initialize the SourceCard component with app state  
         if (!this.sourceCardComponent) {
-            // Access SourceCard from global scope (loaded via script tag)
-            if (!window.SourceCard) {
-                console.error('❌ SourceCard not loaded yet - script tag must load first');
-                return;
-            }
             this.sourceCardComponent = new window.SourceCard(this.appState);
             
             // Listen for component events
