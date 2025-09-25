@@ -118,40 +118,54 @@ export class ChatResearchApp {
         
         if (!message) return;
         
+        console.log(`🚀 RESEARCH FLOW START: Message "${message}", Mode: ${this.appState.getMode()}`);
 
         try {
             // Clear input and show user message
             chatInput.value = '';
             this.uiManager.updateCharacterCount();
             
+            console.log(`📝 Adding user message to chat`);
             const userMessage = this.addMessage('user', message);
             this.appState.setCurrentQuery(message);
             
             // Show typing indicator
+            console.log(`⏳ Showing typing indicator`);
             this.uiManager.showTypingIndicator();
             
             // Send to backend with conversation context for research mode
             const conversationContext = this.appState.getMode() === 'research' ? 
                 this.appState.getConversationHistory() : null;
+            console.log(`🌐 Making API call to backend - Mode: ${this.appState.getMode()}, Context:`, conversationContext);
             const response = await this.apiService.sendMessage(message, this.appState.getMode(), conversationContext);
             
+            console.log(`✅ API RESPONSE RECEIVED:`, response);
             
             // Hide typing indicator
+            console.log(`⏹️ Hiding typing indicator`);
             this.uiManager.hideTypingIndicator();
             
             // Display response
+            console.log(`📄 Processing response content...`);
             if (response.content) {
+                console.log(`✅ Adding assistant response to chat:`, response.content.substring(0, 100) + '...');
                 this.addMessage('assistant', response.content, response.metadata);
             } else {
+                console.log(`⚠️ No content in response`);
             }
             
             // Handle research data with progressive loading
+            console.log(`🔍 Checking for research data:`, response.research_data ? 'FOUND' : 'NOT FOUND');
             if (response.research_data) {
+                console.log(`📚 RESEARCH DATA DETECTED:`, response.research_data);
+                console.log(`📊 Sources count: ${response.research_data.sources?.length || 0}`);
                 
                 this.appState.setCurrentResearchData(response.research_data);
                 
                 // Display immediate source cards
+                console.log(`🎯 CALLING _displaySourceCards with ${response.research_data.sources?.length || 0} sources...`);
                 this._displaySourceCards(response.research_data.sources);
+                console.log(`✅ COMPLETED _displaySourceCards call`);
                 
                 // If enrichment is needed, let the progressive system handle updates
                 // Note: Backend handles progressive enrichment via cache polling automatically
@@ -159,8 +173,10 @@ export class ChatResearchApp {
                     console.log('🔄 Progressive enrichment in progress...'); 
                     // Polling is handled by backend progressive system, no client polling needed
                 } else {
+                    console.log('✅ No enrichment needed');
                 }
             } else {
+                console.log(`❌ No research_data in response`);
             }
             
         } catch (error) {
@@ -860,20 +876,27 @@ export class ChatResearchApp {
     }
     
     _displaySourceCards(sources) {
+        console.log(`🎴 _displaySourceCards CALLED with sources:`, sources);
+        console.log(`🎴 Sources length: ${sources?.length || 0}`);
         
         if (!sources || sources.length === 0) {
+            console.log(`❌ _displaySourceCards: No sources to display`);
             return;
         }
         
+        console.log(`🎴 _displaySourceCards: Processing ${sources.length} sources`);
         
         // Initialize the SourceCard component with app state  
         if (!this.sourceCardComponent) {
+            console.log(`🎴 _displaySourceCards: Initializing SourceCard component...`);
             // Access SourceCard from global scope (loaded via script tag)
             if (!window.SourceCard) {
                 console.error('❌ SourceCard not loaded yet - script tag must load first');
                 return;
             }
+            console.log(`✅ SourceCard class found, creating instance...`);
             this.sourceCardComponent = new window.SourceCard(this.appState);
+            console.log(`✅ SourceCard component initialized:`, this.sourceCardComponent);
             
             // Listen for component events
             document.addEventListener('sourceUnlockRequested', (e) => {
@@ -890,28 +913,37 @@ export class ChatResearchApp {
         }
         
         // Create the source cards grid using the component
+        console.log(`🎴 Creating source cards grid container...`);
         const sourcesGrid = document.createElement('div');
         sourcesGrid.className = 'source-cards-grid';
+        console.log(`✅ Source cards grid container created`);
         
+        console.log(`🎴 Processing ${sources.length} individual sources...`);
         sources.forEach((source, index) => {
+            console.log(`🎴 Processing source ${index + 1}/${sources.length}:`, source);
             
             // Use source data as-is from backend
             const sourceData = {
                 ...source
             };
             
+            console.log(`🎴 Calling sourceCardComponent.create for source ${index + 1}...`);
             // Create source card using the component
             const sourceCard = this.sourceCardComponent.create(sourceData, {
                 showCheckbox: true,
                 showActions: true
             });
             
+            console.log(`✅ Source card created for source ${index + 1}:`, sourceCard);
             
             // Source card is ready to display with real backend data
+            console.log(`🎴 Appending source card ${index + 1} to grid...`);
             sourcesGrid.appendChild(sourceCard);
+            console.log(`✅ Source card ${index + 1} appended to grid`);
         });
         
         // Create wrapper message with original formatting
+        console.log(`🎴 Creating wrapper message div...`);
         const messageDiv = document.createElement('div');
         const headerText = document.createElement('strong');
         headerText.textContent = `🔍 Found ${sources.length} sources for your research:`;
@@ -919,8 +951,11 @@ export class ChatResearchApp {
         messageDiv.appendChild(document.createElement('br'));
         messageDiv.appendChild(document.createElement('br'));
         messageDiv.appendChild(sourcesGrid);
+        console.log(`✅ Wrapper message div created with ${sources.length} source cards`);
         
+        console.log(`🎴 Adding message to chat with HTML content...`);
         this.addMessage('assistant', messageDiv.outerHTML);
+        console.log(`✅ _displaySourceCards COMPLETED - message added to chat`);
     }
     
     async _pollForEnrichedResults(query) {
