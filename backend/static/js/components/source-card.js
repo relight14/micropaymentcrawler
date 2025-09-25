@@ -243,11 +243,9 @@ class SourceCard {
             badges.appendChild(typeBadge);
         }
 
-        // License badge
-        if (source.licensing_protocol || (source.unlock_price && source.unlock_price > 0)) {
-            const licenseBadge = this._createLicenseBadge(source);
-            badges.appendChild(licenseBadge);
-        }
+        // License badge - ALWAYS show a badge (Free, Coming Soon, or Paid)
+        const licenseBadge = this._createLicenseBadge(source);
+        badges.appendChild(licenseBadge);
 
         return badges;
     }
@@ -329,14 +327,14 @@ class SourceCard {
         if (rawScore === null || rawScore === undefined) {
             normalizedScore = 1.0; // Default to 1.0 if no score
         } else if (rawScore <= 1.0) {
-            // Assume 0-1 scale, convert to 1-5 with decimals
-            normalizedScore = Math.max(1.0, Math.round((rawScore * 5) * 10) / 10);
+            // Assume 0-1 scale, convert to 1-5 with decimals  
+            normalizedScore = Math.max(1.0, rawScore * 5);
         } else if (rawScore <= 5.0) {
             // Assume already 0-5 scale
-            normalizedScore = Math.max(1.0, Math.round(rawScore * 10) / 10);
+            normalizedScore = Math.max(1.0, rawScore);
         } else {
             // Assume 0-100 scale, convert to 1-5
-            normalizedScore = Math.max(1.0, Math.round(((rawScore / 100) * 5) * 10) / 10);
+            normalizedScore = Math.max(1.0, (rawScore / 100) * 5);
         }
         
         const maxStars = 5;

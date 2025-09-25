@@ -206,10 +206,8 @@ export class UIManager {
     }
 
     formatSourcesHTML(sources) {
-        // Format sources display
-        return sources.map(source => 
-            `<div class="source-preview">${source.title}</div>`
-        ).join('');
+        // LEGACY TEMPLATE REMOVED - SourceCard component handles all rendering
+        return '<div class="legacy-sources-removed">Sources rendered by SourceCard component</div>';
     }
 
     // Typing indicator
