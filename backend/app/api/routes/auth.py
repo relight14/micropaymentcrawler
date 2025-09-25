@@ -1,14 +1,12 @@
 """Authentication routes"""
 
 from fastapi import APIRouter, HTTPException, Header, Depends
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
+import requests  # For handling HTTP exceptions from LedeWire API
 
 from integrations.ledewire import LedeWireAPI
 from schemas.api import LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
-from utils.rate_limit import get_user_or_ip_key
 
 router = APIRouter()
 
@@ -91,29 +89,30 @@ async def signup(request: SignupRequest):
         raise HTTPException(status_code=500, detail="Account creation service unavailable")
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 @router.post("/refresh")
-async def refresh_token(request: dict):
+async def refresh_token(request: RefreshRequest):
     """Refresh access token using refresh token"""
     try:
-        refresh_token = request.get("refresh_token")
-        if not refresh_token:
+        if not request.refresh_token:
             raise HTTPException(status_code=400, detail="Refresh token required")
             
-        # Use LedeWire API to refresh token
-        result = ledewire.refresh_access_token(refresh_token)
+        # Note: LedeWire API doesn't currently support token refresh
+        # TODO: Implement when LedeWire adds refresh token support
+        raise HTTPException(status_code=501, detail="Token refresh not yet implemented")
         
-        return {
-            "access_token": result["access_token"],
-            "refresh_token": result.get("refresh_token", refresh_token),
-            "token_type": result.get("token_type", "Bearer"),
-            "expires_in": result.get("expires_in", 3600)
-        }
-    except requests.HTTPError as e:
+        
+    except requests.exceptions.HTTPError as e:
         if "Invalid or expired refresh token" in str(e):
             raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
         else:
             print(f"Token refresh error: {str(e)}")
             raise HTTPException(status_code=503, detail="Unable to refresh token")
+    except Exception as e:
+        print(f"Token refresh error: {e}")
+        raise HTTPException(status_code=500, detail="Token refresh service unavailable")
 
 
 @router.get("/balance", response_model=WalletBalanceResponse)
