@@ -107,7 +107,7 @@ class SourceCard {
         }
 
         // License badge
-        if (source.license_type || source.licensing) {
+        if (source.licensing_protocol || (source.unlock_price && source.unlock_price > 0)) {
             const licenseBadge = this._createLicenseBadge(source);
             badges.appendChild(licenseBadge);
         }
@@ -166,7 +166,7 @@ class SourceCard {
         const rating = document.createElement('div');
         rating.className = 'source-rating';
 
-        const score = source.rating || source.quality_score || 0;
+        const score = source.rating || source.relevance_score || source.quality_score || 0;
         const maxStars = 5;
         
         // Create star elements
