@@ -322,20 +322,35 @@ class SourceCard {
         const rating = document.createElement('div');
         rating.className = 'source-rating';
 
-        const score = source.rating || source.relevance_score || source.quality_score || 0;
-        const maxStars = 5;
-        const roundedScore = Math.round(score * 2) / 2; // Round to nearest 0.5
+        // Get relevance score and normalize to 1-5 scale
+        const rawScore = source.relevance_score || source.rating || source.quality_score;
+        let normalizedScore;
         
-        // Create star elements with half-star support
+        if (rawScore === null || rawScore === undefined) {
+            normalizedScore = 1; // Default to 1 star if no score
+        } else if (rawScore <= 1.0) {
+            // Assume 0-1 scale, convert to 1-5
+            normalizedScore = Math.max(1, Math.round(rawScore * 5));
+        } else if (rawScore <= 5.0) {
+            // Assume already 0-5 scale
+            normalizedScore = Math.max(1, Math.round(rawScore));
+        } else {
+            // Assume 0-100 scale, convert to 1-5
+            normalizedScore = Math.max(1, Math.round((rawScore / 100) * 5));
+        }
+        
+        const maxStars = 5;
+        
+        // Add hover tooltip
+        rating.title = `Relevance: ${normalizedScore}/5`;
+        
+        // Create star elements (no half-stars, round to nearest integer)
         for (let i = 0; i < maxStars; i++) {
             const star = document.createElement('span');
             
-            if (i < Math.floor(roundedScore)) {
+            if (i < normalizedScore) {
                 star.className = 'star filled';
-                star.textContent = '★';
-            } else if (i === Math.floor(roundedScore) && roundedScore % 1 === 0.5) {
-                star.className = 'star half';
-                star.textContent = '⭐'; // Half star emoji
+                star.textContent = '⭐️';
             } else {
                 star.className = 'star empty';
                 star.textContent = '☆';
@@ -343,12 +358,6 @@ class SourceCard {
             
             rating.appendChild(star);
         }
-
-        // Rating text
-        const ratingText = document.createElement('span');
-        ratingText.className = 'rating-text';
-        ratingText.textContent = `${Number(roundedScore || 0).toFixed(1)}/5`;
-        rating.appendChild(ratingText);
 
         return rating;
     }

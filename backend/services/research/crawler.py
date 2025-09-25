@@ -391,6 +391,12 @@ class ContentCrawlerStub:
             if budget_limit is not None and (current_cost + unlock_price) > budget_limit:
                 break
                 
+            # Generate relevance score (0.0-1.0 based on position and query matching)
+            base_score = max(0.1, 1.0 - (i * 0.05))  # Decreasing score by position
+            query_bonus = 0.1 if query.lower() in title.lower() else 0.0
+            domain_bonus = 0.1 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0
+            relevance_score = min(1.0, base_score + query_bonus + domain_bonus)
+            
             source = SourceCard(
                 id=str(uuid.uuid4()),
                 title=title,
@@ -398,7 +404,8 @@ class ContentCrawlerStub:
                 domain=domain,
                 url=f'https://{domain}/research/{str(uuid.uuid4())[:8]}',  # Generate mock URL
                 unlock_price=unlock_price,
-                is_unlocked=False
+                is_unlocked=False,
+                relevance_score=relevance_score
             )
             
             # Try real licensing discovery first
