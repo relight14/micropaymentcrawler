@@ -1676,7 +1676,6 @@ input:checked + .slider:before {
 }
 
 .send-icon {
-    pointer-events: none;
     font-size: 1rem;
 }
 
