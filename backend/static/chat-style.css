@@ -594,9 +594,9 @@
 
 /* Authentication Button */
 .auth-btn {
-    background: var(--accent);
-    color: var(--accent-foreground);
-    border: 1px solid var(--accent);
+    background: linear-gradient(135deg, #FFD700, #FFC107);
+    color: #fff38D;
+    border: 1px solid #FFD700;
     border-radius: calc(var(--radius) - 2px);
     padding: 0.5rem 1rem;
     font-size: var(--text-sm);
@@ -606,7 +606,9 @@
 }
 
 .auth-btn:hover {
-    background: color-mix(in srgb, var(--accent) 90%, transparent);
+    background: linear-gradient(135deg, #FFC107, #FF9800);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3);
 }
 
 
@@ -2281,8 +2283,8 @@ input:checked + .slider:before {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: linear-gradient(135deg, #4CAF50, #45a049);
-    color: white;
+    background: linear-gradient(135deg, #87CEEB, #6BB6D6);
+    color: #dae6ef;
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -2293,9 +2295,9 @@ input:checked + .slider:before {
 }
 
 .profile-btn:hover {
-    background: linear-gradient(135deg, #45a049, #3d8b40);
+    background: linear-gradient(135deg, #6BB6D6, #5AA5C5);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 4px 8px rgba(135, 206, 235, 0.3);
 }
 
 .user-initials {
