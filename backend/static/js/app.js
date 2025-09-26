@@ -75,7 +75,7 @@ export class ChatResearchApp {
 
         // Chat functionality
         if (sendButton) {
-                sendButton.addEventListener('click', () => {
+            sendButton.addEventListener('click', () => {
                 this.sendMessage();
             });
         }
