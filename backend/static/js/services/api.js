@@ -247,6 +247,14 @@ export class APIService {
             requestBody.selected_source_ids = selectedSources.map(source => source.id);
         }
         
+        // DIAGNOSTIC LOG: Final request body being sent to API
+        console.log('🔍 API REQUEST BODY LOG:', {
+            requestBody: requestBody,
+            requestBodyStringified: JSON.stringify(requestBody),
+            headers: this.getAuthHeaders(),
+            url: `${this.baseURL}/api/purchase`
+        });
+        
         return await this._fetchWithRetry(`${this.baseURL}/api/purchase`, {
             method: 'POST',
             headers: this.getAuthHeaders(),

@@ -607,10 +607,28 @@ export class ChatResearchApp {
                     this._showToast('Please select sources first', 'error');
                     return;
                 }
+                
+                // DIAGNOSTIC LOG: Check purchase request data before API call
+                console.log('💳 PURCHASE REQUEST LOG (with sources):', {
+                    tierId,
+                    price,
+                    query,
+                    selectedSourcesCount: selectedSources.length,
+                    selectedSources: selectedSources,
+                    useSelectedSources: true
+                });
+                
                 result = await this.apiService.purchaseTier(tierId, price, query, selectedSources);
                 this._showToast(`Report generated with ${selectedSources.length} selected sources!`, 'success');
             } else {
                 // Normal tier purchase with all sources
+                console.log('💳 PURCHASE REQUEST LOG (normal tier):', {
+                    tierId,
+                    price,
+                    query,
+                    useSelectedSources: false
+                });
+                
                 result = await this.apiService.purchaseTier(tierId, price, query);
                 this._showToast(`Research tier purchased successfully!`, 'success');
             }
@@ -682,6 +700,15 @@ export class ChatResearchApp {
         const selectedSources = this.appState.getSelectedSources();
         const sourceCount = selectedSources.length;
         const totalCost = this.appState.getSelectedSourcesTotal();
+        
+        // DIAGNOSTIC LOG: Check what we're getting from getSelectedSources()
+        console.log('📊 REPORT BUILDER DATA LOG:', {
+            selectedSourcesCount: sourceCount,
+            selectedSourcesData: selectedSources,
+            appStateGetSelectedSources: typeof this.appState.getSelectedSources,
+            firstSource: selectedSources[0] || 'NO_SOURCES',
+            totalCost
+        });
         
         const containerDiv = document.createElement('div');
         containerDiv.className = 'tier-cards-section';
