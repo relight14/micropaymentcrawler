@@ -1,0 +1,68 @@
+Clarifications on Report Builder Implementation
+Thanks — your breakdown is spot on. Here's clarification on your open questions and a quick confirmation of the implementation direction:
+
+💡 Selected Sources Display:
+Yes, we do want to show:
+✅ Clickable Title (if URL is available)
+
+
+✅ Author, Publication / Domain (if present)
+
+
+✅ Short one-liner description or excerpt
+
+
+✅ Remove button (trash icon is fine)
+
+
+Prefer a compact list/table layout (not full story cards)
+
+
+Use whatever is available in getSelectedSources() — even if some sources don’t have author info, just gracefully handle that. We're optimizing for quick visual scanability.
+
+💸 Report Tiers:
+Confirmed, the two report options should be:
+Basic Report ($0.99) → Outline + key takeaways (uses HTMLPacketGenerator - confirm that is correct)
+
+
+Pro Report ($1.99) → Full synthesis with citations (uses HTMLPacketGenerator)
+
+
+We do NOT need the free tier visible right now — just focus on Basic + Pro tiers in UI and logic.
+
+📄 Report Display Flow:
+When user clicks "Generate Report", it should:
+✅ Trigger the appropriate backend generator (HTMLPacketGenerator)
+
+
+✅ Return a downloadable HTML file 
+
+
+Preferably treat the generated report as a new “message” in the chat flow to keep things consistent.
+
+🧱 Data Shape of getSelectedSources():
+You can inspect it to be sure, but the expected fields should look something like:
+{
+  id: 'source_abc123',
+  title: 'Interesting Finding from MIT',
+  url: 'https://example.com/story',
+  excerpt: 'A recent study demonstrates...',
+  author: 'Jane Doe',
+  domain: 'example.com',
+  licensing_protocol: 'RSL',
+  unlock_price: 0.25
+}
+
+You can safely assume title, excerpt, and domain are always present. Handle missing author or url gracefully.
+
+🧭 Next Steps:
+✅ Refactor the report builder to live inside the chat UI, not as a separate interface.
+
+
+✅ Use selected sources to render a compact summary list view
+
+
+✅ Hook up the tier selection and pricing logic
+
+
+✅ On “Generate Report,” call appropriate backend and render output
