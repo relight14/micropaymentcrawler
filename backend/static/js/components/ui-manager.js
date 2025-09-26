@@ -120,6 +120,9 @@ export class UIManager {
         // Handle DOM nodes directly to preserve event listeners
         if (message.content instanceof HTMLElement) {
             messageDiv.appendChild(message.content);
+        } else if (message.metadata?.type === 'source_cards') {
+            // Recreate source cards component for restoration scenarios
+            this._recreateSourceCardsMessage(messageDiv, message);
         } else {
             messageDiv.innerHTML = this.formatMessageHTML(message);
         }
@@ -128,6 +131,65 @@ export class UIManager {
         this.scrollToBottom();
         
         return messageDiv;
+    }
+    
+    _recreateSourceCardsMessage(messageDiv, message) {
+        // Recreate source cards with live event listeners from stored metadata
+        const sources = message.metadata?.sources;
+        if (!sources || !Array.isArray(sources)) {
+            messageDiv.innerHTML = message.content; // Fallback to static HTML
+            return;
+        }
+        
+        // Wait for SourceCard to be available
+        if (window.SourceCard) {
+            this._buildSourceCardsContent(messageDiv, sources);
+        } else {
+            // Wait for component then rebuild
+            document.addEventListener('SourceCardReady', () => {
+                this._buildSourceCardsContent(messageDiv, sources);
+            }, { once: true });
+        }
+    }
+    
+    _buildSourceCardsContent(messageDiv, sources) {
+        // Access appState from global app instance (try multiple paths)
+        const appState = window.LedeWire?.researchApp?.appState || window.researchApp?.appState || window.app?.appState;
+        if (!appState) {
+            messageDiv.innerHTML = 'Error: Unable to recreate source cards';
+            return;
+        }
+        
+        const sourceCardComponent = new window.SourceCard(appState);
+        
+        // Create the DOM structure that CSS expects
+        const container = document.createElement('div');
+        container.className = 'sources-preview-section';
+        
+        // Create header section
+        const header = document.createElement('div');
+        header.className = 'preview-header';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Sources Found';
+        
+        const subtitle = document.createElement('p');
+        subtitle.textContent = `Found ${sources.length} sources for your research`;
+        
+        header.appendChild(title);
+        header.appendChild(subtitle);
+        container.appendChild(header);
+        
+        // Create individual source cards with live event listeners
+        sources.forEach((source) => {
+            const sourceCard = sourceCardComponent.create(source, {
+                showCheckbox: true,
+                showActions: true
+            });
+            container.appendChild(sourceCard);
+        });
+        
+        messageDiv.appendChild(container);
     }
 
     formatMessageHTML(message) {

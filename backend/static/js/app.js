@@ -220,8 +220,26 @@ export class ChatResearchApp {
     }
 
     addMessage(sender, content, metadata = null) {
-        const message = this.appState.addMessage(sender, content, metadata);
-        this.uiManager.addMessageToChat(message);
+        // Handle live DOM nodes: store serializable content in state, pass live DOM to UI
+        let stateContent = content;
+        let uiContent = content;
+        
+        if (content instanceof HTMLElement) {
+            // Store serializable version in state for conversation history
+            stateContent = content.outerHTML;
+            // Pass live DOM node to UI to preserve event listeners
+            uiContent = content;
+        }
+        
+        const message = this.appState.addMessage(sender, stateContent, metadata);
+        
+        // Create UI message with live DOM content if applicable
+        const uiMessage = {
+            ...message,
+            content: uiContent
+        };
+        
+        this.uiManager.addMessageToChat(uiMessage);
         
         // Hide welcome screen after first message is sent
         this.hideWelcomeScreen();
@@ -933,10 +951,14 @@ export class ChatResearchApp {
             reportBuilder.remove();
         }
         
-        // Properly restore hidden messages by removing inline display style
-        const hiddenMessages = messagesContainer.querySelectorAll('.message, .welcome-screen');
-        hiddenMessages.forEach(msg => {
-            msg.style.removeProperty('display'); // Properly restore display
+        // Clear existing messages to rebuild fresh
+        messagesContainer.innerHTML = '';
+        
+        // Rebuild UI from stored conversation history WITHOUT mutating state
+        const conversationHistory = this.appState.getConversationHistory();
+        conversationHistory.forEach(message => {
+            // Call UI manager directly to avoid state mutation during restoration
+            this.uiManager.addMessageToChat(message);
         });
     }
     
@@ -1048,8 +1070,12 @@ export class ChatResearchApp {
             container.appendChild(sourceCard);
         });
         
-        // Add the properly structured container to the chat (preserve live DOM)
-        this.addMessage('assistant', container);
+        // Add the properly structured container to the chat with source data for restoration
+        this.addMessage('assistant', container, {
+            type: 'source_cards',
+            sources: sources,
+            query: this.appState.getCurrentQuery()
+        });
     }
     
     async _pollForEnrichedResults(query) {
