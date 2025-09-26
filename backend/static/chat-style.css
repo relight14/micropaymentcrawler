@@ -299,6 +299,88 @@
     margin-bottom: 2rem;
 }
 
+/* Report Builder Selected Sources */
+.selected-sources-section {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.selected-sources-section h4 {
+    margin: 0 0 1rem 0;
+    color: var(--foreground);
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-semibold);
+}
+
+.selected-source-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    margin-bottom: 0.75rem;
+}
+
+.selected-source-item .source-title a {
+    color: var(--foreground);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    font-size: var(--text-base);
+}
+
+.selected-source-item .source-title a:hover {
+    color: var(--accent-foreground);
+    text-decoration: underline;
+}
+
+.selected-source-item .source-meta {
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+}
+
+.selected-source-item .source-excerpt {
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+}
+
+.source-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.source-remove-btn {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.source-remove-btn:hover {
+    background: var(--destructive);
+    color: var(--destructive-foreground);
+    border-color: var(--destructive);
+}
+
+.sources-cost-summary {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    text-align: right;
+    font-weight: var(--font-weight-semibold);
+    color: var(--foreground);
+}
+
 .no-sources-message {
     text-align: center;
     color: var(--muted-foreground);

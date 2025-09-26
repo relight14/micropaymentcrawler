@@ -640,27 +640,41 @@ export class ChatResearchApp {
         const researchData = data || this.appState.getCurrentResearchData();
         if (!researchData) return;
         
-        // Generate Report Builder UI WITHOUT expensive packet building operations
+        // Add system message to inform user about mode switch (like research mode)
+        this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
+        
+        // Create report builder DOM and append directly to maintain chat continuity AND preserve event listeners
         const messagesContainer = document.getElementById('messagesContainer');
-        
-        // Hide existing messages but don't clear them
-        const existingMessages = messagesContainer.querySelectorAll('.message, .welcome-screen');
-        existingMessages.forEach(msg => msg.style.display = 'none');
-        
-        // Remove any existing report builder UI
-        const existingReportBuilder = messagesContainer.querySelector('.report-builder-interface');
-        if (existingReportBuilder) {
-            existingReportBuilder.remove();
-        }
-        
-        // Create Report Builder UI
         const reportBuilderDiv = document.createElement('div');
-        reportBuilderDiv.className = 'report-builder-interface';
-        reportBuilderDiv.appendChild(this._generateReportBuilderDOM());
+        reportBuilderDiv.className = 'message system report-builder-container';
+        
+        // Create message structure similar to other system messages
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        
+        const messageHeader = document.createElement('div');
+        messageHeader.className = 'message-header';
+        const senderSpan = document.createElement('span');
+        senderSpan.className = 'message-sender';
+        senderSpan.textContent = '⚙️ System';
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time';
+        timeSpan.textContent = new Date().toLocaleTimeString();
+        messageHeader.appendChild(senderSpan);
+        messageHeader.appendChild(timeSpan);
+        
+        const messageText = document.createElement('div');
+        messageText.className = 'message-text';
+        messageText.appendChild(this._generateReportBuilderDOM());
+        
+        messageContent.appendChild(messageHeader);
+        messageContent.appendChild(messageText);
+        reportBuilderDiv.appendChild(messageContent);
         
         messagesContainer.appendChild(reportBuilderDiv);
+        this.uiManager.scrollToBottom();
         
-        // Add event listeners to purchase buttons
+        // Add event listeners to purchase buttons - now they will work since DOM is live
         this._attachTierPurchaseListeners();
     }
 
@@ -683,25 +697,95 @@ export class ChatResearchApp {
         headerDiv.appendChild(headerDesc);
         containerDiv.appendChild(headerDiv);
         
-        // Compact selected sources summary (if any)
+        // Selected sources list (if any)
         if (sourceCount > 0) {
-            const sourcesCompact = document.createElement('div');
-            sourcesCompact.className = 'selected-sources-compact';
+            const sourcesSection = document.createElement('div');
+            sourcesSection.className = 'selected-sources-section';
             
-            // Budget validation
-            const budgetWarning = this._checkBudgetWarning(totalCost);
+            // Section header
+            const sourcesHeader = document.createElement('h4');
+            sourcesHeader.textContent = `Selected Sources (${sourceCount})`;
+            sourcesSection.appendChild(sourcesHeader);
             
-            if (budgetWarning) {
-                sourcesCompact.innerHTML = `
-                    <div class="sources-summary">${sourceCount} sources selected • $${Number(totalCost || 0).toFixed(2)} total license cost</div>
-                    <div class="budget-warning">${budgetWarning}</div>
-                `;
-                sourcesCompact.classList.add('has-warning');
-            } else {
-                sourcesCompact.textContent = `${sourceCount} sources selected • $${Number(totalCost || 0).toFixed(2)} total license cost`;
-            }
+            // Sources list
+            const sourcesList = document.createElement('div');
+            sourcesList.className = 'selected-sources-list';
             
-            containerDiv.appendChild(sourcesCompact);
+            selectedSources.forEach(source => {
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'selected-source-item';
+                
+                // Title (clickable if URL available)
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'source-title';
+                if (source.url) {
+                    const titleLink = document.createElement('a');
+                    titleLink.href = source.url;
+                    titleLink.target = '_blank';
+                    titleLink.textContent = source.title || 'Untitled Source';
+                    titleDiv.appendChild(titleLink);
+                } else {
+                    titleDiv.textContent = source.title || 'Untitled Source';
+                }
+                
+                // Author and domain
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'source-meta';
+                const authorText = source.author ? `${source.author} • ` : '';
+                const domainText = source.domain || 'Unknown Domain';
+                metaDiv.textContent = `${authorText}${domainText}`;
+                
+                // Excerpt
+                const excerptDiv = document.createElement('div');
+                excerptDiv.className = 'source-excerpt';
+                excerptDiv.textContent = source.excerpt || 'No preview available.';
+                
+                // Licensing and remove button
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'source-actions';
+                
+                // Licensing protocol badge
+                if (source.licensing_protocol) {
+                    const licenseSpan = document.createElement('span');
+                    licenseSpan.className = `license-badge ${source.licensing_protocol.toLowerCase()}`;
+                    licenseSpan.textContent = source.licensing_protocol;
+                    actionsDiv.appendChild(licenseSpan);
+                }
+                
+                // Remove button
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'source-remove-btn';
+                removeBtn.textContent = '🗑️';
+                removeBtn.title = 'Remove from selection';
+                removeBtn.onclick = () => {
+                    this.appState.toggleSourceSelection(source.id, source);
+                    sourceItem.remove();
+                    // Update header count
+                    const remaining = this.appState.getSelectedSourcesCount();
+                    sourcesHeader.textContent = `Selected Sources (${remaining})`;
+                    if (remaining === 0) {
+                        sourcesSection.remove();
+                    }
+                };
+                actionsDiv.appendChild(removeBtn);
+                
+                sourceItem.appendChild(titleDiv);
+                sourceItem.appendChild(metaDiv);
+                sourceItem.appendChild(excerptDiv);
+                sourceItem.appendChild(actionsDiv);
+                
+                sourcesList.appendChild(sourceItem);
+            });
+            
+            sourcesSection.appendChild(sourcesList);
+            
+            // Total cost summary
+            const costSummary = document.createElement('div');
+            costSummary.className = 'sources-cost-summary';
+            costSummary.textContent = `Total licensing cost: $${Number(totalCost || 0).toFixed(2)}`;
+            sourcesSection.appendChild(costSummary);
+            
+            containerDiv.appendChild(sourcesSection);
         }
         
         // Tier cards
