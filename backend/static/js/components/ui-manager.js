@@ -191,6 +191,117 @@ export class UIManager {
         
         messageDiv.appendChild(container);
     }
+    
+    /**
+     * Show purchase confirmation modal
+     */
+    showPurchaseConfirmationModal(purchaseDetails) {
+        return new Promise((resolve, reject) => {
+            // Remove any existing modal
+            const existingModal = document.getElementById('purchaseModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            const { tier, price, selectedSources = [], query = "" } = purchaseDetails;
+            const sourceCount = selectedSources.length;
+            const tierName = tier === 'research' ? 'Research Package' : 'Pro Package';
+            const isCustom = sourceCount > 0;
+            
+            // Create modal HTML with same structure as auth modal
+            const modalHTML = `
+                <div id="purchaseModal" class="modal-overlay">
+                    <div class="modal-content auth-modal">
+                        <div class="auth-modal-header">
+                            <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
+                            <h2>Confirm Purchase</h2>
+                            <p>${isCustom ? 'Generate custom report with selected sources' : 'Purchase research package'}</p>
+                            <button class="modal-close" id="purchaseModalClose" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
+                        </div>
+                        <div class="auth-modal-content">
+                            <div class="purchase-details">
+                                <div class="purchase-item">
+                                    <span class="purchase-label">${isCustom ? 'Custom Report' : tierName}</span>
+                                    <span class="purchase-value">$${Number(price || 0).toFixed(2)}</span>
+                                </div>
+                                ${isCustom ? `
+                                    <div class="purchase-item">
+                                        <span class="purchase-label">Selected Sources</span>
+                                        <span class="purchase-value">${sourceCount} sources</span>
+                                    </div>
+                                ` : ''}
+                                <div class="purchase-item">
+                                    <span class="purchase-label">Query</span>
+                                    <span class="purchase-value">${query.substring(0, 50)}${query.length > 50 ? '...' : ''}</span>
+                                </div>
+                                <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;">
+                                <div class="purchase-item total">
+                                    <span class="purchase-label"><strong>Total</strong></span>
+                                    <span class="purchase-value"><strong>$${Number(price || 0).toFixed(2)}</strong></span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                                <button class="auth-btn" id="purchaseConfirmBtn" style="flex: 1; background-color: #10b981;">
+                                    Confirm Purchase
+                                </button>
+                                <button class="auth-btn" id="purchaseCancelBtn" style="flex: 1; background-color: #6b7280; color: white;">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                        <div class="auth-modal-footer">
+                            Powered by LedeWire
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to page
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+            // Set up event listeners
+            const modal = document.getElementById('purchaseModal');
+            const confirmBtn = document.getElementById('purchaseConfirmBtn');
+            const cancelBtn = document.getElementById('purchaseCancelBtn');
+            const closeBtn = document.getElementById('purchaseModalClose');
+
+            const handleConfirm = () => {
+                modal.remove();
+                resolve(true); // User confirmed purchase
+            };
+
+            const handleCancel = () => {
+                modal.remove();
+                resolve(false); // User cancelled purchase
+            };
+
+            const handleError = (error) => {
+                modal.remove();
+                reject(error);
+            };
+
+            // Event listeners
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+            closeBtn.addEventListener('click', handleCancel);
+
+            // Close on backdrop click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    handleCancel();
+                }
+            });
+
+            // Escape key handling
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    handleCancel();
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
 
     formatMessageHTML(message) {
         // Safe timestamp handling with fallback
