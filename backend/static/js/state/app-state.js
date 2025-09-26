@@ -16,7 +16,7 @@ export class AppState {
         this.currentMode = 'chat';
         this.conversationHistory = this._loadFromStorage('conversationHistory', []);
         this.selectedSources = this._loadFromStorage('selectedSources', []);
-        this.currentResearchData = null;
+        this.currentResearchData = this._loadFromStorage('currentResearchData', null);
         this.purchasedItems = new Set(this._loadFromStorage('purchasedItems', []));
         this.pendingAction = null;
         
@@ -186,6 +186,7 @@ export class AppState {
     // Research data management
     setCurrentResearchData(data) {
         this.currentResearchData = data;
+        this._saveToStorage('currentResearchData', data);
     }
 
     getCurrentResearchData() {
