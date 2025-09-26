@@ -187,11 +187,9 @@ class SourceCard {
                 }
                 
                 // Add new license badge with enriched data
-                if (enrichedSource.licensing_protocol || enrichedSource.unlock_price > 0) {
-                    const newLicenseBadge = this._createLicenseBadge(enrichedSource);
-                    newLicenseBadge.classList.add('badge-updated'); // Visual feedback
-                    badgesContainer.appendChild(newLicenseBadge);
-                }
+                const newLicenseBadge = this._createLicenseBadge(enrichedSource);
+                newLicenseBadge.classList.add('badge-updated'); // Visual feedback
+                badgesContainer.appendChild(newLicenseBadge);
             }
         });
         
