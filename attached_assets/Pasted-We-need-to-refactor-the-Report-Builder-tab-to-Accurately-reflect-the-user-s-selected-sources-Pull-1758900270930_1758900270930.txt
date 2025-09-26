@@ -1,0 +1,68 @@
+We need to refactor the Report Builder tab to:
+✅ Accurately reflect the user’s selected sources
+Pull from appState.getSelectedSources() — this state is already correctly tracked when users check boxes on source cards.
+When the user toggles to the report builder tab it should not feel like a new chat, it should feel like one continuous UX with the storycard view still visible if the user scrolls up in the chat.  
+
+
+🎯 UI/UX Goals:
+Do NOT reuse full story card layout.
+
+
+Instead, display a tight, scrollable list of selected sources with the following info per source:
+
+
+Title (linked, if URL available)
+
+
+Author
+
+
+Publication / Domain
+
+
+Short excerpt or one-liner summary
+
+
+Licensing protocol (display tag or label, e.g., “RSL”, “Tollbit”, “Free Discovery”)
+
+
+This should feel clean and table-like — prioritize readability and scanability over visual flair.
+🧠 UX Inspiration:
+Think of a “shopping cart” or “reading list” — quick scan, easy to deselect if needed.
+
+
+Each row could have a trash icon or “Remove” button.
+
+
+Minimalist layout using flex/grid with well-aligned columns.
+
+
+🧪 Include the Research Tier Options:
+Below the selected list, show the two research output tiers:
+
+
+Tier 1: Summary and outline ( basic)
+
+
+Tier 2: Full synthesis w/ citations (requires unlocks)
+Both of these report formats were given to you in figma files so they should already be built.  Just use the figma for styling and layout references do not introduce any new languages just for the sake of this build, be consistent with current architecture.  
+
+
+Make these selectable cards or radio buttons — user should pick one before clicking “Generate Report”
+
+
+⚙️ Integration Notes:
+On “Generate Report”, use appState.getCurrentResearchData() + selected tier to kick off report generation - the ai model powering this report build should only reference the selected sources.  
+
+
+You can reuse helper functions like extractCompellingQuote() or formatDate() from utils.js if needed.
+
+
+🧼 Final Note:
+This should feel like a professional, lightweight report assembly view — not another research discovery tab.
+
+
+Clean typography, tight spacing, and fast scanability are key.
+
+
+
