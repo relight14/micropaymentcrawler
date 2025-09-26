@@ -45,9 +45,9 @@ export class ChatResearchApp {
             if (this.authService.isAuthenticated()) {
                 await this.authService.updateWalletBalance();
                 // Safe wallet display update - only if user is authenticated
-            if (this.authService.isAuthenticated()) {
-                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-            }
+                if (this.authService.isAuthenticated()) {
+                    this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+                }
             }
         } catch (error) {
             console.error('Error initializing app:', error);
@@ -156,7 +156,6 @@ export class ChatResearchApp {
             // Display response
             if (response.content) {
                 this.addMessage('assistant', response.content, response.metadata);
-            } else {
             }
             
             // Handle research data with progressive loading
@@ -180,9 +179,7 @@ export class ChatResearchApp {
                 if (response.research_data.enrichment_needed) {
                     console.log('🔄 Progressive enrichment in progress...'); 
                     // Polling is handled by backend progressive system, no client polling needed
-                } else {
                 }
-            } else {
             }
             
         } catch (error) {
