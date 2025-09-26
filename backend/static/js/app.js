@@ -617,40 +617,73 @@ export class ChatResearchApp {
         }
 
         try {
-            let result;
+            // Prepare purchase details for confirmation modal
+            let selectedSources = [];
             if (useSelectedSources) {
-                // Use selectedSources[] instead of all research results
-                const selectedSources = this.appState.getSelectedSources();
+                selectedSources = this.appState.getSelectedSources();
                 if (selectedSources.length === 0) {
                     this._showToast('Please select sources first', 'error');
                     return;
-                }
-                
-                result = await this.apiService.purchaseTier(tierId, price, query, selectedSources);
-                this._showToast(`Report generated with ${selectedSources.length} selected sources!`, 'success');
-            } else {
-                // Normal tier purchase with all sources
-                result = await this.apiService.purchaseTier(tierId, price, query);
-                this._showToast(`Research tier purchased successfully!`, 'success');
             }
+
+            const purchaseDetails = {
+                tier: tierId,
+                price: price,
+                selectedSources: selectedSources,
+                query: query || this.appState.getCurrentQuery() || "Research Query"
+            };
+
+            // Show purchase confirmation modal and await user decision
+            const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
             
+            if (!userConfirmed) {
+                // User cancelled the purchase - reset button state
+                if (button) {
+                    button.textContent = useSelectedSources ? 
+                        `Build Report with ${selectedSources.length} Selected Sources` : 
+                        `Purchase ${tierId === 'research' ? 'Research' : 'Pro'} Package`;
+                    button.disabled = false;
+                }
+                return;
+            }
+
+            // User confirmed - proceed with mock purchase (no actual API call to LedeWire purchase endpoint)
+            // Simulate brief processing time for realism
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            // Handle successful mock purchase
             this.appState.addPurchasedItem(tierId);
             
-            // Update UI
+            // Update UI with success state
             if (button) {
                 button.textContent = 'Purchased';
                 button.disabled = true;
             }
-            
+
+            // Update wallet balance (keep this real for authentic UX)
             await this.authService.updateWalletBalance();
-            // Safe wallet display update - only if user is authenticated
             if (this.authService.isAuthenticated()) {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
+
+            // Show success message
+            if (useSelectedSources) {
+                this._showToast(`Report generated with ${selectedSources.length} selected sources!`, 'success');
+            } else {
+                this._showToast(`Research tier purchased successfully!`, 'success');
+            }
             
         } catch (error) {
-            console.error('Error purchasing tier:', error);
-            this._showToast(`Failed to purchase tier: ${error.message}`, 'error');
+            console.error('Error in purchase flow:', error);
+            this.addMessage('system', `Failed to complete purchase: ${error.message}`);
+            
+            // Reset button state on error
+            if (button) {
+                button.textContent = useSelectedSources ? 
+                    `Build Report with ${selectedSources.length || 0} Selected Sources` : 
+                    `Purchase ${tierId === 'research' ? 'Research' : 'Pro'} Package`;
+                button.disabled = false;
+            }
         }
     }
 

@@ -2491,6 +2491,33 @@ input:checked + .slider:before {
     animation: slideDown 0.3s ease-out;
 }
 
+/* Purchase Confirmation Modal Styling */
+.purchase-details {
+    text-align: left;
+}
+
+.purchase-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.purchase-item.total {
+    font-size: 1.1rem;
+    color: #1a1a1a;
+}
+
+.purchase-label {
+    color: #666;
+}
+
+.purchase-value {
+    color: #1a1a1a;
+    font-weight: 500;
+}
+
 @keyframes slideDown {
     from {
         opacity: 0;
