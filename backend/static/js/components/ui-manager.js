@@ -116,7 +116,13 @@ export class UIManager {
 
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender}`;
-        messageDiv.innerHTML = this.formatMessageHTML(message);
+        
+        // Handle DOM nodes directly to preserve event listeners
+        if (message.content instanceof HTMLElement) {
+            messageDiv.appendChild(message.content);
+        } else {
+            messageDiv.innerHTML = this.formatMessageHTML(message);
+        }
         
         this.messagesContainer.appendChild(messageDiv);
         this.scrollToBottom();

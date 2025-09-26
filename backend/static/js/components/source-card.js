@@ -462,13 +462,6 @@ class SourceCard {
      * Handle checkbox selection change - sync with appState only
      */
     _handleSelectionChange(source, isSelected) {
-        console.log('🔍 SELECTION CHANGE LOG:', {
-            sourceId: source?.id,
-            sourceTitle: source?.title,
-            isSelected,
-            action: isSelected ? 'ADDING' : 'REMOVING'
-        });
-        
         if (!source || !source.id) {
             console.error('Invalid source in selection change:', source);
             return;
@@ -493,14 +486,6 @@ class SourceCard {
                 this.appState.removeSelectedSource(source.id);
             }
         }
-        
-        // Log current state after change
-        const currentSelected = this.appState?.getSelectedSources() || [];
-        console.log('📊 STATE AFTER SELECTION CHANGE:', {
-            selectedCount: currentSelected.length,
-            selectedIds: currentSelected.map(s => s.id || s.source_id),
-            appStateMethod: typeof this.appState?.getSelectedSources
-        });
 
         // Dispatch custom event for other components
         const event = new CustomEvent('sourceSelectionChanged', {
