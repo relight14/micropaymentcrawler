@@ -1,15 +1,21 @@
 """Dynamic query-based research routes"""
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Header, Depends, Request
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
+import re
+import html
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
 from services.research.packet_builder import PacketBuilder
+from integrations.ledewire import LedeWireAPI
 
 router = APIRouter()
+
+# Initialize services
+ledewire = LedeWireAPI()
 
 # Initialize crawler for dynamic research
 crawler = ContentCrawlerStub()
@@ -20,29 +26,151 @@ packet_builder = PacketBuilder()
 
 class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
-    query: str
+    query: str = Field(..., min_length=3, max_length=500, description="Research query between 3-500 characters")
     tier: TierType
 
 
-@router.post("/generate-report", response_model=ResearchPacket)
-async def generate_research_report(request: GenerateReportRequest):
-    """Generate a complete research report using PacketBuilder based on tier selection"""
+def extract_bearer_token(authorization: str) -> str:
+    """Extract and validate Bearer token from Authorization header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
+    
+    access_token = authorization.split(" ", 1)[1].strip()
+    
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
+    
+    return access_token
+
+
+def validate_user_token(access_token: str):
+    """Validate JWT token with LedeWire API."""
     try:
+        balance_result = ledewire.get_wallet_balance(access_token)
+        
+        if "error" in balance_result:
+            error_message = ledewire.handle_api_error(balance_result)
+            raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
+        
+        return balance_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import requests
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            elif e.response.status_code in [502, 503, 504]:
+                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+            else:
+                raise HTTPException(status_code=500, detail="Authentication service error")
+        else:
+            raise HTTPException(status_code=503, detail="Authentication service unavailable")
+
+
+def get_authenticated_user(authorization: str = Header(None)):
+    """Dependency to get authenticated user info."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    access_token = extract_bearer_token(authorization)
+    user_info = validate_user_token(access_token)
+    return user_info
+
+
+def validate_query_input(query: str) -> str:
+    """Validate query input with minimal sanitization for API use."""
+    if not query or len(query.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Query must be at least 3 characters long")
+    
+    if len(query) > 500:
+        raise HTTPException(status_code=400, detail="Query cannot exceed 500 characters")
+    
+    # Minimal validation: only remove control characters that could cause issues
+    sanitized = query.strip()
+    
+    # Remove null bytes and control characters that could cause parsing/encoding issues
+    sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', sanitized)
+    
+    # Collapse multiple spaces
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    
+    if not sanitized or len(sanitized) < 3:
+        raise HTTPException(status_code=400, detail="Query became too short after validation")
+    
+    return sanitized
+
+
+def sanitize_context_text(context: str) -> str:
+    """Validate conversation context with minimal sanitization."""
+    if not context:
+        return ""
+    
+    # Apply same minimal validation for context
+    sanitized = context.strip()
+    
+    # Remove control characters
+    sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', sanitized)
+    
+    # Collapse multiple spaces and limit length
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    
+    # Limit context length to prevent abuse
+    if len(sanitized) > 200:
+        sanitized = sanitized[:200]
+    
+    return sanitized
+
+
+@router.post("/generate-report", response_model=ResearchPacket)
+async def generate_research_report(
+    request: Request,
+    report_request: GenerateReportRequest,
+    user_info: dict = Depends(get_authenticated_user)
+):
+    """Generate a complete research report using PacketBuilder based on tier selection"""
+    # Apply rate limiting using app-level limiter
+    limiter = request.app.state.limiter
+    await limiter.hit("5/minute", request)
+    
+    try:
+        # Validate and sanitize query input
+        sanitized_query = validate_query_input(report_request.query)
+        
         # Use PacketBuilder to generate complete research packet
         research_packet = packet_builder.build_packet(
-            query=request.query,
-            tier=request.tier
+            query=sanitized_query,
+            tier=report_request.tier
         )
         
         return research_packet
         
+    except HTTPException:
+        raise  # Re-raise validation errors as-is
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating research report: {str(e)}")
+        # Log the actual error for debugging but return generic message
+        print(f"Research report generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred while generating research report")
 
 @router.get("/enrichment/{cache_key}")
-async def get_enrichment_status(cache_key: str):
+async def get_enrichment_status(
+    request: Request,
+    cache_key: str,
+    user_info: dict = Depends(get_authenticated_user)
+):
     """Poll for enriched results after skeleton cards are returned"""
+    # Apply rate limiting using app-level limiter
+    limiter = request.app.state.limiter
+    await limiter.hit("30/minute", request)
+    
     try:
+        # Validate cache_key to prevent injection attacks
+        if not cache_key or not re.match(r'^[a-zA-Z0-9_-]{8,64}$', cache_key):
+            raise HTTPException(status_code=400, detail="Invalid cache key format")
         # Check if enriched results are available in cache
         # Note: Using public method for stability (avoiding private _get_from_cache)
         try:
@@ -78,27 +206,42 @@ async def get_enrichment_status(cache_key: str):
                 "message": "Enrichment in progress..."
             }
     except Exception as e:
+        # Log actual error but return generic message
+        print(f"Enrichment polling error: {str(e)}")
         return {
             "status": "error", 
-            "message": f"Enrichment failed: {str(e)}"
+            "message": "Enrichment polling failed due to internal error"
         }
 
 
 @router.post("/analyze", response_model=DynamicResearchResponse)
-async def analyze_research_query(request: ResearchRequest):
+async def analyze_research_query(
+    request: Request,
+    research_request: ResearchRequest,
+    user_info: dict = Depends(get_authenticated_user)
+):
     """Analyze a research query and return dynamic pricing with source preview."""
+    # Apply rate limiting using app-level limiter
+    limiter = request.app.state.limiter
+    await limiter.hit("15/minute", request)
+    
     try:
+        # Validate and sanitize query input
+        sanitized_query = validate_query_input(research_request.query)
         # Generate sources based on query and budget
-        max_sources = min(request.preferred_source_count or 15, 30)  # Cap at 30
-        budget_limit = (request.max_budget_dollars or 10.0) * 0.75  # 75% for licensing
+        max_sources = min(research_request.preferred_source_count or 15, 30)  # Cap at 30
+        budget_limit = (research_request.max_budget_dollars or 10.0) * 0.75  # 75% for licensing
         
         # Enhance query with conversation context if available
-        enhanced_query = request.query
-        if request.conversation_context:
+        enhanced_query = sanitized_query
+        if research_request.conversation_context:
             # Extract relevant context from recent conversation
-            context_text = _extract_conversation_context(request.conversation_context)
+            context_text = _extract_conversation_context(research_request.conversation_context)
             if context_text:
-                enhanced_query = f"{context_text} {request.query}"
+                # Sanitize context text using strict allowlist approach
+                sanitized_context = sanitize_context_text(context_text)
+                if sanitized_context:  # Only add if context is not empty after sanitization
+                    enhanced_query = f"{sanitized_context} {sanitized_query}"
         
         # Use progressive search for faster initial response with fallback
         try:
@@ -108,7 +251,7 @@ async def analyze_research_query(request: ResearchRequest):
             print(f"⚠️ Progressive search failed: {crawler_error}")
             # Fallback: return minimal skeleton data to prevent total failure
             return DynamicResearchResponse(
-                query=request.query,
+                query=sanitized_query,
                 total_estimated_cost=0.0,
                 source_count=0,
                 premium_source_count=0,
@@ -144,7 +287,7 @@ async def analyze_research_query(request: ResearchRequest):
         
         # Generate research summary (currently sync, but may need async if AI-enhanced)
         # TODO: Consider async if adding GPT-assisted summaries or complex processing
-        summary = _generate_research_preview(request.query, sources)
+        summary = _generate_research_preview(sanitized_query, sources)
         
         # Sort sources by relevance score (highest first)
         sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
@@ -178,7 +321,7 @@ async def analyze_research_query(request: ResearchRequest):
         
         # Create response with progressive flow information
         response = DynamicResearchResponse(
-            query=request.query,
+            query=sanitized_query,
             total_estimated_cost=round(total_cost, 2),
             source_count=len(sources),
             premium_source_count=len(premium_sources),
@@ -199,8 +342,12 @@ async def analyze_research_query(request: ResearchRequest):
             
         return response
         
+    except HTTPException:
+        raise  # Re-raise validation errors (400s) and auth errors (401s) as-is
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error analyzing research query: {str(e)}")
+        # Log the actual error for debugging but return generic message to prevent information leakage
+        print(f"Research query analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred while analyzing research query")
 
 
 def _extract_conversation_context(conversation_history: List[Dict[str, str]]) -> str:
@@ -252,9 +399,20 @@ Tap to preview. Unlock what matters."""
 
 
 @router.get("/sources/{source_id}")
-async def get_source_details(source_id: str):
+async def get_source_details(
+    request: Request,
+    source_id: str,
+    user_info: dict = Depends(get_authenticated_user)
+):
     """Get detailed information about a specific source for unlocking."""
+    # Apply rate limiting using app-level limiter
+    limiter = request.app.state.limiter
+    await limiter.hit("60/minute", request)
+    
     try:
+        # Validate source_id format to prevent injection
+        if not source_id or not re.match(r'^[a-zA-Z0-9_-]{1,100}$', source_id):
+            raise HTTPException(status_code=400, detail="Invalid source ID format")
         # In a real implementation, this would fetch from a database or cache
         # For now, return a generic response structure
         return {
@@ -269,4 +427,6 @@ async def get_source_details(source_id: str):
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching source details: {str(e)}")
+        # Log actual error but return generic message
+        print(f"Source details error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error occurred while fetching source details")
