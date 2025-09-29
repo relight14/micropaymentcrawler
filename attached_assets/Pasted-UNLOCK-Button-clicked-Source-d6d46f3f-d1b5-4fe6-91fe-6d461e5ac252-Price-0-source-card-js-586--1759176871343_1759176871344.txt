@@ -1,0 +1,29 @@
+UNLOCK: Button clicked! Source: d6d46f3f-d1b5-4fe6-91fe-6d461e5ac252 Price: 0
+source-card.js:586 🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested
+source-card.js:591 🔓 UNLOCK: Dispatching event with detail: Object
+app.js:1219 🔓 UNLOCK: Event received in app.js! Object
+app.js:1220 🔓 UNLOCK: Calling handleSourceUnlock with: d6d46f3f-d1b5-4fe6-91fe-6d461e5ac252 0
+app.js:636 🔓 UNLOCK: handleSourceUnlock() called! Object
+app.js:642 🔓 UNLOCK: Proceeding with unlock...
+source-card.js:593 🔓 UNLOCK: Event dispatched successfully
+app.js:660 Uncaught (in promise) TypeError: this.appState.getResearchResults is not a function
+    at ChatResearchApp.handleSourceUnlock (app.js:660:47)
+    at HTMLDocument.<anonymous> (app.js:1221:22)
+    at SourceCard._handleUnlock (source-card.js:592:22)
+    at HTMLButtonElement.unlockHandler (source-card.js:542:46)Understand this error
+source-card.js:584 🔓 UNLOCK: Button clicked! Source: d6d46f3f-d1b5-4fe6-91fe-6d461e5ac252 Price: 0
+source-card.js:586 🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested
+source-card.js:591 🔓 UNLOCK: Dispatching event with detail: Object
+app.js:1219 🔓 UNLOCK: Event received in app.js! Object
+app.js:1220 🔓 UNLOCK: Calling handleSourceUnlock with: d6d46f3f-d1b5-4fe6-91fe-6d461e5ac252 0
+app.js:636 🔓 UNLOCK: handleSourceUnlock() called! Object
+app.js:639 🔓 UNLOCK: Already in progress, ignoring duplicate request
+source-card.js:593 🔓 UNLOCK: Event dispatched successfully
+source-card.js:584 🔓 UNLOCK: Button clicked! Source: d6d46f3f-d1b5-4fe6-91fe-6d461e5ac252 Price: 0
+source-card.js:586 🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested
+source-card.js:591 🔓 UNLOCK: Dispatching event with detail: {source: {…}}
+app.js:1219 🔓 UNLOCK: Event received in app.js! {source: {…}}
+app.js:1220 🔓 UNLOCK: Calling handleSourceUnlock with: d6d46f3f-d1b5-4fe6-91fe-6d461e5ac252 0
+app.js:636 🔓 UNLOCK: handleSourceUnlock() called! {button: null, sourceId: 'd6d46f3f-d1b5-4fe6-91fe-6d461e5ac252', price: 0}
+app.js:639 🔓 UNLOCK: Already in progress, ignoring duplicate request
+source-card.js:593 🔓 UNLOCK: Event dispatched successfully
