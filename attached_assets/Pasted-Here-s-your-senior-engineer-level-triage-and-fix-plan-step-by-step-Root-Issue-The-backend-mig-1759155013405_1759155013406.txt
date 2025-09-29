@@ -1,0 +1,85 @@
+Here's your senior engineer-level triage and fix plan, step-by-step:
+
+🔥 Root Issue
+
+The backend migration logic isn't executing because the X-Previous-User-ID header is not being sent, or it's being sent at the wrong time (after user_id has already changed).
+
+🧠 What’s Actually Happening
+
+User is chatting while unauthenticated
+→ anon_abc123 conversation is stored correctly
+
+User logs in
+→ frontend gets user_xyz789 from /auth response
+
+🛑 Frontend never tells backend that anon_abc123 existed
+
+Backend assumes user_xyz789 is a brand-new user with no prior history
+→ Migration logic never fires
+
+✅ What You Need to Do (Frontend Fix)
+🧩 Step 1: Capture anon_user_id Before Login
+
+Add logic before initiating login flow:
+
+const previousUserId = await apiService.getUserId();  // Will return anon_xxx before auth
+sessionStorage.setItem('preLoginUserId', previousUserId);
+
+🔐 Step 2: Send It During Login Request
+
+Modify the login API call to include this header:
+
+const previousUserId = sessionStorage.getItem('preLoginUserId');
+
+await apiService.login(email, password, {
+  headers: {
+    'X-Previous-User-ID': previousUserId
+  }
+});
+
+
+Make sure this header is forwarded properly in your frontend's apiService.login() method.
+
+✅ Step 3: Backend Migration Logic Will Now Trigger
+
+Your migration middleware or post-auth login handler should already be checking for:
+
+previous_user_id = request.headers.get("X-Previous-User-ID")
+
+
+And logging like:
+
+logger.info(f"Migrated conversation from {previous_user_id} to {new_user_id}")
+
+
+You should now see this log fire if the header is passed correctly.
+
+🧽 Bonus Fix: Cache Key Regex Too Strict
+
+You're seeing:
+
+Enrichment polling error: 400: Invalid cache key format
+
+
+Solution:
+
+Loosen your cache key validation regex. For example:
+
+# Before (too strict)
+if not re.match(r'^[a-z0-9]{32}$', cache_key):
+
+# After (more flexible)
+if not re.match(r'^[a-zA-Z0-9_\-]{20,64}$', cache_key):
+
+
+This allows realistic UUIDs or hash-based keys you're using in enrichment.
+
+🧪 Debug Checklist After Fix
+
+ Log shows X-Previous-User-ID received and migration triggered
+
+ New authenticated user ID has conversation history populated
+
+ Research context includes pre-login chat
+
+ Cache enrichment polling no longer fails
