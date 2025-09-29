@@ -98,6 +98,12 @@ export class APIService {
         
         if (!response.ok) {
             console.error(`🔬 API request failed: ${response.status} ${response.statusText}`);
+            
+            // Handle rate limiting specifically
+            if (response.status === 429) {
+                throw new Error("You've hit the research request limit. Please wait a few minutes and try again. This helps protect system integrity during high-load periods.");
+            }
+            
             throw new Error(`Research analysis failed: ${response.statusText}`);
         }
 
@@ -261,6 +267,11 @@ export class APIService {
                 const response = await fetch(url, options);
                 
                 if (!response.ok) {
+                    // Handle rate limiting specifically with user-friendly message
+                    if (response.status === 429) {
+                        throw new Error("You've hit the research request limit. Please wait a few minutes and try again. This helps protect system integrity during high-load periods.");
+                    }
+                    
                     // Don't retry 4xx errors (client errors) except 408 (timeout)
                     if (response.status >= 400 && response.status < 500 && response.status !== 408) {
                         throw new Error(`${errorPrefix}: ${response.statusText}`);

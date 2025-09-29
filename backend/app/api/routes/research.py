@@ -5,17 +5,20 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import re
 import html
+from slowapi import Limiter
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
 from services.research.packet_builder import PacketBuilder
 from integrations.ledewire import LedeWireAPI
+from utils.rate_limit import get_user_or_ip_key
 
 router = APIRouter()
 
 # Initialize services
 ledewire = LedeWireAPI()
+limiter = Limiter(key_func=get_user_or_ip_key)
 
 # Initialize crawler for dynamic research
 crawler = ContentCrawlerStub()
@@ -127,16 +130,13 @@ def sanitize_context_text(context: str) -> str:
 
 
 @router.post("/generate-report", response_model=ResearchPacket)
+@limiter.limit("5/minute")
 async def generate_research_report(
     request: Request,
     report_request: GenerateReportRequest,
     user_info: dict = Depends(get_authenticated_user)
 ):
     """Generate a complete research report using PacketBuilder based on tier selection"""
-    # Apply rate limiting using app-level limiter
-    limiter = request.app.state.limiter
-    await limiter.hit("5/minute", request)
-    
     try:
         # Validate and sanitize query input
         sanitized_query = validate_query_input(report_request.query)
@@ -157,16 +157,13 @@ async def generate_research_report(
         raise HTTPException(status_code=500, detail="Internal server error occurred while generating research report")
 
 @router.get("/enrichment/{cache_key}")
+@limiter.limit("30/minute")
 async def get_enrichment_status(
     request: Request,
     cache_key: str,
     user_info: dict = Depends(get_authenticated_user)
 ):
     """Poll for enriched results after skeleton cards are returned"""
-    # Apply rate limiting using app-level limiter
-    limiter = request.app.state.limiter
-    await limiter.hit("30/minute", request)
-    
     try:
         # Validate cache_key to prevent injection attacks
         if not cache_key or not re.match(r'^[a-zA-Z0-9_-]{8,64}$', cache_key):
@@ -215,16 +212,13 @@ async def get_enrichment_status(
 
 
 @router.post("/analyze", response_model=DynamicResearchResponse)
+@limiter.limit("15/minute")
 async def analyze_research_query(
     request: Request,
     research_request: ResearchRequest,
     user_info: dict = Depends(get_authenticated_user)
 ):
     """Analyze a research query and return dynamic pricing with source preview."""
-    # Apply rate limiting using app-level limiter
-    limiter = request.app.state.limiter
-    await limiter.hit("15/minute", request)
-    
     try:
         # Validate and sanitize query input
         sanitized_query = validate_query_input(research_request.query)
@@ -399,16 +393,13 @@ Tap to preview. Unlock what matters."""
 
 
 @router.get("/sources/{source_id}")
+@limiter.limit("60/minute")
 async def get_source_details(
     request: Request,
     source_id: str,
     user_info: dict = Depends(get_authenticated_user)
 ):
     """Get detailed information about a specific source for unlocking."""
-    # Apply rate limiting using app-level limiter
-    limiter = request.app.state.limiter
-    await limiter.hit("60/minute", request)
-    
     try:
         # Validate source_id format to prevent injection
         if not source_id or not re.match(r'^[a-zA-Z0-9_-]{1,100}$', source_id):
