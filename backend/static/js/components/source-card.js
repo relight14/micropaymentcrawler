@@ -531,7 +531,7 @@ class SourceCard {
         
         if (isUnlocked) {
             button.className = 'download-btn unlock-btn';
-            button.innerHTML = '📄 <span>Download</span>';
+            button.innerHTML = '📄 <span>View Source</span>';
             const downloadHandler = () => this._handleDownload(source);
             button.addEventListener('click', downloadHandler);
             this.eventListeners.set(button, { type: 'click', handler: downloadHandler });
@@ -559,7 +559,7 @@ class SourceCard {
         
         if (isUnlocked) {
             actionBtn.className = 'download-btn unlock-btn';
-            actionBtn.innerHTML = '📄 <span>Download</span>';
+            actionBtn.innerHTML = '📄 <span>View Source</span>';
         } else {
             actionBtn.className = 'unlock-btn';
             const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';

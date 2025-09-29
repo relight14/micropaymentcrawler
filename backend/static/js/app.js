@@ -19,6 +19,11 @@ export class ChatResearchApp {
         this.appState = new AppState();
         this.uiManager = new UIManager(this.appState);
         
+        // Toast notification system
+        this.toasts = [];
+        this.toastContainer = null;
+        this.isUnlockInProgress = false; // Debounce flag for unlock operations
+        
         // Initialize the application
         this.initializeApp();
         
@@ -35,6 +40,7 @@ export class ChatResearchApp {
     async initializeApp() {
         try {
             this.initializeEventListeners();
+            this.initializeToastSystem();
             this.uiManager.updateModeDisplay();
             // Safe wallet display update - only if user is authenticated
             if (this.authService.isAuthenticated()) {
@@ -53,6 +59,66 @@ export class ChatResearchApp {
             console.error('Error initializing app:', error);
             this.addMessage('system', 'Application initialization failed. Please refresh the page.');
         }
+    }
+
+    initializeToastSystem() {
+        this.toastContainer = document.getElementById('toastContainer');
+        if (!this.toastContainer) {
+            console.warn('Toast container not found, creating fallback');
+            this.toastContainer = document.createElement('div');
+            this.toastContainer.className = 'toast-container';
+            document.body.appendChild(this.toastContainer);
+        }
+    }
+
+    showToast(message, type = 'info', duration = 3000) {
+        const toastId = Date.now();
+        const icons = {
+            success: '✅',
+            error: '⚠️', 
+            info: 'ℹ️'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.dataset.toastId = toastId;
+        
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type] || icons.info}</span>
+            <span class="toast-content">${message}</span>
+            <button class="toast-dismiss" aria-label="Dismiss">×</button>
+        `;
+
+        // Add dismiss functionality
+        const dismissBtn = toast.querySelector('.toast-dismiss');
+        dismissBtn.addEventListener('click', () => this.dismissToast(toastId));
+
+        // Add to container and tracking
+        this.toastContainer.appendChild(toast);
+        this.toasts.push({ id: toastId, element: toast });
+
+        // Auto-dismiss after duration
+        if (duration > 0) {
+            setTimeout(() => this.dismissToast(toastId), duration);
+        }
+
+        return toastId;
+    }
+
+    dismissToast(toastId) {
+        const toastIndex = this.toasts.findIndex(t => t.id === toastId);
+        if (toastIndex === -1) return;
+
+        const toast = this.toasts[toastIndex];
+        toast.element.classList.add('dismissing');
+        
+        // Remove after animation
+        setTimeout(() => {
+            if (toast.element.parentNode) {
+                toast.element.parentNode.removeChild(toast.element);
+            }
+            this.toasts.splice(toastIndex, 1);
+        }, 300);
     }
 
     initializeEventListeners() {
@@ -567,6 +633,12 @@ export class ChatResearchApp {
 
     // Source and tier management methods
     async handleSourceUnlock(button, sourceId, price) {
+        // Debounce mechanism - prevent duplicate unlock attempts
+        if (this.isUnlockInProgress) {
+            console.log('Unlock already in progress, ignoring duplicate request');
+            return;
+        }
+
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
                 type: 'source_unlock', 
@@ -574,30 +646,99 @@ export class ChatResearchApp {
                 sourceId, 
                 price 
             });
-            this.addMessage('system', 'Please log in to unlock this source.');
+            this.showToast('Please log in to unlock this source.', 'info');
             return;
+        }
+
+        // Lock the unlock operation
+        this.isUnlockInProgress = true;
+        
+        // Find the source object to update its state
+        let sourceToUpdate = null;
+        const researchResults = this.appState.getResearchResults();
+        if (researchResults && researchResults.sources) {
+            sourceToUpdate = researchResults.sources.find(s => s.id === sourceId);
+        }
+
+        // Show loading state on button
+        const originalButtonContent = button?.innerHTML;
+        if (button) {
+            button.innerHTML = '🔄 <span>Unlocking...</span>';
+            button.disabled = true;
         }
 
         try {
             const result = await this.apiService.unlockSource(sourceId, price);
-            this.addMessage('system', `Source unlocked successfully!`);
+            
+            // Update source state
+            if (sourceToUpdate) {
+                sourceToUpdate.is_unlocked = true;
+            }
             this.appState.addPurchasedItem(sourceId);
             
-            // Update UI
-            if (button) {
-                button.textContent = 'Unlocked';
-                button.disabled = true;
-            }
-            
+            // Update wallet balance
             await this.authService.updateWalletBalance();
-            // Safe wallet display update - only if user is authenticated
             if (this.authService.isAuthenticated()) {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
-            
+
+            // Show success toast
+            this.showToast('✅ Source unlocked! Redirecting you now…', 'success', 4000);
+
+            // Update button to "View Source" state
+            if (button) {
+                button.innerHTML = '📄 <span>View Source</span>';
+                button.disabled = false;
+                // Update click handler to open source URL
+                const newHandler = () => {
+                    if (sourceToUpdate?.url) {
+                        window.open(sourceToUpdate.url, '_blank');
+                    }
+                };
+                button.removeEventListener('click', button._currentHandler);
+                button.addEventListener('click', newHandler);
+                button._currentHandler = newHandler;
+            }
+
+            // Wait 1.5-2 seconds for UX clarity, then redirect
+            setTimeout(() => {
+                if (sourceToUpdate?.url) {
+                    window.open(sourceToUpdate.url, '_blank');
+                } else {
+                    console.warn('Source URL not found for redirect');
+                }
+            }, 1800);
+
+            // Trigger UI refresh for source cards (shallow copy to force re-render)
+            if (researchResults && researchResults.sources) {
+                this.appState.updateResearchResults({
+                    ...researchResults,
+                    sources: [...researchResults.sources]
+                });
+            }
+
         } catch (error) {
             console.error('Error unlocking source:', error);
-            this.addMessage('system', `Failed to unlock source: ${error.message}`);
+            
+            // Detailed logging for 422 errors
+            if (error.message.includes('422') || error.message.includes('Unprocessable Entity')) {
+                console.warn('⚠️ Unlock schema validation error - check payload structure:', {
+                    sourceId,
+                    price,
+                    error: error.message
+                });
+            }
+            
+            this.showToast('⚠️ Unlock failed. Please try again.', 'error');
+            
+            // Restore button state on failure
+            if (button && originalButtonContent) {
+                button.innerHTML = originalButtonContent;
+                button.disabled = false;
+            }
+        } finally {
+            // Always unlock the operation
+            this.isUnlockInProgress = false;
         }
     }
 
