@@ -549,6 +549,7 @@ class SourceCard {
     
     /**
      * Update action button with fresh state data
+     * IMPORTANT: Only modify text content to preserve event listeners
      */
     _updateActionButton(cardElement, freshSource) {
         const actionBtn = cardElement.querySelector('.unlock-btn');
@@ -557,13 +558,21 @@ class SourceCard {
         const cost = freshSource.unlock_price || 0;
         const isUnlocked = freshSource.is_unlocked || false;
         
+        // Find the span element (text container)
+        const textSpan = actionBtn.querySelector('span');
+        if (!textSpan) return; // Button structure not as expected
+        
         if (isUnlocked) {
             actionBtn.className = 'download-btn unlock-btn';
-            actionBtn.innerHTML = '📄 <span>View Source</span>';
+            // Update only text content, not innerHTML - preserves event listeners
+            actionBtn.firstChild.textContent = '📄 ';
+            textSpan.textContent = 'View Source';
         } else {
             actionBtn.className = 'unlock-btn';
             const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
-            actionBtn.innerHTML = `🔓 <span>Unlock${costText}</span>`;
+            // Update only text content, not innerHTML - preserves event listeners
+            actionBtn.firstChild.textContent = '🔓 ';
+            textSpan.textContent = `Unlock${costText}`;
         }
     }
 
