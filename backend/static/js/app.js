@@ -621,6 +621,7 @@ export class ChatResearchApp {
                 if (selectedSources.length === 0) {
                     this._showToast('Please select sources first', 'error');
                     return;
+                }
             }
 
             const purchaseDetails = {
