@@ -288,4 +288,33 @@ export class APIService {
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
+    
+    async generateReport(query, tier) {
+        console.log(`📊 API SERVICE: generateReport called`);
+        console.log(`📊 Query: "${query}"`);
+        console.log(`📊 Tier: "${tier}"`);
+        
+        try {
+            const response = await fetch(`${this.baseURL}/api/research/generate-report`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({
+                    query: query,
+                    tier: tier
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Report generation failed: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log(`📊 Report generated successfully:`, result);
+            return result;
+            
+        } catch (error) {
+            console.error('Error generating report:', error);
+            throw error;
+        }
+    }
 }
