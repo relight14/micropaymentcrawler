@@ -673,11 +673,17 @@ export class ChatResearchApp {
             
             // Generate research report after successful purchase (for all tiers)
             try {
+                // Show loading message while generating report
+                this._showToast('Generating your research report...', 'info');
+                
                 const reportResponse = await this.apiService.generateReport(query || this.appState.getCurrentQuery() || "Research Query", tierId);
                 
                 if (reportResponse && reportResponse.summary) {
                     // Display the generated report in the UI
                     this._displayGeneratedReport(reportResponse);
+                    
+                    // Show completion message
+                    this._showToast('Research report generated successfully!', 'success');
                 }
             } catch (reportError) {
                 console.error('Error generating report:', reportError);
