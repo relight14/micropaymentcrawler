@@ -1,0 +1,75 @@
+The tab toggle is dead because your app never initialized properly.
+
+Your root cause is either failed instantiation of the ChatResearchApp or missing event listeners due to:
+
+🔥 Most Likely Cause:
+
+window.app = new ChatResearchApp() never ran, or ran before the DOM was ready.
+
+🚨 Here's how to debug it in 60 seconds:
+✅ Step 1: Check if app exists
+
+Open browser dev tools → Console → type:
+
+window.app
+
+
+If it returns undefined → 💥 You never instantiated your app.
+
+If it returns ChatResearchApp {} → Move to step 2.
+
+✅ Step 2: Check if event listeners are bound
+
+Paste this in the console:
+
+document.getElementById('researchModeBtn').onclick
+
+
+If it’s null or undefined, listeners were never attached.
+
+✅ Step 3: Verify DOMContentLoaded timing
+
+Check where you’re calling:
+
+document.addEventListener('DOMContentLoaded', () => {
+  window.app = new ChatResearchApp();
+});
+
+
+If your script is loaded as type="module" and at the bottom of the body, you may not need DOMContentLoaded. In fact, it might be too late.
+
+Instead, try calling new ChatResearchApp() immediately if your script is at the bottom.
+
+⚙️ How to fix it (pick ONE):
+✅ Option 1: If your <script> is at the bottom of <body>
+
+No need to wait for DOMContentLoaded:
+
+window.app = new ChatResearchApp(); // call directly
+
+✅ Option 2: If your <script> is in <head> or doesn't wait:
+
+Keep DOMContentLoaded, but confirm ALL elements exist before calling:
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btnsExist = document.getElementById('chatModeBtn') &&
+                    document.getElementById('researchModeBtn') &&
+                    document.getElementById('reportModeBtn');
+  if (btnsExist) {
+    window.app = new ChatResearchApp();
+  } else {
+    console.error('❌ Mode buttons not found in DOM at init time');
+  }
+});
+
+✅ Final Fix Plan
+
+ Hard refresh your browser (clear script errors in cache)
+
+ Confirm window.app exists
+
+ Confirm buttons have event listeners
+
+ Recheck script load timing vs DOMContentLoaded
+
+ Consider manually calling initializeEventListeners() after confirming app instantiates
