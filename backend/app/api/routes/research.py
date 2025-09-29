@@ -166,7 +166,7 @@ async def get_enrichment_status(
     """Poll for enriched results after skeleton cards are returned"""
     try:
         # Validate cache_key to prevent injection attacks
-        if not cache_key or not re.match(r'^[a-zA-Z0-9_-]{8,64}$', cache_key):
+        if not cache_key or not re.match(r'^[a-zA-Z0-9_:.\-]{8,64}$', cache_key):
             raise HTTPException(status_code=400, detail="Invalid cache key format")
         # Check if enriched results are available in cache
         # Note: Using public method for stability (avoiding private _get_from_cache)

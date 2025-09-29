@@ -43,6 +43,8 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
             raise HTTPException(status_code=401, detail=f"Login failed: {error_msg}")
         
         # Handle conversation migration from anonymous to authenticated user
+        print(f"🔍 Migration check: x_previous_user_id={x_previous_user_id}, has_access_token={bool(result.get('access_token'))}")
+        
         if x_previous_user_id and result.get("access_token"):
             from app.api.routes.chat import extract_user_id_from_token, ai_service
             
@@ -50,6 +52,7 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
             if x_previous_user_id == "anonymous" or x_previous_user_id.startswith("anon_"):
                 # Get the new authenticated user ID
                 new_user_id = extract_user_id_from_token(result["access_token"])
+                print(f"🔄 Attempting migration from '{x_previous_user_id}' to '{new_user_id}'")
                 
                 # Migrate conversation history using the shared AI service instance
                 migrated = ai_service.migrate_conversation(x_previous_user_id, new_user_id)
@@ -59,6 +62,10 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
                     print(f"⚠️ No conversation to migrate from {x_previous_user_id}")
             else:
                 print(f"⚠️ Rejected migration attempt for suspicious user_id: {x_previous_user_id}")
+        elif x_previous_user_id:
+            print(f"🚫 Migration skipped: Missing access token for user_id {x_previous_user_id}")
+        else:
+            print(f"🔍 No previous user ID provided for migration")
         
         return AuthResponse(
             access_token=result["access_token"],
