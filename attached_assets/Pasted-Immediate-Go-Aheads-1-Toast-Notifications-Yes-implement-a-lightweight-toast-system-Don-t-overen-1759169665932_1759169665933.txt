@@ -1,0 +1,90 @@
+Immediate Go-Aheads
+1. Toast Notifications
+
+Yes, implement a lightweight toast system.
+
+Don’t overengineer it — a basic implementation using a transient <div> that floats bottom-center is plenty.
+
+Triggered manually in handleSourceUnlock() (for both success and failure).
+
+Keep it visually distinct from system chat messages so it feels like a UI-level action rather than AI output.
+
+Bonus UX Tip: Make toast auto-dismiss after ~3s and allow manual dismiss (e.g. clicking an “×”).
+
+2. Unlock Flow State Management
+
+Everything you outlined should happen inside handleSourceUnlock():
+
+✅ Set a temporary "Unlocking..." state on the button (disable click)
+
+✅ Call unlockSource()
+
+✅ On success:
+
+Set source.is_unlocked = true
+
+Call appState.addPurchasedItem(sourceId)
+
+Trigger a toast: ✅ Source unlocked! Redirecting you now…
+
+Wait 1.5–2s
+
+window.open(source.url, "_blank")
+
+This achieves your goal of making the user feel like they used your system to unlock paywalled content and are now being rewarded with access.
+
+3. SourceCard UI Update
+
+The SourceCard logic should:
+
+Check source.is_unlocked and display a "📄 View Source" button
+
+Clicking it simply opens the source URL again (window.open)
+
+Optional: add a badge or styling that visually marks it as “Unlocked”
+
+This makes re-entry intuitive and reinforces the value of unlocking.
+
+⚠️ Decisions You Need to Make:
+1. Toast System Location
+
+🟢 Recommended: Build it as a global component managed by App (or appState).
+
+Could just be a simple array of messages with a timer.
+
+2. Where to Store is_unlocked
+
+✅ Yes, update the source object in appState.researchResults if that’s where cards pull from.
+
+Also update addPurchasedItem() if that’s the canonical unlock store.
+
+We just need to ensure that re-render triggers for any unlocked card. You may need a shallow copy to trigger the update (e.g., this.researchResults = [...this.researchResults]).
+
+3. "View Source" vs "Reopen Article"
+
+🟢 Go with "📄 View Source" — it’s clearer, more expected, and pairs nicely with "🔓 Unlock for $X".
+
+4. Error Logging
+
+✅ Log 422 details to the console.
+
+❌ Don't show to user (MVP simplicity), just toast: ⚠️ Unlock failed. Please try again.
+
+✂️ Things to Skip for Now (MVP Discipline)
+
+No modal confirmations
+
+No animated badge reveals
+
+No undo flow
+
+No deep unlock history UX
+
+Just deliver a clean, obvious transition:
+🔒 → ✅ → 🔗
+
+✅ Final Verdict
+
+You're right to prioritize feel over fidelity here. Even if the unlock is mocked or not truly paywalled, the psychology of transactional unlock + redirection makes it feel valuable.
+
+Proceed with the toast-based flow and redirect UX. The backend is working, the frontend wiring is almost done — now it's just polish.
