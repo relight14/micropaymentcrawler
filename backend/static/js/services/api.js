@@ -99,6 +99,11 @@ export class APIService {
         if (!response.ok) {
             console.error(`🔬 API request failed: ${response.status} ${response.statusText}`);
             
+            // Handle authentication specifically
+            if (response.status === 401) {
+                throw new Error("You need to be logged in to run a research query. Please sign in and try again.");
+            }
+            
             // Handle rate limiting specifically
             if (response.status === 429) {
                 throw new Error("You've hit the research request limit. Please wait a few minutes and try again. This helps protect system integrity during high-load periods.");
@@ -267,6 +272,11 @@ export class APIService {
                 const response = await fetch(url, options);
                 
                 if (!response.ok) {
+                    // Handle authentication specifically
+                    if (response.status === 401) {
+                        throw new Error("You need to be logged in to run a research query. Please sign in and try again.");
+                    }
+                    
                     // Handle rate limiting specifically with user-friendly message
                     if (response.status === 429) {
                         throw new Error("You've hit the research request limit. Please wait a few minutes and try again. This helps protect system integrity during high-load periods.");
