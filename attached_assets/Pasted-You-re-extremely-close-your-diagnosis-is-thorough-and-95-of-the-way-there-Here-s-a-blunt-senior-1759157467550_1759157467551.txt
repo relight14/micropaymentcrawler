@@ -1,0 +1,90 @@
+You're extremely close — your diagnosis is thorough and 95% of the way there. Here's a blunt, senior-engineer-style debug breakdown of what’s likely going wrong and how to confirm and fix it fast:
+
+🔥 Root Cause: Header Missing on Login POST
+
+Your backend migration logic lives in the /auth/login (or equivalent) endpoint and depends on:
+
+X-Previous-User-ID: anon_abc123  (or "anonymous")
+
+
+But this header is not making it into the login request.
+
+✅ Confirmed Facts
+
+/api/chat/user-id correctly returns "anonymous" pre-login.
+
+Backend migration logic is implemented inside the login endpoint and has logging.
+
+No migration logs are showing → that code path is never reached.
+
+Research context remains generic → migration didn't happen.
+
+Cache key validation now works → unrelated bug resolved.
+
+🧪 Step-by-Step Debug Plan
+1. 🔍 Confirm: Is the Login Endpoint Actually Called?
+
+Open your browser network tab and filter for the login request. You’re looking for something like:
+
+POST /api/auth/login
+
+
+✅ Confirm it fires after clicking "Login".
+
+If it doesn’t show up — maybe you’re calling some external auth flow (e.g. Firebase Auth, OAuth popup), in which case the backend never sees a login request at all, and thus no migration can happen.
+
+2. 🔍 Confirm: Is X-Previous-User-ID Being Sent?
+
+Still in the network tab, inspect the headers of the login POST.
+
+You should see:
+
+X-Previous-User-ID: anonymous
+
+
+If it’s missing, then that’s the root cause.
+
+3. 💥 Common Causes of Missing Header
+Problem	Symptom	Fix
+Header not added to fetch() call	Login request has no custom header	Add manually using headers: { "X-Previous-User-ID": userId }
+Header added only when authenticated	getAuthHeaders() used, but user not logged in yet	Don't use getAuthHeaders() here – instead create a separate, unauthenticated header builder
+Wrong user ID fetched	/api/chat/user-id called after login	Fetch it before login, cache in variable, then send in login call
+🛠️ Suggested Fix (Frontend Pseudocode)
+// Before login
+const res = await fetch('/api/chat/user-id');
+const { user_id: previousUserId } = await res.json();
+
+// Now login with header
+await fetch('/api/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Previous-User-ID': previousUserId
+  },
+  body: JSON.stringify({ email, password })
+});
+
+✅ Suggested Backend Pattern
+
+Add debug logging at the start of login handler:
+
+@app.post("/auth/login")
+async def login(request: Request):
+    previous_user_id = request.headers.get("X-Previous-User-ID", "")
+    logger.info(f"🔍 Migration check: x_previous_user_id={previous_user_id}, has_access_token={bool(auth_token)}")
+    ...
+
+
+If that log never shows → request never had the header.
+
+🎯 TL;DR Fix Checklist
+
+ ✅ Confirm login endpoint is being called directly to backend
+
+ ✅ Confirm X-Previous-User-ID is added in headers before login
+
+ ✅ Don’t rely on auth headers in this flow
+
+ ✅ Fetch previous user ID before login, not after
+
+ ✅ Add early debug logs in backend to verify header presence
