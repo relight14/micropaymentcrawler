@@ -301,6 +301,23 @@ Keep it concise but compelling - make the user excited about what they'll discov
         """Get the current conversation history for a specific user"""
         return self.user_conversations.get(user_id, [])
     
+    def migrate_conversation(self, old_user_id: str, new_user_id: str) -> bool:
+        """Migrate conversation history from old user ID to new user ID during login"""
+        if old_user_id not in self.user_conversations:
+            return False  # No conversation to migrate
+        
+        if old_user_id == new_user_id:
+            return False  # Same user ID, no migration needed
+        
+        # Move conversation history from old to new user ID
+        conversation_history = self.user_conversations[old_user_id]
+        if conversation_history:  # Only migrate if there's actual content
+            self.user_conversations[new_user_id] = conversation_history
+            del self.user_conversations[old_user_id]
+            return True
+        
+        return False
+    
     def clear_conversation(self, user_id: str) -> None:
         """Clear conversation history for a specific user"""
         if user_id in self.user_conversations:

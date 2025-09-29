@@ -32,7 +32,7 @@ def extract_bearer_token(authorization: str) -> str:
 
 @router.post("/login", response_model=AuthResponse)
 # @limiter.limit("5/minute")  # Prevent brute force attacks
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, x_previous_user_id: str = Header(None, alias="X-Previous-User-ID")):
     """Authenticate user with email and password"""
     try:
         result = ledewire.authenticate_user(request.email, request.password)
@@ -41,6 +41,24 @@ async def login(request: LoginRequest):
             # Handle API errors from LedeWire
             error_msg = ledewire.handle_api_error(result)
             raise HTTPException(status_code=401, detail=f"Login failed: {error_msg}")
+        
+        # Handle conversation migration from anonymous to authenticated user
+        if x_previous_user_id and result.get("access_token"):
+            from app.api.routes.chat import extract_user_id_from_token, ai_service
+            
+            # Security: Only allow migration of "anonymous" or specific patterns to prevent hijacking
+            if x_previous_user_id == "anonymous" or x_previous_user_id.startswith("anon_"):
+                # Get the new authenticated user ID
+                new_user_id = extract_user_id_from_token(result["access_token"])
+                
+                # Migrate conversation history using the shared AI service instance
+                migrated = ai_service.migrate_conversation(x_previous_user_id, new_user_id)
+                if migrated:
+                    print(f"✅ Migrated conversation from {x_previous_user_id} to {new_user_id}")
+                else:
+                    print(f"⚠️ No conversation to migrate from {x_previous_user_id}")
+            else:
+                print(f"⚠️ Rejected migration attempt for suspicious user_id: {x_previous_user_id}")
         
         return AuthResponse(
             access_token=result["access_token"],

@@ -40,9 +40,29 @@ export class AuthService {
     }
 
     async login(email, password) {
+        // Capture current user ID for conversation migration
+        let previousUserId = null;
+        try {
+            const userIdResponse = await fetch(`${this.baseURL}/api/chat/user-id`, {
+                method: 'GET',
+                headers: this.getAuthHeaders()
+            });
+            if (userIdResponse.ok) {
+                const userIdData = await userIdResponse.json();
+                previousUserId = userIdData.user_id;
+            }
+        } catch (error) {
+            console.log('Could not get previous user ID:', error.message);
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (previousUserId) {
+            headers['X-Previous-User-ID'] = previousUserId;
+        }
+
         const response = await fetch(`${this.baseURL}/api/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ email, password })
         });
 
