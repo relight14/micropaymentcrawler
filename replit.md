@@ -6,6 +6,18 @@ This project is an AI-powered research tool MVP offering dynamic research servic
 
 Preferred communication style: Simple, everyday language.
 
+# Recent Changes
+
+- **September 29, 2025**: Production security hardening completed and deployment configured
+  - Implemented JWT authentication requirements for all research endpoints (/analyze, /generate-report, /enrichment) 
+  - Added tiered rate limiting (5, 15, 30, 60/minute) based on operation cost to prevent API abuse
+  - Implemented input validation with minimal sanitization that preserves research content while removing control characters
+  - Added parameter validation with regex guards for cache keys and source IDs
+  - Configured generic error messages to prevent information disclosure
+  - Verified all API keys (Tavily, Anthropic, LedeWire) are properly managed via environment variables
+  - Configured autoscale deployment settings for production readiness
+  - All security measures verified working correctly while maintaining full research functionality
+
 # System Architecture
 
 ## UI/UX Decisions
