@@ -5,12 +5,39 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
+from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
+from services.research.packet_builder import PacketBuilder
 
 router = APIRouter()
 
 # Initialize crawler for dynamic research
 crawler = ContentCrawlerStub()
+
+# Initialize packet builder for report generation
+packet_builder = PacketBuilder()
+
+
+class GenerateReportRequest(BaseModel):
+    """Request model for report generation"""
+    query: str
+    tier: TierType
+
+
+@router.post("/generate-report", response_model=ResearchPacket)
+async def generate_research_report(request: GenerateReportRequest):
+    """Generate a complete research report using PacketBuilder based on tier selection"""
+    try:
+        # Use PacketBuilder to generate complete research packet
+        research_packet = packet_builder.build_packet(
+            query=request.query,
+            tier=request.tier
+        )
+        
+        return research_packet
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating research report: {str(e)}")
 
 @router.get("/enrichment/{cache_key}")
 async def get_enrichment_status(cache_key: str):
