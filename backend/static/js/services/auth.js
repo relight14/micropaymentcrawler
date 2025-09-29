@@ -208,6 +208,10 @@ export class AuthService {
         return this.userInfo || {};
     }
 
+    getUserId() {
+        return this.userInfo?.buyer_claims?.user_id;
+    }
+
     getUserInitials() {
         console.log('Getting user initials, userInfo:', this.userInfo);
         
