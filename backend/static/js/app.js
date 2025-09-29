@@ -657,7 +657,7 @@ export class ChatResearchApp {
         
         // Find the source object to update its state
         let sourceToUpdate = null;
-        const researchResults = this.appState.getResearchResults();
+        const researchResults = this.appState.getCurrentResearchData();
         if (researchResults && researchResults.sources) {
             sourceToUpdate = researchResults.sources.find(s => s.id === sourceId);
         }
@@ -713,7 +713,7 @@ export class ChatResearchApp {
 
             // Trigger UI refresh for source cards (shallow copy to force re-render)
             if (researchResults && researchResults.sources) {
-                this.appState.updateResearchResults({
+                this.appState.setCurrentResearchData({
                     ...researchResults,
                     sources: [...researchResults.sources]
                 });
