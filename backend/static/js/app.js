@@ -664,24 +664,24 @@ export class ChatResearchApp {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
 
-            // Show success message
+            // Show success message and generate report for all purchases (not just selected sources)
             if (useSelectedSources) {
                 this._showToast(`Report generated with ${selectedSources.length} selected sources!`, 'success');
-                
-                // Generate research report after successful purchase
-                try {
-                    const reportResponse = await this.apiService.generateReport(query || this.appState.getCurrentQuery() || "Research Query", tierId);
-                    
-                    if (reportResponse && reportResponse.summary) {
-                        // Display the generated report in the UI
-                        this._displayGeneratedReport(reportResponse);
-                    }
-                } catch (reportError) {
-                    console.error('Error generating report:', reportError);
-                    this._showToast('Purchase successful, but report generation failed. Please try again.', 'warning');
-                }
             } else {
                 this._showToast(`Research tier purchased successfully!`, 'success');
+            }
+            
+            // Generate research report after successful purchase (for all tiers)
+            try {
+                const reportResponse = await this.apiService.generateReport(query || this.appState.getCurrentQuery() || "Research Query", tierId);
+                
+                if (reportResponse && reportResponse.summary) {
+                    // Display the generated report in the UI
+                    this._displayGeneratedReport(reportResponse);
+                }
+            } catch (reportError) {
+                console.error('Error generating report:', reportError);
+                this._showToast('Purchase successful, but report generation failed. Please try again.', 'warning');
             }
             
         } catch (error) {
