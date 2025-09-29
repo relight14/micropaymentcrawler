@@ -45,7 +45,7 @@ export class AuthService {
         try {
             const userIdResponse = await fetch(`${this.baseURL}/api/chat/user-id`, {
                 method: 'GET',
-                headers: this.getAuthHeaders()
+                headers: { 'Content-Type': 'application/json' }  // ✅ FIXED: No getAuthHeaders()
             });
             if (userIdResponse.ok) {
                 const userIdData = await userIdResponse.json();
@@ -53,6 +53,11 @@ export class AuthService {
             }
         } catch (error) {
             console.log('Could not get previous user ID:', error.message);
+        }
+
+        // Warn if no previous user ID detected
+        if (!previousUserId) {
+            console.warn("No previous user ID detected. Migration will not trigger.");
         }
 
         const headers = { 'Content-Type': 'application/json' };
