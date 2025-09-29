@@ -542,6 +542,7 @@ class SourceCard {
             const unlockHandler = () => this._handleUnlock(source);
             button.addEventListener('click', unlockHandler);
             this.eventListeners.set(button, { type: 'click', handler: unlockHandler });
+            console.log('🔓 UNLOCK: Event listener attached to unlock button for:', source.id);
         }
         
         return button;
@@ -580,14 +581,18 @@ class SourceCard {
      * Handle source unlock
      */
     async _handleUnlock(source) {
+        console.log('🔓 UNLOCK: Button clicked! Source:', source.id, 'Price:', source.unlock_price);
         try {
+            console.log('🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested');
             // Dispatch event for app to handle
             const event = new CustomEvent('sourceUnlockRequested', {
                 detail: { source }
             });
+            console.log('🔓 UNLOCK: Dispatching event with detail:', event.detail);
             document.dispatchEvent(event);
+            console.log('🔓 UNLOCK: Event dispatched successfully');
         } catch (error) {
-            console.error('Failed to unlock source:', error);
+            console.error('🔓 UNLOCK: ERROR in _handleUnlock:', error);
         }
     }
 

@@ -633,11 +633,13 @@ export class ChatResearchApp {
 
     // Source and tier management methods
     async handleSourceUnlock(button, sourceId, price) {
+        console.log('🔓 UNLOCK: handleSourceUnlock() called!', { button, sourceId, price });
         // Debounce mechanism - prevent duplicate unlock attempts
         if (this.isUnlockInProgress) {
-            console.log('Unlock already in progress, ignoring duplicate request');
+            console.log('🔓 UNLOCK: Already in progress, ignoring duplicate request');
             return;
         }
+        console.log('🔓 UNLOCK: Proceeding with unlock...');
 
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
@@ -1214,6 +1216,8 @@ export class ChatResearchApp {
             
             // Listen for component events
             document.addEventListener('sourceUnlockRequested', (e) => {
+                console.log('🔓 UNLOCK: Event received in app.js!', e.detail);
+                console.log('🔓 UNLOCK: Calling handleSourceUnlock with:', e.detail.source.id, e.detail.source.unlock_price);
                 this.handleSourceUnlock(null, e.detail.source.id, e.detail.source.unlock_price);
             });
             
