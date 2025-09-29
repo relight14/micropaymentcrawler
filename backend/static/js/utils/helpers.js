@@ -258,3 +258,10 @@ export function isValidEmail(email) {
 export function sanitizeFilename(filename) {
     return filename.replace(/[^a-z0-9.-]/gi, '_');
 }
+
+/**
+ * Generate idempotency key for API requests
+ */
+export function generateIdempotencyKey(userId, sourceId) {
+    return `${userId}:${sourceId}:${Date.now()}`;
+}

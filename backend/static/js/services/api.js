@@ -2,6 +2,8 @@
  * API Service - Handles all backend communication
  * Extracted from the monolithic ChatResearchApp
  */
+import { generateIdempotencyKey } from '../utils/helpers.js';
+
 export class APIService {
     constructor(authService) {
         this.baseURL = window.location.origin;
@@ -235,13 +237,17 @@ export class APIService {
         return await response.json();
     }
 
-    async unlockSource(sourceId, price) {
+    async unlockSource(sourceId, _price) {
+        // _price is unused but retained for compatibility
+        const userId = this.authService.getUserId();
+        const idempotencyKey = generateIdempotencyKey(userId, sourceId);
+        
         return await this._fetchWithRetry(`${this.baseURL}/api/sources/unlock-source`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify({
                 source_id: sourceId,
-                price_cents: Math.round(price * 100)
+                idempotency_key: idempotencyKey
             })
         }, 'Source unlock failed');
     }
@@ -280,6 +286,13 @@ export class APIService {
                     // Handle rate limiting specifically with user-friendly message
                     if (response.status === 429) {
                         throw new Error("You've hit the research request limit. Please wait a few minutes and try again. This helps protect system integrity during high-load periods.");
+                    }
+                    
+                    // Handle schema validation errors with detailed logging
+                    if (response.status === 422) {
+                        const errorBody = await response.json();
+                        console.warn("⚠️ Unlock schema validation error:", errorBody);
+                        throw new Error(`${errorPrefix}: ${response.statusText}`);
                     }
                     
                     // Don't retry 4xx errors (client errors) except 408 (timeout)
