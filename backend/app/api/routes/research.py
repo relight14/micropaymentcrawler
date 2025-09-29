@@ -349,19 +349,39 @@ def _extract_conversation_context(conversation_history: List[Dict[str, str]]) ->
     if not conversation_history or len(conversation_history) == 0:
         return ""
     
-    # Get recent user messages to understand the context
+    # Debug logging
+    print(f"🔍 Research route extracting context from {len(conversation_history)} messages")
+    
+    # Get recent messages from both user and assistant for richer context
     recent_context = []
-    for message in conversation_history[-6:]:  # Last 6 messages for context
-        if message.get('sender') == 'user' and message.get('content'):
-            content = message['content'].strip()
-            if len(content) > 10:  # Meaningful content
-                recent_context.append(content)
+    for message in conversation_history[-8:]:  # Last 8 messages for more context
+        sender = message.get('sender', '')
+        content = message.get('content', '').strip()
+        
+        # Include both user and assistant messages
+        if sender in ['user', 'assistant'] and len(content) > 10:
+            recent_context.append(content)
+    
+    print(f"📝 Found {len(recent_context)} meaningful messages for context")
     
     if recent_context:
-        # Join recent user messages to provide context
-        context = " ".join(recent_context[-3:])  # Last 3 user messages
-        return f"Context from conversation about: {context}."
+        # De-duplicate similar content to avoid repetition
+        seen = set()
+        unique_context = []
+        for content in recent_context[-5:]:  # Last 5 meaningful messages
+            content_clean = content.strip().lower()
+            # Avoid exact duplicates and very similar content
+            if content_clean not in seen and len(content_clean) > 10:
+                unique_context.append(content[:200])  # Truncate very long messages
+                seen.add(content_clean)
+        
+        if unique_context:
+            # Create more natural context without repetitive joining
+            context_summary = " ".join(unique_context)
+            print(f"✅ Generated context summary: {context_summary[:100]}...")
+            return f"Context from conversation about: {context_summary}"
     
+    print("⚠️ No meaningful context found")
     return ""
 
 

@@ -146,17 +146,38 @@ Be specific and targeted based on our conversation. Don't be generic."""
             return self._execute_deep_research(research_query, user_message, user_id)
             
         except Exception as e:
+            print(f"⚠️ Research context extraction failed: {e}")
             # Fallback: use original user message as query
             return self._execute_deep_research(user_message, user_message, user_id)
     
     def _extract_research_context(self, user_id: str) -> str:
         """Extract key research themes from conversation history"""
         user_history = self.user_conversations.get(user_id, [])
+        
+        # Debug logging
+        print(f"🔍 Extracting context for user_id={user_id}, found {len(user_history)} messages")
+        
+        # Include both user and assistant messages for richer context
         recent_messages = [
             msg["content"] for msg in user_history[-8:] 
-            if msg["role"] == "user"
+            if msg["role"] in ["user", "assistant"] and len(msg["content"].strip()) > 10
         ]
-        return "\n".join([f"- {msg}" for msg in recent_messages])
+        
+        # Debug: show message preview
+        print(f"📝 Message preview: {[m[:80] + '...' if len(m) > 80 else m for m in recent_messages[:3]]}")
+        
+        # De-duplicate similar messages
+        seen = set()
+        unique_messages = []
+        for msg in recent_messages:
+            # Simple deduplication by content similarity
+            msg_clean = msg.strip().lower()
+            if msg_clean not in seen and len(msg_clean) > 10:
+                unique_messages.append(msg)
+                seen.add(msg_clean)
+        
+        print(f"✅ Final unique messages: {len(unique_messages)}")
+        return "\n".join([f"- {msg}" for msg in unique_messages])
     
     def _execute_deep_research(self, refined_query: str, original_query: str, user_id: str) -> Dict[str, Any]:
         """Execute deep research with intelligent source selection"""
