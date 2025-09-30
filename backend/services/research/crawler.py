@@ -558,11 +558,14 @@ class ContentCrawlerStub:
         # Use FULL_USE price for human readers unlocking sources
         # Use PARTIAL_USE price (licensing_cost) for AI report generation
         full_use_price = terms.purchase_price
+        print(f"💰 Pricing for {source.domain}: ai_include={terms.ai_include_price}, purchase={terms.purchase_price}, unlock_price will be={full_use_price}")
         if full_use_price and full_use_price > 0:
             source.unlock_price = full_use_price
+            print(f"✅ Set unlock_price to FULL_USE: ${full_use_price}")
         else:
             # If no full-use price, this should be a free source
             source.unlock_price = 0.0
+            print(f"⚠️  No FULL_USE price, defaulting to FREE")
     
     # Removed fake licensing generation - now using real ContentLicenseService
     
