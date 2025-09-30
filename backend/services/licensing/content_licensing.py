@@ -169,6 +169,8 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     def __init__(self):
         self.api_key = os.environ.get('TOLLBIT_API_KEY')
+        self.org_cuid = os.environ.get('TOLLBIT_ORG_CUID')
+        self.agent_id = os.environ.get('TOLLBIT_AGENT_ID', 'ResearchTool-1.0')
         self.base_url = "https://api.tollbit.com"  # Based on documentation
         self.agent_name = "ResearchTool-1.0"
         
@@ -247,6 +249,9 @@ class TollbitProtocolHandler(ProtocolHandler):
                 'User-Agent': self.agent_name,
                 'Content-Type': 'application/json'
             }
+            
+            if self.agent_id:
+                headers['X-Tollbit-AgentId'] = self.agent_id
             
             try:
                 response = requests.get(
