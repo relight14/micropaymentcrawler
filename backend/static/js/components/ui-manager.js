@@ -203,10 +203,24 @@ export class UIManager {
                 existingModal.remove();
             }
 
-            const { tier, price, selectedSources = [], query = "" } = purchaseDetails;
+            const { 
+                tier, 
+                price, 
+                selectedSources = [], 
+                query = "",
+                titleOverride = null,
+                customDescription = null
+            } = purchaseDetails;
+            
             const sourceCount = selectedSources.length;
+            const isSourceUnlock = tier === 'source_unlock';
             const tierName = tier === 'research' ? 'Research Package' : 'Pro Package';
-            const isCustom = sourceCount > 0;
+            const isCustom = sourceCount > 0 && !isSourceUnlock;
+            
+            // Determine modal title and description
+            const modalTitle = titleOverride || 'Confirm Purchase';
+            const modalDescription = customDescription || 
+                (isCustom ? 'Generate custom report with selected sources' : 'Purchase research package');
             
             // Create modal HTML with same structure as auth modal
             const modalHTML = `
@@ -214,35 +228,48 @@ export class UIManager {
                     <div class="modal-content auth-modal">
                         <div class="auth-modal-header">
                             <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
-                            <h2>Confirm Purchase</h2>
-                            <p>${isCustom ? 'Generate custom report with selected sources' : 'Purchase research package'}</p>
+                            <h2>${modalTitle}</h2>
+                            <p>${modalDescription}</p>
                             <button class="modal-close" id="purchaseModalClose" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                         </div>
                         <div class="auth-modal-content">
                             <div class="purchase-details">
-                                <div class="purchase-item">
-                                    <span class="purchase-label">${isCustom ? 'Custom Report' : tierName}</span>
-                                    <span class="purchase-value">$${Number(price || 0).toFixed(2)}</span>
-                                </div>
-                                ${isCustom ? `
+                                ${!isSourceUnlock ? `
                                     <div class="purchase-item">
-                                        <span class="purchase-label">Selected Sources</span>
-                                        <span class="purchase-value">${sourceCount} sources</span>
+                                        <span class="purchase-label">${isCustom ? 'Custom Report' : tierName}</span>
+                                        <span class="purchase-value">$${Number(price || 0).toFixed(2)}</span>
                                     </div>
-                                ` : ''}
-                                <div class="purchase-item">
-                                    <span class="purchase-label">Query</span>
-                                    <span class="purchase-value">${query.substring(0, 50)}${query.length > 50 ? '...' : ''}</span>
-                                </div>
+                                    ${isCustom ? `
+                                        <div class="purchase-item">
+                                            <span class="purchase-label">Selected Sources</span>
+                                            <span class="purchase-value">${sourceCount} sources</span>
+                                        </div>
+                                    ` : ''}
+                                    <div class="purchase-item">
+                                        <span class="purchase-label">Query</span>
+                                        <span class="purchase-value">${query.substring(0, 50)}${query.length > 50 ? '...' : ''}</span>
+                                    </div>
+                                ` : `
+                                    <div class="purchase-item">
+                                        <span class="purchase-label">Source</span>
+                                        <span class="purchase-value">${query.substring(0, 50)}${query.length > 50 ? '...' : ''}</span>
+                                    </div>
+                                    ${selectedSources[0]?.license_type ? `
+                                        <div class="purchase-item">
+                                            <span class="purchase-label">License Type</span>
+                                            <span class="purchase-value">${selectedSources[0].license_type}</span>
+                                        </div>
+                                    ` : ''}
+                                `}
                                 <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;">
                                 <div class="purchase-item total">
                                     <span class="purchase-label"><strong>Total</strong></span>
-                                    <span class="purchase-value"><strong>$${Number(price || 0).toFixed(2)}</strong></span>
+                                    <span class="purchase-value"><strong>${price === 0 ? 'FREE' : `$${Number(price || 0).toFixed(2)}`}</strong></span>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 1rem; margin-top: 2rem;">
                                 <button class="auth-btn" id="purchaseConfirmBtn" style="flex: 1; background-color: #10b981;">
-                                    Confirm Purchase
+                                    ${price === 0 ? 'Confirm Access' : 'Confirm Purchase'}
                                 </button>
                                 <button class="auth-btn" id="purchaseCancelBtn" style="flex: 1; background-color: #6b7280; color: white;">
                                     Cancel
