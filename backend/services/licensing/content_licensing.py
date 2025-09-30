@@ -335,10 +335,23 @@ class TollbitProtocolHandler(ProtocolHandler):
                 'Content-Type': 'application/json'
             }
             
+            if self.agent_id:
+                headers['X-Tollbit-AgentId'] = self.agent_id
+            
             payload = {
                 'agent': self.agent_name,
                 'target': target_url,
             }
+            
+            # Add optional orgCuid and maxPriceMicros if available
+            if self.org_cuid:
+                payload['orgCuid'] = self.org_cuid
+            if self.agent_id:
+                payload['agentId'] = self.agent_id
+            
+            # Set reasonable max price (12 cents = 120,000 micros)
+            payload['maxPriceMicros'] = '120000'
+            payload['licenseType'] = 'ON_DEMAND_FULL_USE_LICENSE'
             
             try:
                 response = requests.post(
