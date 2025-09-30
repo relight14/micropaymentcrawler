@@ -240,9 +240,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            # Use Tollbit rate endpoint with URL-encoded path
-            # GET /dev/v1/rate/<encoded_url>
-            rate_endpoint = f"{self.base_url}/dev/v1/rate/{quote(target_url, safe='')}"
+            # Use Tollbit rate endpoint with raw URL in path (this is what works)
+            # GET /dev/v1/rate/<raw_url>
+            rate_endpoint = f"{self.base_url}/dev/v1/rate/{target_url}"
             
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
