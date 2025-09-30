@@ -1,0 +1,252 @@
+🚀 DOMContentLoaded fired - attempting app initialization
+app.js:1559 📦 Creating new ChatResearchApp instance...
+app.js:15 ✅ ChatResearchApp constructor running
+app.js:125 🔧 initializeEventListeners() starting
+app.js:131 chatInput: <input type=​"text" id=​"newChatInput" placeholder=​"Ask another research question..." class=​"search-input" style=​"height:​ 43px;​">​
+app.js:132 sendButton: <button id=​"newSendButton" class=​"send-btn">​📤​</button>​flex
+auth.js:216 Getting user initials, userInfo: undefined
+auth.js:219 No userInfo or buyer_claims, returning U
+app.js:515 Updating profile UI: Object
+auth.js:216 Getting user initials, userInfo: undefined
+auth.js:219 No userInfo or buyer_claims, returning U
+app.js:524 Set initials to: U
+app.js:530 Set balance to: 0
+app.js:551 Setting up profile dropdown: Object
+app.js:1561 ✅ ChatResearchApp created successfully: ChatResearchApp
+/api/auth/balance:1  Failed to load resource: the server responded with a status of 503 (Service Unavailable)Understand this error
+auth.js:191 Error updating wallet balance: Error: Failed to fetch wallet balance
+    at AuthService.updateWalletBalance (auth.js:184:23)
+updateWalletBalance @ auth.js:191Understand this error
+auth.js:216 Getting user initials, userInfo: undefined
+auth.js:219 No userInfo or buyer_claims, returning U
+app.js:515 Updating profile UI: Object
+auth.js:216 Getting user initials, userInfo: undefined
+auth.js:219 No userInfo or buyer_claims, returning U
+app.js:524 Set initials to: U
+app.js:530 Set balance to: 0
+app.js:551 Setting up profile dropdown: Object
+/api/auth/balance:1  Failed to load resource: the server responded with a status of 503 (Service Unavailable)Understand this error
+auth.js:191 Error updating wallet balance: Error: Failed to fetch wallet balance
+    at AuthService.updateWalletBalance (auth.js:184:23)
+    at async ChatResearchApp.initializeApp (app.js:52:17)
+updateWalletBalance @ auth.js:191Understand this error
+app.js:194 📝 Message to send: recent articles about the gaza/israel conflict and potential for peace
+app.js:317 Welcome screen hidden after first message
+app.js:216 🔍 PIPELINE TRACE: Search response handler called
+app.js:217 📦 PIPELINE TRACE: Raw response received: Object
+app.js:194 📝 Message to send: i'd like to understand the latest proposed truce
+api.js:66 🔬 API SERVICE: analyzeResearchQuery called
+api.js:67 🔬 Query: "i'd like to understand the latest proposed truce"
+api.js:68 🔬 Conversation context: Array(4)
+api.js:76 🔬 Base request body: Object
+api.js:80 🔬 Adding conversation context to request...
+api.js:90 🔬 Final request body: Object
+api.js:91 🔬 Making request to /api/research/analyze...
+/api/research/analyze:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)Understand this error
+api.js:99 🔬 Response status: 401 Unauthorized
+api.js:102 🔬 API request failed: 401 Unauthorized
+analyzeResearchQuery @ api.js:102Understand this error
+app.js:252 ❌ ERROR IN SEND MESSAGE FLOW: Error: You need to be logged in to run a research query. Please sign in and try again.
+    at APIService.analyzeResearchQuery (api.js:106:23)
+    at async APIService.sendMessage (api.js:35:20)
+    at async ChatResearchApp.sendMessage (app.js:213:30)
+sendMessage @ app.js:252Understand this error
+app.js:253 ❌ ERROR STACK: Error: You need to be logged in to run a research query. Please sign in and try again.
+    at APIService.analyzeResearchQuery (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/services/api.js:106:23)
+    at async APIService.sendMessage (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/services/api.js:35:20)
+    at async ChatResearchApp.sendMessage (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/app.js:213:30)
+sendMessage @ app.js:253Understand this error
+app.js:562 Profile button clicked, toggling dropdown
+2app.js:577 Logout clicked
+app-state.js:78 Duplicate message prevented: You have been logged out successfully.
+addMessage @ app-state.js:78Understand this warning
+74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) null
+auth.js:216 Getting user initials, userInfo: Object
+auth.js:224 User email: rickybobby@hotmail.com
+auth.js:230 Email parts: Array(1)
+auth.js:238 Generated initials from name part: RI
+app.js:515 Updating profile UI: Object
+auth.js:216 Getting user initials, userInfo: Object
+auth.js:224 User email: rickybobby@hotmail.com
+auth.js:230 Email parts: Array(1)
+auth.js:238 Generated initials from name part: RI
+app.js:524 Set initials to: RI
+app.js:530 Set balance to: 9.22
+app.js:551 Setting up profile dropdown: Object
+app.js:194 📝 Message to send: i'd like to understand the latest on the trump proposed truce
+api.js:66 🔬 API SERVICE: analyzeResearchQuery called
+api.js:67 🔬 Query: "i'd like to understand the latest on the trump proposed truce"
+api.js:68 🔬 Conversation context: Array(8)
+api.js:76 🔬 Base request body: Object
+api.js:80 🔬 Adding conversation context to request...
+api.js:90 🔬 Final request body: Object
+api.js:91 🔬 Making request to /api/research/analyze...
+api.js:99 🔬 Response status: 200 OK
+api.js:118 🔬 API SERVICE: Raw response from backend: Object
+api.js:122 🚀 Skeleton cards received, starting progressive enrichment...
+api.js:154 📡 Starting enrichment polling for cache key: search:7877328139893...
+api.js:129 🔬 Transforming response for frontend...
+api.js:146 🔬 API SERVICE: Transformed response: Object
+api.js:147 🔬 API SERVICE: Sources in response: 15
+app.js:216 🔍 PIPELINE TRACE: Search response handler called
+app.js:217 📦 PIPELINE TRACE: Raw response received: Object
+app.js:230 📋 PIPELINE TRACE: Research data found: Object
+app.js:231 📊 PIPELINE TRACE: Sources array: Array(15)
+app.js:232 📏 PIPELINE TRACE: Sources length: 15
+app.js:237 🎯 PIPELINE TRACE: About to call _displaySourceCards()
+app.js:238 🎯 PIPELINE TRACE: Sources parameter: Array(15)
+app.js:1221 🎨 DISPLAY METHOD: _displaySourceCards() ENTRY POINT
+app.js:1222 🎨 DISPLAY METHOD: Sources parameter received: Array(15)
+app.js:1223 🎨 DISPLAY METHOD: Sources type: object
+app.js:1224 🎨 DISPLAY METHOD: Sources is array? true
+app.js:1225 🎨 DISPLAY METHOD: Sources length: 15
+app.js:1234 ✅ DISPLAY METHOD: Validation passed, proceeding to create cards
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 45664e8d-d23c-45a0-81cb-d6310387e022
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '45664e8d-d23c-45a0-81cb-d6310387e022'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 45664e8d-d23c-45a0-81cb-d6310387e022
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: ef90f207-0505-4d41-ad87-f69a84fc1cf6
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'ef90f207-0505-4d41-ad87-f69a84fc1cf6'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: ef90f207-0505-4d41-ad87-f69a84fc1cf6
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 8bbfd2c1-cce4-4949-ac25-51faaaff53d0
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '8bbfd2c1-cce4-4949-ac25-51faaaff53d0'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 8bbfd2c1-cce4-4949-ac25-51faaaff53d0
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 694ca58a-5fde-4cdc-b4d4-99738513ece6
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '694ca58a-5fde-4cdc-b4d4-99738513ece6'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 694ca58a-5fde-4cdc-b4d4-99738513ece6
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 3edef02a-6db0-4c75-831e-e641eb45ee2e
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '3edef02a-6db0-4c75-831e-e641eb45ee2e'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 3edef02a-6db0-4c75-831e-e641eb45ee2e
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 07717bbb-32db-4bd0-97e5-4515dfb05c15
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '07717bbb-32db-4bd0-97e5-4515dfb05c15'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 07717bbb-32db-4bd0-97e5-4515dfb05c15
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: b33a16cd-08f7-47e8-a44f-21dd3c803517
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'b33a16cd-08f7-47e8-a44f-21dd3c803517'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: b33a16cd-08f7-47e8-a44f-21dd3c803517
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 906cf55f-1834-4c67-a3a8-94543beb0d37
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '906cf55f-1834-4c67-a3a8-94543beb0d37'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 906cf55f-1834-4c67-a3a8-94543beb0d37
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: ef1b8ced-446d-4043-b522-8db4f019b55d
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'ef1b8ced-446d-4043-b522-8db4f019b55d'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: ef1b8ced-446d-4043-b522-8db4f019b55d
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: a90f7364-5236-4eb7-84aa-4ab6e31e6af6
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'a90f7364-5236-4eb7-84aa-4ab6e31e6af6'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: a90f7364-5236-4eb7-84aa-4ab6e31e6af6
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: aeb4d068-0d25-4cf4-979f-a184d718dc0d
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'aeb4d068-0d25-4cf4-979f-a184d718dc0d'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: aeb4d068-0d25-4cf4-979f-a184d718dc0d
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: be7fcefb-22be-425f-9c0c-3f239c1871e4
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'be7fcefb-22be-425f-9c0c-3f239c1871e4'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: be7fcefb-22be-425f-9c0c-3f239c1871e4
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 1f6b2541-fb77-4274-a6a9-64878738dabc
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '1f6b2541-fb77-4274-a6a9-64878738dabc'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 1f6b2541-fb77-4274-a6a9-64878738dabc
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 7ffe805b-6d70-40a2-abac-14c23e178512
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '7ffe805b-6d70-40a2-abac-14c23e178512'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 7ffe805b-6d70-40a2-abac-14c23e178512
+source-card.js:47 🎨 SOURCE CARD: create() called for source: Object
+source-card.js:48 🎨 SOURCE CARD: options: Object
+source-card.js:59 ✅ SOURCE CARD: Creating card for source ID: 39b6e4ec-1c4e-4bc6-b35d-33d0b9cf03ce
+source-card.js:67 🎨 SOURCE CARD: Creating main card container...
+source-card.js:83 ✅ SOURCE CARD: Main container created with class 'source-card' and ID '39b6e4ec-1c4e-4bc6-b35d-33d0b9cf03ce'
+source-card.js:545 🔓 UNLOCK: Event listener attached to unlock button for: 39b6e4ec-1c4e-4bc6-b35d-33d0b9cf03ce
+app.js:246 🔄 Progressive enrichment in progress...
+api.js:173 ✅ Enrichment complete! Updated 15 sources
+source-card.js:119 🔍 Enrichment event received: CustomEvent
+source-card.js:133 🎨 Updating 15 cards with enriched content...
+source-card.js:156 🔄 Updating card: Trump's Proposed Gaza Peace Plan: Ambitious but Uncertain Path to Peace
+source-card.js:196 ✅ Card updated: Trump's Proposed Gaza Peace Plan: Ambitious but Uncertain Path to Peace
+source-card.js:156 🔄 Updating card: Hamas Weighs Response to Trump's Gaza Peace Proposal Deadline
+source-card.js:196 ✅ Card updated: Hamas Weighs Response to Trump's Gaza Peace Proposal Deadline
+source-card.js:156 🔄 Updating card: 5 Key Takeaways from the U.S. Ceasefire Proposal for Israel and Hamas
+source-card.js:196 ✅ Card updated: 5 Key Takeaways from the U.S. Ceasefire Proposal for Israel and Hamas
+source-card.js:156 🔄 Updating card: What Does Trump's Gaza Plan Mean for the Future of Palestine?
+source-card.js:196 ✅ Card updated: What Does Trump's Gaza Plan Mean for the Future of Palestine?
+source-card.js:156 🔄 Updating card: Deadly Escalation as Israel Attacks Gaza, Hamas Reviews Trump Proposal
+source-card.js:196 ✅ Card updated: Deadly Escalation as Israel Attacks Gaza, Hamas Reviews Trump Proposal
+source-card.js:156 🔄 Updating card: Israel-Gaza war
+source-card.js:196 ✅ Card updated: Israel-Gaza war
+source-card.js:156 🔄 Updating card: Trump gives Hamas 'three or four days' to respond to Gaza ...
+source-card.js:196 ✅ Card updated: Trump gives Hamas 'three or four days' to respond to Gaza ...
+source-card.js:156 🔄 Updating card: Trump's Gaza plan is a significant step - but faces ...
+source-card.js:196 ✅ Card updated: Trump's Gaza plan is a significant step - but faces ...
+source-card.js:156 🔄 Updating card: Israel news, updates on the war with Hamas
+source-card.js:196 ✅ Card updated: Israel news, updates on the war with Hamas
+source-card.js:156 🔄 Updating card: Middle East war
+source-card.js:196 ✅ Card updated: Middle East war
+source-card.js:156 🔄 Updating card: Hamas under pressure as Trump issues deadline on Gaza ...
+source-card.js:196 ✅ Card updated: Hamas under pressure as Trump issues deadline on Gaza ...
+source-card.js:156 🔄 Updating card: With New U.S. Proposal to End Gaza War, a Rare Moment ...
+source-card.js:196 ✅ Card updated: With New U.S. Proposal to End Gaza War, a Rare Moment ...
+source-card.js:156 🔄 Updating card: 5 takeaways from the U.S. ceasefire proposal for Israel and ...
+source-card.js:196 ✅ Card updated: 5 takeaways from the U.S. ceasefire proposal for Israel and ...
+source-card.js:156 🔄 Updating card: What does Trump's plan mean for the state of Palestine?
+source-card.js:196 ✅ Card updated: What does Trump's plan mean for the state of Palestine?
+source-card.js:156 🔄 Updating card: LIVE: Israel kills 45 people in Gaza; Hamas reviews ...
+source-card.js:196 ✅ Card updated: LIVE: Israel kills 45 people in Gaza; Hamas reviews ...
+api.js:202 📢 Emitted enrichmentComplete event for 15 sources
+source-card.js:584 🔓 UNLOCK: Button clicked! Source: 45664e8d-d23c-45a0-81cb-d6310387e022 Price: 0
+source-card.js:586 🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested
+source-card.js:591 🔓 UNLOCK: Dispatching event with detail: Object
+app.js:1254 🔓 UNLOCK: Event received in app.js! Object
+app.js:1255 🔓 UNLOCK: Calling handleSourceUnlock with: 45664e8d-d23c-45a0-81cb-d6310387e022 0
+app.js:636 🔓 UNLOCK: handleSourceUnlock() called! Object
+source-card.js:593 🔓 UNLOCK: Event dispatched successfully
+app.js:646 Uncaught (in promise) TypeError: this.appState.hasPurchasedItem is not a function
+    at ChatResearchApp.handleSourceUnlock (app.js:646:58)
+    at HTMLDocument.<anonymous> (app.js:1256:22)
+    at SourceCard._handleUnlock (source-card.js:592:22)
+    at HTMLButtonElement.unlockHandler (source-card.js:542:46)Understand this error
+source-card.js:584 🔓 UNLOCK: Button clicked! Source: 45664e8d-d23c-45a0-81cb-d6310387e022 Price: 0
+source-card.js:586 🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested
+source-card.js:591 🔓 UNLOCK: Dispatching event with detail: Object
+app.js:1254 🔓 UNLOCK: Event received in app.js! Object
+app.js:1255 🔓 UNLOCK: Calling handleSourceUnlock with: 45664e8d-d23c-45a0-81cb-d6310387e022 0
+app.js:636 🔓 UNLOCK: handleSourceUnlock() called! Object
+source-card.js:593 🔓 UNLOCK: Event dispatched successfully
+app.js:646 Uncaught (in promise) TypeError: this.appState.hasPurchasedItem is not a function
+    at ChatResearchApp.handleSourceUnlock (app.js:646:58)
+    at HTMLDocument.<anonymous> (app.js:1256:22)
+    at SourceCard._handleUnlock (source-card.js:592:22)
+    at HTMLButtonElement.unlockHandler (source-card.js:542:46)Understand this error
