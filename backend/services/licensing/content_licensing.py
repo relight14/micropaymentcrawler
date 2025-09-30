@@ -266,23 +266,46 @@ class TollbitProtocolHandler(ProtocolHandler):
                     
                     # Handle array response format from documentation
                     if isinstance(data, list) and len(data) > 0:
-                        rate_data = data[0]
-                        # Extract price information from nested structure
-                        price_info = rate_data.get('price', {})
-                        license_info = rate_data.get('license', {})
+                        # Parse both license types for accurate pricing
+                        ai_include_price = None
+                        purchase_price = None
+                        currency = 'USD'
+                        license_path = None
                         
-                        # Convert micros to dollars (1 USD = 1,000,000 micros)
-                        price_micros = price_info.get('priceMicros', 50000)  # Default 50k micros = $0.05
-                        price_usd = price_micros / 1000000.0
+                        for rate_data in data:
+                            price_info = rate_data.get('price', {})
+                            license_info = rate_data.get('license', {})
+                            license_type = license_info.get('licenseType', '')
+                            
+                            price_micros = price_info.get('priceMicros', 0)
+                            price_usd = price_micros / 1000000.0
+                            
+                            # Map license types to pricing
+                            if license_type == 'ON_DEMAND_LICENSE':
+                                ai_include_price = price_usd
+                                if not license_path:
+                                    license_path = license_info.get('licensePath')
+                                print(f"🎯 AI Include (ON_DEMAND_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
+                            elif license_type == 'ON_DEMAND_FULL_USE_LICENSE':
+                                purchase_price = price_usd
+                                if not license_path:
+                                    license_path = license_info.get('licensePath')
+                                print(f"🎯 Full Purchase (ON_DEMAND_FULL_USE_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
+                            
+                            currency = price_info.get('currency', 'USD')
                         
-                        print(f"🎯 REAL PRICING: {price_micros} micros = ${price_usd:.3f} USD")
+                        # Fallback if only one license type available
+                        if ai_include_price and not purchase_price:
+                            purchase_price = ai_include_price * 2.4
+                        elif purchase_price and not ai_include_price:
+                            ai_include_price = purchase_price / 2.4
                         
                         return {
-                            'ai_include_price': price_usd,
-                            'purchase_price': price_usd * 4,  # Estimate purchase as 4x include
-                            'currency': price_info.get('currency', 'USD'),
-                            'license_path': license_info.get('licensePath'),
-                            'license_type': license_info.get('licenseType', 'ON_DEMAND_LICENSE')
+                            'ai_include_price': ai_include_price or 0.05,
+                            'purchase_price': purchase_price or 0.12,
+                            'currency': currency,
+                            'license_path': license_path,
+                            'license_type': 'ON_DEMAND'
                         }
                 else:
                     print(f"Tollbit rate API response: {response.status_code} - {response.text[:200]}")
