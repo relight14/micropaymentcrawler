@@ -109,6 +109,28 @@ class SourceCard {
             sourceCard.classList.add('skeleton-loading');
         }
         
+        // Set up delegated event handler for all button clicks
+        const cardClickHandler = (e) => {
+            const actionBtn = e.target.closest('[data-action]');
+            if (!actionBtn) return;
+            
+            const action = actionBtn.dataset.action;
+            const sourceId = sourceCard.dataset.sourceId;
+            
+            if (action === 'unlock') {
+                e.preventDefault();
+                this._handleUnlock(sourceId);
+            } else if (action === 'download') {
+                e.preventDefault();
+                this._handleDownload(sourceId);
+            }
+            // view-external opens naturally via href, no handler needed
+        };
+        
+        sourceCard.addEventListener('click', cardClickHandler);
+        this.eventListeners.set(sourceCard, { type: 'click', handler: cardClickHandler });
+        console.log('🎯 EVENT DELEGATION: Attached single click handler to card:', source.id);
+        
         return sourceCard;
     }
     
@@ -507,6 +529,7 @@ class SourceCard {
         button.href = source.url;
         button.target = '_blank';
         button.rel = 'noopener noreferrer';
+        button.setAttribute('data-action', 'view-external');
         
         const icon = document.createElement('span');
         icon.textContent = '🔗';
@@ -531,18 +554,13 @@ class SourceCard {
         
         if (isUnlocked) {
             button.className = 'download-btn unlock-btn';
+            button.setAttribute('data-action', 'download');
             button.innerHTML = '📄 <span>View Source</span>';
-            const downloadHandler = () => this._handleDownload(source);
-            button.addEventListener('click', downloadHandler);
-            this.eventListeners.set(button, { type: 'click', handler: downloadHandler });
         } else {
             button.className = 'unlock-btn';
+            button.setAttribute('data-action', 'unlock');
             const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
             button.innerHTML = `🔓 <span>Unlock${costText}</span>`;
-            const unlockHandler = () => this._handleUnlock(source);
-            button.addEventListener('click', unlockHandler);
-            this.eventListeners.set(button, { type: 'click', handler: unlockHandler });
-            console.log('🔓 UNLOCK: Event listener attached to unlock button for:', source.id);
         }
         
         return button;
@@ -550,7 +568,7 @@ class SourceCard {
     
     /**
      * Update action button with fresh state data
-     * IMPORTANT: Only modify text content to preserve event listeners
+     * Uses event delegation so button can be safely updated without losing listeners
      */
     _updateActionButton(cardElement, freshSource) {
         const actionBtn = cardElement.querySelector('.unlock-btn');
@@ -565,13 +583,15 @@ class SourceCard {
         
         if (isUnlocked) {
             actionBtn.className = 'download-btn unlock-btn';
-            // Update only text content, not innerHTML - preserves event listeners
+            actionBtn.setAttribute('data-action', 'download');
+            // Update only text content, not innerHTML
             actionBtn.firstChild.textContent = '📄 ';
             textSpan.textContent = 'View Source';
         } else {
             actionBtn.className = 'unlock-btn';
+            actionBtn.setAttribute('data-action', 'unlock');
             const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
-            // Update only text content, not innerHTML - preserves event listeners
+            // Update only text content, not innerHTML
             actionBtn.firstChild.textContent = '🔓 ';
             textSpan.textContent = `Unlock${costText}`;
         }
@@ -580,8 +600,24 @@ class SourceCard {
     /**
      * Handle source unlock
      */
-    async _handleUnlock(source) {
-        console.log('🔓 UNLOCK: Button clicked! Source:', source.id, 'Price:', source.unlock_price);
+    async _handleUnlock(sourceId) {
+        console.log('🔓 UNLOCK: Button clicked! SourceID:', sourceId);
+        
+        // Lookup source from appState
+        const researchData = this.appState?.getCurrentResearchData();
+        if (!researchData || !researchData.sources) {
+            console.error('🔓 UNLOCK: No research data available');
+            return;
+        }
+        
+        const source = researchData.sources.find(s => s.id === sourceId);
+        if (!source) {
+            console.error('🔓 UNLOCK: Source not found for ID:', sourceId);
+            return;
+        }
+        
+        console.log('🔓 UNLOCK: Source found:', source.title, 'Price:', source.unlock_price);
+        
         try {
             console.log('🔓 UNLOCK: Creating CustomEvent sourceUnlockRequested');
             // Dispatch event for app to handle
@@ -599,7 +635,20 @@ class SourceCard {
     /**
      * Handle source download
      */
-    async _handleDownload(source) {
+    async _handleDownload(sourceId) {
+        // Lookup source from appState
+        const researchData = this.appState?.getCurrentResearchData();
+        if (!researchData || !researchData.sources) {
+            console.error('Download: No research data available');
+            return;
+        }
+        
+        const source = researchData.sources.find(s => s.id === sourceId);
+        if (!source) {
+            console.error('Download: Source not found for ID:', sourceId);
+            return;
+        }
+        
         try {
             // Dispatch event for app to handle
             const event = new CustomEvent('sourceDownloadRequested', {
