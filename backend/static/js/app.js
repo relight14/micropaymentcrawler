@@ -643,7 +643,7 @@ export class ChatResearchApp {
         }
 
         // Guard: Check if already unlocked
-        if (sourceToUpdate?.is_unlocked || this.appState.hasPurchasedItem(sourceId)) {
+        if (sourceToUpdate?.is_unlocked || this.appState.isPurchased(sourceId)) {
             console.log('🔓 UNLOCK: Source already unlocked, opening directly');
             if (sourceToUpdate?.url) {
                 window.open(sourceToUpdate.url, '_blank');
