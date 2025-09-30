@@ -1,0 +1,97 @@
+Summary: You're Spot-On
+🚨 Must-Fix Now:
+
+Per-URL Caching: Crucial for accuracy — currently invalidates the value of Tollbit entirely.
+
+Proper Rate Endpoint Format: Very likely causing the "400" and partial results — must fix to get clean enrichment.
+
+Authentication Payload: You're not passing orgCuid, agentId, or token signature — this limits access to real prices and content.
+
+🟡 Should-Fix Soon:
+
+Token minting payload: Required for real-world licensing use case.
+
+Actual purchase_price derivation: Use ON_DEMAND_FULL_USE_LICENSE if present, or fallback.
+
+Use gateway.tollbit.com if required: Looks like api.tollbit.com works for now, but future-proofing is smart.
+
+🛠️ Task List – Fixing Tollbit Integration (Prioritized)
+🔴 HIGH PRIORITY (BLOCKING)
+
+Fix cache key to be per-URL
+
+cache_key = source_url.strip().lower()
+
+
+Fix malformed rate endpoint
+
+Encode target_url as query param:
+
+rate_endpoint = f"{self.base_url}/dev/v1/rate?url={quote_plus(target_url)}"
+
+
+Add orgCuid and proper agentId to headers or payload
+
+headers = {
+    'Authorization': f'Bearer {self.api_key}',
+    'User-Agent': self.agent_name,
+    'X-Tollbit-AgentId': self.agent_id,  # Custom header if required
+}
+
+
+Or, add to body if expected:
+
+payload = {
+    'agent': self.agent_name,
+    'orgCuid': self.org_cuid,
+    ...
+}
+
+🟡 MEDIUM PRIORITY (Important for pricing accuracy)
+
+Use proper license price mapping
+
+Parse the returned licenses:
+
+for license in data['licenses']:
+    if license['licenseType'] == 'ON_DEMAND_LICENSE':
+        ai_price = license['priceMicros'] / 1_000_000
+    if license['licenseType'] == 'ON_DEMAND_FULL_USE_LICENSE':
+        purchase_price = license['priceMicros'] / 1_000_000
+
+
+Fix _mint_token() call
+
+Required fields:
+
+payload = {
+    'orgCuid': self.org_cuid,
+    'agentId': self.agent_id,
+    'url': target_url,
+    'maxPriceMicros': 12000,  # or dynamic
+    'licenseType': 'ON_DEMAND_FULL_USE_LICENSE'
+}
+
+🟢 LOW PRIORITY (Production Hardening)
+
+Switch to https://gateway.tollbit.com if needed
+
+Check with real token whether content unlock behaves differently.
+
+Add signature-based validation (optional)
+
+Tollbit docs mention token signing and org authentication using cryptographic validation. May not be needed during dev.
+
+🧪 Verification Plan
+
+After patching:
+
+✅ Log all successful /rate responses with full pricing detail
+
+✅ Log any 400s or errors — with full request URL and headers
+
+✅ Confirm distinct pricing for each article
+
+✅ Confirm 5 enrichment events → 5 Tollbit API hits
+
+✅ Confirm token minting payload returns valid license

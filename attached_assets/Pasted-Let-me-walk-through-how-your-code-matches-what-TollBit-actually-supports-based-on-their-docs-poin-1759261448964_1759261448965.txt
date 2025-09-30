@@ -1,0 +1,92 @@
+Let me walk through how your code matches what TollBit actually supports (based on their docs), point out mismatches / potential bugs, and suggest some tweaks. No fluff — just what you need to adjust.
+
+📚 What TollBit’s Docs Say (Relevant Extracts)
+
+From the documentation:
+
+You can query a rate endpoint: GET /dev/v1/rate/<content_path> to get priceMicros, licenseType, licensePath, etc. 
+TollBit Documentation
+
+The Rates endpoint works per URL (i.e. per page), not purely by domain. 
+TollBit Documentation
+
+TollBit supports ON_DEMAND_LICENSE type. 
+TollBit Documentation
++1
+
+The content endpoint (GET /dev/v1/content/<content_path>) returns the licensed content body, along with metadata and rate info. 
+TollBit Documentation
+
+In Quickstart, they show a token minting endpoint with signature and AgentID usage. 
+TollBit Documentation
+
+TollBit expects an AgentID and signed tokens rather than just open API key in all calls (for security). 
+TollBit Documentation
++1
+
+✅ What Your Code Does Well
+
+You’ve abstracted multiple licensing protocols under ProtocolHandler → good separation of concern.
+
+Your TollbitProtocolHandler.check_source() tries to call a pricing API (_check_pricing) using a GET to rate endpoint, which aligns with TollBit’s /rate/<content_path> approach.
+
+You scale micros → dollars conversion (micros to float) inside _check_pricing → correct mapping.
+
+request_license() uses _mint_token(...) which aligns with TollBit’s token minting endpoint concept (they require a token to get actual content).
+
+You cache by domain (via self._cache with netloc) — this is sensible as an optimization, though potentially risky given URL-level pricing.
+
+Licensing fallback (None) and graceful failure are handled.
+
+⚠️ Key Mismatches / Risk Areas You’ll Want to Adjust
+Issue	Why It’s a Problem	Suggestion
+Using only domain in cache key	TollBit’s docs suggest per-page (URL-level) pricing is supported. Caching by domain may lead to incorrect reuse of price across different pages.	Use full normalized URL (or path+domain) as cache key, not just domain.
+Using GET /dev/v1/rate/<target_url> with full URL path in path param	TollBit docs want <content_path> — not always full URL; you might need to URL‑encode or adjust path format.	Normalize the path (strip protocol, domain, prefix) when building rate endpoint. Test edge cases.
+No usage of AgentID, signed tokens in pricing requests	TollBit Quickstart says you should request tokens via a signature call instead of exposing API key in client queries.	Integrate token signing (or pass AgentID / valid signed token) in your rate request if required by TollBit.
+Your purchase_price estimation (4x ai_include_price)	Without data from TollBit, this is speculative.	Optionally remove or make purchase price optional until real data arrives.
+Using this.base_url + "/dev/v1/rate/" directly	In TollBit docs, the rate endpoint is /dev/v1/rate/<content_path>, but in their quickstart they use a gateway domain (gateway.tollbit.com).	Confirm correct base URL (gateway versus api.tollbit.com) from TollBit docs or SDK.
+No signature or validation on _mint_token payload	TollBit’s docs require proper payload with url, maxPriceMicros, licenseType etc.	Add required fields (orgCuid, AgentID, etc.) in mint payload per TollBit spec (Quickstart documentation).
+Publisher/admin overhead not integrated	Your code doesn’t address how publishers register domains, set rates, or enforce bot paywalls, which TollBit offers.	That may be outside your component, but be aware for full integration.
+🔧 Suggested Adjustments (Minimal)
+
+Cache key granularity:
+
+cache_key = urlparse(source_url).path + "|" + urlparse(source_url).netloc
+
+
+Rate endpoint formatting:
+
+# maybe use urlencoded path instead of full url string
+rate_endpoint = f"{self.base_url}/dev/v1/rate/{quote_plus(target_url)}"
+
+
+Include AgentID / orgCuid / token signing:
+In _check_pricing or _mint_token, include:
+
+{
+  "orgCuid": "<your_org_id>",
+  "url": target_url,
+  "userAgent": self.agent_name,
+  "licenseType": "ON_DEMAND_LICENSE",
+  "maxPriceMicros": <some limit>
+}
+
+
+Respect priceMicros field fully:
+Use that in both ai_include_price and purchase_price if provided, not compute heuristics.
+
+Use correct base host:
+If TollBit uses a special gateway (e.g. gateway.tollbit.com), confirm if api.tollbit.com is right. The quickstart suggests using gateway.tollbit.com. 
+TollBit Documentation
+
+🧭 How I’d Proceed to Validate This Integration
+
+Write unit tests / mocks using TollBit sample responses from docs (especially from /rate/ and /content/ endpoints).
+
+Test with a real or sandbox TollBit key, hit a few known URLs.
+
+Log raw JSON responses for pricing and token minting to confirm fields (micros, licensePath, expires) match your parsing.
+
+For URLs without licensing, verify fallback is correct (returning None).
+
+Monitor caching correctness — ensure price lookup isn’t stale or misapplied across pages.
