@@ -634,13 +634,30 @@ export class ChatResearchApp {
     // Source and tier management methods
     async handleSourceUnlock(button, sourceId, price) {
         console.log('🔓 UNLOCK: handleSourceUnlock() called!', { button, sourceId, price });
-        // Debounce mechanism - prevent duplicate unlock attempts
+        
+        // Find the source object
+        let sourceToUpdate = null;
+        const researchResults = this.appState.getCurrentResearchData();
+        if (researchResults && researchResults.sources) {
+            sourceToUpdate = researchResults.sources.find(s => s.id === sourceId);
+        }
+
+        // Guard: Check if already unlocked
+        if (sourceToUpdate?.is_unlocked || this.appState.hasPurchasedItem(sourceId)) {
+            console.log('🔓 UNLOCK: Source already unlocked, opening directly');
+            if (sourceToUpdate?.url) {
+                window.open(sourceToUpdate.url, '_blank');
+            }
+            return;
+        }
+
+        // Guard: Prevent duplicate unlock attempts
         if (this.isUnlockInProgress) {
             console.log('🔓 UNLOCK: Already in progress, ignoring duplicate request');
             return;
         }
-        console.log('🔓 UNLOCK: Proceeding with unlock...');
 
+        // Auth check: Show auth modal if not authenticated
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
                 type: 'source_unlock', 
@@ -648,19 +665,37 @@ export class ChatResearchApp {
                 sourceId, 
                 price 
             });
-            this.showToast('Please log in to unlock this source.', 'info');
+            this.showAuthModal();
+            return;
+        }
+
+        // Prepare purchase details for checkout modal
+        const purchaseDetails = {
+            tier: 'source_unlock',
+            price: price,
+            titleOverride: 'Unlock Source',
+            customDescription: price === 0 
+                ? 'This source is free to unlock. Click confirm to access.'
+                : `Unlock this ${sourceToUpdate?.license_type || 'licensed'} source for $${Number(price).toFixed(2)}`,
+            selectedSources: sourceToUpdate ? [sourceToUpdate] : [],
+            query: sourceToUpdate?.title || 'Source Access'
+        };
+
+        // Show checkout confirmation modal
+        const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
+        
+        if (!userConfirmed) {
+            // User cancelled - reset button state
+            console.log('🔓 UNLOCK: User cancelled purchase');
+            if (button) {
+                button.innerHTML = '🔓 <span>Unlock</span>';
+                button.disabled = false;
+            }
             return;
         }
 
         // Lock the unlock operation
         this.isUnlockInProgress = true;
-        
-        // Find the source object to update its state
-        let sourceToUpdate = null;
-        const researchResults = this.appState.getCurrentResearchData();
-        if (researchResults && researchResults.sources) {
-            sourceToUpdate = researchResults.sources.find(s => s.id === sourceId);
-        }
 
         // Show loading state on button
         const originalButtonContent = button?.innerHTML;
