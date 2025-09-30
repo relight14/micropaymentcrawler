@@ -154,6 +154,19 @@ class SourceCard {
         
         console.log(`🎨 Updating ${sources.length} cards with enriched content...`);
         
+        // Update appState with enriched source data
+        const currentData = this.appState.getCurrentResearchData();
+        if (currentData && currentData.sources) {
+            currentData.sources.forEach(existing => {
+                const enriched = sources.find(s => s.id === existing.id);
+                if (enriched) {
+                    Object.assign(existing, enriched);
+                }
+            });
+            this.appState.setCurrentResearchData(currentData);
+            console.log('✅ AppState updated with enriched pricing data');
+        }
+        
         sources.forEach(enrichedSource => {
             this.updateCard(enrichedSource);
         });
