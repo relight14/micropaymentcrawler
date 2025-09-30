@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, quote_plus
 
 @dataclass
 class LicenseTerms:
@@ -238,9 +238,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            # Use correct Tollbit rate endpoint from documentation  
-            # GET /dev/v1/rate/<content_path> where content_path is the plain URL
-            rate_endpoint = f"{self.base_url}/dev/v1/rate/{target_url}"
+            # Use correct Tollbit rate endpoint with URL as query parameter
+            # GET /dev/v1/rate?url=<encoded_url>
+            rate_endpoint = f"{self.base_url}/dev/v1/rate/{quote_plus(target_url)}"
             
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
