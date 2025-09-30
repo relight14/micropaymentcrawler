@@ -397,7 +397,7 @@ class ContentLicenseService:
     
     def discover_licensing(self, source_url: str) -> Optional[Dict[str, Any]]:
         """Check all supported protocols for licensing information"""
-        cache_key = urlparse(source_url).netloc
+        cache_key = source_url.strip().lower()
         
         # Check cache first
         if cache_key in self._cache:
