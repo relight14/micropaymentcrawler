@@ -240,9 +240,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            # Use correct Tollbit rate endpoint with URL as query parameter
+            # Use correct Tollbit rate endpoint with URL as query parameter per Tollbit spec
             # GET /dev/v1/rate?url=<encoded_url>
-            rate_endpoint = f"{self.base_url}/dev/v1/rate/{quote_plus(target_url)}"
+            rate_endpoint = f"{self.base_url}/dev/v1/rate?url={quote_plus(target_url)}"
             
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
