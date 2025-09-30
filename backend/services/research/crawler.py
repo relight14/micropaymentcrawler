@@ -550,17 +550,18 @@ class ContentCrawlerStub:
         protocol = terms.protocol
         
         source.licensing_protocol = protocol.upper() if protocol else None
-        source.licensing_cost = terms.ai_include_price
+        source.licensing_cost = terms.ai_include_price  # PARTIAL_USE price for AI summaries
         source.publisher_name = terms.publisher
         source.license_type = "ai-include"
         source.requires_attribution = terms.requires_attribution
         
-        # Use ONLY the actual licensing cost as the unlock price for transparency
-        # This replaces any previous pricing calculation
-        if source.licensing_cost and source.licensing_cost > 0:
-            source.unlock_price = source.licensing_cost
+        # Use FULL_USE price for human readers unlocking sources
+        # Use PARTIAL_USE price (licensing_cost) for AI report generation
+        full_use_price = terms.purchase_price
+        if full_use_price and full_use_price > 0:
+            source.unlock_price = full_use_price
         else:
-            # If no licensing cost, this should be a free source
+            # If no full-use price, this should be a free source
             source.unlock_price = 0.0
     
     # Removed fake licensing generation - now using real ContentLicenseService

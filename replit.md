@@ -8,6 +8,14 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **September 30, 2025**: Tollbit integration enhanced with dual-pricing model
+  - Implemented per-URL caching for individual article pricing (replacing domain-level caching)
+  - Fixed Tollbit API endpoint to use raw URL path format for successful pricing discovery
+  - Added support for TOLLBIT_ORG_CUID and TOLLBIT_AGENT_ID environment variables
+  - Enhanced license parsing to extract both ON_DEMAND_LICENSE (partial use) and ON_DEMAND_FULL_USE_LICENSE prices
+  - **Dual-pricing model**: Source unlock uses FULL_USE price ($0.012) for human readers, while AI report generation uses PARTIAL_USE price ($0.005-0.09) for AI summaries
+  - Verified live Tollbit pricing with real data: time.com sources return variable pricing from $0.005 to $0.09 per article
+
 - **September 29, 2025**: Production security hardening completed and deployment configured
   - Implemented JWT authentication requirements for all research endpoints (/analyze, /generate-report, /enrichment) 
   - Added tiered rate limiting (5, 15, 30, 60/minute) based on operation cost to prevent API abuse
