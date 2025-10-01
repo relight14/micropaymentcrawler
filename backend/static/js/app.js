@@ -823,49 +823,47 @@ export class ChatResearchApp {
                 return;
             }
 
-            // User confirmed - proceed with mock purchase (no actual API call to LedeWire purchase endpoint)
-            // Simulate brief processing time for realism
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            // Handle successful mock purchase
-            this.appState.addPurchasedItem(tierId);
-            
-            // Update UI with success state
-            if (button) {
-                button.textContent = 'Purchased';
-                button.disabled = true;
-            }
-
-            // Update wallet balance (keep this real for authentic UX)
-            await this.authService.updateWalletBalance();
-            if (this.authService.isAuthenticated()) {
-                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-            }
-
-            // Show success message and generate report for all purchases (not just selected sources)
-            if (useSelectedSources) {
-                this._showToast(`Report generated with ${selectedSources.length} selected sources!`, 'success');
-            } else {
-                this._showToast(`Research tier purchased successfully!`, 'success');
-            }
-            
-            // Generate research report after successful purchase (for all tiers)
+            // User confirmed - proceed with real purchase API call
             try {
-                // Show loading message while generating report
-                this._showToast('Generating your research report...', 'info');
+                // Show loading message
+                this._showToast('Generating your AI-powered research report...', 'info');
                 
-                const reportResponse = await this.apiService.generateReport(query || this.appState.getCurrentQuery() || "Research Query", tierId);
+                // Call real purchase endpoint which generates sources + AI report
+                const purchaseResponse = await this.apiService.purchaseTier(
+                    tierId, 
+                    price, 
+                    query || this.appState.getCurrentQuery() || "Research Query", 
+                    useSelectedSources ? selectedSources : null
+                );
                 
-                if (reportResponse && reportResponse.summary) {
-                    // Display the generated report in the UI
-                    this._displayGeneratedReport(reportResponse);
+                if (purchaseResponse && purchaseResponse.success && purchaseResponse.packet) {
+                    // Mark as purchased in state
+                    this.appState.addPurchasedItem(tierId);
+                    
+                    // Update UI with success state
+                    if (button) {
+                        button.textContent = 'Purchased';
+                        button.disabled = true;
+                    }
+
+                    // Update wallet balance
+                    await this.authService.updateWalletBalance();
+                    if (this.authService.isAuthenticated()) {
+                        this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+                    }
+
+                    // Display the AI-generated report in the UI
+                    this._displayGeneratedReport(purchaseResponse.packet);
                     
                     // Show completion message
-                    this._showToast('Research report generated successfully!', 'success');
+                    this._showToast('AI research report generated successfully!', 'success');
+                } else {
+                    throw new Error('Invalid purchase response');
                 }
             } catch (reportError) {
-                console.error('Error generating report:', reportError);
-                this._showToast('Purchase successful, but report generation failed. Please try again.', 'warning');
+                console.error('Error in purchase/report generation:', reportError);
+                this._showToast(`Purchase failed: ${reportError.message}`, 'error');
+                throw reportError;
             }
             
         } catch (error) {
