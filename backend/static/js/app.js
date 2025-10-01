@@ -6,6 +6,7 @@ import { APIService } from './services/api.js';
 import { AuthService } from './services/auth.js';
 import { AppState } from './state/app-state.js';
 import { UIManager } from './components/ui-manager.js';
+import { MessageRenderer } from './components/message-renderer.js';
 import { debounce } from './utils/helpers.js';
 
 // SourceCard will be loaded globally - access it dynamically when needed
@@ -901,35 +902,21 @@ export class ChatResearchApp {
         // Add system message to inform user about mode switch (like research mode)
         this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
         
-        // Create report builder DOM and append directly to maintain chat continuity AND preserve event listeners
+        // Create report builder DOM content
+        const reportBuilderContent = this._generateReportBuilderDOM();
+        
+        // Use MessageRenderer for consistent message structure
+        const reportBuilderMessage = MessageRenderer.createMessageElement({
+            sender: 'system',
+            content: reportBuilderContent,
+            timestamp: new Date()
+        });
+        
+        // Add custom class for specific styling if needed
+        reportBuilderMessage.classList.add('report-builder-container');
+        
         const messagesContainer = document.getElementById('messagesContainer');
-        const reportBuilderDiv = document.createElement('div');
-        reportBuilderDiv.className = 'message system report-builder-container';
-        
-        // Create message structure similar to other system messages
-        const messageContent = document.createElement('div');
-        messageContent.className = 'message-content';
-        
-        const messageHeader = document.createElement('div');
-        messageHeader.className = 'message-header';
-        const senderSpan = document.createElement('span');
-        senderSpan.className = 'message-sender';
-        senderSpan.textContent = '⚙️ System';
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'message-time';
-        timeSpan.textContent = new Date().toLocaleTimeString();
-        messageHeader.appendChild(senderSpan);
-        messageHeader.appendChild(timeSpan);
-        
-        const messageText = document.createElement('div');
-        messageText.className = 'message-text';
-        messageText.appendChild(this._generateReportBuilderDOM());
-        
-        messageContent.appendChild(messageHeader);
-        messageContent.appendChild(messageText);
-        reportBuilderDiv.appendChild(messageContent);
-        
-        messagesContainer.appendChild(reportBuilderDiv);
+        messagesContainer.appendChild(reportBuilderMessage);
         this.uiManager.scrollToBottom();
         
         // Add event listeners to purchase buttons - now they will work since DOM is live
@@ -1198,19 +1185,19 @@ export class ChatResearchApp {
     
     _addLoadingMessage(message) {
         const messagesContainer = document.getElementById('messagesContainer');
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'message system loading-message';
-        loadingDiv.innerHTML = `
-            <div class="loading-content">
-                <div class="spinner"></div>
-                <span class="loading-text">${message}</span>
-            </div>
-        `;
         
-        messagesContainer.appendChild(loadingDiv);
+        // Use new MessageRenderer for consistent loading indicators
+        const loadingMessage = MessageRenderer.createMessageElement({
+            sender: 'system',
+            content: message,
+            timestamp: new Date(),
+            variant: 'loading'
+        });
+        
+        messagesContainer.appendChild(loadingMessage);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        return loadingDiv;
+        return loadingMessage;
     }
     
     _removeLoadingMessage(element) {
