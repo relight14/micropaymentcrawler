@@ -198,28 +198,40 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Build packet with AI-generated report
         packet = packet_builder.build_packet_with_sources(purchase_request.query, purchase_request.tier, sources, report)
         
-        # Process payment with LedeWire
-        payment_result = ledewire.process_payment(
-            access_token=access_token,
-            amount_cents=int(config["price"] * 100),
-            description=f"{purchase_request.tier.value.title()} Research: {purchase_request.query[:50]}...",
-            idempotency_key=purchase_request.idempotency_key
-        )
+        # Selective Mock: Check if payments should be mocked
+        import os
+        if os.getenv("LEDEWIRE_MOCK_PAYMENTS") == "true":
+            # MOCK MODE: Skip real payment, generate fake transaction
+            transaction_id = f"mock_txn_{uuid.uuid4().hex[:12]}"
+            wallet_id = None  # No real wallet involved in mock
+            
+        else:
+            # REAL MODE: Process actual LedeWire payment
+            content_id = packet.content_id or f"research_{uuid.uuid4().hex[:8]}"
+            payment_result = ledewire.create_purchase(
+                access_token=access_token,
+                content_id=content_id,
+                price_cents=int(config["price"] * 100),
+                idempotency_key=purchase_request.idempotency_key
+            )
+            
+            if "error" in payment_result:
+                error_msg = ledewire.handle_api_error(payment_result)
+                if "insufficient" in error_msg.lower():
+                    raise HTTPException(status_code=402, detail=f"Insufficient funds: {error_msg}")
+                else:
+                    raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
+            
+            transaction_id = payment_result.get("transaction_id")
+            wallet_id = payment_result.get("wallet_id")
         
-        if "error" in payment_result:
-            error_msg = ledewire.handle_api_error(payment_result)
-            if "insufficient" in error_msg.lower():
-                raise HTTPException(status_code=402, detail=f"Insufficient funds: {error_msg}")
-            else:
-                raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
-        
-        # Record successful purchase
+        # Record successful purchase (both mock and real paths)
         purchase_id = ledger.record_purchase(
             query=purchase_request.query,
             tier=purchase_request.tier,
             price=config["price"],
-            wallet_id=payment_result.get("wallet_id"),
-            transaction_id=payment_result.get("transaction_id"),
+            wallet_id=wallet_id,
+            transaction_id=transaction_id,
             packet=packet
         )
         
