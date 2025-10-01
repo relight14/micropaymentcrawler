@@ -1203,7 +1203,7 @@ export class ChatResearchApp {
         loadingDiv.innerHTML = `
             <div class="loading-content">
                 <div class="spinner"></div>
-                <span>${message}</span>
+                <span class="loading-text">${message}</span>
             </div>
         `;
         

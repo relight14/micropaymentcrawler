@@ -3222,16 +3222,24 @@ input:checked + .slider:before {
 /* Loading Message Spinner */
 .loading-message {
     background: var(--accent-primary);
-    color: var(--background);
+    color: white;
     border-radius: 12px;
     padding: 1rem 1.5rem;
     animation: fadeIn 0.3s ease-out;
+    max-width: 85%;
 }
 
 .loading-content {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+}
+
+.loading-text {
+    color: white;
+    font-weight: 500;
+    font-size: 0.95rem;
+    white-space: nowrap;
 }
 
 .spinner {
@@ -3241,6 +3249,7 @@ input:checked + .slider:before {
     border-top-color: white;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
 }
 
 @keyframes spin {
