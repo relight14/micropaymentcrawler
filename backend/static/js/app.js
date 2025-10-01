@@ -824,9 +824,10 @@ export class ChatResearchApp {
             }
 
             // User confirmed - proceed with real purchase API call
+            let loadingMessageElement = null;
             try {
-                // Show loading message
-                this._showToast('Generating your AI-powered research report...', 'info');
+                // Show loading indicator in chat
+                loadingMessageElement = this._addLoadingMessage('🔬 Generating your premium research report...');
                 
                 // Call real purchase endpoint which generates sources + AI report
                 const purchaseResponse = await this.apiService.purchaseTier(
@@ -835,6 +836,12 @@ export class ChatResearchApp {
                     query || this.appState.getCurrentQuery() || "Research Query", 
                     useSelectedSources ? selectedSources : null
                 );
+                
+                // Remove loading indicator
+                if (loadingMessageElement) {
+                    this._removeLoadingMessage(loadingMessageElement);
+                    loadingMessageElement = null;
+                }
                 
                 if (purchaseResponse && purchaseResponse.success && purchaseResponse.packet) {
                     // Mark as purchased in state
@@ -855,14 +862,20 @@ export class ChatResearchApp {
                     // Display the AI-generated report in the UI
                     this._displayGeneratedReport(purchaseResponse.packet);
                     
-                    // Show completion message
-                    this._showToast('AI research report generated successfully!', 'success');
+                    // Show success message in chat
+                    this.addMessage('system', '✅ AI research report generated successfully!');
                 } else {
                     throw new Error('Invalid purchase response');
                 }
             } catch (reportError) {
                 console.error('Error in purchase/report generation:', reportError);
-                this._showToast(`Purchase failed: ${reportError.message}`, 'error');
+                
+                // Remove loading indicator on error
+                if (loadingMessageElement) {
+                    this._removeLoadingMessage(loadingMessageElement);
+                }
+                
+                this.addMessage('system', `❌ Purchase failed: ${reportError.message}`);
                 throw reportError;
             }
             
@@ -1181,6 +1194,29 @@ export class ChatResearchApp {
             toast.style.animation = 'slideOut 0.3s ease-in';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    }
+    
+    _addLoadingMessage(message) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message system loading-message';
+        loadingDiv.innerHTML = `
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(loadingDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        return loadingDiv;
+    }
+    
+    _removeLoadingMessage(element) {
+        if (element && element.parentNode) {
+            element.remove();
+        }
     }
     
     async _displaySourceCards(sources) {
