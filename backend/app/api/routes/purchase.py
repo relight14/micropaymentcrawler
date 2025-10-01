@@ -9,6 +9,7 @@ from schemas.api import PurchaseRequest, PurchaseResponse
 from schemas.domain import TierType
 from services.research.packet_builder import PacketBuilder
 from services.research.crawler import ContentCrawlerStub
+from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import get_user_or_ip_key
@@ -18,6 +19,7 @@ router = APIRouter()
 # Initialize services
 packet_builder = PacketBuilder()
 crawler = ContentCrawlerStub()
+report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
 
@@ -155,9 +157,14 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         budget_limit = config["price"] * 0.60
         max_sources = config["max_sources"]
         
-        # Generate sources and build packet
+        # Generate sources
         sources = crawler.generate_sources(request.query, max_sources, budget_limit)
-        packet = packet_builder.build_packet_with_sources(request.query, request.tier, sources)
+        
+        # Generate AI report (with fallback handling built-in)
+        report = report_generator.generate_report(request.query, sources, request.tier)
+        
+        # Build packet with AI-generated report
+        packet = packet_builder.build_packet_with_sources(request.query, request.tier, sources, report)
         
         # Process payment with LedeWire
         payment_result = ledewire.process_payment(
