@@ -2,8 +2,10 @@
 
 import uuid
 from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from typing import Dict, Any
+import time
 
 from schemas.api import PurchaseRequest, PurchaseResponse
 from schemas.domain import TierType
@@ -106,20 +108,49 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             request_signature = f"{user_id}:{purchase_request.query}:{purchase_request.tier.value}:{base_price}"
             purchase_request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
         
-        # Check for existing response
-        existing_response = ledger.check_idempotency(user_id, purchase_request.idempotency_key, "purchase")
-        if existing_response:
-            return PurchaseResponse(**existing_response)
+        # Check idempotency status
+        idem_status = ledger.get_idempotency_status(user_id, purchase_request.idempotency_key, "purchase")
         
-        # Reserve this operation
+        if idem_status:
+            if idem_status["status"] == "completed":
+                # Return cached response (idempotent 200)
+                return PurchaseResponse(**idem_status["response_data"])
+            
+            elif idem_status["status"] == "processing":
+                # Wait inline with short polling (simpler than 202 + polling endpoint)
+                max_wait_seconds = 15
+                poll_interval = 0.5
+                attempts = int(max_wait_seconds / poll_interval)
+                
+                for attempt in range(attempts):
+                    time.sleep(poll_interval)
+                    updated_status = ledger.get_idempotency_status(user_id, purchase_request.idempotency_key, "purchase")
+                    
+                    if updated_status and updated_status["status"] == "completed":
+                        return PurchaseResponse(**updated_status["response_data"])
+                
+                # Still processing after max wait - return 202
+                return JSONResponse(
+                    status_code=202,
+                    content={"status": "processing", "message": "Purchase is still being processed. Please try again in a moment."},
+                    headers={"Retry-After": "2"}
+                )
+            
+            elif idem_status["status"] == "failed":
+                raise HTTPException(status_code=500, detail="Previous purchase attempt failed. Please retry with a new request.")
+        
+        # Reserve this operation (first time seeing this key)
         if not ledger.reserve_idempotency(user_id, purchase_request.idempotency_key, "purchase"):
-            import time
-            time.sleep(0.2)
-            existing_response = ledger.check_idempotency(user_id, purchase_request.idempotency_key, "purchase")
-            if existing_response:
-                return PurchaseResponse(**existing_response)
-            else:
-                raise HTTPException(status_code=409, detail="Duplicate request processing - please retry")
+            # Race condition - another request just reserved it, treat as processing
+            time.sleep(0.5)
+            retry_status = ledger.get_idempotency_status(user_id, purchase_request.idempotency_key, "purchase")
+            if retry_status and retry_status["status"] == "completed":
+                return PurchaseResponse(**retry_status["response_data"])
+            return JSONResponse(
+                status_code=202,
+                content={"status": "processing", "message": "Purchase is being processed by another request."},
+                headers={"Retry-After": "2"}
+            )
         
         # Tier configurations
         tier_configs = {
@@ -147,11 +178,11 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             response_data = PurchaseResponse(
                 success=True,
                 message="Free research unlocked! Enjoy your Basic tier research.",
-                packet=packet,
+                packet=packet.model_dump(),
                 wallet_deduction=0.0
             )
             
-            ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.dict())
+            ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.model_dump(), "completed")
             return response_data
         
         # PAID TIERS: Continue with payment processing
@@ -195,16 +226,28 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         response_data = PurchaseResponse(
             success=True,
             message=f"Research purchased successfully! Your {purchase_request.tier.value.title()} tier research is ready.",
-            packet=packet,
+            packet=packet.model_dump(),
             wallet_deduction=config["price"]
         )
         
-        # Store for idempotency
-        ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.dict())
+        # Store for idempotency with completed status
+        ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.model_dump(), "completed")
         return response_data
         
     except HTTPException:
+        # Mark as failed for non-recoverable errors
+        try:
+            if purchase_request.idempotency_key:
+                ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", {"error": "failed"}, "failed")
+        except:
+            pass
         raise
     except Exception as e:
         print(f"Purchase error: {e}")
+        # Mark as failed
+        try:
+            if purchase_request.idempotency_key:
+                ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", {"error": str(e)}, "failed")
+        except:
+            pass
         raise HTTPException(status_code=500, detail="Purchase processing failed")

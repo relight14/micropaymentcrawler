@@ -291,6 +291,17 @@ export class APIService {
             try {
                 const response = await fetch(url, options);
                 
+                // Handle 202 Accepted (purchase still processing) with inline retry
+                if (response.status === 202) {
+                    const data = await response.json();
+                    const retryAfter = response.headers.get('Retry-After') || 2;
+                    console.log(`⏳ Purchase processing (202). Retrying after ${retryAfter}s...`);
+                    
+                    // Wait and retry
+                    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+                    continue; // Retry the request
+                }
+                
                 if (!response.ok) {
                     // Handle authentication specifically
                     if (response.status === 401) {

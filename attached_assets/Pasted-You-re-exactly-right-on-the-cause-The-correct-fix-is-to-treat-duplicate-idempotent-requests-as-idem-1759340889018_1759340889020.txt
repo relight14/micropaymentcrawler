@@ -1,0 +1,64 @@
+You’re exactly right on the cause. The correct fix is to treat duplicate idempotent requests as idempotent, not errors.
+
+Do this (server)
+
+Make the idempotency key unique
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_idem_key ON purchases(idempotency_key);
+
+
+Table needs: idempotency_key TEXT PK/UNIQUE, status ENUM('processing','completed','failed'), response JSONB, updated_at TIMESTAMP.
+
+Route logic (no 409s)
+
+If key not found → insert processing, kick off work, proceed.
+
+If key status=completed → return cached response 200.
+
+If key status=processing → return 202 Accepted with operation_id = key and Retry-After: 2.
+
+@router.post("/purchase")
+async def purchase_research(req: Request, body: PurchaseRequest, auth: str = Header(None, alias="Authorization")):
+    key = body.idempotency_key
+    row = ledger.get(key)
+    if not row:
+        ledger.insert(key, status="processing")
+        try:
+            packet = await do_work(body)  # Claude + sources
+            ledger.update(key, status="completed", response=packet)
+            return {"success": True, "packet": packet}
+        except Exception as e:
+            ledger.update(key, status="failed")
+            raise
+    if row.status == "completed":
+        return {"success": True, "packet": row.response}
+    if row.status == "processing":
+        return JSONResponse({"status": "processing", "operation_id": key}, status_code=202, headers={"Retry-After": "2"})
+    raise HTTPException(500, "Unexpected idempotency state")
+
+
+If you prefer to wait inline, replace the 202 branch with a short poll loop (e.g., 0.5s * 20 = 10s total). But 202 + polling is cleaner.
+
+Background option (even better)
+
+Immediately return 202 + operation_id after reserving.
+
+Run the generation in a background task/worker.
+
+Add GET /purchase/status/{operation_id} to fetch state or final result.
+
+Do this (client)
+
+Disable the purchase button on click + show spinner.
+
+If response 202, start polling /purchase/status/{operation_id} every 1–2s until completed.
+
+If response 200, render packet.
+
+Never re-fire the same request while status is processing.
+
+Remove the 409 path
+
+409 is correct for conflicting writes, but for idempotent purchases, it’s hostile UX. Use 200 (cached) or 202 (in-progress) only.
+
+That’s the no-drama fix: unique idempotency row + 200/202 semantics + button disable + optional polling endpoint.

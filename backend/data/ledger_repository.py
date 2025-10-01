@@ -52,8 +52,10 @@ class ResearchLedger:
                     user_id TEXT NOT NULL,
                     idempotency_key TEXT NOT NULL,
                     operation_type TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'processing',
                     response_data TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (user_id, idempotency_key, operation_type)
                 )
             """)
@@ -85,6 +87,26 @@ class ResearchLedger:
             
             return cursor.lastrowid or 0
     
+    def get_idempotency_status(self, user_id: str, idempotency_key: str, operation_type: str) -> Optional[Dict]:
+        """Get current status of an idempotent operation. Returns dict with status and response_data, or None."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT status, response_data, created_at, updated_at FROM idempotency_keys 
+                WHERE user_id = ? AND idempotency_key = ? AND operation_type = ?
+            """, (user_id, idempotency_key, operation_type))
+            
+            result = cursor.fetchone()
+            if result:
+                status, response_data, created_at, updated_at = result
+                return {
+                    "status": status,
+                    "response_data": json.loads(response_data) if response_data else {},
+                    "created_at": created_at,
+                    "updated_at": updated_at
+                }
+            return None
+
     def reserve_idempotency(self, user_id: str, idempotency_key: str, operation_type: str) -> bool:
         """Atomically reserve an idempotency key. Returns True if reserved, False if already exists."""
         with sqlite3.connect(self.db_path) as conn:
@@ -93,9 +115,9 @@ class ResearchLedger:
                 # Try to insert with "processing" status
                 cursor.execute("""
                     INSERT INTO idempotency_keys 
-                    (user_id, idempotency_key, operation_type, response_data)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, idempotency_key, operation_type, json.dumps({"status": "processing"})))
+                    (user_id, idempotency_key, operation_type, status, response_data)
+                    VALUES (?, ?, ?, 'processing', ?)
+                """, (user_id, idempotency_key, operation_type, json.dumps({})))
                 return True  # Successfully reserved
             except sqlite3.IntegrityError:
                 return False  # Already exists
@@ -130,15 +152,15 @@ class ResearchLedger:
                 return data  # Completed result
             return None
     
-    def store_idempotency(self, user_id: str, idempotency_key: str, operation_type: str, response_data: Dict):
-        """Store operation result for idempotency protection."""
+    def store_idempotency(self, user_id: str, idempotency_key: str, operation_type: str, response_data: Dict, status: str = "completed"):
+        """Store operation result for idempotency protection with status."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO idempotency_keys 
-                (user_id, idempotency_key, operation_type, response_data)
-                VALUES (?, ?, ?, ?)
-            """, (user_id, idempotency_key, operation_type, json.dumps(response_data)))
+                (user_id, idempotency_key, operation_type, status, response_data, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, idempotency_key, operation_type, status, json.dumps(response_data)))
     
     def record_source_unlock(self, 
                            purchase_id: int, 
