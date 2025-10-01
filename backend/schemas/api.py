@@ -3,6 +3,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Dict, Any, Optional, List
 from enum import Enum
+from schemas.domain import TierType
 
 
 # Authentication schemas
@@ -57,6 +58,7 @@ class DynamicResearchResponse(BaseModel):
 # Purchase schemas
 class PurchaseRequest(BaseModel):
     query: str
+    tier: TierType
     selected_source_ids: Optional[List[str]] = None  # Specific sources to unlock
     budget_limit_dollars: Optional[float] = None  # Total budget for research
     idempotency_key: Optional[str] = None
@@ -65,9 +67,7 @@ class PurchaseRequest(BaseModel):
 class PurchaseResponse(BaseModel):
     success: bool
     message: str
-    research_package: Optional[Dict[str, Any]] = None
-    total_cost: float
-    sources_unlocked: int
+    packet: Optional[Dict[str, Any]] = None
     wallet_deduction: float
 
 
