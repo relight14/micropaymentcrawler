@@ -181,7 +181,7 @@ Source {i}:
 - Domain: {source.domain}
 - Title: {source.title}
 - URL: {source.url}
-- Content: {source.description or source.quote or 'No content available'}
+- Content: {source.excerpt or 'No content available'}
 """)
         return "\n".join(formatted)
     
