@@ -22,6 +22,7 @@ crawler = ContentCrawlerStub()
 report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
+limiter = Limiter(key_func=get_user_or_ip_key)
 
 
 def extract_bearer_token(authorization: str) -> str:
@@ -82,7 +83,7 @@ def extract_user_id_from_token(access_token: str) -> str:
 
 
 @router.post("", response_model=PurchaseResponse)
-# @limiter.limit("10/minute")
+@limiter.limit("10/minute")
 async def purchase_research(request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """Process a research purchase request using LedeWire API with server-enforced licensing costs."""
     try:

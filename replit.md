@@ -8,6 +8,15 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **October 1, 2025**: AI-powered tiered research reports with Claude integration
+  - Integrated Claude API (Haiku model) for generating tier-specific research reports with distinct content quality
+  - Research tier ($0.99): ~500 word executive summaries with key findings and source citations
+  - Pro tier ($1.99): ~1500 word comprehensive analyst reports with confidence scoring, thematic analysis, related questions, and executive briefing
+  - Implemented 10-minute in-memory caching (50-entry LRU) to reduce Claude API costs on repeated queries
+  - Added graceful fallback to basic summaries if Claude API fails, maintaining purchase flow integrity
+  - Wired tier purchase cards to real purchase endpoint (`/api/purchase`) which generates AI reports instead of mock enrichment endpoint
+  - Frontend now calls `purchaseTier()` API for Research/Pro cards, triggering full backend pipeline: source generation → Claude report generation → packet building → payment processing
+
 - **September 30, 2025**: Tollbit integration enhanced with dual-pricing model
   - Implemented per-URL caching for individual article pricing (replacing domain-level caching)
   - Fixed Tollbit API endpoint to use raw URL path format for successful pricing discovery

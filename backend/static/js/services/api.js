@@ -253,10 +253,24 @@ export class APIService {
     }
 
     async purchaseTier(tierId, price, query = "Research Query", selectedSources = null) {
+        // Generate stable idempotency key for this purchase attempt
+        const userId = this.authService.getUserId();
+        const sourceIds = selectedSources ? selectedSources.map(s => s.id).sort().join(',') : '';
+        const idempotencySignature = `${userId}:${query}:${tierId}:${price}:${sourceIds}`;
+        
+        // Simple hash function for client-side idempotency key
+        let hash = 0;
+        for (let i = 0; i < idempotencySignature.length; i++) {
+            const char = idempotencySignature.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        const idempotencyKey = `purchase_${userId}_${Math.abs(hash).toString(16)}`;
+        
         const requestBody = {
             query,
             tier: tierId,
-            idempotency_key: null
+            idempotency_key: idempotencyKey
         };
         
         // Include selected sources if provided (for custom report generation)
