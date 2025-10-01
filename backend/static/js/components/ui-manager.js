@@ -2,6 +2,8 @@
  * UI Manager - Handles DOM manipulation and UI updates
  * Extracted from the monolithic ChatResearchApp
  */
+import { MessageRenderer } from './message-renderer.js';
+
 export class UIManager {
     constructor(appState, options = {}) {
         this.appState = appState;
@@ -114,17 +116,35 @@ export class UIManager {
             return;
         }
 
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.sender}`;
+        let messageDiv;
         
-        // Handle DOM nodes directly to preserve event listeners
-        if (message.content instanceof HTMLElement) {
-            messageDiv.appendChild(message.content);
+        // Handle DOM nodes directly to preserve event listeners (backwards compatibility)
+        if (message.content instanceof HTMLElement && !message.metadata?.type) {
+            // Legacy DOM element - wrap it in new MessageRenderer structure
+            messageDiv = MessageRenderer.createMessageElement({
+                sender: message.sender || 'assistant',
+                content: message.content,
+                timestamp: message.timestamp || new Date(),
+                metadata: message.metadata,
+                variant: message.variant || null
+            });
         } else if (message.metadata?.type === 'source_cards') {
-            // Recreate source cards component for restoration scenarios
-            this._recreateSourceCardsMessage(messageDiv, message);
+            // Special handling for source cards - recreate with live event listeners
+            messageDiv = MessageRenderer.createMessageElement({
+                sender: 'assistant',
+                content: document.createElement('div'), // Placeholder
+                timestamp: message.timestamp || new Date()
+            });
+            this._recreateSourceCardsMessage(messageDiv.querySelector('.message__body'), message);
         } else {
-            messageDiv.innerHTML = this.formatMessageHTML(message);
+            // Standard message - use MessageRenderer
+            messageDiv = MessageRenderer.createMessageElement({
+                sender: message.sender || 'assistant',
+                content: message.content || '',
+                timestamp: message.timestamp || new Date(),
+                metadata: message.metadata,
+                variant: message.variant || null
+            });
         }
         
         this.messagesContainer.appendChild(messageDiv);
@@ -330,111 +350,24 @@ export class UIManager {
         });
     }
 
-    formatMessageHTML(message) {
-        // Safe timestamp handling with fallback
-        let timeString = '--:--';
-        try {
-            if (message.timestamp) {
-                const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp);
-                timeString = timestamp.toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            }
-        } catch (error) {
-            console.warn('Invalid timestamp in message:', message.timestamp, error);
-            timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-        
-        let html = `
-            <div class="message-content">
-                <div class="message-header">
-                    <span class="message-sender">${this.formatSender(message.sender)}</span>
-                    <span class="message-time">${timeString}</span>
-                </div>
-                <div class="message-text">${this.formatMessage(message.content)}</div>
-            </div>
-        `;
-        
-        // Add metadata if present (research packets, sources, etc.)
-        if (message.metadata) {
-            html += this.formatMessageMetadata(message.metadata);
-        }
-        
-        return html;
-    }
+    // OLD FORMATTING METHODS REMOVED
+    // MessageRenderer now handles all message formatting with consistent BEM architecture
+    // Removed: formatMessageHTML, formatSender, formatMessage, formatMessageMetadata,
+    // formatResearchPacketHTML, formatSourcesHTML
 
-    formatSender(sender) {
-        const senderMap = {
-            'user': '👤 You',
-            'assistant': '🤖 Assistant', 
-            'system': '⚙️ System'
-        };
-        return senderMap[sender] || sender;
-    }
-
-    formatMessage(text) {
-        // Check if this is HTML content (like source cards) that should not be escaped
-        if (text.includes('<div class="sources-preview-section">') || 
-            text.includes('<div class="source-card">')) {
-            // This is HTML content that should be rendered as-is
-            return text;
-        }
-        
-        // Secure approach: escape first, then apply formatting
-        const escaped = this.escapeHtml(text);
-        
-        // Apply formatting to escaped content (safer than regex on raw input)
-        const formatted = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/`(.*?)`/g, '<code>$1</code>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/\n/g, '<br>');
-            
-        // Final sanitization pass (belt and suspenders)
-        return this.sanitizeHtml(formatted);
-    }
-
-    formatMessageMetadata(metadata) {
-        // Handle different types of metadata (sources, research packets, etc.)
-        if (metadata.type === 'research_packet') {
-            return this.formatResearchPacketHTML(metadata.data);
-        } else if (metadata.type === 'sources') {
-            return this.formatSourcesHTML(metadata.data);
-        }
-        return '';
-    }
-
-    formatResearchPacketHTML(packet) {
-        // Format research packet display
-        return `<div class="research-packet">${packet.summary || 'Research completed'}</div>`;
-    }
-
-    formatSourcesHTML(sources) {
-        // LEGACY TEMPLATE REMOVED - SourceCard component handles all rendering
-        return '<div class="legacy-sources-removed">Sources rendered by SourceCard component</div>';
-    }
-
-    // Typing indicator
-    showTypingIndicator() {
+    // Typing/Loading indicator using MessageRenderer
+    showTypingIndicator(message = 'Thinking...') {
         this.hideTypingIndicator(); // Remove any existing indicator
         
-        const typingDiv = document.createElement('div');
-        typingDiv.id = 'typingIndicator';
-        typingDiv.className = 'message assistant typing';
-        typingDiv.innerHTML = `
-            <div class="message-content">
-                <div class="message-header">
-                    <span class="message-sender">🤖 Assistant</span>
-                </div>
-                <div class="typing-dots">
-                    <span></span><span></span><span></span>
-                </div>
-            </div>
-        `;
+        const loadingMessage = MessageRenderer.createMessageElement({
+            sender: 'system',
+            content: message,
+            timestamp: new Date(),
+            variant: 'loading'
+        });
         
-        this.messagesContainer.appendChild(typingDiv);
+        loadingMessage.id = 'typingIndicator';
+        this.messagesContainer.appendChild(loadingMessage);
         this.scrollToBottom();
     }
 
