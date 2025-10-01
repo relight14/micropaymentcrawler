@@ -1052,37 +1052,6 @@ export class ChatResearchApp {
         
         containerDiv.appendChild(cardsContainer);
         
-        // Build Report button (only if sources are selected)
-        if (sourceCount > 0) {
-            const buildReportDiv = document.createElement('div');
-            buildReportDiv.className = 'build-report-section';
-            
-            const buildButton = document.createElement('button');
-            buildButton.className = 'build-report-btn';
-            buildButton.dataset.tier = 'research';
-            buildButton.dataset.price = '0.99';
-            buildButton.textContent = `Build Report with ${sourceCount} Selected Sources`;
-            buildButton.addEventListener('click', async (e) => {
-                const tier = e.target.dataset.tier;
-                const price = parseFloat(e.target.dataset.price);
-                const query = this.appState.getCurrentQuery() || "Selected Sources Research";
-                
-                e.target.textContent = 'Processing...';
-                e.target.disabled = true;
-                
-                try {
-                    // Use existing handleTierPurchase but with selectedSources flag
-                    await this.handleTierPurchase(e.target, tier, price, query, true);
-                } catch (error) {
-                    e.target.textContent = `Build Report with ${sourceCount} Selected Sources`;
-                    e.target.disabled = false;
-                }
-            });
-            
-            buildReportDiv.appendChild(buildButton);
-            containerDiv.appendChild(buildReportDiv);
-        }
-        
         // Note
         const noteDiv = document.createElement('div');
         noteDiv.className = 'tier-cards-note';
