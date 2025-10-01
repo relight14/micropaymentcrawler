@@ -1,7 +1,7 @@
 """Purchase and transaction routes"""
 
 import uuid
-from fastapi import APIRouter, HTTPException, Header, Request, Body
+from fastapi import APIRouter, HTTPException, Header, Request
 from slowapi import Limiter
 from typing import Dict, Any
 
@@ -84,7 +84,7 @@ def extract_user_id_from_token(access_token: str) -> str:
 
 @router.post("", response_model=PurchaseResponse)
 @limiter.limit("10/minute")
-async def purchase_research(request: Request, purchase_request: PurchaseRequest = Body(...), authorization: str = Header(None, alias="Authorization")):
+async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """Process a research purchase request using LedeWire API with server-enforced licensing costs."""
     try:
         # Extract and validate Bearer token
