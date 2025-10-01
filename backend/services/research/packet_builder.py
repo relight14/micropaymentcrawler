@@ -36,6 +36,28 @@ class PacketBuilder:
             total_sources=len(sources)
         )
     
+    def build_packet_with_sources(self, query: str, tier: TierType, sources: List[SourceCard], report: Optional[str] = None) -> ResearchPacket:
+        """Build a research packet with pre-generated sources and optional AI report."""
+        # Get tier configuration
+        config = self._get_tier_config(tier)
+        
+        # Use provided AI report or fallback to generated summary
+        summary = report if report else self._generate_summary(query, tier, sources)
+        
+        # Generate optional components based on tier, using real source data
+        outline = self._generate_outline(query, sources) if config["includes_outline"] else None
+        insights = self._generate_insights(query, sources) if config["includes_insights"] else None
+        
+        return ResearchPacket(
+            query=query,
+            tier=tier,
+            summary=summary,
+            outline=outline,
+            insights=insights,
+            sources=sources,
+            total_sources=len(sources)
+        )
+    
     def _get_tier_config(self, tier: TierType) -> dict:
         """Get configuration for each tier."""
         configs = {
