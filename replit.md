@@ -8,6 +8,16 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **October 1, 2025**: Unified message rendering system - Major architectural refactor
+  - Created MessageRenderer class with BEM-style CSS architecture for consistent, maintainable message rendering
+  - Eliminated CSS selector mismatches that caused recurring styling bugs (loading indicator emoji-only display, inconsistent message layouts)
+  - Refactored all message creation to use single source of truth: MessageRenderer.createMessageElement()
+  - Standardized BEM naming convention: `.message--{type}` for modifiers, `.message__{element}` for children
+  - Removed 6 old formatting methods from UIManager and 120+ lines of duplicate CSS
+  - Updated loading indicators, typing indicators, and all message variants to use unified API
+  - Comprehensive JSDoc documentation with usage examples in MessageRenderer.js
+  - **Result**: Durable, long-term stable message system that prevents future CSS conflicts and simplifies extensions
+
 - **October 1, 2025**: AI-powered tiered research reports with Claude integration
   - Integrated Claude API (Haiku model) for generating tier-specific research reports with distinct content quality
   - Research tier ($0.99): ~500 word executive summaries with key findings and source citations
