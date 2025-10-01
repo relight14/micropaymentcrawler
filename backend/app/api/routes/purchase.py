@@ -1,7 +1,7 @@
 """Purchase and transaction routes"""
 
 import uuid
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Request
 from slowapi import Limiter
 from typing import Dict, Any
 
@@ -84,7 +84,7 @@ def extract_user_id_from_token(access_token: str) -> str:
 
 @router.post("", response_model=PurchaseResponse)
 @limiter.limit("10/minute")
-async def purchase_research(request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
+async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """Process a research purchase request using LedeWire API with server-enforced licensing costs."""
     try:
         # Extract and validate Bearer token
@@ -98,24 +98,24 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
             TierType.RESEARCH: 0.99,  
             TierType.PRO: 1.99
         }
-        base_price = tier_base_prices[request.tier]
+        base_price = tier_base_prices[purchase_request.tier]
         
         # Generate stable idempotency key if not provided
         import hashlib
-        if not request.idempotency_key:
-            request_signature = f"{user_id}:{request.query}:{request.tier.value}:{base_price}"
-            request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
+        if not purchase_request.idempotency_key:
+            request_signature = f"{user_id}:{purchase_request.query}:{purchase_request.tier.value}:{base_price}"
+            purchase_request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
         
         # Check for existing response
-        existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "purchase")
+        existing_response = ledger.check_idempotency(user_id, purchase_request.idempotency_key, "purchase")
         if existing_response:
             return PurchaseResponse(**existing_response)
         
         # Reserve this operation
-        if not ledger.reserve_idempotency(user_id, request.idempotency_key, "purchase"):
+        if not ledger.reserve_idempotency(user_id, purchase_request.idempotency_key, "purchase"):
             import time
             time.sleep(0.2)
-            existing_response = ledger.check_idempotency(user_id, request.idempotency_key, "purchase")
+            existing_response = ledger.check_idempotency(user_id, purchase_request.idempotency_key, "purchase")
             if existing_response:
                 return PurchaseResponse(**existing_response)
             else:
@@ -128,16 +128,16 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
             TierType.PRO: {"price": 1.99, "max_sources": 40}
         }
         
-        config = tier_configs[request.tier]
+        config = tier_configs[purchase_request.tier]
         
         # Handle FREE TIER
         if config["price"] == 0.00:
-            packet = packet_builder.build_packet(request.query, request.tier)
+            packet = packet_builder.build_packet(purchase_request.query, purchase_request.tier)
             
             free_transaction_id = f"free_{uuid.uuid4().hex[:12]}"
             purchase_id = ledger.record_purchase(
-                query=request.query,
-                tier=request.tier,
+                query=purchase_request.query,
+                tier=purchase_request.tier,
                 price=0.00,
                 wallet_id=None,
                 transaction_id=free_transaction_id,
@@ -151,7 +151,7 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
                 wallet_deduction=0.0
             )
             
-            ledger.store_idempotency(user_id, request.idempotency_key, "purchase", response_data.dict())
+            ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.dict())
             return response_data
         
         # PAID TIERS: Continue with payment processing
@@ -159,20 +159,20 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         max_sources = config["max_sources"]
         
         # Generate sources
-        sources = crawler.generate_sources(request.query, max_sources, budget_limit)
+        sources = crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         
         # Generate AI report (with fallback handling built-in)
-        report = report_generator.generate_report(request.query, sources, request.tier)
+        report = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
         
         # Build packet with AI-generated report
-        packet = packet_builder.build_packet_with_sources(request.query, request.tier, sources, report)
+        packet = packet_builder.build_packet_with_sources(purchase_request.query, purchase_request.tier, sources, report)
         
         # Process payment with LedeWire
         payment_result = ledewire.process_payment(
             access_token=access_token,
             amount_cents=int(config["price"] * 100),
-            description=f"{request.tier.value.title()} Research: {request.query[:50]}...",
-            idempotency_key=request.idempotency_key
+            description=f"{purchase_request.tier.value.title()} Research: {purchase_request.query[:50]}...",
+            idempotency_key=purchase_request.idempotency_key
         )
         
         if "error" in payment_result:
@@ -184,8 +184,8 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         # Record successful purchase
         purchase_id = ledger.record_purchase(
-            query=request.query,
-            tier=request.tier,
+            query=purchase_request.query,
+            tier=purchase_request.tier,
             price=config["price"],
             wallet_id=payment_result.get("wallet_id"),
             transaction_id=payment_result.get("transaction_id"),
@@ -194,13 +194,13 @@ async def purchase_research(request: PurchaseRequest, authorization: str = Heade
         
         response_data = PurchaseResponse(
             success=True,
-            message=f"Research purchased successfully! Your {request.tier.value.title()} tier research is ready.",
+            message=f"Research purchased successfully! Your {purchase_request.tier.value.title()} tier research is ready.",
             packet=packet,
             wallet_deduction=config["price"]
         )
         
         # Store for idempotency
-        ledger.store_idempotency(user_id, request.idempotency_key, "purchase", response_data.dict())
+        ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.dict())
         return response_data
         
     except HTTPException:
