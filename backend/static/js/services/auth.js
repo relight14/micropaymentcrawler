@@ -8,10 +8,63 @@ export class AuthService {
         this.token = localStorage.getItem('ledewire_token');
         this.refreshToken = localStorage.getItem('ledewire_refresh_token');
         this.walletBalance = 0;
+        this.logoutCallbacks = []; // Callbacks to trigger on logout
     }
 
+    /**
+     * Register a callback to be called when user is logged out
+     * @param {Function} callback - Function to call on logout
+     */
+    onLogout(callback) {
+        if (typeof callback === 'function') {
+            this.logoutCallbacks.push(callback);
+        }
+    }
+
+    /**
+     * Check if user is authenticated with a valid (non-expired) token
+     * @returns {boolean} - True if token exists and is not expired
+     */
     isAuthenticated() {
-        return !!this.token;
+        if (!this.token) return false;
+        
+        // Check if token is expired
+        if (this.isTokenExpired(this.token)) {
+            console.log('Token exists but is expired, logging out');
+            this.clearToken();
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Check if a JWT token is expired
+     * @param {string} token - JWT token to check
+     * @returns {boolean} - True if token is expired
+     */
+    isTokenExpired(token) {
+        if (!token) return true;
+        
+        try {
+            const payload = this.decodeJWT(token);
+            if (!payload || !payload.exp) {
+                return false; // If no exp claim, assume valid
+            }
+            
+            // JWT exp is in seconds, Date.now() is in milliseconds
+            const currentTime = Math.floor(Date.now() / 1000);
+            const isExpired = payload.exp < currentTime;
+            
+            if (isExpired) {
+                console.log('Token expired at:', new Date(payload.exp * 1000).toLocaleString());
+            }
+            
+            return isExpired;
+        } catch (error) {
+            console.error('Error checking token expiry:', error);
+            return true; // If we can't decode, treat as expired
+        }
     }
 
     getToken() {
@@ -35,8 +88,19 @@ export class AuthService {
     clearToken() {
         this.token = null;
         this.refreshToken = null;
+        this.userInfo = null;
+        this.walletBalance = 0;
         localStorage.removeItem('ledewire_token');
         localStorage.removeItem('ledewire_refresh_token');
+        
+        // Trigger all logout callbacks to update UI
+        this.logoutCallbacks.forEach(callback => {
+            try {
+                callback();
+            } catch (error) {
+                console.error('Error in logout callback:', error);
+            }
+        });
     }
 
     async login(email, password) {
