@@ -101,9 +101,11 @@ export class APIService {
         if (!response.ok) {
             console.error(`🔬 API request failed: ${response.status} ${response.statusText}`);
             
-            // Handle authentication specifically
+            // Handle authentication specifically - trigger logout on 401
             if (response.status === 401) {
-                throw new Error("You need to be logged in to run a research query. Please sign in and try again.");
+                console.log('🔐 401 Unauthorized - triggering logout');
+                this.authService.clearToken(); // This will trigger logout callbacks
+                throw new Error("Your session has expired. Please log in again.");
             }
             
             // Handle rate limiting specifically
@@ -303,9 +305,11 @@ export class APIService {
                 }
                 
                 if (!response.ok) {
-                    // Handle authentication specifically
+                    // Handle authentication specifically - trigger logout on 401
                     if (response.status === 401) {
-                        throw new Error("You need to be logged in to run a research query. Please sign in and try again.");
+                        console.log('🔐 401 Unauthorized - triggering logout');
+                        this.authService.clearToken(); // This will trigger logout callbacks
+                        throw new Error("Your session has expired. Please log in again.");
                     }
                     
                     // Handle rate limiting specifically with user-friendly message
