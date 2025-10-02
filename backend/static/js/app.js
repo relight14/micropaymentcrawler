@@ -1159,8 +1159,16 @@ export class ChatResearchApp {
         // Rebuild UI from stored conversation history WITHOUT mutating state
         const conversationHistory = this.appState.getConversationHistory();
         conversationHistory.forEach(message => {
+            // Convert HTML strings back to DOM elements for proper rendering
+            const uiMessage = { ...message };
+            if (typeof message.content === 'string' && message.content.startsWith('<')) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = message.content;
+                uiMessage.content = tempDiv.firstChild;
+            }
+            
             // Call UI manager directly to avoid state mutation during restoration
-            this.uiManager.addMessageToChat(message);
+            this.uiManager.addMessageToChat(uiMessage);
         });
     }
     
