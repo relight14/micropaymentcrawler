@@ -2,6 +2,7 @@
 
 import hashlib
 from fastapi import Request
+from slowapi import Limiter
 
 
 def get_user_or_ip_key(request: Request) -> str:
@@ -20,3 +21,7 @@ def get_user_or_ip_key(request: Request) -> str:
     # Fallback to IP-based rate limiting
     client_ip = request.client.host if request.client else "unknown"
     return f"ip_{client_ip}"
+
+
+# Shared limiter instance - can be imported by route modules and app factory
+limiter = Limiter(key_func=get_user_or_ip_key)

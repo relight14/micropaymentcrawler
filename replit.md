@@ -111,3 +111,55 @@ The frontend is a Single Page Application built with vanilla HTML/CSS/JavaScript
 - **Tavily API**: For discovering real, clickable URLs from live web search.
 - **Anthropic Claude API**: For AI-powered content polishing and conversational AI.
 - **LedeWire Wallet API**: Integrated for authentication, wallet balance, and purchase processing (live HTTP integration with production security).
+
+# Deployment Checklist
+
+## Required Environment Variables
+Before deploying to production, ensure all required environment variables are configured in Replit Secrets:
+
+### Critical (Required)
+- `ANTHROPIC_API_KEY` - Claude AI integration for report generation and chat
+- `TAVILY_API_KEY` - Web search functionality for discovering sources
+- `TOLLBIT_API_KEY` - Tollbit content licensing integration
+- `LEDEWIRE_API_KEY` - LedeWire wallet authentication (already configured)
+- `ALLOWED_ORIGINS` - **MUST be set in production** to restrict CORS (comma-separated list of allowed domains)
+
+### Optional (Tollbit Enhancement)
+- `TOLLBIT_ORG_CUID` - Organization identifier for Tollbit
+- `TOLLBIT_AGENT_ID` - Agent identifier for Tollbit (defaults to 'ResearchTool-1.0')
+
+### Testing/Development Only
+- `LEDEWIRE_MOCK_PAYMENTS` - Set to "true" for payment testing (never use in production)
+- `LEDEWIRE_USE_MOCK` - Set to "true" for mock auth mode (never use in production)
+
+## Security Checklist
+- ✅ Rate limiting centralized and applied to all endpoints
+- ✅ Authentication required for all chat and research endpoints (no anonymous fallback)
+- ✅ CORS configured with explicit origin allowlist support
+- ✅ Sensitive data logging removed from console logs
+- ✅ Input validation and sanitization implemented
+- ✅ Generic error messages prevent information disclosure
+- ⚠️ **Action Required**: Set `ALLOWED_ORIGINS` environment variable to your production domain before deploying
+- ⚠️ **Known Limitation**: Refresh tokens stored in localStorage (vulnerable to XSS) - consider implementing httpOnly cookies for enhanced security in future
+
+## Deployment Configuration
+The application is configured for Replit Autoscale deployment in `.replit`:
+- **Deployment Target**: `autoscale` (stateless, scales automatically)
+- **Run Command**: `python backend/main.py`
+- **Port**: 5000 (frontend and API served from same origin)
+- **No Build Step Required**: Pure Python with static assets
+
+## Pre-Deployment Verification
+1. **Environment Variables**: Verify all required secrets are set in Replit dashboard
+2. **CORS Configuration**: Set `ALLOWED_ORIGINS` to your production domain (e.g., `https://yourdomain.com`)
+3. **Test Mock Mode is Disabled**: Ensure `LEDEWIRE_MOCK_PAYMENTS` is not set or is set to "false"
+4. **Rate Limits**: Verify rate limiting is appropriate for your expected traffic
+5. **Database**: SQLite database (`research_ledger.db`) will be created automatically on first run
+
+## Post-Deployment Validation
+1. Test authentication flow (login/signup)
+2. Test chat functionality with Claude AI
+3. Test research mode with Tavily search
+4. Test tier purchase flow with LedeWire wallet
+5. Verify CORS headers are correctly restricted
+6. Monitor rate limiting behavior under load
