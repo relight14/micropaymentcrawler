@@ -90,15 +90,25 @@ def extract_user_id_from_token(access_token: str) -> str:
 @router.post("", response_model=ChatResponse)
 @limiter.limit("30/minute")
 async def chat(request: Request, chat_request: ChatRequest, authorization: str = Header(None)):
-    """AI chat endpoint supporting both conversational and deep research modes"""
+    """AI chat endpoint supporting both conversational and deep research modes (free for all users)"""
     try:
-        # Require authentication for all chat modes
-        if not authorization:
-            raise HTTPException(status_code=401, detail="Authorization required")
-        
-        token = extract_bearer_token(authorization)
-        validate_user_token(token)
-        user_id = extract_user_id_from_token(token)
+        # Chat is free - allow both authenticated and anonymous users
+        if authorization:
+            # Authenticated user - validate token and get user ID
+            try:
+                token = extract_bearer_token(authorization)
+                validate_user_token(token)
+                user_id = extract_user_id_from_token(token)
+            except HTTPException:
+                # If token validation fails, fall back to anonymous
+                import hashlib
+                client_ip = request.client.host if request.client else "unknown"
+                user_id = f"anon_{hashlib.sha256(client_ip.encode()).hexdigest()[:12]}"
+        else:
+            # Anonymous user - generate ID from IP
+            import hashlib
+            client_ip = request.client.host if request.client else "unknown"
+            user_id = f"anon_{hashlib.sha256(client_ip.encode()).hexdigest()[:12]}"
         
         # Process chat message with user-specific session
         response = ai_service.chat(chat_request.message, chat_request.mode, user_id)
