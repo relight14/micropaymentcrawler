@@ -95,16 +95,13 @@ def extract_user_id_from_token(access_token: str) -> str:
 async def chat(request: Request, chat_request: ChatRequest, authorization: str = Header(None)):
     """AI chat endpoint supporting both conversational and deep research modes"""
     try:
-        # Extract user identity for session isolation
-        user_id = "anonymous"
-        if authorization:
-            try:
-                token = extract_bearer_token(authorization)
-                validate_user_token(token)
-                user_id = extract_user_id_from_token(token)
-            except HTTPException:
-                # Continue as anonymous if authentication fails
-                pass
+        # Require authentication for all chat modes
+        if not authorization:
+            raise HTTPException(status_code=401, detail="Authorization required")
+        
+        token = extract_bearer_token(authorization)
+        validate_user_token(token)
+        user_id = extract_user_id_from_token(token)
         
         # Process chat message with user-specific session
         response = ai_service.chat(chat_request.message, chat_request.mode, user_id)
@@ -125,15 +122,13 @@ async def chat(request: Request, chat_request: ChatRequest, authorization: str =
 # Rate limiting: 60/minute enforced by middleware
 async def get_conversation_history(request: Request, authorization: str = Header(None)):
     """Get current conversation history for authenticated user"""
-    # Extract user identity
-    user_id = "anonymous"
-    if authorization:
-        try:
-            token = extract_bearer_token(authorization)
-            validate_user_token(token)
-            user_id = token[:16]  # Use first 16 chars as user identifier
-        except HTTPException:
-            pass  # Continue as anonymous for backward compatibility
+    # Require authentication
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization required")
+    
+    token = extract_bearer_token(authorization)
+    validate_user_token(token)
+    user_id = token[:16]  # Use first 16 chars as user identifier
     
     history = ai_service.get_conversation_history(user_id)
     return {
@@ -145,14 +140,13 @@ async def get_conversation_history(request: Request, authorization: str = Header
 @router.get("/user-id")
 async def get_current_user_id(authorization: str = Header(None)):
     """Get current user ID for session management"""
-    user_id = "anonymous"
-    if authorization:
-        try:
-            token = extract_bearer_token(authorization)
-            validate_user_token(token)
-            user_id = extract_user_id_from_token(token)
-        except HTTPException:
-            pass  # Continue as anonymous for backward compatibility
+    # Require authentication
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization required")
+    
+    token = extract_bearer_token(authorization)
+    validate_user_token(token)
+    user_id = extract_user_id_from_token(token)
     
     return {"user_id": user_id}
 
@@ -161,15 +155,13 @@ async def get_current_user_id(authorization: str = Header(None)):
 # Rate limiting: 10/minute enforced by middleware
 async def clear_conversation(request: Request, authorization: str = Header(None)):
     """Clear conversation history for authenticated user"""
-    # Extract user identity
-    user_id = "anonymous"
-    if authorization:
-        try:
-            token = extract_bearer_token(authorization)
-            validate_user_token(token)
-            user_id = token[:16]  # Use first 16 chars as user identifier
-        except HTTPException:
-            pass  # Continue as anonymous for backward compatibility
+    # Require authentication
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization required")
+    
+    token = extract_bearer_token(authorization)
+    validate_user_token(token)
+    user_id = token[:16]  # Use first 16 chars as user identifier
     
     ai_service.clear_conversation(user_id)
     return {"success": True, "message": "Conversation cleared"}

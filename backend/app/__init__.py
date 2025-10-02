@@ -24,19 +24,39 @@ def create_app() -> FastAPI:
         version="1.0.0"
     )
     
-    # CORS middleware
+    # CORS middleware - production-ready configuration
+    # In production, only allow requests from your actual frontend domain
+    allowed_origins = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=allowed_origins,
+        allow_credentials=False,  # Set to False when using Bearer tokens only
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
     )
     
-    # Rate limiting
+    # Rate limiting with tiered limits
     limiter = Limiter(key_func=get_user_or_ip_key)
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)
+    
+    # Apply rate limits to protected endpoints
+    from app.api.routes import purchase, research, chat
+    
+    # Purchase endpoint: strict rate limit (expensive operations)
+    limiter.limit("10/minute")(purchase.purchase_research)
+    
+    # Research endpoints: moderate rate limits
+    limiter.limit("15/minute")(research.analyze_research_query)
+    limiter.limit("5/minute")(research.generate_research_report)
+    limiter.limit("30/minute")(research.get_enrichment_status)
+    limiter.limit("60/minute")(research.get_source_details)
+    
+    # Chat endpoints: higher rate limits
+    limiter.limit("30/minute")(chat.chat)
+    limiter.limit("60/minute")(chat.get_conversation_history)
+    limiter.limit("10/minute")(chat.clear_conversation)
     
     # Custom rate limit exception handler
     @app.exception_handler(RateLimitExceeded)

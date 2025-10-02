@@ -3,7 +3,6 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
 from typing import Dict, Any
 import time
 
@@ -14,7 +13,6 @@ from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
-from utils.rate_limit import get_user_or_ip_key
 
 router = APIRouter()
 
@@ -24,7 +22,6 @@ crawler = ContentCrawlerStub()
 report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
-limiter = Limiter(key_func=get_user_or_ip_key)
 
 
 def extract_bearer_token(authorization: str) -> str:
@@ -85,7 +82,6 @@ def extract_user_id_from_token(access_token: str) -> str:
 
 
 @router.post("", response_model=PurchaseResponse)
-@limiter.limit("10/minute")
 async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """Process a research purchase request using LedeWire API with server-enforced licensing costs."""
     try:

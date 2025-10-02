@@ -5,20 +5,17 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import re
 import html
-from slowapi import Limiter
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
 from services.research.packet_builder import PacketBuilder
 from integrations.ledewire import LedeWireAPI
-from utils.rate_limit import get_user_or_ip_key
 
 router = APIRouter()
 
 # Initialize services
 ledewire = LedeWireAPI()
-limiter = Limiter(key_func=get_user_or_ip_key)
 
 # Initialize crawler for dynamic research
 crawler = ContentCrawlerStub()
@@ -130,7 +127,6 @@ def sanitize_context_text(context: str) -> str:
 
 
 @router.post("/generate-report", response_model=ResearchPacket)
-@limiter.limit("5/minute")
 async def generate_research_report(
     request: Request,
     report_request: GenerateReportRequest,
@@ -157,7 +153,6 @@ async def generate_research_report(
         raise HTTPException(status_code=500, detail="Internal server error occurred while generating research report")
 
 @router.get("/enrichment/{cache_key}")
-@limiter.limit("30/minute")
 async def get_enrichment_status(
     request: Request,
     cache_key: str,
@@ -212,7 +207,6 @@ async def get_enrichment_status(
 
 
 @router.post("/analyze", response_model=DynamicResearchResponse)
-@limiter.limit("15/minute")
 async def analyze_research_query(
     request: Request,
     research_request: ResearchRequest,
@@ -413,7 +407,6 @@ Tap to preview. Unlock what matters."""
 
 
 @router.get("/sources/{source_id}")
-@limiter.limit("60/minute")
 async def get_source_details(
     request: Request,
     source_id: str,
