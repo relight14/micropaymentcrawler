@@ -29,6 +29,18 @@ export class APIService {
         return headers;
     }
 
+    /**
+     * Centralized 401 handler - triggers logout and throws consistent error
+     * Call this in response.ok checks to ensure consistent auth handling
+     */
+    _handle401(response) {
+        if (response.status === 401) {
+            console.log('🔐 401 Unauthorized - triggering logout');
+            this.authService.clearToken(); // This will trigger logout callbacks
+            throw new Error("Your session has expired. Please log in again.");
+        }
+    }
+
     async sendMessage(message, mode, conversationContext = null) {
         // Use optimized research endpoint for research mode
         if (mode === 'research') {
@@ -43,6 +55,7 @@ export class APIService {
         });
         
         if (!response.ok) {
+            this._handle401(response);
             throw new Error(`API request failed: ${response.statusText}`);
         }
         
@@ -100,13 +113,7 @@ export class APIService {
         
         if (!response.ok) {
             console.error(`🔬 API request failed: ${response.status} ${response.statusText}`);
-            
-            // Handle authentication specifically - trigger logout on 401
-            if (response.status === 401) {
-                console.log('🔐 401 Unauthorized - triggering logout');
-                this.authService.clearToken(); // This will trigger logout callbacks
-                throw new Error("Your session has expired. Please log in again.");
-            }
+            this._handle401(response);
             
             // Handle rate limiting specifically
             if (response.status === 429) {
@@ -165,6 +172,12 @@ export class APIService {
                 });
                 
                 if (!response.ok) {
+                    // Handle authentication - stop polling on 401
+                    if (response.status === 401) {
+                        console.log('🔐 401 Unauthorized during polling - triggering logout');
+                        this.authService.clearToken(); // Trigger logout callbacks
+                        return; // Stop polling silently (user will see toast from callback)
+                    }
                     console.log(`⚠️ Polling attempt ${attempt} failed: ${response.statusText}`);
                     continue;
                 }
@@ -215,6 +228,7 @@ export class APIService {
         });
         
         if (!response.ok) {
+            this._handle401(response);
             throw new Error('Failed to clear conversation');
         }
         
@@ -233,6 +247,7 @@ export class APIService {
         });
 
         if (!response.ok) {
+            this._handle401(response);
             throw new Error(`Tier analysis failed: ${response.statusText}`);
         }
 
@@ -305,12 +320,7 @@ export class APIService {
                 }
                 
                 if (!response.ok) {
-                    // Handle authentication specifically - trigger logout on 401
-                    if (response.status === 401) {
-                        console.log('🔐 401 Unauthorized - triggering logout');
-                        this.authService.clearToken(); // This will trigger logout callbacks
-                        throw new Error("Your session has expired. Please log in again.");
-                    }
+                    this._handle401(response);
                     
                     // Handle rate limiting specifically with user-friendly message
                     if (response.status === 429) {
@@ -368,6 +378,7 @@ export class APIService {
             });
             
             if (!response.ok) {
+                this._handle401(response);
                 throw new Error(`Report generation failed: ${response.statusText}`);
             }
             
