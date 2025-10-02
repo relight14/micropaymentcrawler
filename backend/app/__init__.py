@@ -53,9 +53,15 @@ def create_app() -> FastAPI:
             content={"detail": f"Rate limit exceeded: {exc.detail}"}
         )
     
-    # Static files with no-cache
-    static_dir = "static"
-    if os.path.exists(static_dir):
+    # Static files with no-cache - handle both dev and deployment paths
+    possible_static_dirs = ["static", "backend/static", "./static"]
+    static_dir = None
+    for dir_path in possible_static_dirs:
+        if os.path.exists(dir_path):
+            static_dir = dir_path
+            break
+    
+    if static_dir:
         app.mount("/static", NoCacheStaticFiles(directory=static_dir), name="static")
     
     # Include API routes
