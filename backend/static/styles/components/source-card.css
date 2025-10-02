@@ -105,8 +105,8 @@
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius) !important;
-    padding: 1.25rem !important;
-    margin-bottom: 1rem !important;
+    padding: 1rem !important;
+    margin-bottom: 0.75rem !important;
     transition: all 0.15s ease !important;
     box-shadow: var(--shadow-sm) !important;
     position: relative !important;
@@ -149,7 +149,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     gap: 1rem;
 }
 
@@ -316,9 +316,15 @@
 
 .source-excerpt {
     color: var(--muted-foreground);
-    line-height: 1.5;
-    margin-bottom: 1rem;
+    line-height: 1.4;
+    margin-bottom: 0.75rem;
     font-size: 0.875rem;
+    max-height: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 /* =============================================================================
@@ -514,7 +520,7 @@
     }
     
     .source-card {
-        padding: 1rem;
+        padding: 0.875rem;
     }
     
     .source-actions__left,
