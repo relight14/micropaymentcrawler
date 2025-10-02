@@ -11,7 +11,8 @@ def get_env_var(name: str, default: Optional[str] = None) -> Optional[str]:
 
 def is_mock_mode() -> bool:
     """Check if application is running in mock mode"""
-    return get_env_var("LEDEWIRE_USE_MOCK", "false").lower() == "true"
+    value = get_env_var("LEDEWIRE_USE_MOCK", "false")
+    return value.lower() == "true" if value else False
 
 
 def get_anthropic_api_key() -> Optional[str]:

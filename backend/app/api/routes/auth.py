@@ -82,8 +82,7 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
         raise HTTPException(status_code=500, detail="Authentication service unavailable")
 
 
-@router.post("/signup", response_model=AuthResponse) 
-# @limiter.limit("3/minute")  # Limit account creation attempts
+@router.post("/signup", response_model=AuthResponse)
 async def signup(request: SignupRequest):
     """Create new user account"""
     try:
