@@ -277,33 +277,25 @@ export class AuthService {
     }
 
     getUserInitials() {
-        console.log('Getting user initials, userInfo:', this.userInfo);
-        
         if (!this.userInfo || !this.userInfo.buyer_claims) {
-            console.log('No userInfo or buyer_claims, returning U');
             return 'U'; // Default fallback
         }
         
         const email = this.userInfo.buyer_claims.email;
-        console.log('User email:', email);
         
         if (email) {
             // Extract initials from email (e.g., "rickybobby@hotmail.com" -> "RB")
             const namePart = email.split('@')[0];
             const parts = namePart.split(/[._-]/);
-            console.log('Email parts:', parts);
             
             if (parts.length >= 2) {
                 const initials = (parts[0][0] + parts[1][0]).toUpperCase();
-                console.log('Generated initials from parts:', initials);
                 return initials;
             }
             const initials = namePart.slice(0, 2).toUpperCase();
-            console.log('Generated initials from name part:', initials);
             return initials;
         }
         
-        console.log('No email found, returning U');
         return 'U';
     }
 

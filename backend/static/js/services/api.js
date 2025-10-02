@@ -76,32 +76,21 @@ export class APIService {
     }
     
     async analyzeResearchQuery(query, conversationContext = null) {
-        console.log(`🔬 API SERVICE: analyzeResearchQuery called`);
-        console.log(`🔬 Query: "${query}"`);
-        console.log(`🔬 Conversation context:`, conversationContext);
-        
         // Step 1: Get skeleton cards immediately
         const requestBody = {
             query,
             max_budget_dollars: 10.0,
             preferred_source_count: 15
         };
-        console.log(`🔬 Base request body:`, requestBody);
         
         // Include conversation context if available to make research context-aware
         if (conversationContext && conversationContext.length > 0) {
-            console.log(`🔬 Adding conversation context to request...`);
             // Transform conversation objects to simple format expected by backend
             requestBody.conversation_context = conversationContext.map(msg => ({
                 sender: msg.sender,
                 content: msg.content
             }));
-        } else {
-            console.log(`🔬 No conversation context to add`);
         }
-        
-        console.log(`🔬 Final request body:`, requestBody);
-        console.log(`🔬 Making request to /api/research/analyze...`);
         
         const response = await fetch(`${this.baseURL}/api/research/analyze`, {
             method: 'POST',
@@ -124,7 +113,6 @@ export class APIService {
         }
 
         const result = await response.json();
-        console.log(`🔬 API SERVICE: Raw response from backend:`, result);
         
         // Step 2: If progressive flow, start polling for enriched results
         if (result.stage === 'skeleton' && result.cache_key) {
@@ -135,7 +123,6 @@ export class APIService {
         }
         
         // Transform research response to match expected chat format
-        console.log(`🔬 Transforming response for frontend...`);
         const transformedResponse = {
             content: result.research_summary,
             research_data: {
@@ -152,8 +139,6 @@ export class APIService {
                 licensing_breakdown: result.licensing_breakdown
             }
         };
-        console.log(`🔬 API SERVICE: Transformed response:`, transformedResponse);
-        console.log(`🔬 API SERVICE: Sources in response: ${result.sources?.length || 0}`);
         return transformedResponse;
     }
     
@@ -363,10 +348,6 @@ export class APIService {
     }
     
     async generateReport(query, tier) {
-        console.log(`📊 API SERVICE: generateReport called`);
-        console.log(`📊 Query: "${query}"`);
-        console.log(`📊 Tier: "${tier}"`);
-        
         try {
             const response = await fetch(`${this.baseURL}/api/research/generate-report`, {
                 method: 'POST',
@@ -383,7 +364,6 @@ export class APIService {
             }
             
             const result = await response.json();
-            console.log(`📊 Report generated successfully:`, result);
             return result;
             
         } catch (error) {

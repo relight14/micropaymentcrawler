@@ -8,6 +8,18 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **October 2, 2025**: Pre-deployment security audit and hardening
+  - **Backend Security Fixes**:
+    - Fixed rate limiting: Centralized limiter instance in app factory shared across all endpoints
+    - Fixed authentication bypass: Removed anonymous fallback from chat endpoints (/chat, /history, /user-id, /clear) - now returns 401 when unauthorized
+    - Fixed insecure CORS: Restricted origins to explicit allowlist (configurable via ALLOWED_ORIGINS env var), disabled wildcard allow_credentials, limited methods and headers
+  - **Frontend Security Cleanup**:
+    - Removed console logging of sensitive user data: research queries, conversation context, and request payloads no longer logged
+    - Cleaned up debug logs exposing user information in getUserInitials()
+  - **Known Security Consideration for Future Deployment**:
+    - Refresh tokens are currently stored in localStorage (vulnerable to XSS attacks). For enhanced security in production, consider implementing httpOnly secure cookies for refresh token storage with server-side session management. This would require backend architecture changes to support cookie-based refresh flows.
+  - **Result**: Production-ready security posture with proper authentication enforcement, rate limiting, and CORS configuration. All critical security gaps closed.
+
 - **October 2, 2025**: Comprehensive token expiry handling system
   - Implemented automatic JWT token validation on app initialization to detect expired tokens before API calls
   - Added logout callback system in AuthService for coordinated UI updates when sessions expire
