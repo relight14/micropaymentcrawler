@@ -8,6 +8,16 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **October 2, 2025**: Comprehensive token expiry handling system
+  - Implemented automatic JWT token validation on app initialization to detect expired tokens before API calls
+  - Added logout callback system in AuthService for coordinated UI updates when sessions expire
+  - Centralized 401 error handling with `_handle401()` helper method across all API endpoints
+  - All API methods now trigger automatic logout on 401 responses: chat, research, tier analysis, source unlock, report generation, conversation clear
+  - Background enrichment polling gracefully stops on 401 without error suppression
+  - UI automatically refreshes on session expiry: auth button updates and "Session expired. Please log in again." toast displays
+  - Consistent error messaging across all authentication failures for better UX
+  - **Result**: Production-ready token expiry system with no security gaps, proper error handling, and excellent user experience
+
 - **October 1, 2025**: Unified message rendering system - Major architectural refactor
   - Created MessageRenderer class with BEM-style CSS architecture for consistent, maintainable message rendering
   - Eliminated CSS selector mismatches that caused recurring styling bugs (loading indicator emoji-only display, inconsistent message layouts)
