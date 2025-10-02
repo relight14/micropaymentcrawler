@@ -1090,7 +1090,7 @@ input:checked + .slider:before {
 .message {
     display: flex;
     margin-bottom: 1.5rem;
-    max-width: 85%;
+    max-width: 70%;
     animation: messageSlideIn 0.3s ease-out;
 }
 
@@ -1169,6 +1169,7 @@ input:checked + .slider:before {
     background: var(--ledewire-yellow);
     color: var(--charcoal);
     border-color: var(--yellow-hover);
+    text-align: right;
 }
 
 .message--system .message__content {
@@ -1886,7 +1887,7 @@ input:checked + .slider:before {
     }
     
     .message {
-        max-width: 95%;
+        max-width: 85%;
     }
     
     .messages-container {
