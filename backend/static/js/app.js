@@ -20,6 +20,13 @@ export class ChatResearchApp {
         this.appState = new AppState();
         this.uiManager = new UIManager(this.appState);
         
+        // Register logout callback to update UI when user is logged out
+        this.authService.onLogout(() => {
+            console.log('🔐 Logout callback triggered - updating UI');
+            this.updateAuthButton();
+            this.showToast('Session expired. Please log in again.', 'info');
+        });
+        
         // Toast notification system
         this.toasts = [];
         this.toastContainer = null;
@@ -43,15 +50,15 @@ export class ChatResearchApp {
             this.initializeEventListeners();
             this.initializeToastSystem();
             this.uiManager.updateModeDisplay();
-            // Safe wallet display update - only if user is authenticated
-            if (this.authService.isAuthenticated()) {
-                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-            }
             
-            // Update wallet balance if authenticated
-            if (this.authService.isAuthenticated()) {
+            // Validate token and update auth UI (this will auto-logout if expired)
+            const isAuthenticated = this.authService.isAuthenticated();
+            this.updateAuthButton();
+            
+            // Update wallet balance if authenticated (and still authenticated after validation)
+            if (isAuthenticated && this.authService.isAuthenticated()) {
                 await this.authService.updateWalletBalance();
-                // Safe wallet display update - only if user is authenticated
+                // Safe wallet display update - only if user is still authenticated
                 if (this.authService.isAuthenticated()) {
                     this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
                 }
