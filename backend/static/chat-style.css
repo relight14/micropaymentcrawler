@@ -1642,6 +1642,16 @@ input:checked + .slider:before {
     color: var(--muted-foreground);
 }
 
+.dark .search-input {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dark .search-input::placeholder {
+    color: rgba(255, 255, 255, 0.75);
+}
+
 .input-controls {
     position: absolute;
     right: 4rem;
