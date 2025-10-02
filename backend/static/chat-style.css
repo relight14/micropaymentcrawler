@@ -1236,6 +1236,41 @@ input:checked + .slider:before {
     font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
 }
 
+/* Dark Mode Message Overrides */
+.dark .message__content {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--foreground);
+}
+
+.dark .message--user .message__content {
+    background: rgba(255, 243, 141, 0.2);
+    border-color: rgba(255, 243, 141, 0.35);
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.dark .message--system .message__content {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.dark .message__sender {
+    color: var(--foreground);
+}
+
+.dark .message--user .message__sender {
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.dark .message__time {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.dark .message--user .message__time {
+    color: rgba(255, 255, 255, 0.9);
+}
+
 /* Loading State Modifier */
 .message--loading .message__avatar {
     background: var(--ledewire-yellow);
