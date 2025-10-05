@@ -3,8 +3,8 @@ import uuid
 import os
 import asyncio
 import time
+import requests
 from typing import List, Optional, Dict, Any
-from integrations.tavily import TavilyClient
 from schemas.domain import SourceCard
 from services.licensing.content_licensing import ContentLicenseService
 from services.ai.polishing import ContentPolishingService
@@ -16,12 +16,12 @@ class ContentCrawlerStub:
     """
     
     def __init__(self):
-        # Initialize Tavily client
-        api_key = os.environ.get("TAVILY_API_KEY")
-        if not api_key:
+        # Initialize Tavily API key for direct REST calls
+        self.tavily_api_key = os.environ.get("TAVILY_API_KEY")
+        if not self.tavily_api_key:
             raise ValueError("TAVILY_API_KEY environment variable is required")
         
-        self.tavily_client = TavilyClient(api_key=api_key)
+        self.tavily_api_url = "https://api.tavily.com/search"
         self.use_real_search = True
         
         # Initialize content licensing service and AI research service
@@ -80,6 +80,31 @@ class ContentCrawlerStub:
         
         return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key)
     
+    def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Make direct REST API call to Tavily search endpoint."""
+        payload = {
+            "api_key": self.tavily_api_key,
+            "query": query,
+            "search_depth": "advanced",
+            "max_results": max_results,
+            "include_answer": False,
+            "include_images": False,
+            "include_raw_content": False
+        }
+        
+        # Add domain filter if provided
+        if include_domains:
+            payload["include_domains"] = include_domains
+            print(f"📰 Tavily REST API call with domain filter: {include_domains}")
+        
+        try:
+            response = requests.post(self.tavily_api_url, json=payload, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Tavily API request failed: {str(e)}")
+            raise
+    
     def _extract_domain_filter(self, query: str) -> tuple[str, Optional[List[str]]]:
         """Extract site: domain filter from query and return clean query + domain list for Tavily."""
         import re
@@ -100,7 +125,7 @@ class ContentCrawlerStub:
     
     async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str) -> Dict[str, Any]:
         """Generate sources progressively: immediate raw results + background enrichment"""
-        if not self.tavily_client:
+        if not self.tavily_api_key:
             return await self.generate_sources_progressive(query, count, budget_limit)
         
         try:
@@ -110,22 +135,16 @@ class ContentCrawlerStub:
             # Step 2: Get raw Tavily results immediately (this is fast)
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
             
-            # Build Tavily search params with domain filter support
-            search_params = {
-                "query": tavily_query,
-                "search_depth": "advanced",
-                "max_results": min(count, 20),
-                "include_answer": False,
-                "include_images": False,
-                "include_raw_content": False
-            }
-            
-            # Add domain filter if detected (e.g., site:nytimes.com)
-            if domain_filter:
-                search_params["include_domains"] = domain_filter
-                print(f"📰 Tavily search with domain filter: {domain_filter}")
-            
-            response = self.tavily_client.search(**search_params)
+            # Make REST API call (run in executor to avoid blocking)
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self._call_tavily_api(
+                    query=tavily_query,
+                    max_results=min(count, 20),
+                    include_domains=domain_filter
+                )
+            )
             
             results = response.get('results', [])
             
@@ -292,7 +311,7 @@ class ContentCrawlerStub:
     
     def _generate_tavily_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
         """Generate source cards using hybrid Tavily discovery + Claude polish approach."""
-        if not self.tavily_client:
+        if not self.tavily_api_key:
             return []
             
         try:
@@ -303,22 +322,12 @@ class ContentCrawlerStub:
             # Tavily has a 400 character limit, so truncate to 350 to be safe
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
             
-            # Build Tavily search params with domain filter support
-            search_params = {
-                "query": tavily_query,
-                "search_depth": "advanced",
-                "max_results": min(count, 20),
-                "include_answer": False,
-                "include_images": False,
-                "include_raw_content": False
-            }
-            
-            # Add domain filter if detected (e.g., site:nytimes.com)
-            if domain_filter:
-                search_params["include_domains"] = domain_filter
-                print(f"📰 Tavily sync search with domain filter: {domain_filter}")
-            
-            response = self.tavily_client.search(**search_params)
+            # Make REST API call with domain filter support
+            response = self._call_tavily_api(
+                query=tavily_query,
+                max_results=min(count, 20),
+                include_domains=domain_filter
+            )
             
             results = response.get('results', [])
             
