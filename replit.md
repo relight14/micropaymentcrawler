@@ -17,7 +17,10 @@ The frontend is a Single Page Application (SPA) built with vanilla HTML/CSS/Java
 - **Content Generation**: Employs a hybrid pipeline using Tavily for URL discovery and Anthropic Claude for content refinement and report generation, incorporating licensing detection and graceful API fallbacks.
 - **Authentication**: Implements secure JWT token management, LedeWire integration, and robust 401 handling for authentication flows.
 - **AI Query Refinement**: Integrates Claude AI to synthesize conversation history into targeted research queries, enhancing search relevance.
-- **Publication-Specific Search**: Enables users to search within specific publications (e.g., "NY Times on nuclear energy"). System detects 12 major publications, normalizes name variations, enforces domain constraints on all queries (with or without conversation context), and uses Tavily's `include_domains` parameter for precise filtering.
+- **Hybrid Publication Search**: Enables users to search within ANY publication using a two-tier approach:
+  - **Tier 1 (Domain Filtering)**: For 12 major publications (NY Times, WSJ, Bloomberg, Reuters, Guardian, BBC, CNN, Forbes, Time, Atlantic, Economist, Washington Post), the system uses exact domain filtering via Tavily's `include_domains` parameter for guaranteed precision.
+  - **Tier 2 (Keyword Boosting)**: For any other publication (TechCrunch, The Verge, Wired, etc.), extracts the publication name from queries like "[Publication] on [Topic]" and boosts it as a keyword in the search (e.g., '"TechCrunch" AI advancements'), providing flexible publication-specific results without false positives from domain guessing.
+  - Both tiers preserve conversation context synthesis and use deterministic cache isolation to prevent cross-tier result leakage.
 - **Dual-Mode AI Experience**: Supports both conversational AI and deep research modes, including access to licensed sources and dynamic pricing.
 - **Tiered Research Reports**: Generates AI-powered research reports (executive summaries to comprehensive analyst reports) using Claude, with in-memory caching to optimize API costs.
 - **Token Expiry Handling**: Implements automatic JWT token validation and a centralized logout callback system for consistent UI updates and user experience upon session expiry.

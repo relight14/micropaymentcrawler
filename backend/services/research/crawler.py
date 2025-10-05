@@ -44,9 +44,17 @@ class ContentCrawlerStub:
     
     def _get_cache_key(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None) -> str:
         """Generate cache key for query results including domain filter for cache isolation"""
-        # Convert domain filter to sorted tuple for consistent hashing
-        domain_key = tuple(sorted(domain_filter)) if domain_filter else None
-        return f"search:{hash(query)}:{count}:{budget_limit or 0}:{hash(domain_key)}"
+        # Use deterministic serialization for domain filter to ensure uniqueness
+        # Treat None (no filter) and empty list distinctly
+        if domain_filter is None:
+            domain_key = "NO_FILTER"
+        elif len(domain_filter) == 0:
+            domain_key = "EMPTY_FILTER"
+        else:
+            # Join sorted domains with pipe separator for deterministic key
+            domain_key = "|".join(sorted(domain_filter))
+        
+        return f"search:{hash(query)}:{count}:{budget_limit or 0}:{domain_key}"
     
     def _is_cache_valid(self, timestamp: float) -> bool:
         """Check if cached result is still valid"""
