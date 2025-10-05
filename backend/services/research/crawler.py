@@ -80,22 +80,52 @@ class ContentCrawlerStub:
         
         return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key)
     
+    def _extract_domain_filter(self, query: str) -> tuple[str, Optional[List[str]]]:
+        """Extract site: domain filter from query and return clean query + domain list for Tavily."""
+        import re
+        
+        # Match site:domain.com patterns
+        site_pattern = r'site:([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+        matches = re.findall(site_pattern, query)
+        
+        if matches:
+            # Remove site: operators from query
+            clean_query = re.sub(site_pattern, '', query).strip()
+            # Remove extra whitespace
+            clean_query = ' '.join(clean_query.split())
+            print(f"🔍 Extracted domain filter: {matches} from query")
+            return clean_query, matches
+        
+        return query, None
+    
     async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str) -> Dict[str, Any]:
         """Generate sources progressively: immediate raw results + background enrichment"""
         if not self.tavily_client:
             return await self.generate_sources_progressive(query, count, budget_limit)
         
         try:
-            # Step 1: Get raw Tavily results immediately (this is fast)
-            tavily_query = query[:350] if len(query) > 350 else query
-            response = self.tavily_client.search(
-                query=tavily_query,
-                search_depth="advanced", 
-                max_results=min(count, 20),
-                include_answer=False,
-                include_images=False,
-                include_raw_content=False
-            )
+            # Step 1: Extract domain filter if present (for publication-specific searches)
+            clean_query, domain_filter = self._extract_domain_filter(query)
+            
+            # Step 2: Get raw Tavily results immediately (this is fast)
+            tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
+            
+            # Build Tavily search params with domain filter support
+            search_params = {
+                "query": tavily_query,
+                "search_depth": "advanced",
+                "max_results": min(count, 20),
+                "include_answer": False,
+                "include_images": False,
+                "include_raw_content": False
+            }
+            
+            # Add domain filter if detected (e.g., site:nytimes.com)
+            if domain_filter:
+                search_params["include_domains"] = domain_filter
+                print(f"📰 Tavily search with domain filter: {domain_filter}")
+            
+            response = self.tavily_client.search(**search_params)
             
             results = response.get('results', [])
             
@@ -266,18 +296,29 @@ class ContentCrawlerStub:
             return []
             
         try:
-            # Step 1: Tavily URL Discovery with query length truncation
-            # Tavily has a 400 character limit, so truncate to 350 to be safe
-            tavily_query = query[:350] if len(query) > 350 else query
+            # Step 1: Extract domain filter if present (for publication-specific searches)
+            clean_query, domain_filter = self._extract_domain_filter(query)
             
-            response = self.tavily_client.search(
-                query=tavily_query,
-                search_depth="advanced",
-                max_results=min(count, 20),  # Tavily has limits
-                include_answer=False,
-                include_images=False,
-                include_raw_content=False
-            )
+            # Step 2: Tavily URL Discovery with query length truncation
+            # Tavily has a 400 character limit, so truncate to 350 to be safe
+            tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
+            
+            # Build Tavily search params with domain filter support
+            search_params = {
+                "query": tavily_query,
+                "search_depth": "advanced",
+                "max_results": min(count, 20),
+                "include_answer": False,
+                "include_images": False,
+                "include_raw_content": False
+            }
+            
+            # Add domain filter if detected (e.g., site:nytimes.com)
+            if domain_filter:
+                search_params["include_domains"] = domain_filter
+                print(f"📰 Tavily sync search with domain filter: {domain_filter}")
+            
+            response = self.tavily_client.search(**search_params)
             
             results = response.get('results', [])
             
