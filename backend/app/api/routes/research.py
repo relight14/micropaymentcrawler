@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import re
 import html
+import os
+import anthropic
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket
@@ -23,6 +25,11 @@ crawler = ContentCrawlerStub()
 
 # Initialize packet builder for report generation
 packet_builder = PacketBuilder()
+
+# Initialize Anthropic client for context-aware query refinement
+claude_client = anthropic.Anthropic(
+    api_key=os.environ.get('ANTHROPIC_API_KEY')
+)
 
 
 class GenerateReportRequest(BaseModel):
@@ -125,6 +132,73 @@ def sanitize_context_text(context: str) -> str:
         sanitized = sanitized[:200]
     
     return sanitized
+
+
+def _extract_response_text(response) -> str:
+    """Safely extract text from Anthropic response."""
+    try:
+        if hasattr(response, 'content') and response.content and len(response.content) > 0:
+            content_block = response.content[0]
+            if hasattr(content_block, 'text') and content_block.text:
+                return content_block.text
+            else:
+                return str(content_block)
+        else:
+            return str(response)
+    except Exception:
+        return str(response)
+
+
+def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
+    """Use Claude to intelligently synthesize conversation context into a refined research query."""
+    try:
+        # Extract recent messages from conversation context
+        context_messages = []
+        for msg in conversation_context[-8:]:  # Last 8 messages for context
+            sender = msg.get('sender', 'unknown')
+            content = msg.get('content', '')
+            if content and len(content.strip()) > 10:
+                role = "user" if sender == "user" else "assistant"
+                context_messages.append(f"{role}: {content[:200]}")  # Limit each message
+        
+        if not context_messages:
+            return user_query  # No context to use
+        
+        context_text = "\n".join(context_messages)
+        
+        # Build prompt for Claude to synthesize context
+        system_prompt = f"""You are an expert research analyst. Based on this conversation history:
+
+{context_text}
+
+The user is now requesting research. Your task is to:
+1. Generate a comprehensive research query that captures their specific interests from the conversation
+2. Create search terms that will find the most valuable and relevant sources
+3. Focus on the key themes and questions that emerged in the conversation
+
+Be specific and targeted based on the conversation. Don't be generic."""
+        
+        # Call Claude to refine the query
+        response = claude_client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=300,
+            temperature=0.3,
+            system=system_prompt,
+            messages=[{"role": "user", "content": f"Generate a targeted research query for: {user_query}"}]
+        )
+        
+        refined_query = _extract_response_text(response).strip()
+        
+        # Fallback to original if refinement fails
+        if not refined_query or len(refined_query) < 10:
+            return user_query
+        
+        print(f"🔍 Query refined from '{user_query}' to '{refined_query}'")
+        return refined_query
+        
+    except Exception as e:
+        print(f"⚠️ Query refinement failed: {e}, using original query")
+        return user_query
 
 
 @router.post("/generate-report", response_model=ResearchPacket)
