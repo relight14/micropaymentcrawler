@@ -159,9 +159,27 @@ def _extract_response_text(response) -> str:
         return str(response)
 
 
+def _guess_publication_domain(publication_name: str) -> str:
+    """Convert publication name to likely domain using smart heuristics."""
+    # Remove common words
+    cleaned = publication_name.lower()
+    cleaned = re.sub(r'\b(the|a|an)\b', '', cleaned).strip()
+    
+    # Remove special characters and spaces
+    cleaned = re.sub(r'[^a-z0-9]', '', cleaned)
+    
+    # Return as .com domain (most common)
+    return f"site:{cleaned}.com"
+
 def _detect_publication_constraint(query: str) -> Optional[str]:
-    """Detect if user specified a publication/domain constraint in their query."""
-    # Common publication patterns
+    """Detect if user specified a publication/domain constraint in their query.
+    
+    Uses 3-tier approach:
+    Tier 1: Hardcoded major publications (guaranteed accurate)
+    Tier 2: Generic pattern detection + smart domain guessing
+    Tier 3: Explicit site: syntax (always supported)
+    """
+    # Tier 1: Hardcoded major publication patterns (guaranteed accurate)
     publication_patterns = {
         r'\b(ny times|nyt|new york times)\b': 'site:nytimes.com',
         r'\b(washington post|wapo|wash post)\b': 'site:washingtonpost.com',
@@ -178,10 +196,28 @@ def _detect_publication_constraint(query: str) -> Optional[str]:
     }
     
     query_lower = query.lower()
+    
+    # Try Tier 1: Hardcoded patterns
     for pattern, site_filter in publication_patterns.items():
         if re.search(pattern, query_lower, re.IGNORECASE):
-            print(f"📰 Detected publication constraint: {site_filter}")
+            print(f"📰 Tier 1 - Detected major publication: {site_filter}")
             return site_filter
+    
+    # Tier 2: Generic pattern detection "[Publication] on/about [Topic]"
+    # Match patterns like "TechCrunch on AI", "The Verge about gaming", "Ars Technica on cybersecurity"
+    generic_pattern = r'^([A-Za-z\s]+?)\s+(?:on|about|regarding|covering)\s+(.+)$'
+    match = re.match(generic_pattern, query.strip(), re.IGNORECASE)
+    
+    if match:
+        publication_name = match.group(1).strip()
+        
+        # Skip if publication name is too short (likely not a real publication)
+        if len(publication_name) >= 3:
+            guessed_domain = _guess_publication_domain(publication_name)
+            print(f"📰 Tier 2 - Guessed publication domain: '{publication_name}' → {guessed_domain}")
+            return guessed_domain
+    
+    # Tier 3: Explicit site: syntax is handled downstream
     return None
 
 def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
