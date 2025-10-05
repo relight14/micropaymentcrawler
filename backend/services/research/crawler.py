@@ -65,8 +65,15 @@ class ContentCrawlerStub:
         """Store results in cache with timestamp"""
         self._cache[cache_key] = (data, time.time())
     
-    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None) -> Dict[str, Any]:
-        """Generate sources with progressive loading - returns immediate results + enrichment promise"""
+    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Generate sources with progressive loading - returns immediate results + enrichment promise
+        
+        Args:
+            query: Search query
+            count: Number of sources to generate
+            budget_limit: Optional budget limit for licensing
+            domain_filter: Optional list of domains to filter results (e.g., ['nytimes.com'])
+        """
         cache_key = self._get_cache_key(query, count, budget_limit)
         
         # Check cache first
@@ -78,7 +85,7 @@ class ContentCrawlerStub:
                 "enrichment_needed": False
             }
         
-        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key)
+        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter)
     
     def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
         """Make direct REST API call to Tavily search endpoint."""
@@ -123,14 +130,28 @@ class ContentCrawlerStub:
         
         return query, None
     
-    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str) -> Dict[str, Any]:
-        """Generate sources progressively: immediate raw results + background enrichment"""
+    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Generate sources progressively: immediate raw results + background enrichment
+        
+        Args:
+            query: Search query (may contain site: operators for backward compatibility)
+            count: Number of sources
+            budget_limit: Budget limit
+            cache_key: Cache key
+            domain_filter: Optional domain filter from publication detection (takes precedence)
+        """
         if not self.tavily_api_key:
             return await self.generate_sources_progressive(query, count, budget_limit)
         
         try:
-            # Step 1: Extract domain filter if present (for publication-specific searches)
-            clean_query, domain_filter = self._extract_domain_filter(query)
+            # Step 1: Extract domain filter from query if not already provided
+            clean_query = query
+            extracted_filter = None
+            
+            if not domain_filter:
+                # Only extract from query if not explicitly provided
+                clean_query, extracted_filter = self._extract_domain_filter(query)
+                domain_filter = extracted_filter
             
             # Step 2: Get raw Tavily results immediately (this is fast)
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query

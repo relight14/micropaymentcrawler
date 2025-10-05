@@ -159,132 +159,80 @@ def _extract_response_text(response) -> str:
         return str(response)
 
 
-def _guess_publication_domain(publication_name: str) -> str:
-    """Convert publication name to likely domain using smart heuristics."""
-    # Remove common words
-    cleaned = publication_name.lower()
-    cleaned = re.sub(r'\b(the|a|an)\b', '', cleaned).strip()
+def _detect_publication_constraint(query: str) -> Optional[Dict[str, str]]:
+    """Detect if user specified a publication constraint in their query.
     
-    # Remove special characters and spaces
-    cleaned = re.sub(r'[^a-z0-9]', '', cleaned)
+    Returns dict with:
+    - type: "domain_filter" (Tier 1) or "keyword_boost" (Tier 2)
+    - value: domain string or publication name
+    - original_query: query with publication name removed
     
-    # Return as .com domain (most common)
-    return f"site:{cleaned}.com"
-
-def _detect_publication_constraint(query: str) -> Optional[str]:
-    """Detect if user specified a publication/domain constraint in their query.
-    
-    Uses 3-tier approach:
-    Tier 1: Hardcoded major publications (guaranteed accurate)
-    Tier 2: Generic pattern detection + smart domain guessing
-    Tier 3: Explicit site: syntax (always supported)
+    Tier 1: Major publications → exact domain filtering (include_domains)
+    Tier 2: Other publications → keyword boosting (add to search query)
     """
-    # Tier 1: Hardcoded major publication patterns (guaranteed accurate)
+    # Tier 1: Hardcoded major publication patterns (use exact domain filtering)
     publication_patterns = {
-        r'\b(ny times|nyt|new york times)\b': 'site:nytimes.com',
-        r'\b(washington post|wapo|wash post)\b': 'site:washingtonpost.com',
-        r'\b(wall street journal|wsj)\b': 'site:wsj.com',
-        r'\b(bloomberg)\b': 'site:bloomberg.com',
-        r'\b(reuters)\b': 'site:reuters.com',
-        r'\b(guardian)\b': 'site:theguardian.com',
-        r'\b(bbc)\b': 'site:bbc.com',
-        r'\b(cnn)\b': 'site:cnn.com',
-        r'\b(forbes)\b': 'site:forbes.com',
-        r'\b(time magazine|time)\b': 'site:time.com',
-        r'\b(atlantic)\b': 'site:theatlantic.com',
-        r'\b(economist)\b': 'site:economist.com',
+        r'\b(ny times|nyt|new york times)\b': 'nytimes.com',
+        r'\b(washington post|wapo|wash post)\b': 'washingtonpost.com',
+        r'\b(wall street journal|wsj)\b': 'wsj.com',
+        r'\b(bloomberg)\b': 'bloomberg.com',
+        r'\b(reuters)\b': 'reuters.com',
+        r'\b(guardian)\b': 'theguardian.com',
+        r'\b(bbc)\b': 'bbc.com',
+        r'\b(cnn)\b': 'cnn.com',
+        r'\b(forbes)\b': 'forbes.com',
+        r'\b(time magazine|time)\b': 'time.com',
+        r'\b(atlantic)\b': 'theatlantic.com',
+        r'\b(economist)\b': 'economist.com',
     }
     
     query_lower = query.lower()
     
-    # Try Tier 1: Hardcoded patterns
-    for pattern, site_filter in publication_patterns.items():
-        if re.search(pattern, query_lower, re.IGNORECASE):
-            print(f"📰 Tier 1 - Detected major publication: {site_filter}")
-            return site_filter
+    # Try Tier 1: Hardcoded patterns (exact domain filtering)
+    for pattern, domain in publication_patterns.items():
+        match = re.search(pattern, query_lower, re.IGNORECASE)
+        if match:
+            # Remove publication name from query to get clean topic
+            clean_query = re.sub(pattern, '', query, flags=re.IGNORECASE).strip()
+            clean_query = re.sub(r'\b(on|about|regarding|covering)\b', '', clean_query, flags=re.IGNORECASE).strip()
+            print(f"📰 Tier 1 - Major publication detected: {domain}")
+            return {
+                "type": "domain_filter",
+                "value": domain,
+                "original_query": clean_query
+            }
     
     # Tier 2: Generic pattern detection "[Publication] on/about [Topic]"
-    # CONSERVATIVE approach: Only match when publication name has STRONG suffix indicators
-    # This prevents false positives like "Tech jobs on AI" or "Report on climate"
-    
+    # Use simple keyword boosting instead of domain filtering
     generic_pattern = r'^([A-Za-z\s]+?)\s+(?:on|about|regarding|covering)\s+(.+)$'
     match = re.match(generic_pattern, query.strip(), re.IGNORECASE)
     
     if match:
         publication_name = match.group(1).strip()
-        pub_name_lower = publication_name.lower()
+        topic = match.group(2).strip()
         
-        # ULTRA-STRICT: Publication name must END with or CONTAIN specific publication-only terms
-        # These are terms that appear ONLY in publication names, not in regular queries
-        strong_publication_suffixes = [
-            'news', 'post', 'times', 'journal', 'magazine', 'daily', 'weekly',
-            'review', 'tribune', 'chronicle', 'gazette', 'herald', 'press',
-            'insider', 'wire'  # e.g., "Business Insider", "Reuters Wire"
-        ]
-        
-        # Known tech publication brands with correct domain mapping
-        # Format: cleaned_name -> correct_domain
-        tech_publication_domains = {
-            'techcrunch': 'techcrunch.com',
-            'theverge': 'theverge.com',
-            'verge': 'theverge.com',  # "The Verge" without article
-            'arstechnica': 'arstechnica.com',
-            'wired': 'wired.com',
-            'engadget': 'engadget.com',
-            'gizmodo': 'gizmodo.com',
-            'mashable': 'mashable.com',
-            'cnet': 'cnet.com',
-            'zdnet': 'zdnet.com',
-            'slashdot': 'slashdot.org',
-            'techmeme': 'techmeme.com',
-            'reuters': 'reuters.com',
-            'bloomberg': 'bloomberg.com',
-            'forbes': 'forbes.com',
-            'theatlantic': 'theatlantic.com',
-            'atlantic': 'theatlantic.com'  # "The Atlantic" without article
-        }
-        
-        # PRIORITY 1: Check if the publication name matches a known brand (exact match on cleaned name)
-        cleaned_name = re.sub(r'\b(the|a|an)\b', '', pub_name_lower).strip()
-        cleaned_name = re.sub(r'[^a-z]', '', cleaned_name)  # Remove all non-letters
-        if cleaned_name in tech_publication_domains:
-            if len(publication_name) >= 3:
-                correct_domain = f"site:{tech_publication_domains[cleaned_name]}"
-                print(f"📰 Tier 2 - Matched known publication brand: '{publication_name}' → {correct_domain}")
-                return correct_domain
-        
-        # PRIORITY 2: Check if publication name contains a STRONG suffix (appears at word boundaries)
-        words = pub_name_lower.split()
-        for suffix in strong_publication_suffixes:
-            if suffix in words:  # Must be a complete word, not substring
-                if len(publication_name) >= 3:
-                    guessed_domain = _guess_publication_domain(publication_name)
-                    print(f"📰 Tier 2 - Matched publication suffix '{suffix}': '{publication_name}' → {guessed_domain}")
-                    return guessed_domain
-        
-        # PRIORITY 3: Apply blacklist ONLY if no brand/suffix matched AND it's a single word
-        # This prevents "Tech jobs" from matching but allows multi-word publications through
-        generic_single_words = [
+        # Blacklist: Skip if publication name starts with generic research terms
+        generic_terms = [
             'research', 'studies', 'articles', 'papers', 'reports', 'analysis', 
             'information', 'data', 'findings', 'evidence', 'insights',
-            'content', 'material', 'sources', 'documents', 'education',
-            'policy', 'science', 'technology', 'business', 'health',
-            'environment', 'politics', 'economy', 'society', 'culture',
-            'tech', 'report', 'jobs', 'trends', 'market'
+            'content', 'material', 'sources', 'documents'
         ]
         
-        word_count = len(words)
-        if word_count <= 2:  # Only apply blacklist to single or two-word queries
-            first_word = words[0] if words else ""
-            if first_word in generic_single_words:
-                print(f"📰 Tier 2 - Skipped generic query: '{publication_name}' (no publication indicators)")
-                return None
+        first_word = publication_name.lower().split()[0] if publication_name else ""
+        if first_word in generic_terms:
+            print(f"📰 Tier 2 - Skipped generic term: '{publication_name}'")
+            return None
         
-        # No match - log for monitoring
+        # Valid publication name detected - use keyword boosting
         if len(publication_name) >= 3:
-            print(f"📰 Tier 2 - Skipped (no publication indicator): '{publication_name}'")
+            print(f"📰 Tier 2 - Publication keyword boost: '{publication_name}' for topic '{topic}'")
+            return {
+                "type": "keyword_boost",
+                "value": publication_name,
+                "original_query": topic
+            }
     
-    # Tier 3: Explicit site: syntax is handled downstream
+    # No publication detected
     return None
 
 def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
@@ -457,25 +405,40 @@ async def analyze_research_query(
         budget_limit = (research_request.max_budget_dollars or 10.0) * 0.75  # 75% for licensing
         
         # CRITICAL: Detect publication constraints BEFORE any processing
-        publication_constraint = _detect_publication_constraint(sanitized_query)
+        publication_info = _detect_publication_constraint(sanitized_query)
+        
+        # Determine base query for context refinement
+        base_query = sanitized_query
+        if publication_info:
+            # Use the clean topic query (without publication name) for refinement
+            base_query = publication_info["original_query"]
         
         # Enhance query with conversation context if available
-        enhanced_query = sanitized_query
+        enhanced_query = base_query
         if research_request.conversation_context and len(research_request.conversation_context) > 0:
             # Use Claude to intelligently synthesize conversation context into refined query
             enhanced_query = _refine_query_with_context(
                 research_request.conversation_context,
-                sanitized_query
+                base_query
             )
         
-        # CRITICAL: Ensure publication constraint is in final query (even without conversation context)
-        if publication_constraint and publication_constraint.lower() not in enhanced_query.lower():
-            enhanced_query = f"{enhanced_query} {publication_constraint}"
-            print(f"📰 Enforced publication constraint on final query: {publication_constraint}")
+        # Apply publication constraint based on type
+        final_query = enhanced_query
+        domain_filter = None
+        
+        if publication_info:
+            if publication_info["type"] == "domain_filter":
+                # Tier 1: Use exact domain filtering
+                domain_filter = [publication_info["value"]]
+                print(f"📰 Using domain filter: {domain_filter}")
+            elif publication_info["type"] == "keyword_boost":
+                # Tier 2: Boost publication name as keyword
+                final_query = f'"{publication_info["value"]}" {enhanced_query}'
+                print(f"📰 Boosting keyword: {publication_info['value']}")
         
         # Use progressive search for faster initial response with fallback
         try:
-            result = await crawler.generate_sources_progressive(enhanced_query, max_sources, budget_limit)
+            result = await crawler.generate_sources_progressive(final_query, max_sources, budget_limit, domain_filter=domain_filter)
             sources = result["sources"]
         except Exception as crawler_error:
             print(f"⚠️ Progressive search failed: {crawler_error}")
