@@ -233,6 +233,15 @@ class ContentCrawlerStub:
                     license_info = self._discover_licensing(source.url)
                     if license_info:
                         self._apply_licensing_info(source, license_info)
+                        
+                        # Boost relevance score for paid sources to prioritize credible content
+                        # This makes the platform feel more premium when paid sources are available
+                        if source.unlock_price and source.unlock_price > 0:
+                            paid_source_boost = 0.20  # Significant boost for licensed content
+                            old_score = source.relevance_score or 0.5
+                            source.relevance_score = min(1.0, old_score + paid_source_boost)
+                            print(f"💰 Boosted paid source '{source.title[:50]}...' from {old_score:.2f} to {source.relevance_score:.2f}")
+                            
                 except Exception as e:
                     print(f"Licensing error for {source.url}: {e}")
             
