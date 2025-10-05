@@ -185,11 +185,12 @@ def _detect_publication_constraint(query: str) -> Optional[str]:
     return None
 
 def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
-    """Use Claude to intelligently synthesize conversation context into a refined research query."""
+    """Use Claude to intelligently synthesize conversation context into a refined research query.
+    
+    Note: Publication constraint detection happens in the parent function, not here.
+    This function only focuses on context synthesis.
+    """
     try:
-        # CRITICAL: Detect publication constraints before refinement
-        publication_constraint = _detect_publication_constraint(user_query)
-        
         # Extract recent messages from conversation context (include all messages, even short ones)
         context_messages = []
         for msg in conversation_context[-8:]:  # Last 8 messages for context
@@ -245,13 +246,6 @@ If a publication is mentioned, always include the "site:" operator in your refin
         if not refined_query or len(refined_query) < 10:
             print(f"⚠️ Refinement produced invalid query (too short or empty), using original: '{user_query}'")
             return user_query
-        
-        # CRITICAL: Ensure publication constraint is preserved in refined query
-        if publication_constraint:
-            # If Claude didn't include the site: filter, append it
-            if publication_constraint.lower() not in refined_query.lower():
-                refined_query = f"{refined_query} {publication_constraint}"
-                print(f"🔧 Added missing publication constraint: {publication_constraint}")
         
         print(f"✅ Query refined from '{user_query}' to '{refined_query}'")
         return refined_query
@@ -359,6 +353,9 @@ async def analyze_research_query(
         max_sources = min(research_request.preferred_source_count or 15, 30)  # Cap at 30
         budget_limit = (research_request.max_budget_dollars or 10.0) * 0.75  # 75% for licensing
         
+        # CRITICAL: Detect publication constraints BEFORE any processing
+        publication_constraint = _detect_publication_constraint(sanitized_query)
+        
         # Enhance query with conversation context if available
         enhanced_query = sanitized_query
         if research_request.conversation_context and len(research_request.conversation_context) > 0:
@@ -367,6 +364,11 @@ async def analyze_research_query(
                 research_request.conversation_context,
                 sanitized_query
             )
+        
+        # CRITICAL: Ensure publication constraint is in final query (even without conversation context)
+        if publication_constraint and publication_constraint.lower() not in enhanced_query.lower():
+            enhanced_query = f"{enhanced_query} {publication_constraint}"
+            print(f"📰 Enforced publication constraint on final query: {publication_constraint}")
         
         # Use progressive search for faster initial response with fallback
         try:
