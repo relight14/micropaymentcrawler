@@ -179,7 +179,12 @@ class ContentCrawlerStub:
             
             print(f"✅ Progressive enrichment completed")
             
-            # Cache the final enriched results 
+            # CRITICAL: Re-sort sources by relevance score AFTER paid source boost is applied
+            # This ensures paid sources with boosted scores appear at the top
+            sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+            print(f"🔄 Sources re-sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
+            
+            # Cache the final enriched AND sorted results 
             self._store_in_cache(cache_key, sources)
             print(f"💾 Enriched sources cached with key: {cache_key}")
             
@@ -232,16 +237,8 @@ class ContentCrawlerStub:
                 try:
                     license_info = self._discover_licensing(source.url)
                     if license_info:
+                        # Boost is now applied in _apply_licensing_info for both async and sync paths
                         self._apply_licensing_info(source, license_info)
-                        
-                        # Boost relevance score for paid sources to prioritize credible content
-                        # This makes the platform feel more premium when paid sources are available
-                        if source.unlock_price and source.unlock_price > 0:
-                            paid_source_boost = 0.20  # Significant boost for licensed content
-                            old_score = source.relevance_score or 0.5
-                            source.relevance_score = min(1.0, old_score + paid_source_boost)
-                            print(f"💰 Boosted paid source '{source.title[:50]}...' from {old_score:.2f} to {source.relevance_score:.2f}")
-                            
                 except Exception as e:
                     print(f"Licensing error for {source.url}: {e}")
             
@@ -348,6 +345,10 @@ class ContentCrawlerStub:
                     sources.append(source)
                 else:
                     break  # Budget exceeded, stop generating sources
+            
+            # CRITICAL: Sort sources by relevance AFTER paid source boost is applied
+            sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+            print(f"🔄 Sync path: Sources sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]] if sources else 'none'})")
             
             return sources
             
@@ -569,6 +570,13 @@ class ContentCrawlerStub:
         full_use_price = terms.purchase_price
         if full_use_price and full_use_price > 0:
             source.unlock_price = full_use_price
+            
+            # Boost relevance score for paid sources to prioritize credible content
+            # This makes the platform feel more premium when paid sources are available
+            paid_source_boost = 0.20  # Significant boost for licensed content
+            old_score = source.relevance_score or 0.5
+            source.relevance_score = min(1.0, old_score + paid_source_boost)
+            print(f"💰 Boosted paid source '{source.title[:50]}...' from {old_score:.2f} to {source.relevance_score:.2f}")
         else:
             # If no full-use price, this should be a free source
             source.unlock_price = 0.0
