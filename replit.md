@@ -17,6 +17,7 @@ The frontend is a Single Page Application (SPA) built with vanilla HTML/CSS/Java
 - **Content Generation**: Employs a hybrid pipeline using Tavily for URL discovery and Anthropic Claude for content refinement and report generation, incorporating licensing detection and graceful API fallbacks.
 - **Authentication**: Implements secure JWT token management, LedeWire integration, and robust 401 handling for authentication flows.
 - **AI Query Refinement**: Integrates Claude AI to synthesize conversation history into targeted research queries, enhancing search relevance.
+- **Publication-Specific Search**: Enables users to search within specific publications (e.g., "NY Times on nuclear energy"). System detects 12 major publications, normalizes name variations, enforces domain constraints on all queries (with or without conversation context), and uses Tavily's `include_domains` parameter for precise filtering.
 - **Dual-Mode AI Experience**: Supports both conversational AI and deep research modes, including access to licensed sources and dynamic pricing.
 - **Tiered Research Reports**: Generates AI-powered research reports (executive summaries to comprehensive analyst reports) using Claude, with in-memory caching to optimize API costs.
 - **Token Expiry Handling**: Implements automatic JWT token validation and a centralized logout callback system for consistent UI updates and user experience upon session expiry.
