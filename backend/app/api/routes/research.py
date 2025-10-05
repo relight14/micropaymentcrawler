@@ -300,14 +300,12 @@ async def analyze_research_query(
         
         # Enhance query with conversation context if available
         enhanced_query = sanitized_query
-        if research_request.conversation_context:
-            # Extract relevant context from recent conversation
-            context_text = _extract_conversation_context(research_request.conversation_context)
-            if context_text:
-                # Sanitize context text using strict allowlist approach
-                sanitized_context = sanitize_context_text(context_text)
-                if sanitized_context:  # Only add if context is not empty after sanitization
-                    enhanced_query = f"{sanitized_context} {sanitized_query}"
+        if research_request.conversation_context and len(research_request.conversation_context) > 0:
+            # Use Claude to intelligently synthesize conversation context into refined query
+            enhanced_query = _refine_query_with_context(
+                research_request.conversation_context,
+                sanitized_query
+            )
         
         # Use progressive search for faster initial response with fallback
         try:
