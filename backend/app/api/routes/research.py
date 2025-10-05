@@ -190,8 +190,17 @@ The user is now requesting research. Your task is to:
 1. Generate a comprehensive research query that captures their specific interests from the conversation
 2. Create search terms that will find the most valuable and relevant sources
 3. Focus on the key themes and questions that emerged in the conversation
+4. **CRITICAL**: If the user specifies a publication or source (e.g., "NY Times", "Washington Post", "Bloomberg", "Reuters"), you MUST preserve this requirement and include a domain constraint
 
-Be specific and targeted based on the conversation. Don't be generic."""
+Be specific and targeted based on the conversation. Don't be generic.
+
+Publication Detection Examples:
+- "ny times on climate" → "climate change site:nytimes.com"
+- "washington post about elections" → "elections site:washingtonpost.com" 
+- "bloomberg on markets" → "financial markets site:bloomberg.com"
+- "reuters nuclear" → "nuclear power site:reuters.com"
+
+If a publication is mentioned, always include the "site:" operator in your refined query."""
         
         # Call Claude to refine the query
         response = claude_client.messages.create(
