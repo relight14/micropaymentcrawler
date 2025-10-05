@@ -135,33 +135,48 @@ def sanitize_context_text(context: str) -> str:
 
 
 def _extract_response_text(response) -> str:
-    """Safely extract text from Anthropic response."""
+    """Safely extract text from Anthropic response (handles SDK dict/object formats)."""
     try:
         if hasattr(response, 'content') and response.content and len(response.content) > 0:
+            # Handle both dict and object formats from Anthropic SDK
             content_block = response.content[0]
-            if hasattr(content_block, 'text') and content_block.text:
+            
+            # Try dict access first (common SDK format)
+            if isinstance(content_block, dict):
+                if content_block.get('type') == 'text' and 'text' in content_block:
+                    return content_block['text']
+            
+            # Try object attribute access
+            if hasattr(content_block, 'text'):
                 return content_block.text
-            else:
-                return str(content_block)
+            
+            # Fallback: stringify
+            return str(content_block)
         else:
             return str(response)
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Error extracting response text: {e}")
         return str(response)
 
 
 def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
     """Use Claude to intelligently synthesize conversation context into a refined research query."""
     try:
-        # Extract recent messages from conversation context
+        # Extract recent messages from conversation context (include all messages, even short ones)
         context_messages = []
         for msg in conversation_context[-8:]:  # Last 8 messages for context
             sender = msg.get('sender', 'unknown')
-            content = msg.get('content', '')
-            if content and len(content.strip()) > 10:
+            content = msg.get('content', '').strip()
+            
+            # Include all messages with any content (removed length filter to avoid skipping)
+            if content:
                 role = "user" if sender == "user" else "assistant"
-                context_messages.append(f"{role}: {content[:200]}")  # Limit each message
+                # Sanitize and limit message length
+                sanitized_content = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', content)
+                context_messages.append(f"{role}: {sanitized_content[:200]}")
         
         if not context_messages:
+            print("⚠️ No conversation context available, using original query")
             return user_query  # No context to use
         
         context_text = "\n".join(context_messages)
@@ -189,15 +204,17 @@ Be specific and targeted based on the conversation. Don't be generic."""
         
         refined_query = _extract_response_text(response).strip()
         
-        # Fallback to original if refinement fails
+        # Validate refined query
         if not refined_query or len(refined_query) < 10:
+            print(f"⚠️ Refinement produced invalid query (too short or empty), using original: '{user_query}'")
             return user_query
         
-        print(f"🔍 Query refined from '{user_query}' to '{refined_query}'")
+        print(f"✅ Query refined from '{user_query}' to '{refined_query}'")
         return refined_query
         
     except Exception as e:
-        print(f"⚠️ Query refinement failed: {e}, using original query")
+        print(f"❌ Query refinement FAILED with error: {type(e).__name__}: {str(e)}")
+        print(f"   Falling back to original query: '{user_query}'")
         return user_query
 
 
