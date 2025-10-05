@@ -204,18 +204,85 @@ def _detect_publication_constraint(query: str) -> Optional[str]:
             return site_filter
     
     # Tier 2: Generic pattern detection "[Publication] on/about [Topic]"
-    # Match patterns like "TechCrunch on AI", "The Verge about gaming", "Ars Technica on cybersecurity"
+    # CONSERVATIVE approach: Only match when publication name has STRONG suffix indicators
+    # This prevents false positives like "Tech jobs on AI" or "Report on climate"
+    
     generic_pattern = r'^([A-Za-z\s]+?)\s+(?:on|about|regarding|covering)\s+(.+)$'
     match = re.match(generic_pattern, query.strip(), re.IGNORECASE)
     
     if match:
         publication_name = match.group(1).strip()
+        pub_name_lower = publication_name.lower()
         
-        # Skip if publication name is too short (likely not a real publication)
+        # ULTRA-STRICT: Publication name must END with or CONTAIN specific publication-only terms
+        # These are terms that appear ONLY in publication names, not in regular queries
+        strong_publication_suffixes = [
+            'news', 'post', 'times', 'journal', 'magazine', 'daily', 'weekly',
+            'review', 'tribune', 'chronicle', 'gazette', 'herald', 'press',
+            'insider', 'wire'  # e.g., "Business Insider", "Reuters Wire"
+        ]
+        
+        # Known tech publication brands with correct domain mapping
+        # Format: cleaned_name -> correct_domain
+        tech_publication_domains = {
+            'techcrunch': 'techcrunch.com',
+            'theverge': 'theverge.com',
+            'verge': 'theverge.com',  # "The Verge" without article
+            'arstechnica': 'arstechnica.com',
+            'wired': 'wired.com',
+            'engadget': 'engadget.com',
+            'gizmodo': 'gizmodo.com',
+            'mashable': 'mashable.com',
+            'cnet': 'cnet.com',
+            'zdnet': 'zdnet.com',
+            'slashdot': 'slashdot.org',
+            'techmeme': 'techmeme.com',
+            'reuters': 'reuters.com',
+            'bloomberg': 'bloomberg.com',
+            'forbes': 'forbes.com',
+            'theatlantic': 'theatlantic.com',
+            'atlantic': 'theatlantic.com'  # "The Atlantic" without article
+        }
+        
+        # PRIORITY 1: Check if the publication name matches a known brand (exact match on cleaned name)
+        cleaned_name = re.sub(r'\b(the|a|an)\b', '', pub_name_lower).strip()
+        cleaned_name = re.sub(r'[^a-z]', '', cleaned_name)  # Remove all non-letters
+        if cleaned_name in tech_publication_domains:
+            if len(publication_name) >= 3:
+                correct_domain = f"site:{tech_publication_domains[cleaned_name]}"
+                print(f"📰 Tier 2 - Matched known publication brand: '{publication_name}' → {correct_domain}")
+                return correct_domain
+        
+        # PRIORITY 2: Check if publication name contains a STRONG suffix (appears at word boundaries)
+        words = pub_name_lower.split()
+        for suffix in strong_publication_suffixes:
+            if suffix in words:  # Must be a complete word, not substring
+                if len(publication_name) >= 3:
+                    guessed_domain = _guess_publication_domain(publication_name)
+                    print(f"📰 Tier 2 - Matched publication suffix '{suffix}': '{publication_name}' → {guessed_domain}")
+                    return guessed_domain
+        
+        # PRIORITY 3: Apply blacklist ONLY if no brand/suffix matched AND it's a single word
+        # This prevents "Tech jobs" from matching but allows multi-word publications through
+        generic_single_words = [
+            'research', 'studies', 'articles', 'papers', 'reports', 'analysis', 
+            'information', 'data', 'findings', 'evidence', 'insights',
+            'content', 'material', 'sources', 'documents', 'education',
+            'policy', 'science', 'technology', 'business', 'health',
+            'environment', 'politics', 'economy', 'society', 'culture',
+            'tech', 'report', 'jobs', 'trends', 'market'
+        ]
+        
+        word_count = len(words)
+        if word_count <= 2:  # Only apply blacklist to single or two-word queries
+            first_word = words[0] if words else ""
+            if first_word in generic_single_words:
+                print(f"📰 Tier 2 - Skipped generic query: '{publication_name}' (no publication indicators)")
+                return None
+        
+        # No match - log for monitoring
         if len(publication_name) >= 3:
-            guessed_domain = _guess_publication_domain(publication_name)
-            print(f"📰 Tier 2 - Guessed publication domain: '{publication_name}' → {guessed_domain}")
-            return guessed_domain
+            print(f"📰 Tier 2 - Skipped (no publication indicator): '{publication_name}'")
     
     # Tier 3: Explicit site: syntax is handled downstream
     return None
