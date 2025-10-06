@@ -33,12 +33,15 @@ Generate a **Research Report** in markdown format with:
 1. **Executive Summary** (2-3 paragraphs)
    - Synthesize the KEY INSIGHTS from the sources above
    - Reference specific findings, data points, or arguments from the sources
+   - USE NUMBERED CITATIONS: When citing sources, use [1], [2], [3], etc. where the first source listed above is [1], the second is [2], and so on
+   - Example: "Nuclear expansion faces constraints [1], with fuel supply being critical [2]."
    - Avoid generic statements - ground your summary in actual source content
 
 2. **Key Findings** (4-6 bullet points with ✅ icons)
-   - Each finding must cite specific sources by domain (e.g., "According to nytimes.com, ..." or "Bloomberg data shows...")
+   - Each finding must cite specific sources using numbered citations [1], [2], [3]
    - Include concrete facts, statistics, quotes, or findings from the sources
-   - Format: "✅ [Specific finding from sources] (Source: domain.com)"
+   - Format: "✅ [Specific finding from sources [N]]"
+   - Example: "✅ SMRs offer lower upfront capital costs and shorter construction times [1]"
 
 3. **Research Outline** 
    
@@ -50,23 +53,23 @@ Generate a **Research Report** in markdown format with:
    - Create a descriptive headline (≤10 words) based on actual patterns you find in the sources
    - Write 2-3 sentences explaining what the sources reveal about this theme
    - Include specific evidence: data points, findings, or insights from the sources
-   - Cite which source domains contribute to this theme
+   - USE NUMBERED CITATIONS throughout: [1], [2], [3], etc.
    
    Example format (use themes from YOUR sources, not these examples):
    
    **1. Energy Infrastructure Investment Accelerating Globally**
-   Multiple sources document a sharp increase in grid modernization spending, with Bloomberg reporting $800B in planned investments through 2030 and the IEA highlighting Europe's €300B commitment. The Guardian notes this represents a 40% increase over 2020 levels. Sources: bloomberg.com, iea.org, theguardian.com
+   Multiple sources document a sharp increase in grid modernization spending [1], with planned investments through 2030 [2] and Europe's commitment [3]. This represents a 40% increase over 2020 levels [1].
    
    **2. Nuclear Renaissance Driven by Small Modular Reactors**
-   [Your analysis of what sources say about this theme]. Sources: [domains]
+   [Your analysis of what sources say about this theme [N]].
    
    **3. [Another Specific Theme from Your Sources]**
-   [Your analysis]. Sources: [domains]
+   [Your analysis with citations [N]].
 
 CRITICAL REQUIREMENTS:
 - Base your ENTIRE analysis on the content provided in the sources above
 - Every claim must reference actual source content (not generic assumptions)
-- Use specific citations: "According to [domain]..." or "[Domain] reports that..."
+- USE NUMBERED CITATIONS: Always cite sources as [1], [2], [3] where [1] = first source, [2] = second source, etc.
 - Identify cross-source patterns: where do sources agree or contradict?
 - NO GENERIC THEMES - themes must emerge from actual source analysis
 - DO NOT use academic outline structures (I., II., III., etc.)
