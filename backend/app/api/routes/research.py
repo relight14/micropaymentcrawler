@@ -11,7 +11,6 @@ import anthropic
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
-from services.research.packet_builder import PacketBuilder
 from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
@@ -23,9 +22,6 @@ ledewire = LedeWireAPI()
 
 # Initialize crawler for dynamic research
 crawler = ContentCrawlerStub()
-
-# Initialize packet builder for report generation
-packet_builder = PacketBuilder()
 
 # Initialize report generator for AI reports
 report_generator = ReportGeneratorService()
@@ -352,20 +348,48 @@ async def generate_research_report(
                 report_request.tier
             )
             
-            # Build packet with selected sources and AI report
-            research_packet = packet_builder.build_packet_with_sources(
+            # Build packet directly with AI report (no packet_builder needed)
+            research_packet = ResearchPacket(
                 query=sanitized_query,
                 tier=report_request.tier,
+                summary=ai_report,  # Full AI report with integrated outline
+                outline=None,  # Integrated into summary
+                insights=None,  # Pro tier insights are part of summary
                 sources=selected_sources,
-                report=ai_report
+                total_sources=len(selected_sources)
             )
             
         else:
             # No sources selected - generate sources and report (legacy behavior)
             print(f"📊 Generating report without selected sources (legacy mode)")
-            research_packet = packet_builder.build_packet(
+            
+            # Generate sources based on tier
+            tier_source_limits = {
+                TierType.BASIC: 10,
+                TierType.RESEARCH: 20,
+                TierType.PRO: 40
+            }
+            max_sources = tier_source_limits.get(report_request.tier, 15)
+            
+            # Generate sources
+            generated_sources = crawler.generate_sources(sanitized_query, max_sources)
+            
+            # Generate AI report
+            ai_report = report_generator.generate_report(
+                sanitized_query,
+                generated_sources,
+                report_request.tier
+            )
+            
+            # Build packet directly
+            research_packet = ResearchPacket(
                 query=sanitized_query,
-                tier=report_request.tier
+                tier=report_request.tier,
+                summary=ai_report,
+                outline=None,
+                insights=None,
+                sources=generated_sources,
+                total_sources=len(generated_sources)
             )
         
         return research_packet

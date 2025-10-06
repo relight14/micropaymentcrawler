@@ -7,8 +7,7 @@ from typing import Dict, Any
 import time
 
 from schemas.api import PurchaseRequest, PurchaseResponse
-from schemas.domain import TierType
-from services.research.packet_builder import PacketBuilder
+from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
@@ -18,7 +17,6 @@ from utils.rate_limit import limiter
 router = APIRouter()
 
 # Initialize services
-packet_builder = PacketBuilder()
 crawler = ContentCrawlerStub()
 report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
@@ -86,6 +84,8 @@ def extract_user_id_from_token(access_token: str) -> str:
 @limiter.limit("10/minute")
 async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
     """Process a research purchase request using LedeWire API with server-enforced licensing costs."""
+    # Extract user_id at function start for exception handler access
+    user_id = None
     try:
         # Extract and validate Bearer token
         access_token = extract_bearer_token(authorization)
@@ -161,7 +161,22 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         
         # Handle FREE TIER
         if config["price"] == 0.00:
-            packet = packet_builder.build_packet(purchase_request.query, purchase_request.tier)
+            # Generate sources for free tier
+            sources = crawler.generate_sources(purchase_request.query, config["max_sources"])
+            
+            # Generate AI report
+            report = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+            
+            # Build packet directly
+            packet = ResearchPacket(
+                query=purchase_request.query,
+                tier=purchase_request.tier,
+                summary=report,
+                outline=None,
+                insights=None,
+                sources=sources,
+                total_sources=len(sources)
+            )
             
             free_transaction_id = f"free_{uuid.uuid4().hex[:12]}"
             purchase_id = ledger.record_purchase(
@@ -193,8 +208,16 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Generate AI report (with fallback handling built-in)
         report = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
         
-        # Build packet with AI-generated report
-        packet = packet_builder.build_packet_with_sources(purchase_request.query, purchase_request.tier, sources, report)
+        # Build packet directly with AI-generated report
+        packet = ResearchPacket(
+            query=purchase_request.query,
+            tier=purchase_request.tier,
+            summary=report,
+            outline=None,
+            insights=None,
+            sources=sources,
+            total_sources=len(sources)
+        )
         
         # Selective Mock: Check if payments should be mocked
         import os
@@ -220,7 +243,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 else:
                     raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
             
-            transaction_id = payment_result.get("transaction_id")
+            transaction_id = payment_result.get("transaction_id") or f"fallback_txn_{uuid.uuid4().hex[:12]}"
             wallet_id = payment_result.get("wallet_id")
         
         # Record successful purchase (both mock and real paths)
@@ -247,7 +270,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
     except HTTPException:
         # Mark as failed for non-recoverable errors
         try:
-            if purchase_request.idempotency_key:
+            if purchase_request.idempotency_key and user_id:
                 ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", {"error": "failed"}, "failed")
         except:
             pass
@@ -256,7 +279,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         print(f"Purchase error: {e}")
         # Mark as failed
         try:
-            if purchase_request.idempotency_key:
+            if purchase_request.idempotency_key and user_id:
                 ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", {"error": str(e)}, "failed")
         except:
             pass
