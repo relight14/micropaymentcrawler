@@ -23,6 +23,7 @@ The frontend is a Single Page Application (SPA) built with vanilla HTML/CSS/Java
   - Both tiers preserve conversation context synthesis and use deterministic cache isolation to prevent cross-tier result leakage.
 - **Dual-Mode AI Experience**: Supports both conversational AI and deep research modes, including access to licensed sources and dynamic pricing.
 - **Tiered Research Reports**: Generates AI-powered research reports (executive summaries to comprehensive analyst reports) using Claude, with in-memory caching to optimize API costs.
+- **User-Selected Source Reports**: The `/generate-report` endpoint supports optional `selected_source_ids` parameter, allowing users to build reports from their chosen sources in the Report Builder. The system filters sources by ID, generates reports with proper citations from selected materials, and maintains unique cache keys per source selection to prevent report collision. Backward compatible with legacy mode when no sources are selected.
 - **Token Expiry Handling**: Implements automatic JWT token validation and a centralized logout callback system for consistent UI updates and user experience upon session expiry.
 
 ## Feature Specifications
