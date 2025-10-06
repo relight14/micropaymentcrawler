@@ -347,15 +347,23 @@ export class APIService {
         }
     }
     
-    async generateReport(query, tier) {
+    async generateReport(query, tier, selectedSourceIds = null) {
         try {
+            const requestBody = {
+                query: query,
+                tier: tier
+            };
+            
+            // Include selected source IDs if provided
+            if (selectedSourceIds && selectedSourceIds.length > 0) {
+                requestBody.selected_source_ids = selectedSourceIds;
+                console.log(`📊 Generating report with ${selectedSourceIds.length} selected sources`);
+            }
+            
             const response = await fetch(`${this.baseURL}/api/research/generate-report`, {
                 method: 'POST',
                 headers: this.getAuthHeaders(),
-                body: JSON.stringify({
-                    query: query,
-                    tier: tier
-                })
+                body: JSON.stringify(requestBody)
             });
             
             if (!response.ok) {

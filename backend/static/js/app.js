@@ -787,6 +787,54 @@ export class ChatResearchApp {
         }
     }
 
+    async handleReportGeneration(button, tier, query, selectedSources) {
+        if (!this.authService.isAuthenticated()) {
+            this.addMessage('system', 'Please log in to generate a report.');
+            return;
+        }
+
+        try {
+            // Extract source IDs from selected sources
+            const selectedSourceIds = selectedSources.map(source => source.id);
+            
+            console.log(`📊 Generating ${tier} report with ${selectedSourceIds.length} selected sources`);
+            
+            // Show loading indicator
+            const loadingMessageElement = this._addLoadingMessage('🔬 Generating your research report from selected sources...');
+            
+            // Call generateReport endpoint with selected source IDs
+            const reportPacket = await this.apiService.generateReport(query, tier, selectedSourceIds);
+            
+            // Remove loading indicator
+            if (loadingMessageElement) {
+                this._removeLoadingMessage(loadingMessageElement);
+            }
+            
+            if (reportPacket) {
+                // Update button state
+                if (button) {
+                    button.textContent = 'Report Generated';
+                    button.disabled = true;
+                }
+                
+                // Display the generated report
+                this._displayGeneratedReport(reportPacket);
+                
+                // Show success message
+                this.addMessage('system', `✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${selectedSourceIds.length} selected sources!`);
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            this.showToast(`⚠️ Report generation failed: ${error.message}`, 'error');
+            
+            // Reset button state
+            if (button) {
+                button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
+                button.disabled = false;
+            }
+        }
+    }
+
     async handleTierPurchase(button, tierId, price, query = "Research Query", useSelectedSources = false) {
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
@@ -1124,9 +1172,16 @@ export class ChatResearchApp {
                 e.target.disabled = true;
                 
                 try {
-                    await this.handleTierPurchase(e.target, tier, price, query);
+                    // If in report builder mode with selected sources, use generateReport endpoint
+                    const selectedSources = this.appState.getSelectedSources();
+                    if (selectedSources && selectedSources.length > 0) {
+                        await this.handleReportGeneration(e.target, tier, query, selectedSources);
+                    } else {
+                        // Otherwise use standard purchase flow
+                        await this.handleTierPurchase(e.target, tier, price, query);
+                    }
                 } catch (error) {
-                    e.target.textContent = `Purchase ${tier === 'research' ? 'Research' : 'Pro'} Package`;
+                    e.target.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
                     e.target.disabled = false;
                 }
             });
