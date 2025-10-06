@@ -12,6 +12,7 @@ from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket
 from services.research.crawler import ContentCrawlerStub
 from services.research.packet_builder import PacketBuilder
+from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 
@@ -25,6 +26,9 @@ crawler = ContentCrawlerStub()
 
 # Initialize packet builder for report generation
 packet_builder = PacketBuilder()
+
+# Initialize report generator for AI reports
+report_generator = ReportGeneratorService()
 
 # Initialize Anthropic client for context-aware query refinement
 claude_client = anthropic.Anthropic(

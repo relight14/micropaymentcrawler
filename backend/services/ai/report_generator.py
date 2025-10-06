@@ -135,7 +135,7 @@ class ReportGeneratorService:
             print(f"Report generation failed, using fallback: {e}")
             return self._generate_fallback_report(query, sources, tier)
     
-    def _get_cache_key(self, query: str, tier: TierType, sources: List[SourceCard] = None) -> str:
+    def _get_cache_key(self, query: str, tier: TierType, sources: Optional[List[SourceCard]] = None) -> str:
         """Generate cache key from query, tier, and source IDs for unique reports per selection."""
         import hashlib
         query_hash = hashlib.md5(query.encode()).hexdigest()[:12]
@@ -171,6 +171,9 @@ class ReportGeneratorService:
     
     def _generate_claude_report(self, query: str, sources: List[SourceCard], tier: TierType) -> str:
         """Generate report using Claude API."""
+        if not self.client:
+            raise ValueError("Anthropic client not initialized")
+            
         # Format sources for prompt
         sources_text = self._format_sources_for_prompt(sources)
         
