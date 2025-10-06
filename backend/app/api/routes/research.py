@@ -342,7 +342,7 @@ async def generate_research_report(
                 )
             
             # Generate AI report with selected sources
-            ai_report = report_generator.generate_report(
+            ai_report, citation_metadata = report_generator.generate_report(
                 sanitized_query, 
                 selected_sources, 
                 report_request.tier
@@ -356,7 +356,8 @@ async def generate_research_report(
                 outline=None,  # Integrated into summary
                 insights=None,  # Pro tier insights are part of summary
                 sources=selected_sources,
-                total_sources=len(selected_sources)
+                total_sources=len(selected_sources),
+                citation_metadata=citation_metadata
             )
             
         else:
@@ -375,7 +376,7 @@ async def generate_research_report(
             generated_sources = crawler.generate_sources(sanitized_query, max_sources)
             
             # Generate AI report
-            ai_report = report_generator.generate_report(
+            ai_report, citation_metadata = report_generator.generate_report(
                 sanitized_query,
                 generated_sources,
                 report_request.tier
@@ -389,7 +390,8 @@ async def generate_research_report(
                 outline=None,
                 insights=None,
                 sources=generated_sources,
-                total_sources=len(generated_sources)
+                total_sources=len(generated_sources),
+                citation_metadata=citation_metadata
             )
         
         return research_packet

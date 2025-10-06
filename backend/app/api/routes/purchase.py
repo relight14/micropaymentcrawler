@@ -165,7 +165,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             sources = crawler.generate_sources(purchase_request.query, config["max_sources"])
             
             # Generate AI report
-            report = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+            report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
             
             # Build packet directly
             packet = ResearchPacket(
@@ -175,7 +175,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 outline=None,
                 insights=None,
                 sources=sources,
-                total_sources=len(sources)
+                total_sources=len(sources),
+                citation_metadata=citation_metadata
             )
             
             free_transaction_id = f"free_{uuid.uuid4().hex[:12]}"
@@ -206,7 +207,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         sources = crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         
         # Generate AI report (with fallback handling built-in)
-        report = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+        report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
         
         # Build packet directly with AI-generated report
         packet = ResearchPacket(
@@ -216,7 +217,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             outline=None,
             insights=None,
             sources=sources,
-            total_sources=len(sources)
+            total_sources=len(sources),
+            citation_metadata=citation_metadata
         )
         
         # Selective Mock: Check if payments should be mocked

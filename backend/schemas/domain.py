@@ -53,3 +53,4 @@ class ResearchPacket(BaseModel):
     content_id: Optional[str] = None  # LedeWire content identifier
     licensing_summary: Optional[Dict[str, Any]] = None
     created_at: Optional[str] = None
+    citation_metadata: Optional[Dict[int, Dict[str, Any]]] = None  # Maps citation [N] to source metadata for inline purchase badges
