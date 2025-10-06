@@ -39,14 +39,28 @@ Generate a **Research Report** in markdown format with:
    - Include concrete facts, statistics, quotes, or findings from the sources
    - Format: "✅ [Specific finding from sources] (Source: domain.com)"
 
-3. **Research Outline** (3-4 specific themes discovered across sources)
+3. **Research Outline** 
+   
+   ⚠️ CRITICAL: DO NOT use generic academic structures. NO roman numerals (I., II., III.), NO generic sections like "Executive Summary", "Literature Review", "Methodology", "Conclusions", etc.
+   
+   Instead, identify 3-4 SPECIFIC THEMES that emerge from analyzing the selected sources above:
+   
    For each theme:
-   - Give a concise headline (≤10 words) reflecting actual source content
-   - Provide 2-3 sentences summarizing the key findings on this theme
-   - Cite which sources contribute to this theme (by domain)
-   - Example format:
-     **Theme 1: [Specific Theme from Sources]**
-     [2-3 sentences with concrete findings]. Sources: domain1.com, domain2.com
+   - Create a descriptive headline (≤10 words) based on actual patterns you find in the sources
+   - Write 2-3 sentences explaining what the sources reveal about this theme
+   - Include specific evidence: data points, findings, or insights from the sources
+   - Cite which source domains contribute to this theme
+   
+   Example format (use themes from YOUR sources, not these examples):
+   
+   **1. Energy Infrastructure Investment Accelerating Globally**
+   Multiple sources document a sharp increase in grid modernization spending, with Bloomberg reporting $800B in planned investments through 2030 and the IEA highlighting Europe's €300B commitment. The Guardian notes this represents a 40% increase over 2020 levels. Sources: bloomberg.com, iea.org, theguardian.com
+   
+   **2. Nuclear Renaissance Driven by Small Modular Reactors**
+   [Your analysis of what sources say about this theme]. Sources: [domains]
+   
+   **3. [Another Specific Theme from Your Sources]**
+   [Your analysis]. Sources: [domains]
 
 CRITICAL REQUIREMENTS:
 - Base your ENTIRE analysis on the content provided in the sources above
@@ -54,6 +68,7 @@ CRITICAL REQUIREMENTS:
 - Use specific citations: "According to [domain]..." or "[Domain] reports that..."
 - Identify cross-source patterns: where do sources agree or contradict?
 - NO GENERIC THEMES - themes must emerge from actual source analysis
+- DO NOT use academic outline structures (I., II., III., etc.)
 
 Keep the report under 600 words. Use clear, professional language.
 
