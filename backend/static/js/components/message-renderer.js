@@ -174,6 +174,10 @@ export class MessageRenderer {
         // Handle different content types
         if (message.content instanceof HTMLElement) {
             // DOM element - append directly
+            // Check if this is a research report with citation metadata
+            if (message.metadata?.citation_metadata) {
+                this._injectCitationBadges(message.content, message.metadata.citation_metadata);
+            }
             bodyDiv.appendChild(message.content);
         } else if (message.variant === 'loading' && typeof message.content === 'string') {
             // Loading variant - add spinner
@@ -185,6 +189,89 @@ export class MessageRenderer {
         }
         
         return bodyDiv;
+    }
+    
+    /**
+     * Inject citation badges for locked sources in research reports
+     * @private
+     */
+    static _injectCitationBadges(contentElement, citationMetadata) {
+        if (!contentElement || !citationMetadata) return;
+        
+        // Protocol icon mapping
+        const protocolIcons = {
+            'rsl': '🔒',
+            'tollbit': '⚡',
+            'cloudflare': '☁️'
+        };
+        
+        // Find all text nodes that might contain citations
+        const walker = document.createTreeWalker(
+            contentElement,
+            NodeFilter.SHOW_TEXT,
+            null
+        );
+        
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+            textNodes.push(node);
+        }
+        
+        // Process each text node for citation patterns
+        textNodes.forEach(textNode => {
+            const text = textNode.textContent;
+            const citationRegex = /\[(\d+)\]/g;
+            let match;
+            const fragments = [];
+            let lastIndex = 0;
+            
+            while ((match = citationRegex.exec(text)) !== null) {
+                const citationNum = parseInt(match[1]);
+                const citationData = citationMetadata[citationNum];
+                
+                // Add text before citation
+                if (match.index > lastIndex) {
+                    fragments.push(document.createTextNode(text.substring(lastIndex, match.index)));
+                }
+                
+                // Add citation number
+                fragments.push(document.createTextNode(match[0]));
+                
+                // Add badge if source is locked
+                if (citationData && citationData.locked) {
+                    const badge = document.createElement('span');
+                    badge.className = `citation-badge citation-badge--${citationData.protocol || 'rsl'}`;
+                    badge.setAttribute('data-source-id', citationData.source_id);
+                    badge.setAttribute('data-protocol', citationData.protocol || 'rsl');
+                    badge.setAttribute('data-price', citationData.price || 0);
+                    badge.setAttribute('data-title', citationData.title || 'Source');
+                    
+                    const icon = protocolIcons[citationData.protocol] || '🔒';
+                    const price = Number(citationData.price || 0).toFixed(2);
+                    badge.textContent = `${icon} $${price}`;
+                    badge.title = `Click to unlock: ${citationData.title || 'Source'}`;
+                    
+                    fragments.push(badge);
+                }
+                
+                lastIndex = citationRegex.lastIndex;
+            }
+            
+            // Add remaining text
+            if (lastIndex < text.length) {
+                fragments.push(document.createTextNode(text.substring(lastIndex)));
+            }
+            
+            // Replace text node with fragments if we found citations
+            if (fragments.length > 0) {
+                const parent = textNode.parentNode;
+                fragments.forEach(fragment => {
+                    parent.insertBefore(fragment, textNode);
+                });
+                parent.removeChild(textNode);
+            }
+        });
     }
     
     /**

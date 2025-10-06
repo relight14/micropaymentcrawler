@@ -194,6 +194,35 @@ export class ChatResearchApp {
                 this.updateAuthButton(); // Update again with fresh balance
             });
         }
+        
+        // Citation badge click handlers (event delegation on document)
+        document.addEventListener('click', (e) => {
+            const badge = e.target.closest('.citation-badge');
+            if (!badge) return;
+            
+            e.preventDefault();
+            
+            // Extract source data from badge attributes
+            const sourceId = badge.getAttribute('data-source-id');
+            const price = parseFloat(badge.getAttribute('data-price')) || 0;
+            
+            // Find the source in current research data
+            const researchData = this.appState.getCurrentResearchData();
+            if (!researchData || !researchData.sources) {
+                console.error('Citation badge clicked but no research data available');
+                return;
+            }
+            
+            const source = researchData.sources.find(s => s.id === sourceId);
+            if (!source) {
+                console.error('Citation badge clicked but source not found:', sourceId);
+                return;
+            }
+            
+            // Call the existing unlock handler
+            console.log('🔖 Citation badge clicked for source:', source.title);
+            this.handleSourceUnlock(null, sourceId, price);
+        });
     }
 
     async sendMessage() {
@@ -1464,7 +1493,8 @@ export class ChatResearchApp {
             type: 'research_report',
             tier: reportData.tier,
             query: reportData.query,
-            sources_count: reportData.total_sources || reportData.sources?.length || 0
+            sources_count: reportData.total_sources || reportData.sources?.length || 0,
+            citation_metadata: reportData.citation_metadata || null
         });
     }
     
