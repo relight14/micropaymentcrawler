@@ -36,6 +36,7 @@ class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
     query: str = Field(..., min_length=3, max_length=500, description="Research query between 3-500 characters")
     tier: TierType
+    selected_source_ids: Optional[List[str]] = None  # User's selected sources for report
 
 
 def extract_bearer_token(authorization: str) -> str:
@@ -314,16 +315,54 @@ async def generate_research_report(
     report_request: GenerateReportRequest,
     user_info: dict = Depends(get_authenticated_user)
 ):
-    """Generate a complete research report using PacketBuilder based on tier selection"""
+    """Generate a complete research report based on selected sources or query"""
     try:
         # Validate and sanitize query input
         sanitized_query = validate_query_input(report_request.query)
         
-        # Use PacketBuilder to generate complete research packet
-        research_packet = packet_builder.build_packet(
-            query=sanitized_query,
-            tier=report_request.tier
-        )
+        # If user selected specific sources, use those for the report
+        if report_request.selected_source_ids:
+            print(f"📊 Generating report with {len(report_request.selected_source_ids)} selected sources")
+            
+            # Fetch selected sources from the latest research results
+            # Sources are stored in crawler cache or need to be retrieved
+            selected_sources = []
+            
+            # Try to find sources in cache by checking all cached results
+            for cache_key, (cached_sources, timestamp) in crawler._cache.items():
+                if isinstance(cached_sources, list):
+                    for source in cached_sources:
+                        if source.id in report_request.selected_source_ids:
+                            selected_sources.append(source)
+            
+            if not selected_sources:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Selected sources not found. Please run a search first before generating a report."
+                )
+            
+            # Generate AI report with selected sources
+            ai_report = report_generator.generate_report(
+                sanitized_query, 
+                selected_sources, 
+                report_request.tier
+            )
+            
+            # Build packet with selected sources and AI report
+            research_packet = packet_builder.build_packet_with_sources(
+                query=sanitized_query,
+                tier=report_request.tier,
+                sources=selected_sources,
+                report=ai_report
+            )
+            
+        else:
+            # No sources selected - generate sources and report (legacy behavior)
+            print(f"📊 Generating report without selected sources (legacy mode)")
+            research_packet = packet_builder.build_packet(
+                query=sanitized_query,
+                tier=report_request.tier
+            )
         
         return research_packet
         
