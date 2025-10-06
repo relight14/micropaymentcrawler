@@ -2,8 +2,9 @@
 AI Report Generation Service for tiered research reports using Claude.
 """
 import os
+import re
 import time
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from anthropic import Anthropic
 from schemas.domain import SourceCard, TierType
 
@@ -169,7 +170,71 @@ class ReportGeneratorService:
         # Simple in-memory cache: {cache_key: (report, timestamp)}
         self._cache = {}
     
-    def generate_report(self, query: str, sources: List[SourceCard], tier: TierType) -> str:
+    def _extract_citation_metadata(self, report: str, sources: List[SourceCard]) -> Dict[int, Dict]:
+        """
+        Extract citation metadata from report for inline purchase badges.
+        
+        Parses the report markdown for citation patterns like [1], [2], [3] and maps
+        each citation number to its corresponding source metadata.
+        
+        Args:
+            report: Generated markdown report text
+            sources: List of source cards used in the report
+            
+        Returns:
+            Dict mapping citation number to source metadata:
+            {
+                1: {
+                    "source_id": "abc123",
+                    "locked": True/False,
+                    "protocol": "rsl"/"tollbit"/"cloudflare" (if locked),
+                    "price": 0.05 (if locked),
+                    "title": "Article Title",
+                    "domain": "example.com"
+                },
+                ...
+            }
+        """
+        citation_metadata = {}
+        
+        # Find all citation patterns like [1], [2], [3] in the report
+        # Use regex to find citations: [N] where N is a number
+        citation_pattern = r'\[(\d+)\]'
+        found_citations = re.findall(citation_pattern, report)
+        
+        # Get unique citation numbers
+        unique_citations = sorted(set(int(num) for num in found_citations))
+        
+        # Map each citation number to its source metadata
+        for citation_num in unique_citations:
+            # Citation [1] corresponds to sources[0], [2] to sources[1], etc.
+            source_index = citation_num - 1
+            
+            # Handle edge case: citation number doesn't match sources array
+            if source_index < 0 or source_index >= len(sources):
+                print(f"Warning: Citation [{citation_num}] has no corresponding source (index {source_index} out of range)")
+                continue
+            
+            source = sources[source_index]
+            
+            # Build metadata dict
+            metadata = {
+                "source_id": source.id,
+                "locked": not source.is_unlocked,
+                "title": source.title,
+                "domain": source.domain
+            }
+            
+            # Add protocol and price for locked sources
+            if not source.is_unlocked:
+                metadata["protocol"] = source.licensing_protocol
+                metadata["price"] = source.unlock_price
+            
+            citation_metadata[citation_num] = metadata
+        
+        return citation_metadata
+    
+    def generate_report(self, query: str, sources: List[SourceCard], tier: TierType) -> Tuple[str, Dict[int, Dict]]:
         """
         Generate a tiered research report using Claude.
         
@@ -179,14 +244,17 @@ class ReportGeneratorService:
             tier: Tier type (RESEARCH or PRO)
             
         Returns:
-            Formatted markdown report (or fallback basic summary)
+            Tuple of (formatted markdown report, citation metadata dict)
+            Citation metadata maps citation numbers to source info for inline badges
         """
         # Check cache first - include sources in cache key for unique reports per selection
         cache_key = self._get_cache_key(query, tier, sources)
         cached_report = self._get_cached_report(cache_key)
         if cached_report:
             print(f"✅ Returning cached report for tier {tier.value} with {len(sources)} sources")
-            return cached_report
+            # Extract citation metadata from cached report
+            citation_metadata = self._extract_citation_metadata(cached_report, sources)
+            return cached_report, citation_metadata
         
         # Generate new report
         if not self.enabled or not sources:
@@ -195,7 +263,9 @@ class ReportGeneratorService:
         try:
             report = self._generate_claude_report(query, sources, tier)
             self._cache_report(cache_key, report)
-            return report
+            # Extract citation metadata from generated report
+            citation_metadata = self._extract_citation_metadata(report, sources)
+            return report, citation_metadata
         except Exception as e:
             print(f"Report generation failed, using fallback: {e}")
             return self._generate_fallback_report(query, sources, tier)
@@ -332,12 +402,12 @@ CONTENT:
         except Exception:
             return str(response)
     
-    def _generate_fallback_report(self, query: str, sources: List[SourceCard], tier: TierType) -> str:
+    def _generate_fallback_report(self, query: str, sources: List[SourceCard], tier: TierType) -> Tuple[str, Dict[int, Dict]]:
         """Generate basic fallback report when Claude is unavailable."""
         source_count = len(sources)
         
         if tier == TierType.PRO:
-            return f"""# Research Report: {query}
+            report = f"""# Research Report: {query}
 📊 Professional Analyst Report
 
 ## Executive Summary
@@ -354,7 +424,7 @@ Review the {source_count} sources below for detailed information.
 *Note: Enhanced AI-generated analysis temporarily unavailable. Source content remains fully accessible.*
 """
         else:
-            return f"""# Research Report: {query}
+            report = f"""# Research Report: {query}
 
 ## Executive Summary
 This report analyzes {source_count} sources related to your research query.
@@ -371,3 +441,6 @@ Review the individual sources below for detailed insights.
 ---
 💡 Want deeper analysis? Pro reports include confidence scoring, themed analysis, ready-to-cite sources, and related research questions. Upgrade to Pro tier for comprehensive insights.
 """
+        
+        # Return tuple with empty citation metadata for fallback reports
+        return report, {}
