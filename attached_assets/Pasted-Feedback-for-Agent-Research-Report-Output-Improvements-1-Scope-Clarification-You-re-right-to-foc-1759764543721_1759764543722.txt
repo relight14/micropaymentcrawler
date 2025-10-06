@@ -1,0 +1,83 @@
+Feedback for Agent — Research Report Output Improvements
+1. Scope Clarification
+
+You're right to focus on “Fix Generic Outlines” as the high-value fix. The source card system is working well, so the emphasis should now be squarely on improving the full report output that users pay for.
+
+We don’t need a multi-tier system here — just a single, reliable “paid report” experience that feels premium and concrete.
+
+2. Model Upgrade Decision
+
+✅ Decision: For all paid research reports, switch to Claude 3.5 Sonnet (or Claude Sonnet 4, if available).
+
+Users paying for reports expect deeper synthesis and better phrasing.
+
+Haiku is fine for enrichment or previews, but the report stage should always use the higher-end model.
+
+No tiering or conditional logic needed for now — simplicity wins.
+
+Keep the model configurable in env vars (REPORT_MODEL="claude-3-5-sonnet") for future experimentation.
+
+3. Report Quality Fixes
+
+Right now, reports feel generic because the model gets minimal, uniform input. The goal is to give it enough structured context and better instructions to reason across sources.
+
+a. Content Enrichment
+
+In _format_sources_for_prompt(), feed full or semi-summarized content (up to ~1,500 chars per source) rather than short excerpts.
+
+Include metadata fields that aid pattern recognition:
+
+title
+
+author
+
+publication_date
+
+domain (if relevant)
+
+If a crawler summary exists, use that — not just raw text.
+
+b. Prompt Refinement
+The current instruction (“3-4 main themes discovered”) invites shallow generalization. Instead, explicitly require cross-source synthesis and citation.
+
+Example structure:
+
+“Analyze the ACTUAL CONTENT of these sources. Identify 3–4 specific, evidence-based themes that emerge across them.
+For each theme:
+
+Give a concise headline (≤10 words)
+
+Summarize the key finding in 2–3 sentences
+
+Cite which sources contribute to it
+Conclude with a 1-paragraph synthesis connecting the themes.”
+
+Optional: include a sample output in the prompt to guide formatting.
+
+c. Validation
+Before shipping, generate 3–5 test reports using diverse queries. Check that each theme feels grounded in real source content (mentions specific details, not generic phrasing like “AI adoption continues to grow”).
+
+4. Performance & Context Management
+
+Set a soft cap around 10k–12k tokens per report to stay inside Sonnet’s comfort zone.
+
+If sources exceed this, summarize them first with Haiku and feed condensed versions to Sonnet.
+
+Log token counts per run so we can track cost/performance balance.
+
+5. Summary of Next Steps
+Task	Owner	Priority
+Upgrade REPORT_MODEL to Sonnet 3.5/4	✅ Agent	High
+Enrich _format_sources_for_prompt() to include more content + metadata	✅ Agent	High
+Rewrite report prompt for cross-source synthesis	✅ Agent	High
+Test 3–5 report generations for specificity	✅ Agent	Medium
+Log context length + cost per report for optimization	✅ Agent	Low
+🎯 Final Guidance
+
+Keep the MVP simple: Haiku for enrichment, Sonnet for reports.
+
+Don’t overcomplicate the tiering logic — all paid reports use the best model.
+
+The single biggest unlock will come from better source material + clearer prompt structure, not extra scaffolding.
+
+Aim for reports that read like an analyst brief, not a list of headlines.
