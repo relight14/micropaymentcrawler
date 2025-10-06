@@ -91,10 +91,12 @@ Raw Snippet: {source.get('snippet', '')[:200]}
 Transform these raw web search results into polished, professional source cards. For each source, create:
 
 1. An engaging, specific title (not generic)
-2. A compelling excerpt that highlights the key insights relevant to the query
+2. A comprehensive, detailed excerpt (1,500-2,000 characters) that captures the core content, key insights, data points, and arguments relevant to the query
 3. Make each source feel unique and valuable - avoid repetitive language
+4. Include specific facts, statistics, quotes, or findings when available
+5. Provide enough substance for AI analysis to identify cross-source themes and patterns
 
-Keep titles under 80 characters and excerpts under 150 characters. Focus on what makes each source specifically valuable for this research query.
+Keep titles under 80 characters but make excerpts substantial (1,500-2,000 characters). Extract the most valuable content from each source for deep research analysis.
 
 Raw Sources:
 {sources_text}
@@ -104,7 +106,7 @@ Return your response as JSON in this exact format:
   "polished_sources": [
     {{
       "title": "Engaging specific title",
-      "excerpt": "Compelling excerpt highlighting key insights relevant to the query"
+      "excerpt": "Comprehensive 1,500-2,000 character excerpt with specific insights, data, and findings relevant to the query"
     }}
   ]
 }}"""
@@ -114,7 +116,7 @@ Return your response as JSON in this exact format:
             
         response = self.client.messages.create(
             model=DEFAULT_MODEL_STR,
-            max_tokens=2000,
+            max_tokens=4000,  # Increased for longer excerpts
             messages=[{"role": "user", "content": prompt}]
         )
         
@@ -142,7 +144,7 @@ Return your response as JSON in this exact format:
                     source['excerpt'] = polished[i].get('excerpt', source.get('snippet', ''))
                 else:
                     # Fallback for sources beyond polished count
-                    source['excerpt'] = source.get('snippet', '')[:150]
+                    source['excerpt'] = source.get('snippet', '')[:2000]
             
             return raw_sources
             
@@ -157,11 +159,11 @@ Return your response as JSON in this exact format:
             if not source.get('title'):
                 source['title'] = f"Research Source - {source.get('domain', 'Unknown')}"
             
-            # Truncate and clean snippet for excerpt
+            # Use longer excerpts for better report analysis
             snippet = source.get('snippet', source.get('content', ''))
             if snippet:
-                source['excerpt'] = snippet[:150].strip()
-                if len(snippet) > 150:
+                source['excerpt'] = snippet[:2000].strip()
+                if len(snippet) > 2000:
                     source['excerpt'] += '...'
             else:
                 source['excerpt'] = 'No preview available'

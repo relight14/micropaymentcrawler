@@ -201,7 +201,7 @@ class ContentCrawlerStub:
                 source = SourceCard(
                     id=source_id,
                     title=title,
-                    excerpt=result.get('content', 'Loading enhanced summary...')[:150],
+                    excerpt=result.get('content', 'Loading enhanced summary...')[:2000],  # Expanded for rich report analysis
                     domain=domain,
                     url=result.get('url', f'https://{domain}'),
                     unlock_price=0.0,  # Will be set by licensing discovery
@@ -453,8 +453,8 @@ class ContentCrawlerStub:
             return f"{name_part.capitalize()} Publishing"
         return "Unknown Publisher"
     
-    def _truncate_content(self, content: str, max_length: int = 200) -> str:
-        """Truncate content to excerpt length."""
+    def _truncate_content(self, content: str, max_length: int = 2000) -> str:
+        """Truncate content to excerpt length for report analysis."""
         if len(content) <= max_length:
             return content
         return content[:max_length].rsplit(' ', 1)[0] + "..."
