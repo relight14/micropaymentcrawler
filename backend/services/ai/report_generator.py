@@ -19,50 +19,65 @@ DEFAULT_MODEL_STR = "claude-3-haiku-20240307"  # Use available model
 
 CACHE_TTL_SECONDS = 600  # 10 minutes
 
-RESEARCH_REPORT_PROMPT = """You are a professional research analyst. Generate a concise research report based on the following sources.
+RESEARCH_REPORT_PROMPT = """You are a professional research analyst. Generate a concise research report based on the SPECIFIC SOURCES the user selected for their research.
 
 Query: {query}
 
-Sources:
+SELECTED SOURCES (use these specific sources in your analysis):
 {sources}
 
 Generate a **Research Report** in markdown format with:
-1. **Summary** (2-3 paragraphs synthesizing the key information)
-2. **Key Findings** (3-5 bullet points with ✅ icons)
+1. **Executive Summary** (2-3 paragraphs synthesizing the key information from the selected sources above)
+2. **Key Findings** (4-6 bullet points with ✅ icons, each citing specific sources by domain)
+3. **Research Outline** (3-4 main themes discovered in the selected sources with brief explanations)
 
-Keep the report under 500 words. Use clear, professional language. Include source attribution (e.g., "According to [domain]...").
+IMPORTANT: 
+- Base your entire analysis on the selected sources provided above
+- Include specific citations using source domains (e.g., "According to nytimes.com..." or "Data from bloomberg.com shows...")
+- Reference actual content and insights from the sources, not generic statements
+
+Keep the report under 600 words. Use clear, professional language.
 
 End with this upsell footer:
 ---
 💡 Want deeper analysis? Pro reports include confidence scoring, themed analysis, ready-to-cite sources, and related research questions. Upgrade to Pro tier for comprehensive insights.
 """
 
-PRO_REPORT_PROMPT = """You are a professional research analyst. Generate a comprehensive analyst report based on the following sources.
+PRO_REPORT_PROMPT = """You are a professional research analyst. Generate a comprehensive analyst report based on the SPECIFIC SOURCES the user selected for their research.
 
 Query: {query}
 
-Sources:
+SELECTED SOURCES (analyze these specific sources):
 {sources}
 
 Generate a **Professional Analyst Report** in markdown format with:
 
 1. **Executive Briefing** (in a formatted box with ━ borders):
-   - Bottom Line: One sentence answer
-   - Key Stat: Most important number/fact
+   - Bottom Line: One sentence answer based on the selected sources
+   - Key Stat: Most important number/fact from the sources
    - Action Item: What to do with this info
    - Confidence table with 4 areas (Political/Economic/Security/Implementation) rated as ⚡ High, ⚠️ Mixed, or 📍 Low
 
-2. **Executive Summary** (3-4 paragraphs of deeper synthesis)
+2. **Executive Summary** (3-4 paragraphs of deeper synthesis from the selected sources)
 
-3. **Key Findings** (organized by theme with confidence indicators):
+3. **Key Findings** (organized by theme with confidence indicators and source citations):
    - Use ⚡ High Confidence (X/Y sources) when most sources agree
    - Use ⚠️ Mixed Findings (X vs Y sources) when sources conflict
    - Use 📍 Low Coverage when information is sparse
    - Include ❌ for implementation gaps or missing information
+   - CITE SPECIFIC SOURCES by domain for each finding
 
-4. **Related Research Questions** (5 follow-up questions based on findings)
+4. **Strategic Insights** (2-3 key insights synthesized from cross-referencing the selected sources)
 
-5. **Quick Citations** (simple format: Domain, Date: "Title")
+5. **Related Research Questions** (5 follow-up questions based on findings from the sources)
+
+6. **Quick Citations** (list each selected source: Domain: "Title" - excerpt of key point)
+
+IMPORTANT:
+- Base your ENTIRE analysis on the selected sources provided above
+- Include specific citations throughout (e.g., "According to nytimes.com, ..." or "Bloomberg data shows...")
+- Reference actual content, data points, and insights from the sources
+- Compare and contrast findings across sources when relevant
 
 Keep the report under 1500 words. Use professional language with clear structure. Show analytical rigor through source comparison and confidence scoring.
 """
@@ -101,11 +116,11 @@ class ReportGeneratorService:
         Returns:
             Formatted markdown report (or fallback basic summary)
         """
-        # Check cache first
-        cache_key = self._get_cache_key(query, tier)
+        # Check cache first - include sources in cache key for unique reports per selection
+        cache_key = self._get_cache_key(query, tier, sources)
         cached_report = self._get_cached_report(cache_key)
         if cached_report:
-            print(f"✅ Returning cached report for tier {tier.value}")
+            print(f"✅ Returning cached report for tier {tier.value} with {len(sources)} sources")
             return cached_report
         
         # Generate new report
@@ -120,11 +135,18 @@ class ReportGeneratorService:
             print(f"Report generation failed, using fallback: {e}")
             return self._generate_fallback_report(query, sources, tier)
     
-    def _get_cache_key(self, query: str, tier: TierType) -> str:
-        """Generate cache key from query and tier."""
+    def _get_cache_key(self, query: str, tier: TierType, sources: List[SourceCard] = None) -> str:
+        """Generate cache key from query, tier, and source IDs for unique reports per selection."""
         import hashlib
         query_hash = hashlib.md5(query.encode()).hexdigest()[:12]
-        return f"report:{tier.value}:{query_hash}"
+        
+        # Include source IDs in cache key to ensure different selections get different reports
+        if sources:
+            source_ids = sorted([s.id for s in sources])  # Sort for consistency
+            source_hash = hashlib.md5('|'.join(source_ids).encode()).hexdigest()[:8]
+            return f"report:{tier.value}:{query_hash}:{source_hash}"
+        else:
+            return f"report:{tier.value}:{query_hash}:no_sources"
     
     def _get_cached_report(self, cache_key: str) -> Optional[str]:
         """Retrieve cached report if still valid."""
