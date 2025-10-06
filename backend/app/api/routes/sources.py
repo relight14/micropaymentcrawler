@@ -1,13 +1,11 @@
-"""Source unlock and research packet routes"""
+"""Source unlock routes"""
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
 from slowapi import Limiter
 
 from schemas.api import SourceUnlockRequest, SourceUnlockResponse
 from data.ledger_repository import ResearchLedger
 from utils.rate_limit import get_user_or_ip_key
-from services.research.html_generator import generate_html_packet
 
 router = APIRouter()
 
@@ -68,23 +66,3 @@ async def unlock_source(request: Request, unlock_request: SourceUnlockRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error unlocking source: {str(e)}")
-
-
-@router.get("/research-packet/{content_id}", response_class=HTMLResponse)
-async def get_research_packet_html(content_id: str):
-    """Serve research packet as clean academic HTML report."""
-    try:
-        # In production, this would verify purchase via LedeWire API
-        # For now, we'll retrieve from our ledger for demo purposes
-        packet_data = ledger.get_packet_by_content_id(content_id)
-        
-        if not packet_data:
-            raise HTTPException(status_code=404, detail="Research packet not found")
-        
-        # Generate clean HTML report
-        html_content = generate_html_packet(packet_data)
-        
-        return HTMLResponse(content=html_content)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error serving research packet: {str(e)}")
