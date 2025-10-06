@@ -33,6 +33,7 @@ class SourceCard(BaseModel):
     requires_attribution: bool = False  # Whether attribution is required
     
     # Additional metadata
+    author: Optional[str] = None  # Article author
     is_academic: bool = False
     published_date: Optional[str] = None
     relevance_score: Optional[float] = None
