@@ -99,7 +99,7 @@ Generate a **Professional Analyst Report** in markdown format with:
    
    **Bottom Line:** [One sentence answer grounded in the sources' evidence]
    
-   **Key Stat:** [Most important number/fact extracted from the sources with citation]
+   **Key Stat:** [Most important number/fact extracted from the sources with numbered citation [N]]
    
    **Action Item:** [Recommendation based on the evidence in sources]
    
@@ -115,22 +115,23 @@ Generate a **Professional Analyst Report** in markdown format with:
    - Synthesize insights from cross-referencing the sources
    - Highlight areas of consensus and contradiction
    - Ground every claim in specific source content
-   - Reference data points, quotes, or findings from the sources
+   - USE NUMBERED CITATIONS: When citing sources, use [1], [2], [3], etc. where the first source listed above is [1], the second is [2], and so on
+   - Example: "Nuclear expansion faces constraints [1], with fuel supply issues [2] and timeline challenges [3]."
 
 3. **Key Findings** (organized by theme with confidence indicators)
    Format each finding as:
-   - **⚡ High Confidence (X/Y sources agree):** [Finding with specific evidence from sources]
-     - Source citations: domain1.com states "...", domain2.com shows "..."
-   - **⚠️ Mixed Findings (X vs Y sources):** [Describe the contradiction with citations]
+   - **⚡ High Confidence (X/Y sources agree):** [Finding with specific evidence and numbered citations [N]]
+     - Source citations: Include quotes or data with [1], [2], [3] references
+   - **⚠️ Mixed Findings (X vs Y sources):** [Describe the contradiction with numbered citations [N]]
    - **📍 Low Coverage:** [Note gaps in source coverage]
    - **❌ Implementation Gap:** [Missing information or concerns]
 
 4. **Strategic Insights** (2-3 key insights)
    Each insight must:
    - Emerge from cross-referencing multiple sources
-   - Cite specific evidence from at least 2 sources
+   - Cite specific evidence using numbered citations [1], [2], [3]
    - Provide actionable interpretation
-   - Format: "**Insight:** [Headline]" followed by analysis paragraph
+   - Format: "**Insight:** [Headline]" followed by analysis paragraph with [N] citations
 
 5. **Related Research Questions** (5 follow-up questions)
    - Base questions on gaps or extensions of findings from the sources
@@ -142,6 +143,7 @@ Generate a **Professional Analyst Report** in markdown format with:
 CRITICAL REQUIREMENTS:
 - Base your ENTIRE analysis on the selected sources' actual content
 - Every theme, finding, and insight must cite specific sources with evidence
+- USE NUMBERED CITATIONS: Always cite sources as [1], [2], [3] where [1] = first source, [2] = second source, etc.
 - Compare and contrast: where do sources agree? Where do they contradict?
 - Use confidence scoring based on source consensus (not assumptions)
 - Include specific facts, data, quotes, or arguments from the sources
