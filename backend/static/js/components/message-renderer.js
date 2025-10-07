@@ -264,8 +264,9 @@ export class MessageRenderer {
                     
                     const icon = protocolIcons[protocol] || '🔒';
                     const price = Number(citationData.price || 0).toFixed(2);
-                    badge.textContent = `${icon} $${price}`;
-                    badge.title = `Click to unlock: ${citationData.title || 'Source'}`;
+                    const priceText = price === '0.00' ? 'Free Source' : `$${price}`;
+                    badge.textContent = `${icon} ${priceText}`;
+                    badge.title = `Unlock: ${citationData.title || 'Source'} - $${price}`;
                     
                     fragments.push(badge);
                 }
