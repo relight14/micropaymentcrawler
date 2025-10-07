@@ -857,8 +857,8 @@ export class ChatResearchApp {
                 // Display the generated report
                 this._displayGeneratedReport(reportPacket);
                 
-                // Show success message
-                this.addMessage('system', `✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${selectedSourceIds.length} selected sources!`);
+                // Show success message as toast (non-intrusive, won't trigger DOM re-render)
+                this._showToast(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${selectedSourceIds.length} selected sources!`, 'success');
             }
         } catch (error) {
             console.error('Error generating report:', error);
