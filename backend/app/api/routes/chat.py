@@ -111,7 +111,7 @@ async def chat(request: Request, chat_request: ChatRequest, authorization: str =
             user_id = f"anon_{hashlib.sha256(client_ip.encode()).hexdigest()[:12]}"
         
         # Process chat message with user-specific session
-        response = ai_service.chat(chat_request.message, chat_request.mode, user_id)
+        response = await ai_service.chat(chat_request.message, chat_request.mode, user_id)
         
         return ChatResponse(**response)
         

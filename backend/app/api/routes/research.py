@@ -373,7 +373,7 @@ async def generate_research_report(
             max_sources = tier_source_limits.get(report_request.tier, 15)
             
             # Generate sources
-            generated_sources = crawler.generate_sources(sanitized_query, max_sources)
+            generated_sources = await crawler.generate_sources(sanitized_query, max_sources)
             
             # Generate AI report
             ai_report, citation_metadata = report_generator.generate_report(

@@ -37,7 +37,7 @@ class AIResearchService:
         except Exception:
             return str(response)
         
-    def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
+    async def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
         Main chat interface supporting both conversational and deep research modes
         """
@@ -56,7 +56,7 @@ class AIResearchService:
         if mode == "chat" or mode == "conversational":
             return self._conversational_response(user_message, user_id)
         else:  # research or deep_research
-            return self._deep_research_response(user_message, user_id)
+            return await self._deep_research_response(user_message, user_id)
     
     def _conversational_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
         """Generate conversational response to help explore research interests"""
@@ -113,7 +113,7 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
                 "error": str(e)
             }
     
-    def _deep_research_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
+    async def _deep_research_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
         """Generate deep research with context-aware source selection"""
         
         # Analyze conversation history to understand research focus
@@ -143,12 +143,12 @@ Be specific and targeted based on our conversation. Don't be generic."""
             research_query = self._extract_response_text(response).strip()
             
             # Execute deep research with the refined query
-            return self._execute_deep_research(research_query, user_message, user_id)
+            return await self._execute_deep_research(research_query, user_message, user_id)
             
         except Exception as e:
             print(f"⚠️ Research context extraction failed: {e}")
             # Fallback: use original user message as query
-            return self._execute_deep_research(user_message, user_message, user_id)
+            return await self._execute_deep_research(user_message, user_message, user_id)
     
     def _extract_research_context(self, user_id: str) -> str:
         """Extract key research themes from conversation history"""
@@ -179,12 +179,12 @@ Be specific and targeted based on our conversation. Don't be generic."""
         print(f"✅ Final unique messages: {len(unique_messages)}")
         return "\n".join([f"- {msg}" for msg in unique_messages])
     
-    def _execute_deep_research(self, refined_query: str, original_query: str, user_id: str) -> Dict[str, Any]:
+    async def _execute_deep_research(self, refined_query: str, original_query: str, user_id: str) -> Dict[str, Any]:
         """Execute deep research with intelligent source selection"""
         
         try:
             # Generate sources using the refined query
-            sources = self.crawler.generate_sources(refined_query, 15)  # Get more to select from
+            sources = await self.crawler.generate_sources(refined_query, 15)  # Get more to select from
             
             # Convert to dicts and discover licensing
             sources_dicts = []

@@ -162,7 +162,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Handle FREE TIER
         if config["price"] == 0.00:
             # Generate sources for free tier
-            sources = crawler.generate_sources(purchase_request.query, config["max_sources"])
+            sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             
             # Generate AI report
             report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
@@ -204,7 +204,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         max_sources = config["max_sources"]
         
         # Generate sources
-        sources = crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
+        sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         
         # Generate AI report (with fallback handling built-in)
         report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)

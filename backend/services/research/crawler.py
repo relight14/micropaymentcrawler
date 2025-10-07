@@ -3,7 +3,7 @@ import uuid
 import os
 import asyncio
 import time
-import requests
+import httpx
 from typing import List, Optional, Dict, Any
 from schemas.domain import SourceCard
 from services.licensing.content_licensing import ContentLicenseService
@@ -40,6 +40,9 @@ class ContentCrawlerStub:
             "full_text": 1.3,
             "premium_journal": 1.6
         }
+        
+        # Async HTTP client for non-blocking requests
+        self._http_client = None
         
     
     def _get_cache_key(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None) -> str:
@@ -97,8 +100,20 @@ class ContentCrawlerStub:
         
         return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter)
     
-    def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Make direct REST API call to Tavily search endpoint."""
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        """Get or create async HTTP client"""
+        if self._http_client is None:
+            self._http_client = httpx.AsyncClient(timeout=30.0)
+        return self._http_client
+    
+    async def close(self):
+        """Close async HTTP client on shutdown"""
+        if self._http_client:
+            await self._http_client.aclose()
+            self._http_client = None
+    
+    async def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Make async REST API call to Tavily search endpoint."""
         payload = {
             "api_key": self.tavily_api_key,
             "query": query,
@@ -115,10 +130,11 @@ class ContentCrawlerStub:
             print(f"📰 Tavily REST API call with domain filter: {include_domains}")
         
         try:
-            response = requests.post(self.tavily_api_url, json=payload, timeout=30)
+            client = await self._get_http_client()
+            response = await client.post(self.tavily_api_url, json=payload)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             print(f"❌ Tavily API request failed: {str(e)}")
             raise
     
@@ -166,15 +182,11 @@ class ContentCrawlerStub:
             # Step 2: Get raw Tavily results immediately (this is fast)
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
             
-            # Make REST API call (run in executor to avoid blocking)
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: self._call_tavily_api(
-                    query=tavily_query,
-                    max_results=min(count, 20),
-                    include_domains=domain_filter
-                )
+            # Make async REST API call (non-blocking)
+            response = await self._call_tavily_api(
+                query=tavily_query,
+                max_results=min(count, 20),
+                include_domains=domain_filter
             )
             
             results = response.get('results', [])
@@ -315,7 +327,7 @@ class ContentCrawlerStub:
             # Process licensing for all sources concurrently (up to 5 at once to avoid rate limits)
             async def add_single_license(source):
                 try:
-                    license_info = self._discover_licensing(source.url)
+                    license_info = await self._discover_licensing(source.url)
                     if license_info:
                         # Boost is now applied in _apply_licensing_info for both async and sync paths
                         self._apply_licensing_info(source, license_info)
@@ -330,7 +342,7 @@ class ContentCrawlerStub:
         except Exception as e:
             print(f"Batch licensing error: {e}")
 
-    def generate_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
+    async def generate_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
         """Generate source cards using Tavily AI search or fallback to mock data.
         
         Args:
@@ -338,9 +350,9 @@ class ContentCrawlerStub:
             count: Maximum number of sources to generate
             budget_limit: Maximum budget for licensing costs (60% of tier price)
         """
-        return self._generate_tavily_sources(query, count, budget_limit)
+        return await self._generate_tavily_sources(query, count, budget_limit)
     
-    def _generate_tavily_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
+    async def _generate_tavily_sources(self, query: str, count: int, budget_limit: Optional[float] = None) -> List[SourceCard]:
         """Generate source cards using hybrid Tavily discovery + Claude polish approach."""
         if not self.tavily_api_key:
             return []
@@ -353,8 +365,8 @@ class ContentCrawlerStub:
             # Tavily has a 400 character limit, so truncate to 350 to be safe
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
             
-            # Make REST API call with domain filter support
-            response = self._call_tavily_api(
+            # Make async REST API call with domain filter support
+            response = await self._call_tavily_api(
                 query=tavily_query,
                 max_results=min(count, 20),
                 include_domains=domain_filter
@@ -414,7 +426,7 @@ class ContentCrawlerStub:
                 )
                 
                 # Step 5: Real licensing detection on actual URL
-                license_info = self._discover_licensing(url)
+                license_info = await self._discover_licensing(url)
                 print(f"🔍 License discovery for {url}: {license_info is not None}")
                 if license_info:
                     print(f"📋 Applying licensing: protocol={license_info['terms'].protocol}, price={license_info['terms'].ai_include_price}")
@@ -624,10 +636,10 @@ class ContentCrawlerStub:
         final_price = min(max_price, max(base_price, final_price))
         return round(final_price, 2)
     
-    def _discover_licensing(self, url: str):
+    async def _discover_licensing(self, url: str):
         """Discover content licensing for a given URL"""
         try:
-            return self.license_service.discover_licensing(url)
+            return await self.license_service.discover_licensing(url)
         except Exception as e:
             print(f"License discovery failed for {url}: {e}")
             return None
@@ -664,10 +676,10 @@ class ContentCrawlerStub:
     
     # Removed fake licensing generation - now using real ContentLicenseService
     
-    def get_estimated_cost(self, query: str, source_count: int) -> float:
+    async def get_estimated_cost(self, query: str, source_count: int) -> float:
         """Estimate total unlock cost for sources (for tier pricing)."""
         # Generate a sample to estimate average unlock price (without budget constraints for estimation)
-        sample_sources = self.generate_sources(query, min(10, source_count), budget_limit=None)
+        sample_sources = await self.generate_sources(query, min(10, source_count), budget_limit=None)
         if not sample_sources:
             return 0.0
         avg_unlock_price = sum(s.unlock_price for s in sample_sources) / len(sample_sources)
