@@ -23,22 +23,16 @@ def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            last_exception = None
-            
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except (httpx.HTTPError, httpx.TimeoutException) as e:
-                    last_exception = e
-                    
+                except httpx.HTTPError as e:
                     if attempt == max_attempts - 1:
                         raise
                     
                     delay = min(base_delay * (exponential_base ** attempt), max_delay)
                     print(f"⚠️  API call failed (attempt {attempt + 1}/{max_attempts}): {str(e)[:100]}. Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
-            
-            raise last_exception
         
         return wrapper
     return decorator
@@ -146,6 +140,36 @@ class ContentCrawlerStub:
             await self._http_client.aclose()
             self._http_client = None
     
+    def _get_credibility_penalty(self, url: str) -> float:
+        """
+        Apply credibility penalty to low-quality sources (social media, Wikipedia, etc.).
+        Returns a negative score adjustment for less credible domains.
+        
+        Args:
+            url: Full URL to check for low-credibility patterns
+        """
+        # Low-credibility patterns (checked against full URL for path-specific matches)
+        low_credibility_patterns = [
+            'reddit.com', 'www.reddit.com',
+            'facebook.com', 'www.facebook.com', 'm.facebook.com',
+            'twitter.com', 'www.twitter.com', 'x.com', 'www.x.com',
+            'instagram.com', 'www.instagram.com',
+            'tiktok.com', 'www.tiktok.com',
+            'linkedin.com/posts', 'www.linkedin.com/posts',  # LinkedIn posts, not articles
+            'wikipedia.org', 'en.wikipedia.org',
+            'quora.com', 'www.quora.com',
+            'medium.com', 'www.medium.com',  # Varies in quality
+            'answers.yahoo.com',
+        ]
+        
+        # Check if URL matches any low-credibility pattern
+        url_lower = url.lower()
+        for pattern in low_credibility_patterns:
+            if pattern in url_lower:
+                return -0.35  # Significant penalty to push below credible sources
+        
+        return 0.0  # No penalty for other URLs
+    
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
         """Make async REST API call to Tavily search endpoint with retry logic."""
@@ -229,8 +253,14 @@ class ContentCrawlerStub:
             # Step 2: Create basic source cards immediately with Tavily data
             immediate_sources = []
             for i, result in enumerate(results[:count]):
+                # Extract URL first (Tavily should always provide this)
+                url = result.get('url')
+                if not url:
+                    print(f"⚠️  Warning: Tavily result missing URL, skipping")
+                    continue
+                
                 try:
-                    domain = result['url'].split('/')[2]
+                    domain = url.split('/')[2]
                 except:
                     domain = "unknown.com"
                 
@@ -242,7 +272,8 @@ class ContentCrawlerStub:
                 random_factor = random.uniform(-0.15, 0.15)  # Variety
                 query_bonus = 0.2 if query.lower() in title.lower() else 0.0  # Query matching
                 domain_bonus = 0.15 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0  # Authority
-                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + random_factor))
+                credibility_penalty = self._get_credibility_penalty(url)  # Downrank social media/Wikipedia
+                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + credibility_penalty + random_factor))
                 
                 # Start with free pricing - real licensing discovery will set authentic prices
                 source = SourceCard(
@@ -250,7 +281,7 @@ class ContentCrawlerStub:
                     title=title,
                     excerpt=result.get('content', 'Loading enhanced summary...')[:2000],  # Expanded for rich report analysis
                     domain=domain,
-                    url=result.get('url', f'https://{domain}'),
+                    url=url,
                     unlock_price=0.0,  # Will be set by licensing discovery
                     is_unlocked=False,
                     licensing_protocol=None,  # Will be set by licensing discovery 
@@ -412,13 +443,19 @@ class ContentCrawlerStub:
             # Step 2: Prepare raw source data for Claude polishing
             raw_sources = []
             for result in results[:count]:
+                # Extract URL first (Tavily should always provide this)
+                url = result.get('url')
+                if not url:
+                    print(f"⚠️  Warning: Tavily result missing URL in sync path, skipping")
+                    continue
+                
                 try:
-                    domain = result['url'].split('/')[2]
+                    domain = url.split('/')[2]
                 except:
                     domain = "unknown.com"
                     
                 raw_sources.append({
-                    'url': result.get('url', f'https://{domain}'),
+                    'url': url,
                     'domain': domain,
                     'title': result.get('title', ''),
                     'snippet': result.get('content', '')[:150],  # Truncate for efficiency
@@ -430,8 +467,13 @@ class ContentCrawlerStub:
             # Step 4: Create SourceCard objects with licensing and pricing
             sources = []
             for i, polished in enumerate(polished_sources):
+                # Extract URL (should always be present from polishing)
+                url = polished.get('url')
+                if not url:
+                    print(f"⚠️  Warning: Polished source missing URL, skipping")
+                    continue
+                
                 source_id = str(uuid.uuid4())
-                url = polished.get('url', f'https://{polished.get("domain", "unknown.com")}')
                 domain = polished.get('domain', 'unknown.com')
                 title = polished.get('title', f'Research Source {i+1}')
                 
@@ -444,9 +486,10 @@ class ContentCrawlerStub:
                 # Bonuses for quality indicators
                 query_bonus = 0.2 if query.lower() in title.lower() else 0.0
                 domain_bonus = 0.15 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0
+                credibility_penalty = self._get_credibility_penalty(url)  # Downrank social media/Wikipedia
                 
                 # Calculate final score with more spread
-                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + random_factor))
+                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + credibility_penalty + random_factor))
                 
                 # Start with free source - real licensing will set authentic price
                 source = SourceCard(

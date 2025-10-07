@@ -28,22 +28,16 @@ def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            last_exception = None
-            
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except (httpx.HTTPError, httpx.TimeoutException) as e:
-                    last_exception = e
-                    
+                except httpx.HTTPError as e:
                     if attempt == max_attempts - 1:
                         raise
                     
                     delay = min(base_delay * (exponential_base ** attempt), max_delay)
                     print(f"⚠️  API call failed (attempt {attempt + 1}/{max_attempts}): {str(e)[:100]}. Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
-            
-            raise last_exception
         
         return wrapper
     return decorator
