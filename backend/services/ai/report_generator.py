@@ -174,6 +174,7 @@ class ReportGeneratorService:
         
         # Simple in-memory cache: {cache_key: (report, timestamp)}
         self._cache = {}
+        self._cache_stats = {"hits": 0, "misses": 0}
     
     def _extract_citation_metadata(self, report: str, sources: List[SourceCard]) -> Dict[int, Dict]:
         """
@@ -278,7 +279,10 @@ class ReportGeneratorService:
     def _get_cache_key(self, query: str, tier: TierType, sources: Optional[List[SourceCard]] = None) -> str:
         """Generate cache key from query, tier, and source IDs for unique reports per selection."""
         import hashlib
-        query_hash = hashlib.md5(query.encode()).hexdigest()[:12]
+        
+        # Normalize query for better cache hits (lowercase, trim, collapse spaces)
+        normalized_query = ' '.join(query.lower().strip().split())
+        query_hash = hashlib.md5(normalized_query.encode()).hexdigest()[:12]
         
         # Include source IDs in cache key to ensure different selections get different reports
         if sources:
@@ -294,18 +298,30 @@ class ReportGeneratorService:
             report, timestamp = self._cache[cache_key]
             age = time.time() - timestamp
             if age < CACHE_TTL_SECONDS:
+                self._cache_stats["hits"] += 1
+                self._log_cache_stats()
                 return report
             else:
                 # Expired, remove from cache
                 del self._cache[cache_key]
+        
+        self._cache_stats["misses"] += 1
+        self._log_cache_stats()
         return None
+    
+    def _log_cache_stats(self):
+        """Log cache hit rate for monitoring."""
+        total = self._cache_stats["hits"] + self._cache_stats["misses"]
+        if total > 0:
+            hit_rate = (self._cache_stats["hits"] / total) * 100
+            print(f"📊 Cache stats: {self._cache_stats['hits']} hits, {self._cache_stats['misses']} misses ({hit_rate:.1f}% hit rate, {len(self._cache)} cached)")
     
     def _cache_report(self, cache_key: str, report: str):
         """Store report in cache with timestamp."""
         self._cache[cache_key] = (report, time.time())
         
-        # Simple cache cleanup: keep only last 50 entries
-        if len(self._cache) > 50:
+        # Simple cache cleanup: keep only last 100 entries (increased from 50 for better hit rate)
+        if len(self._cache) > 100:
             oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
             del self._cache[oldest_key]
     

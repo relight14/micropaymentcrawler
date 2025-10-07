@@ -5,9 +5,43 @@ import asyncio
 import time
 import httpx
 from typing import List, Optional, Dict, Any
+from functools import wraps
 from schemas.domain import SourceCard
 from services.licensing.content_licensing import ContentLicenseService
 from services.ai.polishing import ContentPolishingService
+
+def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base=2):
+    """
+    Simple retry decorator with exponential backoff for async functions.
+    
+    Args:
+        max_attempts: Maximum number of retry attempts
+        base_delay: Initial delay between retries in seconds
+        max_delay: Maximum delay between retries in seconds
+        exponential_base: Base for exponential backoff calculation
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except (httpx.HTTPError, httpx.TimeoutException) as e:
+                    last_exception = e
+                    
+                    if attempt == max_attempts - 1:
+                        raise
+                    
+                    delay = min(base_delay * (exponential_base ** attempt), max_delay)
+                    print(f"⚠️  API call failed (attempt {attempt + 1}/{max_attempts}): {str(e)[:100]}. Retrying in {delay:.1f}s...")
+                    await asyncio.sleep(delay)
+            
+            raise last_exception
+        
+        return wrapper
+    return decorator
 
 class ContentCrawlerStub:
     """
@@ -112,8 +146,9 @@ class ContentCrawlerStub:
             await self._http_client.aclose()
             self._http_client = None
     
+    @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Make async REST API call to Tavily search endpoint."""
+        """Make async REST API call to Tavily search endpoint with retry logic."""
         payload = {
             "api_key": self.tavily_api_key,
             "query": query,

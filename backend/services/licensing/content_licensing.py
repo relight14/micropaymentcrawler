@@ -7,11 +7,46 @@ import uuid
 import httpx
 import defusedxml.ElementTree as ET
 import json
+import asyncio
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse, quote_plus, quote
+from functools import wraps
+
+def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base=2):
+    """
+    Simple retry decorator with exponential backoff for async functions.
+    
+    Args:
+        max_attempts: Maximum number of retry attempts
+        base_delay: Initial delay between retries in seconds
+        max_delay: Maximum delay between retries in seconds
+        exponential_base: Base for exponential backoff calculation
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except (httpx.HTTPError, httpx.TimeoutException) as e:
+                    last_exception = e
+                    
+                    if attempt == max_attempts - 1:
+                        raise
+                    
+                    delay = min(base_delay * (exponential_base ** attempt), max_delay)
+                    print(f"⚠️  API call failed (attempt {attempt + 1}/{max_attempts}): {str(e)[:100]}. Retrying in {delay:.1f}s...")
+                    await asyncio.sleep(delay)
+            
+            raise last_exception
+        
+        return wrapper
+    return decorator
 
 @dataclass
 class LicenseTerms:
@@ -238,8 +273,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             
         return None
     
+    @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _check_pricing(self, target_url: str) -> Optional[Dict]:
-        """Check real Tollbit pricing using official API endpoint"""
+        """Check real Tollbit pricing using official API endpoint with retry logic"""
         if not self.api_key:
             return None
             
@@ -319,8 +355,9 @@ class TollbitProtocolHandler(ProtocolHandler):
             print(f"Tollbit pricing discovery error: {e}")
             return None
 
+    @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _mint_token(self, target_url: str) -> Optional[Dict]:
-        """Mint a Tollbit token using their official API"""
+        """Mint a Tollbit token using their official API with retry logic"""
         if not self.api_key:
             return None
             
