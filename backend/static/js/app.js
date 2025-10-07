@@ -1399,6 +1399,7 @@ export class ChatResearchApp {
     
     _displayGeneratedReport(reportData) {
         console.log('📊 DISPLAY REPORT: Displaying generated report:', reportData);
+        console.log('🔍 CITATION DEBUG: citation_metadata =', reportData.citation_metadata);
         
         if (!reportData || !reportData.summary) {
             console.error('❌ DISPLAY REPORT: Invalid report data:', reportData);
