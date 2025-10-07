@@ -187,9 +187,6 @@ export class MessageRenderer {
             // Plain text or HTML string
             bodyDiv.innerHTML = this._formatContent(message.content);
             
-            console.log('🔍 BADGE INJECT: metadata =', message.metadata);
-            console.log('🔍 BADGE INJECT: citation_metadata =', message.metadata?.citation_metadata);
-            
             // Inject citation badges after content is in DOM (for string content)
             if (message.metadata?.citation_metadata) {
                 this._injectCitationBadges(bodyDiv, message.metadata.citation_metadata);
@@ -204,8 +201,6 @@ export class MessageRenderer {
      * @private
      */
     static _injectCitationBadges(contentElement, citationMetadata) {
-        console.log('🔍 INJECT BADGES called with:', { contentElement, citationMetadata });
-        
         if (!contentElement || !citationMetadata) return;
         
         // Protocol icon mapping
@@ -214,8 +209,6 @@ export class MessageRenderer {
             'tollbit': '⚡',
             'cloudflare': '☁️'
         };
-        
-        console.log('🔍 INJECT BADGES: Protocol icons =', protocolIcons);
         
         // Find all text nodes that might contain citations
         const walker = document.createTreeWalker(
@@ -229,8 +222,6 @@ export class MessageRenderer {
         while (node = walker.nextNode()) {
             textNodes.push(node);
         }
-        
-        console.log('🔍 INJECT BADGES: Found text nodes =', textNodes.map(n => n.textContent))
         
         // Process each text node for citation patterns
         textNodes.forEach(textNode => {

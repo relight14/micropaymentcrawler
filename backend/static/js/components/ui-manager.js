@@ -110,13 +110,6 @@ export class UIManager {
 
     // Message display with error handling
     addMessageToChat(message) {
-        console.log('🎨 UI MANAGER addMessageToChat:', { 
-            sender: message.sender, 
-            hasMetadata: !!message.metadata,
-            metadataType: message.metadata?.type,
-            hasCitationMetadata: !!message.metadata?.citation_metadata 
-        });
-        
         if (!this.messagesContainer) {
             console.error(`❌ UI MANAGER: No messagesContainer found!`);
             return;

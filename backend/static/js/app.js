@@ -320,8 +320,6 @@ export class ChatResearchApp {
     }
 
     addMessage(sender, content, metadata = null) {
-        console.log('➕ addMessage called:', { sender, metadata, stack: new Error().stack.split('\n').slice(1, 3).join('\n') });
-        
         // Handle live DOM nodes: store serializable content in state, pass live DOM to UI
         let stateContent = content;
         let uiContent = content;
@@ -340,12 +338,6 @@ export class ChatResearchApp {
             ...message,
             content: uiContent
         };
-        
-        console.log('➕ Calling uiManager.addMessageToChat with:', { 
-            sender: uiMessage.sender, 
-            hasMetadata: !!uiMessage.metadata,
-            metadata: uiMessage.metadata 
-        });
         
         this.uiManager.addMessageToChat(uiMessage);
         
@@ -1237,8 +1229,6 @@ export class ChatResearchApp {
 
 
     _restoreChatMessages() {
-        console.log('🔄 _restoreChatMessages called - stack trace:', new Error().stack);
-        
         const messagesContainer = document.getElementById('messagesContainer');
         
         // Remove report builder UI
@@ -1252,15 +1242,8 @@ export class ChatResearchApp {
         
         // Rebuild UI from stored conversation history WITHOUT mutating state
         const conversationHistory = this.appState.getConversationHistory();
-        console.log('🔄 Restoring', conversationHistory.length, 'messages');
         
-        conversationHistory.forEach((message, index) => {
-            console.log(`🔄 Restoring message ${index}:`, {
-                sender: message.sender,
-                hasMetadata: !!message.metadata,
-                metadata: message.metadata
-            });
-            
+        conversationHistory.forEach((message) => {
             // Convert HTML strings back to DOM elements for proper rendering
             const uiMessage = { ...message };
             if (typeof message.content === 'string' && message.content.startsWith('<')) {
