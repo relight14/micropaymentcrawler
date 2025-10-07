@@ -241,13 +241,14 @@ export class MessageRenderer {
                 // Add badge if source is locked
                 if (citationData && citationData.locked) {
                     const badge = document.createElement('span');
-                    badge.className = `citation-badge citation-badge--${citationData.protocol || 'rsl'}`;
+                    const protocol = (citationData.protocol || 'rsl').toLowerCase();
+                    badge.className = `citation-badge citation-badge--${protocol}`;
                     badge.setAttribute('data-source-id', citationData.source_id);
-                    badge.setAttribute('data-protocol', citationData.protocol || 'rsl');
+                    badge.setAttribute('data-protocol', protocol);
                     badge.setAttribute('data-price', citationData.price || 0);
                     badge.setAttribute('data-title', citationData.title || 'Source');
                     
-                    const icon = protocolIcons[citationData.protocol] || '🔒';
+                    const icon = protocolIcons[protocol] || '🔒';
                     const price = Number(citationData.price || 0).toFixed(2);
                     badge.textContent = `${icon} $${price}`;
                     badge.title = `Click to unlock: ${citationData.title || 'Source'}`;
