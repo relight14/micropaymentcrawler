@@ -13,7 +13,6 @@ import { debounce } from './utils/helpers.js';
 
 export class ChatResearchApp {
     constructor() {
-        console.log("✅ ChatResearchApp constructor running");
         // Initialize services and state (dependency injection)
         this.authService = new AuthService();
         this.apiService = new APIService(this.authService);
@@ -130,14 +129,9 @@ export class ChatResearchApp {
     }
 
     initializeEventListeners() {
-        console.log("🔧 initializeEventListeners() starting");
         // Get DOM elements
         const chatInput = document.getElementById('newChatInput');
         const sendButton = document.getElementById('newSendButton');
-        
-        // Debug DOM elements
-        console.log("chatInput:", chatInput);
-        console.log("sendButton:", sendButton);
         const clearButton = document.getElementById('clearButton');
         const newChatBtn = document.getElementById('newChatBtn');
         const chatModeBtn = document.getElementById('chatModeBtn');
@@ -228,7 +222,6 @@ export class ChatResearchApp {
     async sendMessage() {
         const chatInput = document.getElementById('newChatInput');
         const message = chatInput?.value?.trim();
-        console.log("📝 Message to send:", message);
         
         if (!message) return;
         
@@ -249,10 +242,6 @@ export class ChatResearchApp {
                 this.appState.getConversationHistory() : null;
             const response = await this.apiService.sendMessage(message, this.appState.getMode(), conversationContext);
             
-            // 1. PIPELINE TRACE: Log raw response
-            console.log('🔍 PIPELINE TRACE: Search response handler called');
-            console.log('📦 PIPELINE TRACE: Raw response received:', response);
-            
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();
             
@@ -263,16 +252,7 @@ export class ChatResearchApp {
             
             // Handle research data with progressive loading
             if (response.research_data) {
-                // 2. PIPELINE TRACE: Log research data
-                console.log('📋 PIPELINE TRACE: Research data found:', response.research_data);
-                console.log('📊 PIPELINE TRACE: Sources array:', response.research_data?.sources);
-                console.log('📏 PIPELINE TRACE: Sources length:', response.research_data?.sources?.length);
-                
                 this.appState.setCurrentResearchData(response.research_data);
-                
-                // 3. PIPELINE TRACE: Before calling _displaySourceCards
-                console.log('🎯 PIPELINE TRACE: About to call _displaySourceCards()');
-                console.log('🎯 PIPELINE TRACE: Sources parameter:', response.research_data.sources);
                 
                 // Display immediate source cards
                 this._displaySourceCards(response.research_data.sources);
@@ -280,7 +260,7 @@ export class ChatResearchApp {
                 // If enrichment is needed, let the progressive system handle updates
                 // Note: Backend handles progressive enrichment via cache polling automatically
                 if (response.research_data.enrichment_needed) {
-                    console.log('🔄 Progressive enrichment in progress...'); 
+ 
                     // Polling is handled by backend progressive system, no client polling needed
                 }
             }
@@ -351,7 +331,6 @@ export class ChatResearchApp {
         const welcomeScreen = document.getElementById('welcomeScreen');
         if (welcomeScreen && welcomeScreen.style.display !== 'none') {
             welcomeScreen.style.display = 'none';
-            console.log('Welcome screen hidden after first message');
         }
     }
 
@@ -1582,13 +1561,10 @@ export class ChatResearchApp {
 
 // Initialize the app when DOM is ready  
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("🚀 DOMContentLoaded fired - attempting app initialization");
     // Ensure only one instance exists
     if (!window.LedeWire?.researchApp) {
         try {
-            console.log("📦 Creating new ChatResearchApp instance...");
             window.app = new ChatResearchApp();
-            console.log("✅ ChatResearchApp created successfully:", window.app);
             // Legacy global only if not already set (avoid conflicts)
             if (!window.researchApp) {
                 window.researchApp = window.app;
@@ -1597,7 +1573,5 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("🚨 App initialization failed:", e);
             console.error("Stack trace:", e.stack);
         }
-    } else {
-        console.log("⚠️ App instance already exists, skipping initialization");
     }
 });
