@@ -186,6 +186,11 @@ export class MessageRenderer {
         } else {
             // Plain text or HTML string
             bodyDiv.innerHTML = this._formatContent(message.content);
+            
+            // Inject citation badges after content is in DOM (for string content)
+            if (message.metadata?.citation_metadata) {
+                this._injectCitationBadges(bodyDiv, message.metadata.citation_metadata);
+            }
         }
         
         return bodyDiv;

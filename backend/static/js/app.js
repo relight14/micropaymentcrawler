@@ -1405,95 +1405,33 @@ export class ChatResearchApp {
             return;
         }
         
-        // Create main container for the research report
-        const container = document.createElement('div');
-        container.className = 'research-report-container';
+        // Build report header
+        const headerText = `# Research Report: ${reportData.query}\n**${(reportData.tier || 'research').toUpperCase()} TIER**\n\n`;
         
-        // Add report header
-        const header = document.createElement('div');
-        header.className = 'report-header';
+        // Build complete report content
+        let reportContent = headerText + reportData.summary;
         
-        const title = document.createElement('h2');
-        title.textContent = `Research Report: ${reportData.query}`;
-        title.className = 'report-title';
-        
-        const tierBadge = document.createElement('span');
-        tierBadge.className = `tier-badge tier-${reportData.tier || 'research'}`;
-        tierBadge.textContent = `${(reportData.tier || 'research').toUpperCase()} TIER`;
-        
-        header.appendChild(title);
-        header.appendChild(tierBadge);
-        container.appendChild(header);
-        
-        // Add summary section (always present)
-        const summarySection = document.createElement('div');
-        summarySection.className = 'report-section summary-section';
-        
-        const summaryTitle = document.createElement('h3');
-        summaryTitle.textContent = '📋 Executive Summary';
-        summaryTitle.className = 'section-title';
-        
-        const summaryContent = document.createElement('div');
-        summaryContent.className = 'section-content';
-        summaryContent.innerHTML = reportData.summary.replace(/\n/g, '<br>');
-        
-        summarySection.appendChild(summaryTitle);
-        summarySection.appendChild(summaryContent);
-        container.appendChild(summarySection);
-        
-        // Add outline section (if available - research and pro tiers)
+        // Add outline if available
         if (reportData.outline) {
-            const outlineSection = document.createElement('div');
-            outlineSection.className = 'report-section outline-section';
-            
-            const outlineTitle = document.createElement('h3');
-            outlineTitle.textContent = '📝 Research Outline';
-            outlineTitle.className = 'section-title';
-            
-            const outlineContent = document.createElement('div');
-            outlineContent.className = 'section-content';
-            outlineContent.innerHTML = reportData.outline.replace(/\n/g, '<br>');
-            
-            outlineSection.appendChild(outlineTitle);
-            outlineSection.appendChild(outlineContent);
-            container.appendChild(outlineSection);
+            reportContent += '\n\n' + reportData.outline;
         }
         
-        // Add strategic insights section (if available - pro tier only)
+        // Add insights if available
         if (reportData.insights) {
-            const insightsSection = document.createElement('div');
-            insightsSection.className = 'report-section insights-section';
-            
-            const insightsTitle = document.createElement('h3');
-            insightsTitle.textContent = '🧠 Strategic Insights';
-            insightsTitle.className = 'section-title';
-            
-            const insightsContent = document.createElement('div');
-            insightsContent.className = 'section-content';
-            insightsContent.innerHTML = reportData.insights.replace(/\n/g, '<br>');
-            
-            insightsSection.appendChild(insightsTitle);
-            insightsSection.appendChild(insightsContent);
-            container.appendChild(insightsSection);
+            reportContent += '\n\n' + reportData.insights;
         }
         
-        // Add source summary footer
-        const footer = document.createElement('div');
-        footer.className = 'report-footer';
+        // Add footer
+        const sourceCount = reportData.total_sources || reportData.sources?.length || 0;
+        reportContent += `\n\n---\n*Generated from ${sourceCount} sources*`;
         
-        const sourceStats = document.createElement('p');
-        sourceStats.className = 'source-stats';
-        sourceStats.textContent = `Generated from ${reportData.total_sources || reportData.sources?.length || 0} sources`;
-        
-        footer.appendChild(sourceStats);
-        container.appendChild(footer);
-        
-        // Add the complete research report to the chat
-        this.addMessage('assistant', container, {
+        // Pass raw markdown to MessageRenderer with citation metadata
+        // MessageRenderer will handle conversion to HTML and inject citation badges
+        this.addMessage('assistant', reportContent, {
             type: 'research_report',
             tier: reportData.tier,
             query: reportData.query,
-            sources_count: reportData.total_sources || reportData.sources?.length || 0,
+            sources_count: sourceCount,
             citation_metadata: reportData.citation_metadata || null
         });
     }
