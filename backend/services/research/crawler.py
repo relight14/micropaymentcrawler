@@ -324,27 +324,27 @@ class ContentCrawlerStub:
     # Removed _calculate_basic_price - now using real licensing discovery only
     
     async def _enrich_sources_progressive(self, sources: List[SourceCard], query: str, cache_key: str):
-        """Progressive enrichment: licensing discovery + Claude polishing in parallel"""
+        """Two-phase progressive enrichment: pricing first (fast), then polishing (slow)"""
         try:
             print(f"🔍 Starting progressive enrichment for {len(sources)} sources...")
             
-            # Run licensing and Claude in parallel for maximum speed
-            licensing_task = asyncio.create_task(self._add_licensing_async(sources))
-            claude_task = asyncio.create_task(self._polish_sources_claude(sources, query))
+            # PHASE 1: Licensing discovery (fast ~2-3s) - cache immediately!
+            await self._add_licensing_async(sources)
             
-            # Wait for both to complete
-            await asyncio.gather(licensing_task, claude_task, return_exceptions=True)
-            
-            print(f"✅ Progressive enrichment completed")
-            
-            # CRITICAL: Re-sort sources by relevance score AFTER paid source boost is applied
-            # This ensures paid sources with boosted scores appear at the top
+            # Sort by relevance after licensing boost is applied
             sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
-            print(f"🔄 Sources re-sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
+            print(f"🔄 Phase 1 complete: Sources sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
             
-            # Cache the final enriched AND sorted results 
+            # Cache pricing results immediately so frontend gets them fast!
             self._store_in_cache(cache_key, sources)
-            print(f"💾 Enriched sources cached with key: {cache_key}")
+            print(f"💾 Phase 1 cached: Pricing available in ~3 seconds")
+            
+            # PHASE 2: Claude polishing (slow ~30s) - cache again when done
+            await self._polish_sources_claude(sources, query)
+            
+            # Re-cache with polished content
+            self._store_in_cache(cache_key, sources)
+            print(f"✅ Progressive enrichment completed - polished content cached")
             
         except Exception as e:
             print(f"❌ Progressive enrichment error: {e}")
