@@ -29,6 +29,46 @@ async def get_system_stats():
         return {"error": str(e), "status": "degraded"}
 
 
+@router.get("/{source_id}/pricing")
+async def get_source_pricing(source_id: str, request: Request):
+    """Fetch fresh server-authoritative pricing for a specific source (Layer 3 safety check)"""
+    try:
+        from services.research.crawler import ContentCrawlerStub
+        
+        # Access crawler instance to search cache
+        crawler = ContentCrawlerStub()
+        
+        # Search all cached results for the source
+        source = None
+        for cache_key in crawler._cache:
+            cached_sources, timestamp = crawler._cache[cache_key]
+            if crawler._is_cache_valid(timestamp):
+                for cached_source in cached_sources:
+                    if cached_source.id == source_id:
+                        source = cached_source
+                        break
+            if source:
+                break
+        
+        if not source:
+            raise HTTPException(status_code=404, detail=f"Source {source_id} not found in cache")
+        
+        # Return fresh pricing data
+        return {
+            "source_id": source.id,
+            "title": source.title,
+            "unlock_price": source.unlock_price or 0.0,
+            "licensing_protocol": source.licensing_protocol,
+            "is_unlocked": source.is_unlocked,
+            "domain": source.domain
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching source pricing: {str(e)}")
+
+
 @router.post("/unlock-source", response_model=SourceUnlockResponse)
 # @limiter.limit("20/minute")
 async def unlock_source(request: Request, unlock_request: SourceUnlockRequest):

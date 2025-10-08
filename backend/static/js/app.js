@@ -254,6 +254,14 @@ export class ChatResearchApp {
             if (response.research_data) {
                 this.appState.setCurrentResearchData(response.research_data);
                 
+                // Set enrichment status based on response
+                if (response.research_data.stage === 'skeleton' || response.research_data.enrichment_needed) {
+                    this.appState.setEnrichmentStatus('processing');
+                    console.log('🔄 Enrichment status set to processing');
+                } else {
+                    this.appState.setEnrichmentStatus('complete');
+                }
+                
                 // Display immediate source cards
                 this._displaySourceCards(response.research_data.sources);
                 
@@ -667,6 +675,13 @@ export class ChatResearchApp {
             return;
         }
 
+        // LAYER 2 SAFETY: Block unlock if enrichment is still pending
+        if (this.appState.isEnrichmentPending()) {
+            this.showToast('⏳ Pricing is still loading... please wait', 'info', 3000);
+            console.log('🔓 UNLOCK: Blocked - enrichment still pending');
+            return;
+        }
+
         // Guard: Prevent duplicate unlock attempts
         if (this.isUnlockInProgress) {
             console.log('🔓 UNLOCK: Already in progress, ignoring duplicate request');
@@ -682,6 +697,27 @@ export class ChatResearchApp {
                 price 
             });
             this.showAuthModal();
+            return;
+        }
+        
+        // LAYER 3 SAFETY: Always fetch fresh server-authoritative pricing before showing modal
+        try {
+            console.log('🔓 UNLOCK: Fetching fresh pricing from server...');
+            const freshPricing = await this.apiService.getFreshSourcePricing(sourceId);
+            
+            // Update source with fresh pricing
+            if (sourceToUpdate) {
+                sourceToUpdate.unlock_price = freshPricing.unlock_price;
+                sourceToUpdate.licensing_protocol = freshPricing.licensing_protocol;
+            }
+            
+            // Use fresh price for modal
+            price = freshPricing.unlock_price;
+            console.log('✅ UNLOCK: Fresh pricing fetched:', freshPricing);
+            
+        } catch (error) {
+            console.error('❌ UNLOCK: Failed to fetch fresh pricing:', error);
+            this.showToast('Failed to load pricing. Please try again.', 'error');
             return;
         }
 

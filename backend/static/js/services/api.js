@@ -239,6 +239,20 @@ export class APIService {
         return await response.json();
     }
 
+    async getFreshSourcePricing(sourceId) {
+        const response = await fetch(`${this.baseURL}/api/sources/${sourceId}/pricing`, {
+            method: 'GET',
+            headers: this.getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            this._handle401(response);
+            throw new Error('Failed to fetch source pricing');
+        }
+        
+        return await response.json();
+    }
+
     async unlockSource(sourceId, _price) {
         // _price is unused but retained for compatibility
         const userId = this.authService.getUserId();

@@ -20,6 +20,9 @@ export class AppState {
         this.purchasedItems = new Set(this._loadFromStorage('purchasedItems', []));
         this.pendingAction = null;
         
+        // Enrichment tracking
+        this.enrichmentStatus = 'idle'; // idle | processing | complete
+        
         // UI state
         this.isDarkMode = localStorage.getItem('darkMode') === 'true';
         this.isLoginMode = true;
@@ -187,10 +190,28 @@ export class AppState {
     setCurrentResearchData(data) {
         this.currentResearchData = data;
         this._saveToStorage('currentResearchData', data);
+        
+        // Track enrichment status from research data
+        if (data?.enrichment_status) {
+            this.enrichmentStatus = data.enrichment_status === 'ready' ? 'complete' : 'processing';
+        }
     }
 
     getCurrentResearchData() {
         return this.currentResearchData;
+    }
+    
+    // Enrichment status tracking
+    setEnrichmentStatus(status) {
+        this.enrichmentStatus = status;
+    }
+    
+    getEnrichmentStatus() {
+        return this.enrichmentStatus;
+    }
+    
+    isEnrichmentPending() {
+        return this.enrichmentStatus === 'processing';
     }
 
     // Purchased items tracking with persistence

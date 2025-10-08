@@ -167,6 +167,10 @@ class SourceCard {
             console.log('✅ AppState updated with enriched pricing data');
         }
         
+        // Mark enrichment as complete (Layer 1 & 2 safety)
+        this.appState.setEnrichmentStatus('complete');
+        console.log('✅ Enrichment status set to complete');
+        
         sources.forEach(enrichedSource => {
             this.updateCard(enrichedSource);
         });
@@ -288,6 +292,7 @@ class SourceCard {
      * - Tollbit: Real pricing when confirmed, otherwise no badge
      * - RSL/Cloudflare: Always "Coming Soon" for demo potential  
      * - Free sources: Show as FREE
+     * - Enrichment pending: Show "⏳ PRICING..." (Layer 1 safety)
      */
     _createLicenseBadge(source) {
         const badge = document.createElement('span');
@@ -295,6 +300,15 @@ class SourceCard {
         
         const protocol = source.licensing_protocol;
         const cost = source.unlock_price || source.licensing_cost || 0;
+        const isEnrichmentPending = this.appState.isEnrichmentPending();
+        
+        // LAYER 1 SAFETY: Show loading state if enrichment is pending and no pricing yet
+        if (isEnrichmentPending && cost === 0 && !protocol) {
+            badge.classList.add('license-loading');
+            badge.textContent = '⏳ PRICING...';
+            badge.dataset.enrichmentPending = 'true';
+            return badge;
+        }
         
         // HYBRID BADGE STRATEGY
         if (protocol && protocol.toLowerCase() === 'tollbit' && cost > 0) {
@@ -313,7 +327,7 @@ class SourceCard {
             badge.textContent = '☁️ Cloudflare Coming Soon';
             
         } else if (cost === 0) {
-            // Free discovery content
+            // Free discovery content (only show if enrichment is complete)
             badge.classList.add('license-free');
             badge.textContent = 'FREE DISCOVERY';
             
