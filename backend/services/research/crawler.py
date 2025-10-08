@@ -324,27 +324,20 @@ class ContentCrawlerStub:
     # Removed _calculate_basic_price - now using real licensing discovery only
     
     async def _enrich_sources_progressive(self, sources: List[SourceCard], query: str, cache_key: str):
-        """Two-phase progressive enrichment: pricing first (fast), then polishing (slow)"""
+        """Progressive enrichment: pricing discovery only (fast ~3s)"""
         try:
             print(f"🔍 Starting progressive enrichment for {len(sources)} sources...")
             
-            # PHASE 1: Licensing discovery (fast ~2-3s) - cache immediately!
+            # Licensing discovery (fast ~2-3s) - Tavily excerpts are already good enough!
             await self._add_licensing_async(sources)
             
             # Sort by relevance after licensing boost is applied
             sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
-            print(f"🔄 Phase 1 complete: Sources sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
+            print(f"🔄 Sources sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
             
-            # Cache pricing results immediately so frontend gets them fast!
+            # Cache pricing results - Tavily content is already compelling!
             self._store_in_cache(cache_key, sources)
-            print(f"💾 Phase 1 cached: Pricing available in ~3 seconds")
-            
-            # PHASE 2: Claude polishing (slow ~30s) - cache again when done
-            await self._polish_sources_claude(sources, query)
-            
-            # Re-cache with polished content
-            self._store_in_cache(cache_key, sources)
-            print(f"✅ Progressive enrichment completed - polished content cached")
+            print(f"✅ Progressive enrichment completed - pricing cached in ~3 seconds")
             
         except Exception as e:
             print(f"❌ Progressive enrichment error: {e}")
