@@ -324,6 +324,12 @@ class TollbitProtocolHandler(ProtocolHandler):
                             
                             currency = price_info.get('currency', 'USD')
                         
+                        # PRICING FALLBACK LOGIC:
+                        # Some publishers (e.g., Forbes) only provide ON_DEMAND_LICENSE (AI scraping) 
+                        # without ON_DEMAND_FULL_USE_LICENSE (human reader access).
+                        # When only AI price exists: multiply by 2.4x to estimate fair full-access price
+                        # Example: Forbes $0.015 (AI) → $0.036 ≈ $0.04 (human unlock)
+                        # When only full price exists: divide by 2.4x to estimate AI scraping price
                         if ai_include_price and not purchase_price:
                             purchase_price = ai_include_price * 2.4
                         elif purchase_price and not ai_include_price:
