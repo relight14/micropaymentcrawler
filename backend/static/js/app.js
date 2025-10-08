@@ -252,15 +252,8 @@ export class ChatResearchApp {
             
             // Handle research data with progressive loading
             if (response.research_data) {
+                // Backend is single source of truth for enrichment status
                 this.appState.setCurrentResearchData(response.research_data);
-                
-                // Set enrichment status based on response
-                if (response.research_data.stage === 'skeleton' || response.research_data.enrichment_needed) {
-                    this.appState.setEnrichmentStatus('processing');
-                    console.log('🔄 Enrichment status set to processing');
-                } else {
-                    this.appState.setEnrichmentStatus('complete');
-                }
                 
                 // Display immediate source cards
                 this._displaySourceCards(response.research_data.sources);

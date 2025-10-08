@@ -191,9 +191,18 @@ export class AppState {
         this.currentResearchData = data;
         this._saveToStorage('currentResearchData', data);
         
-        // Track enrichment status from research data
+        // Track enrichment status from research data (backend is single source of truth)
         if (data?.enrichment_status) {
-            this.enrichmentStatus = data.enrichment_status === 'ready' ? 'complete' : 'processing';
+            // Map backend statuses to frontend states
+            const statusMap = {
+                'idle': 'idle',
+                'processing': 'processing',
+                'complete': 'complete',
+                'ready': 'complete',  // Backend enrichment endpoint returns 'ready'
+                'error': 'complete',
+                'failed': 'complete'
+            };
+            this.enrichmentStatus = statusMap[data.enrichment_status] || 'idle';
         }
     }
 

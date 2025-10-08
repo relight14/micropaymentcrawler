@@ -582,6 +582,10 @@ async def analyze_research_query(
             })
         
         # Create response with progressive flow information
+        # Map stage to enrichment_status: skeleton->processing, complete->complete, error->error
+        stage = result.get("stage", "complete")
+        enrichment_status = "processing" if stage == "skeleton" else stage
+        
         response = DynamicResearchResponse(
             query=sanitized_query,
             total_estimated_cost=round(total_cost, 2),
@@ -590,7 +594,7 @@ async def analyze_research_query(
             research_summary=summary,
             sources=sources_response,
             licensing_breakdown=licensing_breakdown,
-            enrichment_status=result.get("stage", "complete"),
+            enrichment_status=enrichment_status,
             enrichment_needed=result.get("enrichment_needed", False)
         )
         
