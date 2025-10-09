@@ -9,7 +9,7 @@ import os
 import anthropic
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
-from schemas.domain import TierType, ResearchPacket
+from schemas.domain import TierType, ResearchPacket, SourceCard
 from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
