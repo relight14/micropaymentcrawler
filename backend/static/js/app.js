@@ -375,6 +375,22 @@ export class ChatResearchApp {
         this.showAuthModal();
     }
 
+    showAuthModalMessage(message, type = 'error') {
+        const messageEl = document.getElementById('authModalMessage');
+        if (!messageEl) return;
+        
+        messageEl.textContent = message;
+        messageEl.className = `auth-modal-message ${type}`;
+        messageEl.style.display = 'block';
+        
+        // Auto-hide success messages after 3 seconds
+        if (type === 'success') {
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+    }
+
     showAuthModal() {
         // Remove any existing modal
         const existingModal = document.getElementById('authModal');
@@ -394,6 +410,7 @@ export class ChatResearchApp {
                         <button class="modal-close" onclick="document.getElementById('authModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
                     <div class="auth-modal-content">
+                        <div id="authModalMessage" class="auth-modal-message" style="display: none;"></div>
                         <form class="auth-form" id="authForm">
                             ${!isLogin ? `
                                 <div class="auth-form-group">
@@ -460,7 +477,7 @@ export class ChatResearchApp {
             forgotPasswordLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 // TODO: Implement forgot password functionality
-                this.addMessage('system', 'Forgot password functionality coming soon. Please contact support for assistance.');
+                this.showAuthModalMessage('Forgot password functionality coming soon. Please contact support for assistance.', 'info');
             });
         }
 
@@ -635,12 +652,12 @@ export class ChatResearchApp {
         const lastName = lastNameInput?.value?.trim();
         
         if (!email || !password) {
-            this.addMessage('system', 'Please enter both email and password.');
+            this.showAuthModalMessage('Please enter both email and password.');
             return;
         }
         
         if (type === 'signup' && (!firstName || !lastName)) {
-            this.addMessage('system', 'Please enter your first and last name.');
+            this.showAuthModalMessage('Please enter your first and last name.');
             return;
         }
 
@@ -663,13 +680,15 @@ export class ChatResearchApp {
             if (this.authService.isAuthenticated()) {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
-            this.addMessage('system', `Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`);
             
             // Close the auth modal
             const authModal = document.getElementById('authModal');
             if (authModal) {
                 authModal.remove();
             }
+            
+            // Show success toast
+            this.showToast(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
 
             // Auto-trigger funding modal if balance is $0
             if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
@@ -688,7 +707,7 @@ export class ChatResearchApp {
             
         } catch (error) {
             console.error(`${type} error:`, error);
-            this.addMessage('system', `${type === 'login' ? 'Login' : 'Signup'} failed: ${error.message}`);
+            this.showAuthModalMessage(`${type === 'login' ? 'Login' : 'Signup'} failed: ${error.message}`);
             
             // Re-enable submit button on error
             const submitBtn = document.getElementById('authSubmitBtn');
