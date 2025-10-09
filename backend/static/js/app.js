@@ -13,6 +13,9 @@ import { debounce } from './utils/helpers.js';
 
 export class ChatResearchApp {
     constructor() {
+        // Initialize base URL for API calls
+        this.baseURL = window.location.origin;
+        
         // Initialize services and state (dependency injection)
         this.authService = new AuthService();
         this.apiService = new APIService(this.authService);
