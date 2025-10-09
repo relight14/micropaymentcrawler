@@ -515,6 +515,11 @@ export class ChatResearchApp {
         const amountButtons = document.querySelectorAll('.funding-amount-btn');
         amountButtons.forEach(btn => {
             btn.addEventListener('click', async () => {
+                // Remove selected class from all buttons
+                amountButtons.forEach(b => b.classList.remove('selected'));
+                // Add selected class to clicked button
+                btn.classList.add('selected');
+                
                 const amount = parseInt(btn.dataset.amount);
                 await this.handleFundingAmountSelection(amount);
             });

@@ -2091,6 +2091,8 @@ input:checked + .slider:before {
 
 .auth-modal-content {
     padding: 2rem;
+    max-height: 70vh;
+    overflow-y: auto;
 }
 
 .auth-modal-footer {
@@ -2215,6 +2217,13 @@ input:checked + .slider:before {
     border-color: #4285f4;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(66, 133, 244, 0.15);
+}
+
+.funding-amount-btn.selected {
+    background: #e3f2fd;
+    border-color: #4285f4;
+    border-width: 3px;
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
 }
 
 .funding-amount-btn .amount {
