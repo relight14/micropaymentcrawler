@@ -278,6 +278,13 @@ export class ChatResearchApp {
     }
 
     setMode(mode) {
+        // Check authentication for research mode
+        if (mode === 'research' && !this.authService.isAuthenticated()) {
+            // Show login modal instead of switching mode
+            this.showAuthModal();
+            return;
+        }
+        
         const modeChanged = this.appState.setMode(mode);
         if (!modeChanged) return;
 
