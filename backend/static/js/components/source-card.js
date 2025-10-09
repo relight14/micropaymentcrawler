@@ -272,19 +272,38 @@ class SourceCard {
         const badges = document.createElement('div');
         badges.className = 'source-badges';
 
-        // Source type badge
-        if (source.source_type || source.type) {
-            const typeBadge = document.createElement('span');
-            typeBadge.className = 'source-type-badge';
-            typeBadge.textContent = source.source_type || source.type;
-            badges.appendChild(typeBadge);
-        }
+        // Source type badge with emoji
+        const typeBadge = this._createSourceTypeBadge(source);
+        badges.appendChild(typeBadge);
 
         // License badge - ALWAYS show a badge (Free, Coming Soon, or Paid)
         const licenseBadge = this._createLicenseBadge(source);
         badges.appendChild(licenseBadge);
 
         return badges;
+    }
+    
+    /**
+     * Create source type badge with emoji and tooltip
+     */
+    _createSourceTypeBadge(source) {
+        const badge = document.createElement('span');
+        badge.className = 'source-type-badge';
+        
+        const sourceType = source.source_type || 'journalism';
+        const typeMap = {
+            'academic': { emoji: '🎓', label: 'Academic' },
+            'journalism': { emoji: '📰', label: 'Journalism' },
+            'business': { emoji: '💼', label: 'Business' },
+            'government': { emoji: '🏛️', label: 'Government' }
+        };
+        
+        const typeInfo = typeMap[sourceType] || typeMap['journalism'];
+        badge.textContent = typeInfo.emoji;
+        badge.setAttribute('title', typeInfo.label);
+        badge.setAttribute('data-source-type', sourceType);
+        
+        return badge;
     }
 
     /**

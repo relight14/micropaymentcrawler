@@ -199,6 +199,10 @@ export class UIManager {
         header.appendChild(subtitle);
         container.appendChild(header);
         
+        // Add filter chips for source types
+        const filterSection = this._createSourceTypeFilters(sources);
+        container.appendChild(filterSection);
+        
         // Create individual source cards with live event listeners
         sources.forEach((source) => {
             const sourceCard = sourceCardComponent.create(source, {
@@ -209,6 +213,98 @@ export class UIManager {
         });
         
         messageDiv.appendChild(container);
+    }
+    
+    _createSourceTypeFilters(sources) {
+        const filterSection = document.createElement('div');
+        filterSection.className = 'source-type-filters';
+        
+        // Count sources by type
+        const typeCounts = {
+            'academic': 0,
+            'journalism': 0,
+            'business': 0,
+            'government': 0
+        };
+        
+        sources.forEach(source => {
+            const type = source.source_type || 'journalism';
+            if (typeCounts.hasOwnProperty(type)) {
+                typeCounts[type]++;
+            }
+        });
+        
+        // Filter label
+        const label = document.createElement('span');
+        label.className = 'filter-label';
+        label.textContent = 'Filter:';
+        filterSection.appendChild(label);
+        
+        // Create filter chips with emojis and counts
+        const filterTypes = [
+            { type: 'academic', emoji: '🎓', label: 'Academic' },
+            { type: 'journalism', emoji: '📰', label: 'Journalism' },
+            { type: 'business', emoji: '💼', label: 'Business' },
+            { type: 'government', emoji: '🏛️', label: 'Government' }
+        ];
+        
+        filterTypes.forEach(({ type, emoji, label }) => {
+            const count = typeCounts[type];
+            if (count === 0) return; // Skip if no sources of this type
+            
+            const chip = document.createElement('button');
+            chip.className = 'filter-chip';
+            chip.setAttribute('data-filter-type', type);
+            chip.innerHTML = `${emoji} ${label} <span class="count">${count}</span>`;
+            
+            chip.addEventListener('click', () => {
+                this._toggleSourceTypeFilter(chip, type);
+            });
+            
+            filterSection.appendChild(chip);
+        });
+        
+        return filterSection;
+    }
+    
+    _toggleSourceTypeFilter(chipElement, filterType) {
+        const isActive = chipElement.classList.contains('active');
+        
+        if (isActive) {
+            // Deactivate filter - show all cards
+            chipElement.classList.remove('active');
+            document.querySelectorAll('.source-card').forEach(card => {
+                card.classList.remove('filtered-hidden');
+            });
+        } else {
+            // Deactivate all other chips first
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+            
+            // Activate this chip
+            chipElement.classList.add('active');
+            
+            // Filter source cards
+            document.querySelectorAll('.source-card').forEach(card => {
+                const sourceId = card.getAttribute('data-source-id');
+                const badge = card.querySelector('.source-type-badge');
+                const cardType = badge?.getAttribute('data-source-type');
+                
+                if (cardType === filterType) {
+                    card.classList.remove('filtered-hidden');
+                } else {
+                    card.classList.add('filtered-hidden');
+                }
+            });
+        }
+        
+        // Store filter state in sessionStorage for persistence
+        if (isActive) {
+            sessionStorage.removeItem('sourceTypeFilter');
+        } else {
+            sessionStorage.setItem('sourceTypeFilter', filterType);
+        }
     }
     
     /**
