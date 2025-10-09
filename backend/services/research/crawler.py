@@ -140,6 +140,59 @@ class ContentCrawlerStub:
             await self._http_client.aclose()
             self._http_client = None
     
+    def _classify_source_type(self, domain: str, url: str) -> str:
+        """
+        Classify source type based on domain and URL patterns.
+        
+        Returns:
+            Source type: "academic", "journalism", "business", "government"
+        """
+        domain_lower = domain.lower()
+        url_lower = url.lower()
+        
+        # Academic sources
+        academic_patterns = [
+            '.edu', 'scholar.google', 'arxiv.org', 'researchgate.net', 
+            'jstor.org', 'pubmed', 'ieee.org', 'sciencedirect.com',
+            'springer.com', 'nature.com', 'science.org', 'plos.org',
+            'nber.org', 'ssrn.com', 'academic.oup.com'
+        ]
+        
+        # Journalism sources
+        journalism_patterns = [
+            'nytimes.com', 'washingtonpost.com', 'wsj.com', 'bloomberg.com',
+            'reuters.com', 'apnews.com', 'bbc.com', 'cnn.com', 'theguardian.com',
+            'ft.com', 'economist.com', 'forbes.com', 'time.com', 'theatlantic.com',
+            'npr.org', 'politico.com', 'axios.com', 'propublica.org'
+        ]
+        
+        # Business/industry sources
+        business_patterns = [
+            'hbr.org', 'mckinsey.com', 'bcg.com', 'deloitte.com', 'pwc.com',
+            'gartner.com', 'forrester.com', 'fortune.com', 'businessinsider.com',
+            'cnbc.com', 'marketwatch.com', 'investopedia.com'
+        ]
+        
+        # Government sources
+        government_patterns = [
+            '.gov', 'census.gov', 'bls.gov', 'fed.gov', 'whitehouse.gov',
+            'congress.gov', 'europa.eu', 'oecd.org', 'worldbank.org',
+            'imf.org', 'who.int', 'un.org'
+        ]
+        
+        # Check patterns
+        if any(pattern in domain_lower or pattern in url_lower for pattern in academic_patterns):
+            return 'academic'
+        elif any(pattern in domain_lower for pattern in journalism_patterns):
+            return 'journalism'
+        elif any(pattern in domain_lower for pattern in business_patterns):
+            return 'business'
+        elif any(pattern in domain_lower for pattern in government_patterns):
+            return 'government'
+        else:
+            # Default to journalism for general news/credible sources
+            return 'journalism'
+    
     def _get_credibility_penalty(self, url: str) -> float:
         """
         Apply credibility penalty to low-quality sources (social media, Wikipedia, etc.).
@@ -294,6 +347,9 @@ class ContentCrawlerStub:
                 credibility_penalty = self._get_credibility_penalty(url)  # Downrank social media/Wikipedia
                 relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + credibility_penalty + random_factor))
                 
+                # Classify source type based on domain
+                source_type = self._classify_source_type(domain, url)
+                
                 # Start with free pricing - real licensing discovery will set authentic prices
                 source = SourceCard(
                     id=source_id,
@@ -305,7 +361,8 @@ class ContentCrawlerStub:
                     is_unlocked=False,
                     licensing_protocol=None,  # Will be set by licensing discovery 
                     licensing_cost=None,
-                    relevance_score=relevance_score  # Add relevance score immediately
+                    relevance_score=relevance_score,  # Add relevance score immediately
+                    source_type=source_type  # Add source type for blended results
                 )
                 
                 # Check budget constraint

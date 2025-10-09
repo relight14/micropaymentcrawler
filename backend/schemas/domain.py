@@ -37,6 +37,7 @@ class SourceCard(BaseModel):
     is_academic: bool = False
     published_date: Optional[str] = None
     relevance_score: Optional[float] = None
+    source_type: Optional[str] = None  # "academic", "journalism", "business", "government"
 
 
 class ResearchPacket(BaseModel):

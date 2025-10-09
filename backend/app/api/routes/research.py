@@ -236,6 +236,61 @@ def _detect_publication_constraint(query: str) -> Optional[Dict[str, str]]:
     # No publication detected
     return None
 
+def _blend_sources_by_intent(sources: List[SourceCard], intent: str) -> List[SourceCard]:
+    """
+    Blend sources based on research intent using weighted sampling.
+    
+    Args:
+        sources: List of source cards with source_type field
+        intent: Research intent ('academic', 'business', 'news', 'general')
+    
+    Returns:
+        Reordered list of sources with optimal mix for the intent
+    """
+    import random
+    
+    # Define intent-based weights
+    intent_weights = {
+        'academic': {'academic': 0.6, 'business': 0.2, 'journalism': 0.15, 'government': 0.05},
+        'business': {'business': 0.5, 'journalism': 0.3, 'academic': 0.15, 'government': 0.05},
+        'news': {'journalism': 0.7, 'business': 0.15, 'academic': 0.1, 'government': 0.05},
+        'general': {'journalism': 0.4, 'academic': 0.3, 'business': 0.2, 'government': 0.1}
+    }
+    
+    weights = intent_weights.get(intent, intent_weights['general'])
+    
+    # Group sources by type
+    sources_by_type = {'academic': [], 'business': [], 'journalism': [], 'government': []}
+    for source in sources:
+        source_type = source.source_type or 'journalism'
+        if source_type in sources_by_type:
+            sources_by_type[source_type].append(source)
+    
+    # Sample sources proportionally based on weights
+    blended_sources = []
+    total_sources = len(sources)
+    
+    for source_type, weight in weights.items():
+        target_count = int(total_sources * weight)
+        available = sources_by_type[source_type]
+        
+        if available:
+            # Sort by relevance within type
+            available.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+            # Take top N from this type
+            blended_sources.extend(available[:target_count])
+    
+    # If we haven't filled all slots, add remaining high-relevance sources
+    if len(blended_sources) < total_sources:
+        remaining = [s for s in sources if s not in blended_sources]
+        remaining.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+        blended_sources.extend(remaining[:total_sources - len(blended_sources)])
+    
+    # Final sort by relevance while maintaining diversity
+    blended_sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+    
+    return blended_sources
+
 def _detect_research_intent(conversation_context: List[Dict]) -> str:
     """Detect the type of research intent from conversation context.
     
@@ -634,8 +689,14 @@ async def analyze_research_query(
         # TODO: Consider async if adding GPT-assisted summaries or complex processing
         summary = _generate_research_preview(sanitized_query, sources)
         
-        # Sort sources by relevance score (highest first)
-        sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+        # Apply weighted source sampling based on detected intent
+        if research_request.conversation_context and len(research_request.conversation_context) > 0:
+            intent = _detect_research_intent(research_request.conversation_context)
+            sources = _blend_sources_by_intent(sources, intent)
+            print(f"🎨 Blended sources for {intent} intent: {len(sources)} total")
+        else:
+            # No context - just sort by relevance
+            sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
         
         # Convert sources to response format
         sources_response = []
