@@ -1,0 +1,107 @@
+The Real Problem in Plain Terms
+
+Right now your search engine logic is too literal and too shallow:
+
+It’s taking conversational text and stripping it into short, generic fragments.
+
+It then feeds those directly into Tavily, which behaves like a general web search without any domain weighting or contextual understanding.
+→ That’s why you’re getting Wikipedia: it’s the “lowest-entropy, highest-SEO” result for generic economic terms.
+
+The key is to make your query refinement layer more like a human researcher, not just a string condenser.
+
+🚀 What’s Already Right (Keep These)
+
+✅ The agent’s identification of:
+
+Truncated context
+
+Missing domain filters
+
+Weak academic weighting
+
+Wrong model for synthesis
+
+All correct — implement all those.
+
+✅ The new prompt template they drafted is very good — that alone will raise baseline query quality a lot.
+✅ Exclusion list for low-value domains = must-have.
+✅ Multi-pass search strategy = elegant fallback.
+
+⚙️ What You Should Add / Change
+1. Add an Intent-Detection Layer (before refinement)
+
+Before crafting the final query, first detect what kind of information the user is seeking.
+E.g.:
+
+Intent	Example keywords	Weight result toward
+Academic / causal analysis	“why”, “impact”, “relationship”, “hypothesis”, “correlation”	.edu, NBER, JSTOR, academic terms
+Market / business trends	“profitability”, “corporate”, “earnings”, “labor market”	WSJ, HBR, McKinsey, Reuters
+News / event	“recent”, “today”, “report”	Bloomberg, Reuters, AP
+
+Then append contextually:
+
+if intent == "academic":
+    refined_query += " site:.edu OR site:nber.org OR site:hbr.org OR site:reuters.com OR site:bloomberg.com"
+
+
+This single step will stop 80% of Wikipedia-style drifts.
+
+2. Use a “semantic compression” model, not truncation
+
+Instead of chopping messages at 500 chars, summarize them with intent retention:
+
+context_summary = claude.summarize(
+  "Summarize this conversation preserving the user’s hypothesis, causal logic, and key terms",
+  messages=conversation_context[-20:]
+)
+
+
+→ Feed that summary to your query refiner.
+This keeps the intellectual structure of the hypothesis (e.g. “productivity → profits → stagnant employment”) instead of fragmented text.
+
+3. Boost academic & business domains dynamically
+
+If you don’t want to hardcode exclude_domains, use domain scoring:
+
+domain_weights = {
+  ".edu": +0.4,
+  ".gov": +0.3,
+  "nber.org": +0.5,
+  "hbr.org": +0.3,
+  "reuters.com": +0.25,
+  "bloomberg.com": +0.25,
+  "ft.com": +0.25,
+  "wikipedia.org": -1.0,
+  "reddit.com": -1.0
+}
+
+
+Then rerank results client-side after Tavily returns.
+This keeps your search engine neutral but gives you perceived intelligence.
+
+4. Cache and Combine
+
+If enrichment is slow (like in your earlier issue), you can run parallel search passes:
+
+results_academic = tavily.search(... academic bias ...)
+results_business = tavily.search(... business bias ...)
+combined = deduplicate_and_rerank(results_academic + results_business)
+
+
+Then progressively show results as they arrive — makes it feel fast and alive.
+
+5. UX Fix — Transparency Helps Perception
+
+Even if some results are generic, showing why the system chose them massively improves user trust.
+
+Show a small badge:
+
+🧭 Focused on “academic + business analysis of productivity and employment.”
+
+This makes users think: “Ah, the system understood my intent,” even before seeing results.
+
+💡 TL;DR — What to Tell Your Agent
+
+Great root-cause breakdown. Let’s implement your proposed fixes, but let’s add an intent-detection layer so the query refiner knows when to emphasize academic vs. business vs. news sources.
+Also, switch from character-truncation to semantic summarization of the last 20 messages, and add domain weighting (boost .edu, .gov, NBER, HBR, Bloomberg; penalize Wikipedia/Reddit).
+This will make the searches feel 3–5× smarter without changing the underlying Tavily API.
