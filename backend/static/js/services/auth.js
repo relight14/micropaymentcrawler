@@ -9,6 +9,11 @@ export class AuthService {
         this.refreshToken = localStorage.getItem('ledewire_refresh_token');
         this.walletBalance = 0;
         this.logoutCallbacks = []; // Callbacks to trigger on logout
+        
+        // Decode userInfo from stored token on page load/reload
+        if (this.token) {
+            this.userInfo = this.decodeJWT(this.token);
+        }
     }
 
     /**
