@@ -76,9 +76,14 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
         
     except HTTPException:
         raise  # Re-raise FastAPI exceptions as-is
+    except requests.HTTPError as e:
+        # Extract the actual error message from the HTTPError
+        print(f"Login error for {request.email}: {e}")
+        error_message = str(e).split(',')[0] if ',' in str(e) else str(e)
+        raise HTTPException(status_code=401, detail=error_message)
     except Exception as e:
         # Log the full error for debugging while returning safe message to user
-        print(f"Login error for {request.email}: {e}")
+        print(f"Unexpected login error for {request.email}: {e}")
         raise HTTPException(status_code=500, detail="Authentication service unavailable")
 
 
@@ -110,8 +115,19 @@ async def signup(request: SignupRequest):
         
     except HTTPException:
         raise  # Re-raise FastAPI exceptions as-is
-    except Exception as e:
+    except requests.HTTPError as e:
+        # Extract the actual error message from the HTTPError
         print(f"Signup error for {request.email}: {e}")
+        error_message = str(e).split(',')[0] if ',' in str(e) else str(e)
+        # Determine appropriate status code based on error message
+        if "already exists" in error_message.lower():
+            raise HTTPException(status_code=409, detail=error_message)
+        elif "invalid" in error_message.lower():
+            raise HTTPException(status_code=400, detail=error_message)
+        else:
+            raise HTTPException(status_code=400, detail=error_message)
+    except Exception as e:
+        print(f"Unexpected signup error for {request.email}: {e}")
         raise HTTPException(status_code=500, detail="Account creation service unavailable")
 
 
