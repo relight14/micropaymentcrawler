@@ -390,7 +390,7 @@ export class ChatResearchApp {
                     <div class="auth-modal-header">
                         <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
                         <h2 id="authTitle">${isLogin ? 'Welcome back!' : 'Create Account'}</h2>
-                        <p>${isLogin ? 'Sign in to access your wallet' : 'Join LedeWire to access premium features'}</p>
+                        <p>${isLogin ? 'Sign in to unlock full research access' : 'Join LedeWire to access premium features'}</p>
                         <button class="modal-close" onclick="document.getElementById('authModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
                     <div class="auth-modal-content">
