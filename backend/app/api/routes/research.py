@@ -236,6 +236,54 @@ def _detect_publication_constraint(query: str) -> Optional[Dict[str, str]]:
     # No publication detected
     return None
 
+def _detect_research_intent(conversation_context: List[Dict]) -> str:
+    """Detect the type of research intent from conversation context.
+    
+    Returns:
+        Intent category: 'academic', 'business', 'news', or 'general'
+    """
+    # Extract text from recent messages
+    context_text = ""
+    for msg in conversation_context[-8:]:
+        content = msg.get('content', '').strip()
+        if content:
+            context_text += content.lower() + " "
+    
+    # Academic/causal analysis keywords
+    academic_keywords = [
+        'hypothesis', 'correlation', 'causation', 'impact', 'relationship', 
+        'why', 'how does', 'research', 'study', 'evidence', 'data shows',
+        'analysis', 'paradox', 'theory', 'model', 'academic', 'peer-reviewed'
+    ]
+    
+    # Business/market keywords
+    business_keywords = [
+        'profitability', 'corporate', 'earnings', 'revenue', 'market', 
+        'business', 'industry', 'financial', 'economic', 'company',
+        'investment', 'growth', 'strategy', 'competitive'
+    ]
+    
+    # News/current events keywords
+    news_keywords = [
+        'recent', 'today', 'latest', 'breaking', 'new', 'announcement',
+        'report says', 'just released', 'this week', 'current'
+    ]
+    
+    # Count matches
+    academic_score = sum(1 for kw in academic_keywords if kw in context_text)
+    business_score = sum(1 for kw in business_keywords if kw in context_text)
+    news_score = sum(1 for kw in news_keywords if kw in context_text)
+    
+    # Determine intent
+    if academic_score >= 2:
+        return 'academic'
+    elif business_score >= 2:
+        return 'business'
+    elif news_score >= 2:
+        return 'news'
+    else:
+        return 'general'
+
 def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
     """Use Claude to intelligently synthesize conversation context into a refined research query.
     
@@ -243,45 +291,80 @@ def _refine_query_with_context(conversation_context: List[Dict], user_query: str
     This function only focuses on context synthesis.
     """
     try:
-        # Extract recent messages from conversation context (include all messages, even short ones)
+        # Detect research intent
+        intent = _detect_research_intent(conversation_context)
+        print(f"🎯 Detected research intent: {intent}")
+        
+        # Extract recent messages from conversation context
         context_messages = []
-        for msg in conversation_context[-8:]:  # Last 8 messages for context
+        for msg in conversation_context[-12:]:  # Increased from 8 to 12 for better context
             sender = msg.get('sender', 'unknown')
             content = msg.get('content', '').strip()
             
-            # Include all messages with any content (removed length filter to avoid skipping)
             if content:
                 role = "user" if sender == "user" else "assistant"
-                # Sanitize and limit message length
+                # Sanitize and limit message length (increased from 200 to 400)
                 sanitized_content = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', content)
-                context_messages.append(f"{role}: {sanitized_content[:200]}")
+                context_messages.append(f"{role}: {sanitized_content[:400]}")
         
         if not context_messages:
             print("⚠️ No conversation context available, using original query")
-            return user_query  # No context to use
+            return user_query
         
         context_text = "\n".join(context_messages)
         
-        # Build prompt for Claude to synthesize context
+        # Intent-specific instructions
+        intent_instructions = {
+            'academic': """
+PRIORITY: Find academic papers, peer-reviewed research, and scholarly analysis.
+OPTIMIZE FOR: .edu domains, NBER, JSTOR, academic journals, research institutions
+APPEND: terms like "research paper" OR "academic study" OR "peer-reviewed" OR "scholarly analysis"
+AVOID: conversational phrasing that would return Wikipedia or general websites""",
+            
+            'business': """
+PRIORITY: Find authoritative business analysis, market reports, and financial journalism.
+OPTIMIZE FOR: Harvard Business Review, Bloomberg, WSJ, McKinsey, Reuters, Financial Times
+APPEND: terms like "business analysis" OR "market research" OR "industry report" OR "financial analysis"
+AVOID: generic business advice websites or Wikipedia""",
+            
+            'news': """
+PRIORITY: Find recent news coverage and current reporting.
+OPTIMIZE FOR: Reuters, AP News, Bloomberg, major newspapers
+APPEND: terms like "news report" OR "recent developments" OR "latest coverage"
+AVOID: opinion blogs or Wikipedia""",
+            
+            'general': """
+PRIORITY: Find credible, authoritative sources.
+OPTIMIZE FOR: reputable publications, established institutions, expert analysis
+AVOID: Wikipedia, Reddit, social media, general forums"""
+        }
+        
+        # Build enhanced prompt with intent awareness
         system_prompt = f"""You are an expert research analyst. Based on this conversation history:
 
 {context_text}
 
+DETECTED INTENT: {intent.upper()}
+{intent_instructions[intent]}
+
 The user is now requesting research. Your task is to:
 1. Generate a comprehensive research query that captures their specific interests from the conversation
-2. Create search terms that will find the most valuable and relevant sources
-3. Focus on the key themes and questions that emerged in the conversation
-4. **CRITICAL**: If the user specifies a publication or source (e.g., "NY Times", "Washington Post", "Bloomberg", "Reuters"), you MUST preserve this requirement and include a domain constraint
+2. Create search terms optimized for finding {intent} sources (NOT Wikipedia or generic websites)
+3. Focus on the key themes, hypotheses, and causal relationships that emerged
+4. Use precise academic/technical terminology, not conversational language
+5. **CRITICAL**: If the user specifies a publication (e.g., "NY Times", "Bloomberg"), preserve it with site: operator
 
-Be specific and targeted based on the conversation. Don't be generic.
+EXAMPLES OF GOOD QUERIES:
+- Academic: "automation productivity corporate profitability employment academic research NBER"
+- Business: "AI impact labor market business analysis McKinsey HBR"
+- News: "recent corporate earnings automation report Bloomberg Reuters"
 
-Publication Detection Examples:
-- "ny times on climate" → "climate change site:nytimes.com"
-- "washington post about elections" → "elections site:washingtonpost.com" 
-- "bloomberg on markets" → "financial markets site:bloomberg.com"
-- "reuters nuclear" → "nuclear power site:reuters.com"
+EXAMPLES OF BAD QUERIES (avoid these):
+- "how does AI affect jobs" (too conversational → Wikipedia)
+- "productivity" (too generic → Wikipedia)
+- "automation impact" (too vague → Wikipedia)
 
-If a publication is mentioned, always include the "site:" operator in your refined query."""
+Be specific, technical, and targeted. Your query should make Wikipedia results impossible."""
         
         # Call Claude to refine the query
         response = claude_client.messages.create(
