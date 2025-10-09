@@ -4,11 +4,15 @@ import os
 import asyncio
 import time
 import httpx
+import logging
 from typing import List, Optional, Dict, Any
 from functools import wraps
 from schemas.domain import SourceCard
 from services.licensing.content_licensing import ContentLicenseService
 from services.ai.polishing import ContentPolishingService
+
+# Setup structured logging
+logger = logging.getLogger(__name__)
 
 def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base=2):
     """
@@ -72,6 +76,102 @@ class ContentCrawlerStub:
         # Async HTTP client for non-blocking requests
         self._http_client = None
         
+        # Domain authority weights for ranking
+        self.domain_weights = {
+            # News wire services
+            'reuters.com': 0.6, 'apnews.com': 0.6, 'bloomberg.com': 0.6,
+            # Major news outlets
+            'nytimes.com': 0.45, 'wsj.com': 0.45, 'ft.com': 0.45,
+            'theguardian.com': 0.45, 'bbc.com': 0.45,
+            # Policy/think tanks
+            'brookings.edu': 0.4, 'carnegieendowment.org': 0.4,
+            'csis.org': 0.4, 'mei.edu': 0.4,
+            # Academic
+            '.edu': 0.5, 'nber.org': 0.5
+        }
+    
+    def _calculate_recency_score(self, published_date: Optional[str], timeframe: str = "T1") -> float:
+        """Calculate recency score based on publication date and temporal bucket."""
+        if not published_date:
+            return 0.5  # Neutral score if no date
+        
+        try:
+            from datetime import datetime
+            import dateutil.parser
+            
+            # Parse the date
+            pub_date = dateutil.parser.parse(published_date)
+            now = datetime.now(pub_date.tzinfo or None)
+            hours_ago = (now - pub_date).total_seconds() / 3600
+            
+            # Apply decay based on timeframe
+            if timeframe == "T0":  # 24h - exponential decay
+                return max(0.1, min(1.0, 2 ** (-hours_ago / 24)))
+            elif timeframe == "T1":  # 3 days - moderate decay
+                return max(0.1, min(1.0, 1 - (hours_ago / (72 * 2))))
+            elif timeframe == "T7":  # 7 days - linear decay
+                return max(0.1, min(1.0, 1 - (hours_ago / (168 * 2))))
+            else:  # TH - minimal decay
+                days_ago = hours_ago / 24
+                return max(0.1, min(1.0, 1 - (days_ago / 365)))
+        except:
+            return 0.5
+    
+    def _get_domain_authority(self, domain: str) -> float:
+        """Get authority weight for domain."""
+        # Check exact matches
+        if domain in self.domain_weights:
+            return self.domain_weights[domain]
+        
+        # Check suffix matches (e.g., .edu)
+        for pattern, weight in self.domain_weights.items():
+            if pattern.startswith('.') and domain.endswith(pattern):
+                return weight
+        
+        return 0.0  # Unknown domain
+    
+    def _rerank_with_recency(self, sources: List[SourceCard], classification: Optional[Dict[str, Any]] = None) -> List[SourceCard]:
+        """Rerank sources using recency, relevance, and authority based on classification."""
+        if not classification:
+            # No classification - just sort by relevance
+            sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
+            return sources
+        
+        recency_weight = classification.get("recency_weight", 0.3)
+        temporal_bucket = classification.get("temporal_bucket", "T1")
+        
+        # Calculate composite scores
+        for source in sources:
+            relevance = source.relevance_score or 0.5
+            recency = self._calculate_recency_score(
+                getattr(source, 'published_date', None),
+                temporal_bucket
+            )
+            authority = self._get_domain_authority(source.domain)
+            
+            # Weighted combination (must sum to 1.0)
+            # Higher recency_weight means more emphasis on freshness
+            topicality_weight = 0.35
+            authority_weight = max(0, 1.0 - recency_weight - topicality_weight)  # Ensure non-negative
+            
+            # Normalize if needed (safety check)
+            total_weight = recency_weight + topicality_weight + authority_weight
+            if total_weight > 0:
+                composite_score = (
+                    (recency_weight / total_weight) * recency +
+                    (topicality_weight / total_weight) * relevance +
+                    (authority_weight / total_weight) * authority
+                )
+            else:
+                composite_score = relevance  # Fallback to relevance only
+            
+            # Store composite score for sorting
+            source.composite_score = composite_score
+        
+        # Sort by composite score
+        sources.sort(key=lambda x: getattr(x, 'composite_score', 0.0), reverse=True)
+        
+        return sources
     
     def _get_cache_key(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None) -> str:
         """Generate cache key for query results including domain filter for cache isolation"""
@@ -106,7 +206,7 @@ class ContentCrawlerStub:
         """Store results in cache with timestamp"""
         self._cache[cache_key] = (data, time.time())
     
-    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None) -> Dict[str, Any]:
+    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate sources with progressive loading - returns immediate results + enrichment promise
         
         Args:
@@ -114,19 +214,24 @@ class ContentCrawlerStub:
             count: Number of sources to generate
             budget_limit: Optional budget limit for licensing
             domain_filter: Optional list of domains to filter results (e.g., ['nytimes.com'])
+            classification: Optional classification dict with intent, temporal_bucket, recency_weight
         """
         cache_key = self._get_cache_key(query, count, budget_limit, domain_filter)
         
         # Check cache first
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
+            # Apply recency-based reranking even to cached results
+            if classification:
+                cached_result = self._rerank_with_recency(cached_result, classification)
+            
             return {
                 "sources": cached_result,
                 "stage": "complete",
                 "enrichment_needed": False
             }
         
-        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter)
+        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter, classification)
     
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -287,7 +392,7 @@ class ContentCrawlerStub:
         
         return query, None
     
-    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None) -> Dict[str, Any]:
+    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate sources progressively: immediate raw results + background enrichment
         
         Args:
@@ -296,6 +401,7 @@ class ContentCrawlerStub:
             budget_limit: Budget limit
             cache_key: Cache key
             domain_filter: Optional domain filter from publication detection (takes precedence)
+            classification: Optional classification for recency-weighted reranking
         """
         if not self.tavily_api_key:
             return await self.generate_sources_progressive(query, count, budget_limit)
@@ -377,7 +483,7 @@ class ContentCrawlerStub:
             
             # Step 4: Start background enrichment (licensing + content polishing) 
             asyncio.create_task(self._enrich_sources_progressive(
-                immediate_sources, query, cache_key
+                immediate_sources, query, cache_key, classification
             ))
             
             return {
@@ -399,7 +505,7 @@ class ContentCrawlerStub:
     
     # Removed _calculate_basic_price - now using real licensing discovery only
     
-    async def _enrich_sources_progressive(self, sources: List[SourceCard], query: str, cache_key: str):
+    async def _enrich_sources_progressive(self, sources: List[SourceCard], query: str, cache_key: str, classification: Optional[Dict[str, Any]] = None):
         """Progressive enrichment: pricing discovery only (fast ~3s)"""
         try:
             print(f"🔍 Starting progressive enrichment for {len(sources)} sources...")
@@ -407,9 +513,9 @@ class ContentCrawlerStub:
             # Licensing discovery (fast ~2-3s) - Tavily excerpts are already good enough!
             await self._add_licensing_async(sources)
             
-            # Sort by relevance after licensing boost is applied
-            sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
-            print(f"🔄 Sources sorted by relevance (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
+            # Rerank sources with recency weighting (if classification available)
+            sources = self._rerank_with_recency(sources, classification)
+            print(f"🔄 Sources reranked (top 3: {[f'{s.title[:30]}... ({s.relevance_score:.2f})' for s in sources[:3]]})")
             
             # Cache pricing results - Tavily content is already compelling!
             self._store_in_cache(cache_key, sources)

@@ -7,6 +7,11 @@ import re
 import html
 import os
 import anthropic
+import logging
+from datetime import datetime, timedelta
+
+# Setup structured logging
+logger = logging.getLogger(__name__)
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket, SourceCard
@@ -156,8 +161,348 @@ def _extract_response_text(response) -> str:
         else:
             return str(response)
     except Exception as e:
-        print(f"⚠️ Error extracting response text: {e}")
+        logger.warning(f"Error extracting response text: {e}")
         return str(response)
+
+
+# ============================================================================
+# NEW: Research Brief Extraction System
+# ============================================================================
+
+def _extract_timeframe(text: str, output_bias: str = 'general') -> str:
+    """Detect temporal bucket from conversation text."""
+    
+    # T0 signals (last 24h)
+    t0_patterns = [
+        r'\btoday\b', r'\bthis morning\b', r'\bthis afternoon\b', 
+        r'\bjust announced\b', r'\bbreaking\b', r'\bcurrent\b',
+        r'\brecent\b', r'\blast (few )?hours?\b', r'\bnow\b'
+    ]
+    
+    # T1 signals (last 3 days)
+    t1_patterns = [
+        r'\byesterday\b', r'\bthis week\b', r'\brecently\b',
+        r'\blast (few )?days?\b', r'\bpast (few )?days?\b'
+    ]
+    
+    # T7 signals (last 7 days)
+    t7_patterns = [
+        r'\bpast week\b', r'\blast week\b', r'\bthis month\b'
+    ]
+    
+    # TH signals (historical)
+    th_patterns = [
+        r'\bhistory of\b', r'\bhistorical\b', r'\bover the years\b',
+        r'\bsince \d{4}\b', r'\bbackground\b', r'\bevolution of\b',
+        r'\blast (year|decade)\b', r'\bpast (year|decade)\b'
+    ]
+    
+    # Check patterns in order (most recent first)
+    for pattern in t0_patterns:
+        if re.search(pattern, text):
+            return "T0"  # 24 hours
+    
+    for pattern in t1_patterns:
+        if re.search(pattern, text):
+            return "T1"  # 3 days
+    
+    for pattern in t7_patterns:
+        if re.search(pattern, text):
+            return "T7"  # 7 days
+    
+    for pattern in th_patterns:
+        if re.search(pattern, text):
+            return "TH"  # Historical
+    
+    # Default based on output bias (academic gets T7, others get T1)
+    if output_bias == "academic":
+        return "T7"
+    return "T1"
+
+
+def _extract_entities(text: str) -> List[str]:
+    """Extract key entities (places, organizations, people)."""
+    entities = []
+    
+    # Common entities to look for (expandable)
+    entity_patterns = {
+        # Gaza/Israel related
+        r'\b(gaza|israel|hamas|egypt|qatar|un|united nations)\b': ['Gaza', 'Israel', 'Hamas', 'Egypt', 'Qatar', 'UN'],
+        
+        # Organizations
+        r'\b(fed|federal reserve|ecb|imf|world bank)\b': ['Federal Reserve', 'ECB', 'IMF', 'World Bank'],
+        
+        # Countries
+        r'\b(china|russia|ukraine|iran|us|usa|united states)\b': ['China', 'Russia', 'Ukraine', 'Iran', 'United States'],
+        
+        # Tech companies
+        r'\b(openai|anthropic|google|meta|microsoft|apple)\b': ['OpenAI', 'Anthropic', 'Google', 'Meta', 'Microsoft', 'Apple']
+    }
+    
+    for pattern, entity_list in entity_patterns.items():
+        if re.search(pattern, text):
+            entities.extend(entity_list)
+    
+    # Remove duplicates, keep order
+    seen = set()
+    unique_entities = []
+    for e in entities:
+        if e not in seen:
+            seen.add(e)
+            unique_entities.append(e)
+    
+    return unique_entities[:5]  # Top 5 most relevant
+
+
+def _extract_topic(query: str, context: str) -> str:
+    """Extract main topic - use query as primary, context for refinement."""
+    
+    # Start with the query itself
+    topic = query.strip()
+    
+    # If query is very short or generic ("ok let's find..."), look in context
+    if len(topic) < 20 and context:
+        # Find last question or substantive noun phrase
+        sentences = re.split(r'[.?!]', context)
+        for sent in reversed(sentences[-5:]):
+            # Look for sentence with actual content (nouns > 3 words)
+            if len(sent.split()) > 3 and re.search(r'\b(deal|peace|treaty|policy|market|research|analysis|impact|study)\b', sent):
+                topic = sent.strip()
+                break
+    
+    # Clean up temporal/action words to get core topic
+    topic = re.sub(r'\b(let\'s|please|can you|i want to|find|search for|dig into)\b', '', topic, flags=re.IGNORECASE)
+    topic = topic.strip()
+    
+    return topic[:150]  # Max 150 chars
+
+
+def _detect_subtasks(text: str) -> List[str]:
+    """Detect what aspects user wants to explore."""
+    subtasks = []
+    
+    if re.search(r'\b(terms?|details?|specifics?|what.{0,20}agreed)\b', text):
+        subtasks.append("terms_and_details")
+    
+    if re.search(r'\b(who|parties|actors|stakeholders?|supporters?|opponents?)\b', text):
+        subtasks.append("actors_and_stakeholders")
+    
+    if re.search(r'\b(impact|consequences?|effects?|implications?)\b', text):
+        subtasks.append("impact_analysis")
+    
+    if re.search(r'\b(prospects?|future|lasting|sustain|likelihood|chances?)\b', text):
+        subtasks.append("future_outlook")
+    
+    if re.search(r'\b(background|context|history|lead.{0,10}up)\b', text):
+        subtasks.append("background_context")
+    
+    return subtasks
+
+
+def _detect_output_bias(text: str) -> str:
+    """Detect preferred source type."""
+    
+    # News signals
+    if re.search(r'\b(news|stories|reporting|coverage|articles?|breaking)\b', text):
+        return "news"
+    
+    # Academic signals
+    if re.search(r'\b(research|study|studies|academic|papers?|scholarly)\b', text):
+        return "academic"
+    
+    # Business signals
+    if re.search(r'\b(business|market|economic|financial|industry)\b', text):
+        return "business"
+    
+    # Policy/analysis signals
+    if re.search(r'\b(policy|analysis|think tank|assessment|strategic)\b', text):
+        return "policy"
+    
+    # Data signals
+    if re.search(r'\b(data|statistics|numbers|figures|metrics)\b', text):
+        return "data"
+    
+    return "general"
+
+
+def _build_research_brief(conversation_context: List[Dict], user_query: str) -> Dict[str, Any]:
+    """
+    Extract structured research brief from conversation + current query.
+    Returns: {topic, entities, timeframe, subtasks, output_bias}
+    """
+    
+    # Combine recent conversation for context (last 6 messages)
+    context_text = ""
+    if conversation_context:
+        for msg in conversation_context[-6:]:
+            content = msg.get('content', '').strip()
+            if len(content) > 10:
+                context_text += content + " "
+    
+    # Add current query
+    full_text = (context_text + user_query).lower()
+    
+    # Extract output bias first (needed for temporal defaults)
+    output_bias = _detect_output_bias(full_text)
+    
+    # Extract components
+    timeframe = _extract_timeframe(full_text, output_bias)
+    entities = _extract_entities(full_text)
+    topic = _extract_topic(user_query, context_text)
+    subtasks = _detect_subtasks(full_text)
+    
+    brief = {
+        "topic": topic,
+        "entities": entities,
+        "timeframe": timeframe,
+        "subtasks": subtasks,
+        "output_bias": output_bias,
+        "raw_query": user_query
+    }
+    
+    logger.info("📋 Research Brief extracted", extra={
+        "topic": topic[:50],
+        "timeframe": timeframe,
+        "output_bias": output_bias,
+        "entity_count": len(entities)
+    })
+    
+    return brief
+
+
+def _classify_intent_and_temporal(brief: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Classify research intent and temporal bucket.
+    Returns: {intent, temporal_bucket, rails, rail_weights, recency_weight}
+    """
+    
+    timeframe = brief["timeframe"]
+    output_bias = brief["output_bias"]
+    subtasks = brief["subtasks"]
+    
+    # ===== INTENT CLASSIFICATION =====
+    
+    # News Event: Breaking news, current events, recent developments
+    if timeframe in ["T0", "T1"] and output_bias in ["news", "general"]:
+        intent = "news_event"
+    
+    # Policy Analysis: Think tank analysis, strategic assessment
+    elif output_bias == "policy" or "future_outlook" in subtasks:
+        intent = "policy_analysis"
+    
+    # Academic/Causal: Research, studies, deep understanding
+    elif output_bias == "academic" or "background_context" in subtasks:
+        intent = "academic_causal"
+    
+    # Historical: Background, evolution over time
+    elif timeframe == "TH":
+        intent = "historical_explainer"
+    
+    # Business Trends: Market analysis, economic impact
+    elif output_bias == "business":
+        intent = "business_trends"
+    
+    # Data/Stats: Numbers, metrics, datasets
+    elif output_bias == "data":
+        intent = "data_statistics"
+    
+    else:
+        intent = "general_research"
+    
+    # ===== RAIL ALLOCATION (Budget split) =====
+    
+    rail_config = {
+        "news_event": {
+            "rails": ["news", "policy"],
+            "weights": [0.70, 0.30],
+            "recency_weight": 0.50
+        },
+        "policy_analysis": {
+            "rails": ["policy", "news", "academic"],
+            "weights": [0.50, 0.30, 0.20],
+            "recency_weight": 0.25
+        },
+        "academic_causal": {
+            "rails": ["academic", "policy"],
+            "weights": [0.70, 0.30],
+            "recency_weight": 0.10
+        },
+        "historical_explainer": {
+            "rails": ["academic", "policy", "news"],
+            "weights": [0.50, 0.30, 0.20],
+            "recency_weight": 0.05
+        },
+        "business_trends": {
+            "rails": ["news", "business"],
+            "weights": [0.60, 0.40],
+            "recency_weight": 0.35
+        },
+        "data_statistics": {
+            "rails": ["data", "academic"],
+            "weights": [0.60, 0.40],
+            "recency_weight": 0.15
+        },
+        "general_research": {
+            "rails": ["news", "policy", "academic"],
+            "weights": [0.40, 0.35, 0.25],
+            "recency_weight": 0.30
+        }
+    }
+    
+    config = rail_config.get(intent, rail_config["general_research"])
+    
+    result = {
+        "intent": intent,
+        "temporal_bucket": timeframe,
+        "rails": config["rails"],
+        "rail_weights": config["weights"],
+        "recency_weight": config["recency_weight"]
+    }
+    
+    logger.info("🎯 Classification complete", extra={
+        "intent": intent,
+        "temporal": timeframe,
+        "recency_weight": config["recency_weight"]
+    })
+    
+    return result
+
+
+def _build_query_with_brief(brief: Dict[str, Any], classification: Dict[str, Any]) -> str:
+    """Build targeted Tavily query from research brief."""
+    
+    topic = brief["topic"]
+    entities = brief["entities"]
+    timeframe = brief["timeframe"]
+    
+    # Start with core topic
+    query_parts = [topic]
+    
+    # Add entities for precision
+    if entities:
+        query_parts.extend(entities[:3])  # Top 3 entities
+    
+    # Add temporal keywords based on bucket
+    temporal_keywords = {
+        "T0": ["today", "current", "latest", "breaking", "announced"],
+        "T1": ["recent", "this week", "latest developments"],
+        "T7": ["recent weeks", "current situation"],
+        "TH": ["history", "background", "evolution", "context"]
+    }
+    
+    if timeframe in temporal_keywords:
+        # Add one temporal keyword
+        query_parts.append(temporal_keywords[timeframe][0])
+    
+    # Join into coherent query
+    query = " ".join(query_parts)
+    
+    # Clean up
+    query = re.sub(r'\s+', ' ', query).strip()
+    
+    logger.info(f"🔍 Built query: '{query}'")
+    
+    return query
 
 
 def _detect_publication_constraint(query: str) -> Optional[Dict[str, str]]:
@@ -290,160 +635,6 @@ def _blend_sources_by_intent(sources: List[SourceCard], intent: str) -> List[Sou
     blended_sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
     
     return blended_sources
-
-def _detect_research_intent(conversation_context: List[Dict]) -> str:
-    """Detect the type of research intent from conversation context.
-    
-    Returns:
-        Intent category: 'academic', 'business', 'news', or 'general'
-    """
-    # Extract text from recent messages
-    context_text = ""
-    for msg in conversation_context[-8:]:
-        content = msg.get('content', '').strip()
-        if content:
-            context_text += content.lower() + " "
-    
-    # Academic/causal analysis keywords
-    academic_keywords = [
-        'hypothesis', 'correlation', 'causation', 'impact', 'relationship', 
-        'why', 'how does', 'research', 'study', 'evidence', 'data shows',
-        'analysis', 'paradox', 'theory', 'model', 'academic', 'peer-reviewed'
-    ]
-    
-    # Business/market keywords
-    business_keywords = [
-        'profitability', 'corporate', 'earnings', 'revenue', 'market', 
-        'business', 'industry', 'financial', 'economic', 'company',
-        'investment', 'growth', 'strategy', 'competitive'
-    ]
-    
-    # News/current events keywords
-    news_keywords = [
-        'recent', 'today', 'latest', 'breaking', 'new', 'announcement',
-        'report says', 'just released', 'this week', 'current'
-    ]
-    
-    # Count matches
-    academic_score = sum(1 for kw in academic_keywords if kw in context_text)
-    business_score = sum(1 for kw in business_keywords if kw in context_text)
-    news_score = sum(1 for kw in news_keywords if kw in context_text)
-    
-    # Determine intent
-    if academic_score >= 2:
-        return 'academic'
-    elif business_score >= 2:
-        return 'business'
-    elif news_score >= 2:
-        return 'news'
-    else:
-        return 'general'
-
-def _refine_query_with_context(conversation_context: List[Dict], user_query: str) -> str:
-    """Use Claude to intelligently synthesize conversation context into a refined research query.
-    
-    Note: Publication constraint detection happens in the parent function, not here.
-    This function only focuses on context synthesis.
-    """
-    try:
-        # Detect research intent
-        intent = _detect_research_intent(conversation_context)
-        print(f"🎯 Detected research intent: {intent}")
-        
-        # Extract recent messages from conversation context
-        context_messages = []
-        for msg in conversation_context[-12:]:  # Increased from 8 to 12 for better context
-            sender = msg.get('sender', 'unknown')
-            content = msg.get('content', '').strip()
-            
-            if content:
-                role = "user" if sender == "user" else "assistant"
-                # Sanitize and limit message length (increased from 200 to 400)
-                sanitized_content = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', content)
-                context_messages.append(f"{role}: {sanitized_content[:400]}")
-        
-        if not context_messages:
-            print("⚠️ No conversation context available, using original query")
-            return user_query
-        
-        context_text = "\n".join(context_messages)
-        
-        # Intent-specific instructions
-        intent_instructions = {
-            'academic': """
-PRIORITY: Find academic papers, peer-reviewed research, and scholarly analysis.
-OPTIMIZE FOR: .edu domains, NBER, JSTOR, academic journals, research institutions
-APPEND: terms like "research paper" OR "academic study" OR "peer-reviewed" OR "scholarly analysis"
-AVOID: conversational phrasing that would return Wikipedia or general websites""",
-            
-            'business': """
-PRIORITY: Find authoritative business analysis, market reports, and financial journalism.
-OPTIMIZE FOR: Harvard Business Review, Bloomberg, WSJ, McKinsey, Reuters, Financial Times
-APPEND: terms like "business analysis" OR "market research" OR "industry report" OR "financial analysis"
-AVOID: generic business advice websites or Wikipedia""",
-            
-            'news': """
-PRIORITY: Find recent news coverage and current reporting.
-OPTIMIZE FOR: Reuters, AP News, Bloomberg, major newspapers
-APPEND: terms like "news report" OR "recent developments" OR "latest coverage"
-AVOID: opinion blogs or Wikipedia""",
-            
-            'general': """
-PRIORITY: Find credible, authoritative sources.
-OPTIMIZE FOR: reputable publications, established institutions, expert analysis
-AVOID: Wikipedia, Reddit, social media, general forums"""
-        }
-        
-        # Build enhanced prompt with intent awareness
-        system_prompt = f"""You are an expert research analyst. Based on this conversation history:
-
-{context_text}
-
-DETECTED INTENT: {intent.upper()}
-{intent_instructions[intent]}
-
-The user is now requesting research. Your task is to:
-1. Generate a comprehensive research query that captures their specific interests from the conversation
-2. Create search terms optimized for finding {intent} sources (NOT Wikipedia or generic websites)
-3. Focus on the key themes, hypotheses, and causal relationships that emerged
-4. Use precise academic/technical terminology, not conversational language
-5. **CRITICAL**: If the user specifies a publication (e.g., "NY Times", "Bloomberg"), preserve it with site: operator
-
-EXAMPLES OF GOOD QUERIES:
-- Academic: "automation productivity corporate profitability employment academic research NBER"
-- Business: "AI impact labor market business analysis McKinsey HBR"
-- News: "recent corporate earnings automation report Bloomberg Reuters"
-
-EXAMPLES OF BAD QUERIES (avoid these):
-- "how does AI affect jobs" (too conversational → Wikipedia)
-- "productivity" (too generic → Wikipedia)
-- "automation impact" (too vague → Wikipedia)
-
-Be specific, technical, and targeted. Your query should make Wikipedia results impossible."""
-        
-        # Call Claude to refine the query
-        response = claude_client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=300,
-            temperature=0.3,
-            system=system_prompt,
-            messages=[{"role": "user", "content": f"Generate a targeted research query for: {user_query}"}]
-        )
-        
-        refined_query = _extract_response_text(response).strip()
-        
-        # Validate refined query
-        if not refined_query or len(refined_query) < 10:
-            print(f"⚠️ Refinement produced invalid query (too short or empty), using original: '{user_query}'")
-            return user_query
-        
-        print(f"✅ Query refined from '{user_query}' to '{refined_query}'")
-        return refined_query
-        
-    except Exception as e:
-        print(f"❌ Query refinement FAILED with error: {type(e).__name__}: {str(e)}")
-        print(f"   Falling back to original query: '{user_query}'")
-        return user_query
 
 
 @router.post("/generate-report", response_model=ResearchPacket)
@@ -620,14 +811,22 @@ async def analyze_research_query(
             # Use the clean topic query (without publication name) for refinement
             base_query = publication_info["original_query"]
         
-        # Enhance query with conversation context if available
+        # NEW: Build research brief and classify intent
+        classification = None
         enhanced_query = base_query
+        
         if research_request.conversation_context and len(research_request.conversation_context) > 0:
-            # Use Claude to intelligently synthesize conversation context into refined query
-            enhanced_query = _refine_query_with_context(
+            # Build research brief from conversation context
+            brief = _build_research_brief(
                 research_request.conversation_context,
                 base_query
             )
+            
+            # Classify intent and temporal bucket
+            classification = _classify_intent_and_temporal(brief)
+            
+            # Build targeted query from brief
+            enhanced_query = _build_query_with_brief(brief, classification)
         
         # Apply publication constraint based on type
         final_query = enhanced_query
@@ -645,7 +844,13 @@ async def analyze_research_query(
         
         # Use progressive search for faster initial response with fallback
         try:
-            result = await crawler.generate_sources_progressive(final_query, max_sources, budget_limit, domain_filter=domain_filter)
+            result = await crawler.generate_sources_progressive(
+                final_query, 
+                max_sources, 
+                budget_limit, 
+                domain_filter=domain_filter,
+                classification=classification
+            )
             sources = result["sources"]
         except Exception as crawler_error:
             print(f"⚠️ Progressive search failed: {crawler_error}")
@@ -689,11 +894,21 @@ async def analyze_research_query(
         # TODO: Consider async if adding GPT-assisted summaries or complex processing
         summary = _generate_research_preview(sanitized_query, sources)
         
-        # Apply weighted source sampling based on detected intent
-        if research_request.conversation_context and len(research_request.conversation_context) > 0:
-            intent = _detect_research_intent(research_request.conversation_context)
-            sources = _blend_sources_by_intent(sources, intent)
-            print(f"🎨 Blended sources for {intent} intent: {len(sources)} total")
+        # Apply weighted source sampling based on classification
+        if classification:
+            # Map our new intent types to old blending logic (temporary compatibility)
+            intent_map = {
+                "news_event": "news",
+                "policy_analysis": "general",
+                "academic_causal": "academic",
+                "historical_explainer": "academic",
+                "business_trends": "business",
+                "data_statistics": "academic",
+                "general_research": "general"
+            }
+            legacy_intent = intent_map.get(classification["intent"], "general")
+            sources = _blend_sources_by_intent(sources, legacy_intent)
+            logger.info(f"🎨 Blended sources for {classification['intent']} intent: {len(sources)} total")
         else:
             # No context - just sort by relevance
             sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
