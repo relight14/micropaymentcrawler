@@ -1,0 +1,66 @@
+"""Wallet routes for payment and funding operations"""
+
+from fastapi import APIRouter, HTTPException, Header
+import requests
+
+from integrations.ledewire import LedeWireAPI
+from schemas.api import PaymentSessionRequest, PaymentSessionResponse
+
+router = APIRouter()
+
+# Initialize LedeWire API integration
+ledewire = LedeWireAPI()
+
+
+def extract_bearer_token(authorization: str) -> str:
+    """Extract and validate Bearer token from Authorization header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
+    
+    access_token = authorization.split(" ", 1)[1].strip()
+    
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
+    
+    return access_token
+
+
+@router.post("/payment-session", response_model=PaymentSessionResponse)
+async def create_payment_session(
+    request: PaymentSessionRequest,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """Create a Stripe payment session for wallet funding via LedeWire"""
+    try:
+        access_token = extract_bearer_token(authorization)
+        
+        # Call LedeWire to create payment session
+        payment_session = ledewire.create_payment_session(
+            access_token=access_token,
+            amount_cents=request.amount_cents,
+            currency=request.currency
+        )
+        
+        if "error" in payment_session:
+            error_message = ledewire.handle_api_error(payment_session)
+            raise HTTPException(status_code=400, detail=f"Payment session failed: {error_message}")
+        
+        return PaymentSessionResponse(
+            client_secret=payment_session["client_secret"],
+            session_id=payment_session["session_id"],
+            public_key=payment_session["public_key"]
+        )
+        
+    except HTTPException:
+        raise
+    except requests.exceptions.HTTPError as e:
+        if "Invalid or expired token" in str(e):
+            raise HTTPException(status_code=401, detail="Authentication expired")
+        print(f"Payment session error: {e}")
+        raise HTTPException(status_code=503, detail="Payment service temporarily unavailable")
+    except Exception as e:
+        print(f"Payment session error: {e}")
+        raise HTTPException(status_code=500, detail="Payment service error")

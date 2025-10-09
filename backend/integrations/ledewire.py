@@ -230,6 +230,45 @@ class LedeWireAPI:
         balance = self.get_wallet_balance(access_token)
         return balance["balance_cents"] >= amount_cents
     
+    def create_payment_session(self, access_token: str, amount_cents: int, currency: str = "usd") -> Dict[str, Any]:
+        """
+        POST /v1/wallet/payment-session
+        Create a Stripe payment session for wallet funding.
+        Returns client_secret, session_id, and public_key for frontend Stripe integration.
+        """
+        try:
+            request_data = {
+                "amount_cents": amount_cents,
+                "currency": currency
+            }
+            
+            logger.info(f"Creating payment session for {amount_cents} cents ({currency})")
+            
+            response = self.session.post(
+                f"{self.api_base}/wallet/payment-session",
+                headers={"Authorization": f"Bearer {access_token}"},
+                json=request_data,
+                timeout=10
+            )
+            
+            logger.info(f"Payment session response status: {response.status_code}")
+            response.raise_for_status()
+            
+            result = response.json()
+            logger.info(f"Payment session created: session_id={result.get('session_id')}")
+            return result
+            
+        except requests.RequestException as e:
+            logger.error(f"Payment session creation failed: {str(e)}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response: {e.response.status_code} - {e.response.text}")
+                if e.response.status_code == 401:
+                    raise requests.HTTPError("Invalid or expired token", response=e.response)
+                else:
+                    raise requests.HTTPError(f"Payment session failed: {e.response.status_code}", response=e.response)
+            else:
+                raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+    
     # Purchase Methods
     
     def create_purchase(self, access_token: str, content_id: str, price_cents: int, idempotency_key: Optional[str] = None) -> Dict[str, Any]:

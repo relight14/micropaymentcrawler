@@ -31,6 +31,17 @@ class WalletBalanceResponse(BaseModel):
     currency: str = "USD"
 
 
+class PaymentSessionRequest(BaseModel):
+    amount_cents: int
+    currency: str = "usd"
+
+
+class PaymentSessionResponse(BaseModel):
+    client_secret: str
+    session_id: str
+    public_key: str
+
+
 # Dynamic Research schemas
 class ResearchRequest(BaseModel):
     query: str

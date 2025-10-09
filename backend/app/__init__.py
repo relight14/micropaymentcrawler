@@ -11,7 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from utils.rate_limit import limiter
 from utils.static import NoCacheStaticFiles
-from app.api.routes import auth, research, purchase, chat, sources, health
+from app.api.routes import auth, research, purchase, chat, sources, health, wallet
 
 
 def create_app() -> FastAPI:
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     # Include API routes
     app.include_router(health.router, tags=["health"])  # Root level routes like /
     app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
+    app.include_router(wallet.router, prefix="/api/wallet", tags=["wallet"])
     app.include_router(research.router, prefix="/api/research", tags=["research"])
     app.include_router(purchase.router, prefix="/api/purchase", tags=["purchase"])  # Re-enabled for purchase flow
     app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
