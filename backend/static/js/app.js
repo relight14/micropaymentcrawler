@@ -636,6 +636,13 @@ export class ChatResearchApp {
             if (authModal) {
                 authModal.remove();
             }
+
+            // Auto-trigger funding modal if balance is $0
+            if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
+                setTimeout(() => {
+                    this.showFundingModal();
+                }, 500);
+            }
             
             // Update button text to show logged in state
             this.updateAuthButton();
