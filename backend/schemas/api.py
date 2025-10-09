@@ -15,7 +15,8 @@ class LoginRequest(BaseModel):
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
-    name: str
+    first_name: str
+    last_name: str
 
 
 class AuthResponse(BaseModel):

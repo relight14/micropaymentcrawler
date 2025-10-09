@@ -385,6 +385,16 @@ export class ChatResearchApp {
                     </div>
                     <div class="auth-modal-content">
                         <form class="auth-form" id="authForm">
+                            ${!isLogin ? `
+                                <div class="auth-form-group">
+                                    <label for="authFirstName">First Name *</label>
+                                    <input type="text" id="authFirstName" placeholder="" required>
+                                </div>
+                                <div class="auth-form-group">
+                                    <label for="authLastName">Last Name *</label>
+                                    <input type="text" id="authLastName" placeholder="" required>
+                                </div>
+                            ` : ''}
                             <div class="auth-form-group">
                                 <label for="authEmail">Email *</label>
                                 <input type="email" id="authEmail" placeholder="" required>
@@ -601,12 +611,21 @@ export class ChatResearchApp {
     async handleAuth(type) {
         const emailInput = document.getElementById('authEmail');
         const passwordInput = document.getElementById('authPassword');
+        const firstNameInput = document.getElementById('authFirstName');
+        const lastNameInput = document.getElementById('authLastName');
         
         const email = emailInput?.value?.trim();
         const password = passwordInput?.value?.trim();
+        const firstName = firstNameInput?.value?.trim();
+        const lastName = lastNameInput?.value?.trim();
         
         if (!email || !password) {
             this.addMessage('system', 'Please enter both email and password.');
+            return;
+        }
+        
+        if (type === 'signup' && (!firstName || !lastName)) {
+            this.addMessage('system', 'Please enter your first and last name.');
             return;
         }
 
@@ -622,7 +641,7 @@ export class ChatResearchApp {
             if (type === 'login') {
                 result = await this.authService.login(email, password);
             } else {
-                result = await this.authService.signup(email, password);
+                result = await this.authService.signup(email, password, firstName, lastName);
             }
             
             // Safe wallet display update - only if user is authenticated

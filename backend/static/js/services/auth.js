@@ -152,11 +152,16 @@ export class AuthService {
         return data;
     }
 
-    async signup(email, password) {
+    async signup(email, password, firstName, lastName) {
         const response = await fetch(`${this.baseURL}/api/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ 
+                email, 
+                password,
+                first_name: firstName,
+                last_name: lastName
+            })
         });
 
         if (!response.ok) {

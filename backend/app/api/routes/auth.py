@@ -86,7 +86,9 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
 async def signup(request: SignupRequest):
     """Create new user account"""
     try:
-        result = ledewire.signup_user(request.email, request.password, request.name)
+        # Combine first and last name for LedeWire API
+        full_name = f"{request.first_name} {request.last_name}"
+        result = ledewire.signup_user(request.email, request.password, full_name)
         
         if "error" in result:
             error_msg = ledewire.handle_api_error(result)
