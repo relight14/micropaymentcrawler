@@ -735,9 +735,10 @@ export class ChatResearchApp {
     setupProfileDropdown() {
         const profileButton = document.getElementById('profileButton');
         const dropdownMenu = document.getElementById('dropdownMenu');
+        const topUpItem = document.getElementById('topUpItem');
         const logoutItem = document.getElementById('logoutItem');
         
-        console.log('Setting up profile dropdown:', { profileButton, dropdownMenu, logoutItem });
+        console.log('Setting up profile dropdown:', { profileButton, dropdownMenu, topUpItem, logoutItem });
         
         if (profileButton && dropdownMenu) {
             // Remove any existing listeners to avoid duplicates
@@ -757,6 +758,15 @@ export class ChatResearchApp {
                 if (!newProfileButton.contains(e.target)) {
                     dropdownMenu.classList.remove('show');
                 }
+            });
+        }
+        
+        if (topUpItem) {
+            topUpItem.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Top Up clicked');
+                dropdownMenu.classList.remove('show'); // Close dropdown
+                this.showFundingModal(); // Launch funding modal
             });
         }
         
