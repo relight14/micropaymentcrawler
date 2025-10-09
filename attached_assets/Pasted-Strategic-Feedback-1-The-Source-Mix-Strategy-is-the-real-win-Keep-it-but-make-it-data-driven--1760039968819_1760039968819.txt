@@ -1,0 +1,81 @@
+Strategic Feedback
+✅ 1. The “Source Mix Strategy” is the real win
+
+Keep it, but make it data-driven, not rule-heavy for now.
+Rather than rigid ratios (60/40 etc.), just store a lightweight source_type attribute (academic / journalism / business / government) in your enrichment metadata and let your backend sample proportionally when building the feed.
+
+Example (pseudocode):
+
+weights = INTENT_WEIGHTS[intent]  # {academic: 0.6, journalism: 0.4}
+sources = pick_weighted_sources(all_results, weights)
+
+
+✅ Benefit: Achieves diversity without new API calls.
+⚙️ Effort: ~20 lines in backend aggregator.
+
+✅ 2. Visual Badges — high payoff, negligible cost
+
+Absolutely do this. It adds perceived sophistication at almost zero runtime cost.
+
+Implementation tip:
+
+Add a source_type_icon map in frontend (🎓, 📰, 💼, 🏛️ for government).
+
+Keep colors subtle (e.g., gray/blue text next to the title).
+
+Users will feel like the system curated intelligently even before they click.
+
+✅ 3. Filter Chips — yes, but start simple
+
+For MVP, these can be frontend-only filters. Don’t refetch data; just filter the in-memory results array.
+
+results.filter(r => selectedType === "All" || r.source_type === selectedType)
+
+
+Later you can hook them into backend search refinement, but this early version gives instant responsiveness and teaches users what “source diversity” means.
+
+⚖️ 4. Intent Override — great UX, optional for MVP
+
+Keep this in the design file but don’t implement immediately.
+It adds clarity but requires storing user intent state across views.
+For now, your “Focused on Academic + Business” badge already communicates the same idea.
+
+🕒 5. Smart Temporal Mixing — good idea, but postpone
+
+Temporal weighting adds complexity (you’ll need keyword detection + recency scoring).
+Skip for MVP; add later when you start showing publication dates more visibly.
+You can simulate it with a one-liner:
+
+if "recent" in conversation_summary.lower(): intent = "news_event"
+
+
+That’s enough for now.
+
+🔧 Recommended MVP Build Order
+Priority	Feature	Effort	Cost	Impact
+1	Weighted source blending (backend)	🟢 Low	💲	🔥🔥🔥
+2	Visual badges	🟢 Very low	💲	🔥🔥
+3	Filter chips (frontend only)	🟠 Medium	💲	🔥🔥
+4	Intent override text (optional)	🟡 Low	💲	🔥
+5	Temporal mixing	🔴 Later	💲	🔥
+
+→ Implementing just the first three gives you a tangible jump in perceived intelligence and “research feel” with virtually no additional model or API cost.
+
+💡 Micro-UX Polish Suggestions
+
+Use hover tooltips:
+🎓 Academic → tooltip: “Peer-reviewed or institutional research”
+📰 News → “Recent journalistic coverage”
+Adds polish and trust with minimal code.
+
+Badge in results header:
+“🧭 Focused on: Academic + Business Analysis” → small, calm typography above filter chips.
+
+Save user preference:
+If someone switches to “News,” remember it in session so the system “learns” their style.
+
+🧾 TL;DR for Your Agent
+
+Let’s implement the blended-source logic, badges, and local filter chips first.
+Skip temporal mixing and deep override UX for now.
+This trio delivers immediate perceived intelligence, stronger trust, and zero extra model or API spend — a perfect MVP milestone.
