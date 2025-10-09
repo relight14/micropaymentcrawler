@@ -2188,6 +2188,41 @@ input:checked + .slider:before {
     text-decoration: underline;
 }
 
+/* Funding Modal Styles */
+.funding-amounts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.funding-amount-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.funding-amount-btn:hover {
+    background: #e9ecef;
+    border-color: #4285f4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.15);
+}
+
+.funding-amount-btn .amount {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
 /* Profile Dropdown Styles */
 .auth-container {
     position: relative;

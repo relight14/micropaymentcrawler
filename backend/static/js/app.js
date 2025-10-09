@@ -455,6 +455,149 @@ export class ChatResearchApp {
         }
     }
 
+    async showFundingModal() {
+        // Remove any existing funding modal
+        const existingModal = document.getElementById('fundingModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const modalHTML = `
+            <div id="fundingModal" class="modal-overlay">
+                <div class="modal-content auth-modal">
+                    <div class="auth-modal-header">
+                        <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
+                        <h2>Add Funds to Your Wallet</h2>
+                        <p>Choose an amount to add to your LedeWire wallet</p>
+                        <button class="modal-close" onclick="document.getElementById('fundingModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
+                    </div>
+                    <div class="auth-modal-content">
+                        <div class="funding-amounts">
+                            <button class="funding-amount-btn" data-amount="500">
+                                <span class="amount">$5</span>
+                            </button>
+                            <button class="funding-amount-btn" data-amount="1000">
+                                <span class="amount">$10</span>
+                            </button>
+                            <button class="funding-amount-btn" data-amount="2000">
+                                <span class="amount">$20</span>
+                            </button>
+                        </div>
+                        <div id="stripePaymentElement" style="display: none; margin-top: 1.5rem;"></div>
+                        <button id="stripeSubmitBtn" class="auth-btn" style="display: none; margin-top: 1rem;">
+                            Complete Payment
+                        </button>
+                        <div id="fundingStatus" style="margin-top: 1rem; text-align: center; color: #666;"></div>
+                    </div>
+                    <div class="auth-modal-footer">
+                        Powered by LedeWire • Secured by Stripe
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Add event listeners to amount buttons
+        const amountButtons = document.querySelectorAll('.funding-amount-btn');
+        amountButtons.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const amount = parseInt(btn.dataset.amount);
+                await this.handleFundingAmountSelection(amount);
+            });
+        });
+
+        // Close modal when clicking outside
+        const modal = document.getElementById('fundingModal');
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        }
+    }
+
+    async handleFundingAmountSelection(amountCents) {
+        const statusEl = document.getElementById('fundingStatus');
+        statusEl.textContent = 'Preparing payment...';
+
+        try {
+            // Call backend to create payment session
+            const response = await fetch(`${this.baseURL}/api/wallet/payment-session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authService.getToken()}`
+                },
+                body: JSON.stringify({
+                    amount_cents: amountCents,
+                    currency: 'usd'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create payment session');
+            }
+
+            const { client_secret, public_key } = await response.json();
+
+            // Initialize Stripe with public key from LedeWire
+            const stripe = Stripe(public_key);
+            const elements = stripe.elements({ clientSecret: client_secret });
+            const paymentElement = elements.create('payment');
+            
+            // Mount payment element
+            const container = document.getElementById('stripePaymentElement');
+            container.style.display = 'block';
+            paymentElement.mount('#stripePaymentElement');
+
+            // Show submit button
+            const submitBtn = document.getElementById('stripeSubmitBtn');
+            submitBtn.style.display = 'block';
+            statusEl.textContent = '';
+
+            // Handle payment submission
+            submitBtn.onclick = async () => {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Processing...';
+                statusEl.textContent = 'Processing payment...';
+
+                const { error } = await stripe.confirmPayment({
+                    elements,
+                    confirmParams: {
+                        return_url: window.location.href
+                    },
+                    redirect: 'if_required'
+                });
+
+                if (error) {
+                    statusEl.textContent = `Payment failed: ${error.message}`;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Complete Payment';
+                } else {
+                    statusEl.textContent = '✅ Payment successful! Updating balance...';
+                    
+                    // Refresh wallet balance
+                    await this.authService.updateWalletBalance();
+                    if (this.authService.isAuthenticated()) {
+                        this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+                    }
+
+                    // Close modal after success
+                    setTimeout(() => {
+                        document.getElementById('fundingModal')?.remove();
+                        this.showToast('💰 Wallet funded successfully!', 'success', 3000);
+                    }, 1500);
+                }
+            };
+
+        } catch (error) {
+            console.error('Payment session error:', error);
+            statusEl.textContent = 'Failed to initialize payment. Please try again.';
+        }
+    }
+
     async handleAuth(type) {
         const emailInput = document.getElementById('authEmail');
         const passwordInput = document.getElementById('authPassword');
