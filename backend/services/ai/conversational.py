@@ -264,12 +264,14 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
                 "suggest_research": should_suggest
             }
             
-            # Add topic hint if we're suggesting research
-            if should_suggest and topic_hint:
-                result["topic_hint"] = topic_hint
-                # Mark that we've suggested for this user
+            # Mark that we've suggested for this user (regardless of topic_hint)
+            if should_suggest:
                 self.suggested_research[user_id] = True
-                print(f"💡 Suggesting research mode switch for topic: {topic_hint}")
+                print(f"💡 Suggesting research mode switch{f' for topic: {topic_hint}' if topic_hint else ''}")
+                
+                # Add topic hint to result if available
+                if topic_hint:
+                    result["topic_hint"] = topic_hint
             
             return result
             
