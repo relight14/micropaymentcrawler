@@ -38,6 +38,7 @@ class SourceCard(BaseModel):
     published_date: Optional[str] = None
     relevance_score: Optional[float] = None
     source_type: Optional[str] = None  # "academic", "journalism", "business", "government"
+    composite_score: Optional[float] = None  # Recency-weighted composite ranking score
 
 
 class ResearchPacket(BaseModel):
