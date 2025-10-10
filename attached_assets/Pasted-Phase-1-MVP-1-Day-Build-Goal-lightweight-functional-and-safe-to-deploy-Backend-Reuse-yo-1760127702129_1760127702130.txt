@@ -1,0 +1,116 @@
+Phase 1 — MVP (1 Day Build)
+
+Goal: lightweight, functional, and safe to deploy.
+
+✅ Backend
+
+Reuse your existing intent classifier
+
+# conversational.py
+intent = conversation.last_intent or classify_intent(conversation.messages)
+
+if intent in ["news_event", "policy_analysis", "academic_causal"] \
+    and len(conversation.messages) >= 2 \
+    and not conversation.suggested_recently:
+    
+    brief = _build_research_brief(conversation.messages[-6:], user_query)
+    topic_hint = brief.get("topic") or (brief["entities"][0] if brief["entities"] else None)
+    
+    response["suggest_research"] = True
+    response["topic_hint"] = topic_hint
+    conversation.suggested_recently = True
+
+
+What’s great:
+– zero new dependency
+– naturally leverages your classification system
+– uses brief extraction for context-rich topic hints
+
+✅ API Schema
+
+Add a small update to your chat message model:
+
+class ChatResponse(BaseModel):
+    message: str
+    suggest_research: bool = False
+    topic_hint: Optional[str] = None
+
+✅ Frontend (MessageRenderer)
+
+Minimal button implementation (to test UX before visual polish):
+
+if (message.suggest_research && !appState.inResearchMode) {
+  const cta = document.createElement('div');
+  cta.className = 'research-suggestion';
+  const preview = message.topic_hint ? `Search for “${message.topic_hint}”?` : 'Find credible sources?';
+
+  cta.innerHTML = `
+    <span class="suggestion-text">${preview}</span>
+    <button class="switch-mode-btn">Switch to Research Mode</button>
+  `;
+  cta.querySelector('button').onclick = () => {
+    switchToResearchTab();
+    if (message.topic_hint) prefillResearchQuery(message.topic_hint);
+  };
+  messageElement.appendChild(cta);
+}
+
+
+CSS (tailwind-style pseudo):
+
+.research-suggestion { 
+  margin-top: .5rem; 
+  color: #4b5563; 
+  font-size: 0.9rem; 
+}
+.switch-mode-btn {
+  margin-left: 0.5rem;
+  background: #e5e7eb;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.switch-mode-btn:hover { background: #d1d5db; }
+
+
+Simple, no-surprise UX: inline and contextual.
+
+✅ State Handling
+
+In appState.js:
+
+state.suggestedTopics = [];
+
+function markSuggestion(topic) {
+  state.suggestedTopics.push(topic);
+}
+
+function shouldSuggest(topic) {
+  return !state.suggestedTopics.includes(topic);
+}
+
+
+Backend sets conversation.suggested_recently → frontend double-checks with this local array.
+Resets when conversation restarts.
+
+✨ Phase 2 — Polish (½ Day)
+
+Upgrade CTA to inline text link with a hover underline (“Want to find sources for this?”)
+
+Preview query text ("I can search for: 'Gaza peace deal 2025 terms'")
+
+Better frequency logic (re-suggest only on new intents)
+
+Respect "No thanks" — user click disables further prompts in that session
+
+Analytics event — track suggestion_shown, clicked, dismissed
+
+🧠 Why This Version Works
+
+No new API layer — uses existing brief + intent infrastructure
+
+Predictable behavior — won’t spam users or derail flow
+
+Natural feel — inline suggestion like a co-pilot, not a modal
+
+Scalable UX — can evolve to include source previews or auto-summaries later

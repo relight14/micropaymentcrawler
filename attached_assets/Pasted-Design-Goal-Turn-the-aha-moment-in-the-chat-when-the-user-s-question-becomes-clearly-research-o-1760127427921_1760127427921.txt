@@ -1,0 +1,130 @@
+Design Goal
+
+Turn the “aha moment” in the chat — when the user’s question becomes clearly research-oriented — into a seamless transition to the research tab.
+
+We want:
+
+Zero extra friction (no forced rerouting)
+
+One gentle prompt per topic
+
+Context continuity — chat → research shares the same topic
+
+🧩 Implementation Plan (Refined)
+1. Detection Layer (LLM + heuristic hybrid)
+
+Keep it cheap and robust.
+
+Option A — prompt-based (Claude logic only):
+You can add this to the conversational system prompt:
+
+If the user’s messages reveal a clear, researchable topic 
+(e.g. a current event, policy issue, historical question, 
+scientific topic, or hypothesis), respond naturally with 
+a friendly invitation like:
+
+"That's a great topic — would you like me to find credible sources so we can dig deeper?"
+
+Then set `suggest_research: true` in your response metadata.
+
+
+Option B — add a fallback heuristic in Python:
+
+if message.intent in ["academic_causal", "policy_analysis", "news_event"] and \
+   message.confidence > 0.7 and not conversation.has_research_suggestion:
+    message.suggest_research = True
+
+
+So even if the model forgets, the backend can still fire the suggestion once.
+
+2. Response Schema
+
+Add the field to your unified chat message object:
+
+{
+  "role": "assistant",
+  "content": "That's a fascinating topic — want to find some sources?",
+  "suggest_research": true,
+  "topic_hint": "Gaza peace deal negotiations"
+}
+
+
+The topic_hint lets you auto-fill the search bar when switching.
+
+3. Frontend UI (MessageRenderer)
+
+Enhance your message component:
+
+if (message.suggest_research) {
+  const btn = document.createElement('button');
+  btn.className = 'switch-mode-btn';
+  btn.innerText = 'Switch to Research Mode';
+  btn.onclick = () => {
+    switchToResearchTab();
+    prefillResearchQuery(message.topic_hint);
+  };
+  messageBody.appendChild(btn);
+}
+
+
+Styling: small inline CTA below the AI message (neutral gray with hover color).
+
+4. State & Frequency Control
+
+In your appState:
+
+if (!state.researchSuggestionShown) {
+  renderResearchButton();
+  state.researchSuggestionShown = true;
+}
+
+
+Resets when a new conversation starts.
+
+5. Optional — “Smart Switch” Flow
+
+On click:
+
+Switch tab → /research
+
+Auto-populate the search box with the summarized topic
+
+Focus the “Find Sources” button
+(don’t auto-run the search — let the user press it)
+
+That preserves agency while still feeling responsive.
+
+🧠 Example in Practice
+
+User: “I’m trying to understand the Gaza peace deal that was announced today — what’s actually in it?”
+Assistant:
+“That’s a really interesting and timely question. Want to find some credible sources and see how different outlets are covering it?”
+👉 [Switch to Research Mode]
+
+When clicked:
+
+Tab changes
+
+Search box: “Gaza peace deal 2025 terms and reactions”
+
+User sees context continuity → immediate trust.
+
+⚙️ Rollout Plan
+Step	Scope	ETA
+Backend flag + prompt update	conversational.py	0.5 day
+API schema update	responses.py	0.25 day
+Frontend button logic	message-renderer.js / app.js	0.5 day
+Style + QA	CSS + test	0.25 day
+
+Total: ~1–1.5 dev days.
+No migration or DB impact.
+
+✅ Why This Works
+
+Feels human — not algorithmic or interruptive.
+
+Uses existing architecture (Claude + message metadata).
+
+Keeps cost at zero (no new model calls).
+
+Bridges discovery → research naturally.
