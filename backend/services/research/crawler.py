@@ -218,10 +218,13 @@ class ContentCrawlerStub:
             publication_name: Optional publication name for Claude relevance filtering (e.g., 'Wall Street Journal')
         """
         cache_key = self._get_cache_key(query, count, budget_limit, domain_filter)
+        print(f"🔑 Cache key generated: {cache_key}")
+        print(f"📦 Current cache size: {len(self._cache)} entries")
         
         # Check cache first
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
+            print(f"✅ CACHE HIT for query: '{query}' - Returning {len(cached_result)} cached sources")
             # Apply recency-based reranking even to cached results
             if classification:
                 cached_result = self._rerank_with_recency(cached_result, classification)
@@ -232,6 +235,7 @@ class ContentCrawlerStub:
                 "enrichment_needed": False
             }
         
+        print(f"❌ CACHE MISS for query: '{query}' - Will call Tavily API")
         return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter, classification, publication_name)
     
     async def _get_http_client(self) -> httpx.AsyncClient:
@@ -423,13 +427,16 @@ class ContentCrawlerStub:
             
             # Make async REST API call (non-blocking)
             # Request more results (30) to give Claude filtering more options
+            max_results_count = min(count * 2, 30)
+            print(f"🌐 Calling Tavily API - Query: '{tavily_query}', Max Results: {max_results_count}, Domains: {domain_filter}")
             response = await self._call_tavily_api(
                 query=tavily_query,
-                max_results=min(count * 2, 30),  # 2x requested count, max 30
+                max_results=max_results_count,
                 include_domains=domain_filter
             )
             
             results = response.get('results', [])
+            print(f"📥 Tavily returned {len(results)} results")
             
             # Step 2.5: Apply Claude relevance filtering to all results
             # Lazy import to avoid circular dependency
