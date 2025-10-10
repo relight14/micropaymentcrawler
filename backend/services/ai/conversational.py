@@ -38,7 +38,10 @@ class AIResearchService:
         Returns:
             Filtered list of relevant results with reasoning
         """
+        print(f"🔎 Claude filtering STARTED - Query: '{query}', Results: {len(results)}, Publication: {publication}")
+        
         if not results:
+            print("⚠️  No results to filter, returning empty list")
             return []
         
         # Build evaluation prompt
@@ -71,6 +74,7 @@ For each result, respond with JSON:
             
             user_message = f"Evaluate these search results for relevance:\n\n{results_text}\n\nRespond with a JSON array of evaluations, one per result."
             
+            print(f"📡 Calling Claude API for relevance filtering...")
             response = self.client.messages.create(
                 model="claude-3-haiku-20240307",  # Fast and cheap for filtering
                 max_tokens=2000,
@@ -81,6 +85,7 @@ For each result, respond with JSON:
                     "content": user_message
                 }]
             )
+            print(f"✅ Claude API response received")
             
             response_text = self._extract_response_text(response)
             
@@ -147,11 +152,14 @@ For each result, respond with JSON:
         """
         # Don't suggest if we already have
         if self.suggested_research.get(user_id, False):
+            print(f"🚫 Research already suggested for user {user_id}, skipping")
             return False, None
         
         # Need at least 2 messages for context
         user_history = self.user_conversations.get(user_id, [])
+        print(f"📊 Checking research suggestion - User {user_id} has {len(user_history)} messages in history")
         if len(user_history) < 2:
+            print(f"⏳ Not enough messages yet ({len(user_history)} < 2), not suggesting research")
             return False, None
         
         # Build research brief from conversation
