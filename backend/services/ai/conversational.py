@@ -155,11 +155,12 @@ For each result, respond with JSON:
             print(f"🚫 Research already suggested for user {user_id}, skipping")
             return False, None
         
-        # Need at least 2 messages for context
+        # Need at least 2 USER messages for context (meaning second exchange)
         user_history = self.user_conversations.get(user_id, [])
-        print(f"📊 Checking research suggestion - User {user_id} has {len(user_history)} messages in history")
-        if len(user_history) < 2:
-            print(f"⏳ Not enough messages yet ({len(user_history)} < 2), not suggesting research")
+        user_messages = [msg for msg in user_history if msg["role"] == "user"]
+        print(f"📊 Checking research suggestion - User {user_id} has {len(user_messages)} user messages ({len(user_history)} total)")
+        if len(user_messages) < 2:
+            print(f"⏳ Not enough user messages yet ({len(user_messages)} < 2), not suggesting research")
             return False, None
         
         # Build research brief from conversation
