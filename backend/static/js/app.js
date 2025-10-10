@@ -220,6 +220,26 @@ export class ChatResearchApp {
             console.log('🔖 Citation badge clicked for source:', source.title);
             this.handleSourceUnlock(null, sourceId, price);
         });
+        
+        // Research mode suggestion button handler (custom event from MessageRenderer)
+        document.addEventListener('switchToResearch', (e) => {
+            const topicHint = e.detail?.topicHint || '';
+            console.log('💡 Switching to research mode with topic:', topicHint);
+            
+            // Switch to research mode
+            this.setMode('research');
+            
+            // Prefill the search query if we have a topic hint
+            if (topicHint) {
+                const chatInput = document.getElementById('newChatInput');
+                if (chatInput) {
+                    chatInput.value = topicHint;
+                    chatInput.focus();
+                    // Update character count
+                    this.uiManager.updateCharacterCount();
+                }
+            }
+        });
     }
 
     async sendMessage() {

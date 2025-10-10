@@ -28,6 +28,8 @@ class ChatResponse(BaseModel):
     licensing_summary: Optional[dict] = None
     total_cost: Optional[float] = None
     refined_query: Optional[str] = None
+    suggest_research: bool = False
+    topic_hint: Optional[str] = None
 
 
 def extract_bearer_token(authorization: str) -> str:

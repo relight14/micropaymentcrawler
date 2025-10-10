@@ -70,7 +70,9 @@ export class APIService {
                 sources: result.sources,
                 licensing_summary: result.licensing_summary,
                 total_cost: result.total_cost,
-                refined_query: result.refined_query
+                refined_query: result.refined_query,
+                suggest_research: result.suggest_research || false,
+                topic_hint: result.topic_hint || null
             }
         };
     }

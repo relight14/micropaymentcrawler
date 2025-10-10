@@ -193,6 +193,12 @@ export class MessageRenderer {
             }
         }
         
+        // Add research mode suggestion if applicable
+        if (message.metadata?.suggest_research) {
+            const suggestionElement = this._createResearchSuggestion(message.metadata.topic_hint);
+            bodyDiv.appendChild(suggestionElement);
+        }
+        
         return bodyDiv;
     }
     
@@ -279,6 +285,41 @@ export class MessageRenderer {
                 parent.removeChild(textNode);
             }
         });
+    }
+    
+    /**
+     * Create research mode suggestion button
+     * @private
+     */
+    static _createResearchSuggestion(topicHint) {
+        const suggestionDiv = document.createElement('div');
+        suggestionDiv.className = 'research-suggestion';
+        
+        // Create preview text
+        const previewText = document.createElement('span');
+        previewText.className = 'suggestion-text';
+        const preview = topicHint ? `Search for "${topicHint}"?` : 'Find credible sources?';
+        previewText.textContent = preview;
+        
+        // Create button
+        const button = document.createElement('button');
+        button.className = 'switch-mode-btn';
+        button.textContent = 'Switch to Research Mode';
+        button.setAttribute('data-topic-hint', topicHint || '');
+        
+        // Add click handler (will be wired up by app.js)
+        button.onclick = () => {
+            // Dispatch custom event that app.js will listen for
+            const event = new CustomEvent('switchToResearch', {
+                detail: { topicHint: topicHint || '' }
+            });
+            document.dispatchEvent(event);
+        };
+        
+        suggestionDiv.appendChild(previewText);
+        suggestionDiv.appendChild(button);
+        
+        return suggestionDiv;
     }
     
     /**

@@ -4,6 +4,7 @@ Integrates Anthropic Claude for both conversational and deep research modes.
 """
 import os
 import json
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import anthropic
@@ -22,6 +23,8 @@ class AIResearchService:
         self.crawler = ContentCrawlerStub()
         # Store conversations per user to prevent cross-user data leakage
         self.user_conversations: Dict[str, List[Dict[str, Any]]] = {}
+        # Track whether we've suggested research mode for each user
+        self.suggested_research: Dict[str, bool] = {}
     
     async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None) -> List[Dict[str, Any]]:
         """
@@ -136,6 +139,48 @@ For each result, respond with JSON:
                 return str(response)
         except Exception:
             return str(response)
+    
+    def _should_suggest_research(self, user_id: str) -> tuple[bool, Optional[str]]:
+        """
+        Determine if we should suggest switching to research mode.
+        Returns: (should_suggest: bool, topic_hint: Optional[str])
+        """
+        # Don't suggest if we already have
+        if self.suggested_research.get(user_id, False):
+            return False, None
+        
+        # Need at least 2 messages for context
+        user_history = self.user_conversations.get(user_id, [])
+        if len(user_history) < 2:
+            return False, None
+        
+        # Build research brief from conversation
+        try:
+            from app.api.routes.research import _build_research_brief, _classify_intent_and_temporal
+            
+            # Get recent messages for context
+            context_messages = user_history[-6:]
+            last_user_message = next((msg["content"] for msg in reversed(user_history) if msg["role"] == "user"), "")
+            
+            # Extract research brief
+            brief = _build_research_brief(context_messages, last_user_message)
+            
+            # Classify intent
+            classification = _classify_intent_and_temporal(brief)
+            intent = classification.get("intent", "general_research")
+            
+            # Research-worthy intents
+            research_intents = ["news_event", "policy_analysis", "academic_causal", "business_trends", "historical_explainer"]
+            
+            if intent in research_intents:
+                # Extract topic hint for prefill
+                topic_hint = brief.get("topic") or (brief["entities"][0] if brief.get("entities") else None)
+                return True, topic_hint
+            
+        except Exception as e:
+            print(f"⚠️ Research suggestion detection error: {e}")
+        
+        return False, None
         
     async def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
@@ -200,16 +245,30 @@ When they seem ready for deep research, you can suggest they switch to "Deep Res
                 "mode": "conversational"
             })
             
-            return {
+            # Check if we should suggest switching to research mode
+            should_suggest, topic_hint = self._should_suggest_research(user_id)
+            
+            result = {
                 "response": ai_response,
                 "mode": "conversational",
-                "conversation_length": len(self.user_conversations[user_id])
+                "conversation_length": len(self.user_conversations[user_id]),
+                "suggest_research": should_suggest
             }
+            
+            # Add topic hint if we're suggesting research
+            if should_suggest and topic_hint:
+                result["topic_hint"] = topic_hint
+                # Mark that we've suggested for this user
+                self.suggested_research[user_id] = True
+                print(f"💡 Suggesting research mode switch for topic: {topic_hint}")
+            
+            return result
             
         except Exception as e:
             return {
                 "response": f"I'm having trouble connecting right now. Let me help you explore your research interests anyway - what specific aspect of your topic are you most curious about?",
                 "mode": "conversational", 
+                "suggest_research": False,
                 "error": str(e)
             }
     
@@ -443,3 +502,6 @@ Keep it concise but compelling - make the user excited about what they'll discov
         """Clear conversation history for a specific user"""
         if user_id in self.user_conversations:
             self.user_conversations[user_id] = []
+        # Reset research suggestion flag when clearing conversation
+        if user_id in self.suggested_research:
+            self.suggested_research[user_id] = False
