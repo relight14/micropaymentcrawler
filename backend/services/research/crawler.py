@@ -206,7 +206,7 @@ class ContentCrawlerStub:
         """Store results in cache with timestamp"""
         self._cache[cache_key] = (data, time.time())
     
-    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None, publication_name: Optional[str] = None) -> Dict[str, Any]:
         """Generate sources with progressive loading - returns immediate results + enrichment promise
         
         Args:
@@ -215,6 +215,7 @@ class ContentCrawlerStub:
             budget_limit: Optional budget limit for licensing
             domain_filter: Optional list of domains to filter results (e.g., ['nytimes.com'])
             classification: Optional classification dict with intent, temporal_bucket, recency_weight
+            publication_name: Optional publication name for Claude relevance filtering (e.g., 'Wall Street Journal')
         """
         cache_key = self._get_cache_key(query, count, budget_limit, domain_filter)
         
@@ -231,7 +232,7 @@ class ContentCrawlerStub:
                 "enrichment_needed": False
             }
         
-        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter, classification)
+        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter, classification, publication_name)
     
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -392,7 +393,7 @@ class ContentCrawlerStub:
         
         return query, None
     
-    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None, publication_name: Optional[str] = None) -> Dict[str, Any]:
         """Generate sources progressively: immediate raw results + background enrichment
         
         Args:
@@ -402,6 +403,7 @@ class ContentCrawlerStub:
             cache_key: Cache key
             domain_filter: Optional domain filter from publication detection (takes precedence)
             classification: Optional classification for recency-weighted reranking
+            publication_name: Optional publication name for Claude relevance filtering
         """
         if not self.tavily_api_key:
             return await self.generate_sources_progressive(query, count, budget_limit)
@@ -428,7 +430,17 @@ class ContentCrawlerStub:
             
             results = response.get('results', [])
             
-            # Step 2: Create basic source cards immediately with Tavily data
+            # Step 2.5: Apply Claude relevance filtering to all results
+            # Lazy import to avoid circular dependency
+            from services.ai.conversational import AIResearchService
+            ai_filter = AIResearchService()
+            results = await ai_filter.filter_search_results_by_relevance(
+                query=clean_query,
+                results=results,
+                publication=publication_name  # Pass publication if available, None otherwise
+            )
+            
+            # Step 3: Create basic source cards immediately with filtered Tavily data
             immediate_sources = []
             for i, result in enumerate(results[:count]):
                 # Extract URL first (Tavily should always provide this)

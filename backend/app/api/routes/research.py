@@ -831,16 +831,21 @@ async def analyze_research_query(
         # Apply publication constraint based on type
         final_query = enhanced_query
         domain_filter = None
+        publication_name = None
         
         if publication_info:
             if publication_info["type"] == "domain_filter":
                 # Tier 1: Use exact domain filtering
                 domain_filter = [publication_info["value"]]
-                print(f"📰 Using domain filter: {domain_filter}")
+                # Extract publication name from domain for Claude filtering
+                domain = publication_info["value"]
+                publication_name = domain.replace('.com', '').replace('the', '').replace('www.', '').title()
+                print(f"📰 Using domain filter: {domain_filter} with Claude filtering for: {publication_name}")
             elif publication_info["type"] == "keyword_boost":
                 # Tier 2: Boost publication name as keyword
-                final_query = f'"{publication_info["value"]}" {enhanced_query}'
-                print(f"📰 Boosting keyword: {publication_info['value']}")
+                publication_name = publication_info["value"]
+                final_query = f'"{publication_name}" {enhanced_query}'
+                print(f"📰 Boosting keyword: {publication_name} with Claude filtering")
         
         # Use progressive search for faster initial response with fallback
         try:
@@ -849,7 +854,8 @@ async def analyze_research_query(
                 max_sources, 
                 budget_limit, 
                 domain_filter=domain_filter,
-                classification=classification
+                classification=classification,
+                publication_name=publication_name
             )
             sources = result["sources"]
         except Exception as crawler_error:

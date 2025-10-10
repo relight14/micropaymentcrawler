@@ -23,6 +23,106 @@ class AIResearchService:
         # Store conversations per user to prevent cross-user data leakage
         self.user_conversations: Dict[str, List[Dict[str, Any]]] = {}
     
+    async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Use Claude to filter search results for query relevance.
+        
+        Args:
+            query: User's research query
+            results: List of search results from Tavily with 'title', 'content', 'url'
+            publication: Optional specific publication name (e.g., "Wall Street Journal", "WSJ")
+        
+        Returns:
+            Filtered list of relevant results with reasoning
+        """
+        if not results:
+            return []
+        
+        # Build evaluation prompt
+        publication_context = ""
+        if publication:
+            publication_context = f"\n\nIMPORTANT: User specifically requested sources from '{publication}'. Heavily prioritize results from this publication and filter out results from other publications unless they are highly relevant to the core query."
+        
+        system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results match a user's research query.
+
+Consider these factors:
+1. **Topic Match**: Does the article actually discuss the core topic?
+2. **Geographic Scope**: If query mentions a specific country/region, does the article focus on that geography?
+3. **Contextual Relevance**: Does the article address the user's specific question or need?
+4. **Tangential vs Core**: Reject results that are only tangentially related (e.g., international nuclear treaties when user asked about US nuclear power)
+5. **Publication Focus**: If a specific publication was requested, is this from that publication?
+
+Be strict - only mark results as relevant if they genuinely address the user's query. When in doubt, filter it out.
+
+User Query: "{query}"{publication_context}
+
+For each result, respond with JSON:
+{{"relevant": true/false, "reason": "brief explanation"}}"""
+
+        try:
+            # Prepare results summary for Claude
+            results_text = "\n\n".join([
+                f"Result {i+1}:\nTitle: {r.get('title', 'No title')}\nURL: {r.get('url', '')}\nSummary: {r.get('content', '')[:300]}..."
+                for i, r in enumerate(results[:15])  # Limit to 15 to stay under token limits
+            ])
+            
+            user_message = f"Evaluate these search results for relevance:\n\n{results_text}\n\nRespond with a JSON array of evaluations, one per result."
+            
+            response = self.client.messages.create(
+                model="claude-3-haiku-20240307",  # Fast and cheap for filtering
+                max_tokens=2000,
+                temperature=0.0,  # Deterministic for consistency
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": user_message
+                }]
+            )
+            
+            response_text = self._extract_response_text(response)
+            
+            # Parse Claude's evaluation
+            try:
+                # Extract JSON from response (handle markdown code blocks)
+                import re
+                json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
+                if json_match:
+                    evaluations = json.loads(json_match.group(1))
+                else:
+                    # Try parsing directly
+                    evaluations = json.loads(response_text)
+                
+                # Filter results based on Claude's evaluation
+                filtered_results = []
+                filtered_reasons = []
+                
+                for i, (result, evaluation) in enumerate(zip(results, evaluations)):
+                    if evaluation.get('relevant', False):
+                        filtered_results.append(result)
+                    else:
+                        reason = evaluation.get('reason', 'Not relevant')
+                        filtered_reasons.append(f"  • {result.get('title', 'Unknown')[:60]}... - {reason}")
+                
+                # Log filtering results
+                if filtered_reasons:
+                    print(f"🔍 Claude filtered out {len(filtered_reasons)} irrelevant results:")
+                    for reason in filtered_reasons[:5]:  # Show first 5
+                        print(reason)
+                    if len(filtered_reasons) > 5:
+                        print(f"  ... and {len(filtered_reasons) - 5} more")
+                
+                print(f"✅ Claude relevance filtering: {len(results)} → {len(filtered_results)} results")
+                return filtered_results
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️  Failed to parse Claude evaluation (using all results): {e}")
+                print(f"Response was: {response_text[:200]}...")
+                return results  # Return all results if parsing fails
+                
+        except Exception as e:
+            print(f"⚠️  Claude filtering error (using all results): {e}")
+            return results  # Fallback to all results on error
+    
     def _extract_response_text(self, response) -> str:
         """Safely extract text from Anthropic response."""
         try:
