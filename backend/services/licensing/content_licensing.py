@@ -274,7 +274,7 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            rate_endpoint = f"{self.base_url}/dev/v1/rate?url={quote_plus(target_url)}"
+            rate_endpoint = f"{self.base_url}/dev/v1/rate/{target_url}"
             
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
