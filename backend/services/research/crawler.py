@@ -422,9 +422,10 @@ class ContentCrawlerStub:
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
             
             # Make async REST API call (non-blocking)
+            # Request more results (30) to give Claude filtering more options
             response = await self._call_tavily_api(
                 query=tavily_query,
-                max_results=min(count, 20),
+                max_results=min(count * 2, 30),  # 2x requested count, max 30
                 include_domains=domain_filter
             )
             
@@ -619,9 +620,10 @@ class ContentCrawlerStub:
             tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
             
             # Make async REST API call with domain filter support
+            # Request more results (30) to give Claude filtering more options
             response = await self._call_tavily_api(
                 query=tavily_query,
-                max_results=min(count, 20),
+                max_results=min(count * 2, 30),  # 2x requested count, max 30
                 include_domains=domain_filter
             )
             
