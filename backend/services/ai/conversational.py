@@ -131,6 +131,83 @@ For each result, respond with JSON:
             print(f"⚠️  Claude filtering error (using all results): {e}")
             return results  # Fallback to all results on error
     
+    async def optimize_search_query(self, raw_query: str, conversation_context: List[Dict[str, Any]]) -> str:
+        """
+        Use Claude to optimize a search query based on conversation context.
+        
+        Args:
+            raw_query: User's raw query string
+            conversation_context: List of conversation messages for context
+        
+        Returns:
+            Optimized query string for Tavily search API
+        """
+        print(f"🎯 Query optimization STARTED - Raw query: '{raw_query}'")
+        
+        # Build conversation summary (last 6 messages)
+        context_summary = ""
+        if conversation_context:
+            for msg in conversation_context[-6:]:
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')[:200]  # Limit length
+                context_summary += f"{role.upper()}: {content}\n"
+        
+        system_prompt = """You are a search query optimization expert. Your job is to convert user queries into highly effective web search queries.
+
+Given a conversation context and user's query, create an optimized search query that:
+
+1. **Prioritizes Specific Entities**: Use specific names (e.g., "US Federal Reserve" not "central banks")
+2. **Geographic Precision**: Put geographic constraints first (e.g., "US" before topic)
+3. **Temporal Anchoring**: Use specific dates/periods instead of vague terms like "recent"
+4. **Complete Thoughts**: Never truncate mid-word or leave incomplete phrases
+5. **Signal Analysis Depth**: Add hints like "analysis", "expert commentary", "news coverage" based on user intent
+6. **Eliminate Filler**: Remove conversational words like "I want to understand", "really"
+
+Examples:
+- Bad: "the role of central banks in setting policy, specifically in the us. really understand this recent uptick in inflation"
+- Good: "US Federal Reserve delayed inflation response 2024 post-COVID - why Fed was slow to raise interest rates"
+
+- Bad: "what's happening with tech stocks recently"
+- Good: "US tech stock market performance October 2025 analysis"
+
+Return ONLY the optimized query (max 120 characters). No explanation."""
+
+        try:
+            user_message = f"""Conversation Context:
+{context_summary}
+
+User Query: "{raw_query}"
+
+Generate an optimized search query (max 120 chars):"""
+
+            print(f"📡 Calling Claude API for query optimization...")
+            response = self.client.messages.create(
+                model="claude-3-haiku-20240307",  # Fast and cheap
+                max_tokens=150,
+                temperature=0.0,  # Deterministic
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": user_message
+                }]
+            )
+            
+            optimized_query = self._extract_response_text(response).strip()
+            
+            # Remove any quotes if Claude added them
+            optimized_query = optimized_query.strip('"\'')
+            
+            # Truncate to 120 chars if needed
+            if len(optimized_query) > 120:
+                optimized_query = optimized_query[:120].rsplit(' ', 1)[0]
+            
+            print(f"✅ Query optimized: '{raw_query}' → '{optimized_query}'")
+            return optimized_query
+            
+        except Exception as e:
+            print(f"⚠️  Query optimization failed (using raw query): {e}")
+            return raw_query  # Fallback to raw query on error
+    
     def _extract_response_text(self, response) -> str:
         """Safely extract text from Anthropic response."""
         try:
