@@ -300,7 +300,11 @@ export class ChatResearchApp {
     setMode(mode) {
         // Check authentication for research mode
         if (mode === 'research' && !this.authService.isAuthenticated()) {
-            // Show login modal instead of switching mode
+            // Save pending mode switch and show login modal
+            this.appState.setPendingAction({ 
+                type: 'mode_switch', 
+                mode: 'research' 
+            });
             this.showAuthModal();
             return;
         }
@@ -874,6 +878,9 @@ export class ChatResearchApp {
                 await this.handleSourceUnlock(action.button, action.sourceId, action.price);
             } else if (action.type === 'tier_purchase') {
                 await this.handleTierPurchase(action.button, action.tierId, action.price);
+            } else if (action.type === 'mode_switch') {
+                // Switch to the pending mode after login
+                this.setMode(action.mode);
             }
         } catch (error) {
             console.error('Error executing pending action:', error);
