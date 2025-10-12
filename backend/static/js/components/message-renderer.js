@@ -298,13 +298,15 @@ export class MessageRenderer {
         // Create preview text
         const previewText = document.createElement('span');
         previewText.className = 'suggestion-text';
-        const preview = topicHint ? `Search for "${topicHint}"?` : 'Find credible sources?';
+        const preview = topicHint 
+            ? `I think I've got it - ready to find credible sources on this?`
+            : `Ready to search for authoritative sources?`;
         previewText.textContent = preview;
         
         // Create button
         const button = document.createElement('button');
         button.className = 'switch-mode-btn';
-        button.textContent = 'Switch to Research Mode';
+        button.textContent = 'Find Sources';
         button.setAttribute('data-topic-hint', topicHint || '');
         
         // Add click handler (will be wired up by app.js)
