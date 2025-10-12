@@ -197,6 +197,11 @@ Generate an optimized search query (max 120 chars):"""
             # Remove any quotes if Claude added them
             optimized_query = optimized_query.strip('"\'')
             
+            # Safety: Fallback to raw query if Claude returns empty/whitespace
+            if not optimized_query or optimized_query.isspace():
+                print(f"⚠️  Claude returned empty query, using raw query")
+                return raw_query
+            
             # Truncate to 120 chars if needed
             if len(optimized_query) > 120:
                 optimized_query = optimized_query[:120].rsplit(' ', 1)[0]
