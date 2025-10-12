@@ -237,12 +237,12 @@ Generate an optimized search query (max 120 chars):"""
             print(f"🚫 Research already suggested for user {user_id}, skipping")
             return False, None
         
-        # Need at least 2 USER messages for context (meaning second exchange)
+        # Need at least 3 USER messages for context (meaning third exchange)
         user_history = self.user_conversations.get(user_id, [])
         user_messages = [msg for msg in user_history if msg["role"] == "user"]
         print(f"📊 Checking research suggestion - User {user_id} has {len(user_messages)} user messages ({len(user_history)} total)")
-        if len(user_messages) < 2:
-            print(f"⏳ Not enough user messages yet ({len(user_messages)} < 2), not suggesting research")
+        if len(user_messages) < 3:
+            print(f"⏳ Not enough user messages yet ({len(user_messages)} < 3), not suggesting research")
             return False, None
         
         # Build research brief from conversation

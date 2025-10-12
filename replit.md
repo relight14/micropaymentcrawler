@@ -30,7 +30,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Inline Citation Badges**: AI-generated reports feature contextual purchase badges next to locked source citations, showing unlock pricing and linking to the unlock modal.
 - **Token Expiry Handling**: Automatic JWT token validation and a centralized logout callback system for consistent UI updates.
 - **Tab State Persistence After Login**: Preserves user intent by saving desired actions (e.g., mode switch) before authentication and executing them post-login.
-- **Chat-to-Research Transition**: Intelligent mode switching suggests transitioning to research mode for research-worthy conversations, leveraging intent classification and providing topic hints for query prefilling.
+- **Chat-to-Research Transition**: Intelligent mode switching suggests transitioning to research mode for research-worthy conversations after at least 3 user messages (third exchange), leveraging intent classification and providing topic hints for query prefilling.
 
 ## Feature Specifications
 - **Dynamic Research Services**: Provides query-based research packages with variable pricing ($0.10-$10.00), determined by source count, quality, and licensing complexity.

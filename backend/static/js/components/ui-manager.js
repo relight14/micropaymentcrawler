@@ -502,9 +502,9 @@ export class UIManager {
     
     scrollToMessage(messageElement) {
         if (this.messagesContainer && messageElement) {
-            // Scroll to show the top of the message with a small offset for padding
-            const offset = 20;
-            this.messagesContainer.scrollTop = messageElement.offsetTop - offset;
+            // Scroll to show the very top of the message
+            // Use scrollIntoView for precise top alignment
+            messageElement.scrollIntoView({ behavior: 'auto', block: 'start' });
         }
     }
     
