@@ -825,8 +825,16 @@ async def analyze_research_query(
             # Classify intent and temporal bucket
             classification = _classify_intent_and_temporal(brief)
             
-            # Build targeted query from brief
+            # Build targeted query from brief (regex-based)
             enhanced_query = _build_query_with_brief(brief, classification)
+            
+            # AI-POWERED: Optimize query using Claude with full conversation context
+            from services.ai.conversational import AIResearchService
+            ai_service = AIResearchService()
+            enhanced_query = await ai_service.optimize_search_query(
+                raw_query=enhanced_query,
+                conversation_context=research_request.conversation_context
+            )
         
         # Apply publication constraint based on type
         final_query = enhanced_query
