@@ -147,7 +147,13 @@ export class UIManager {
         }
         
         this.messagesContainer.appendChild(messageDiv);
-        this.scrollToBottom();
+        
+        // Scroll to top of message for assistant responses, bottom for user messages
+        if (message.sender === 'assistant') {
+            this.scrollToMessage(messageDiv);
+        } else {
+            this.scrollToBottom();
+        }
         
         return messageDiv;
     }
@@ -491,6 +497,14 @@ export class UIManager {
     scrollToBottom() {
         if (this.messagesContainer) {
             this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        }
+    }
+    
+    scrollToMessage(messageElement) {
+        if (this.messagesContainer && messageElement) {
+            // Scroll to show the top of the message with a small offset for padding
+            const offset = 20;
+            this.messagesContainer.scrollTop = messageElement.offsetTop - offset;
         }
     }
     
