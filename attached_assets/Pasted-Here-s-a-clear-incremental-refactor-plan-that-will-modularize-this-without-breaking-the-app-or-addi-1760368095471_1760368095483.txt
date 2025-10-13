@@ -1,0 +1,148 @@
+Here’s a clear, incremental refactor plan that will modularize this without breaking the app or adding unnecessary complexity.
+
+🧱 1. Separate by Concern
+
+You can divide this file into 4 logical layers, each with its own module directory:
+
+/src
+ ├── app/
+ │    ├── app-controller.js       ← the lightweight orchestrator (replaces app.js)
+ │    ├── event-router.js         ← sets up all DOM/event listeners
+ │    ├── toast-manager.js        ← handles toast rendering + lifecycle
+ │    └── modal-controller.js     ← handles auth + funding modals
+ ├── services/
+ │    ├── api.js
+ │    ├── auth.js
+ │    └── wallet.js               ← optional: isolate funding/wallet logic
+ ├── components/
+ │    ├── ui-manager.js
+ │    ├── message-renderer.js
+ │    ├── source-card.js
+ │    └── report-builder.js
+ └── state/
+      └── app-state.js
+
+⚙️ 2. Extract “Heavy” Responsibilities First
+🧩 A. toast-manager.js
+
+Everything from initializeToastSystem, showToast, and dismissToast should move to its own class:
+
+export class ToastManager {
+  constructor(containerSelector = '#toastContainer') { ... }
+  show(message, type = 'info', duration = 3000) { ... }
+  dismiss(id) { ... }
+}
+
+
+Then ChatResearchApp just does:
+
+this.toastManager = new ToastManager();
+this.toastManager.show('Session expired', 'info');
+
+🧩 B. event-router.js
+
+Move all event listener wiring out of initializeEventListeners():
+
+export class EventRouter {
+  constructor(app, uiManager, authService, appState) {
+    this.app = app;
+    this.ui = uiManager;
+    this.auth = authService;
+    this.state = appState;
+  }
+  registerAll() {
+    this.registerChatEvents();
+    this.registerAuthEvents();
+    this.registerModeSwitching();
+    ...
+  }
+}
+
+
+Then in app-controller.js:
+
+this.eventRouter = new EventRouter(this, this.uiManager, this.authService, this.appState);
+this.eventRouter.registerAll();
+
+
+This drastically lightens the controller and isolates DOM bindings.
+
+🧩 C. modal-controller.js
+
+Extract auth modal and funding modal rendering into a new class:
+
+export class ModalController {
+  constructor(authService, uiManager) { ... }
+  showAuthModal() { ... }
+  showFundingModal() { ... }
+}
+
+
+That lets your main app reduce hundreds of lines to:
+
+this.modals = new ModalController(this.authService, this.uiManager);
+...
+this.modals.showAuthModal();
+
+🧩 D. report-builder.js
+
+Extract all report-builder-related DOM creation (_generateReportBuilderDOM, _createTierCard, _attachTierPurchaseListeners) into its own component file:
+
+export class ReportBuilder {
+  constructor(appState, uiManager) { ... }
+  render() { ... }
+}
+
+
+Then ChatResearchApp.displayReportBuilderResults() simply becomes:
+
+const reportBuilder = new ReportBuilder(this.appState, this.uiManager);
+this.addMessage('system', reportBuilder.render());
+
+🧩 3. Keep ChatResearchApp as a Lightweight Orchestrator
+
+After the refactor, your ChatResearchApp (renamed to AppController) should mainly do:
+
+Dependency injection (authService, apiService, uiManager, etc.)
+
+Initialize modular subsystems
+
+Wire global event handlers (e.g., SourceCardReady, sourceUnlockRequested)
+
+Manage global app state transitions
+
+Roughly 200–250 lines total, down from 2,000+.
+
+🧠 4. Optional Enhancements
+
+Lazy-load noncritical modules (e.g., import() modals or report builder only when needed).
+
+Event-driven pattern: have subsystems emit and listen to CustomEvents (app:auth:success, ui:mode:changed), reducing tight coupling.
+
+Dependency container: add a simple registry to manage singletons (serviceLocator.get('auth')).
+
+✅ Example High-Level Refactor Flow
+import { APIService } from '../services/api.js';
+import { AuthService } from '../services/auth.js';
+import { UIManager } from '../components/ui-manager.js';
+import { EventRouter } from './event-router.js';
+import { ToastManager } from './toast-manager.js';
+import { ModalController } from './modal-controller.js';
+
+export class AppController {
+  constructor() {
+    this.auth = new AuthService();
+    this.api = new APIService(this.auth);
+    this.ui = new UIManager();
+    this.toast = new ToastManager();
+    this.modals = new ModalController(this.auth, this.ui);
+    this.events = new EventRouter(this, this.ui, this.auth);
+  }
+
+  async init() {
+    await this.auth.validateToken();
+    this.ui.init();
+    this.events.registerAll();
+    this.toast.show('App ready', 'success');
+  }
+}
