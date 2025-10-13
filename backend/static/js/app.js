@@ -61,36 +61,52 @@ export class ChatResearchApp {
         try {
             // Setup modal controller callbacks
             this.modalController.setAuthSuccessCallback(async (type) => {
-                // Close the auth modal
-                this.modalController.closeAuthModal();
-                
-                // Show success toast
-                this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
-
-                // Fetch wallet balance from API
-                await this.authService.updateWalletBalance();
-                
-                // Auto-trigger funding modal if balance is $0
-                if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
-                    setTimeout(() => {
-                        this.modalController.showFundingModal();
-                    }, 500);
-                }
-                
-                // Execute any pending tab state action
-                const pendingTabAction = this.appState.getPendingTabAction();
-                if (pendingTabAction) {
-                    console.log('🔄 Executing pending tab action after login:', pendingTabAction);
+                try {
+                    console.log('🔐 Auth success callback started:', type);
                     
-                    if (pendingTabAction.type === 'mode_switch') {
-                        this.setMode(pendingTabAction.mode);
+                    // Close the auth modal
+                    this.modalController.closeAuthModal();
+                    
+                    // Show success toast
+                    this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
+
+                    // Fetch wallet balance from API
+                    console.log('💰 Fetching wallet balance...');
+                    await this.authService.updateWalletBalance();
+                    console.log('💰 Wallet balance updated:', this.authService.getWalletBalance());
+                    
+                    // Auto-trigger funding modal if balance is $0
+                    if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
+                        setTimeout(() => {
+                            this.modalController.showFundingModal();
+                        }, 500);
                     }
                     
-                    this.appState.clearPendingTabAction();
+                    // Execute any pending tab state action
+                    const pendingTabAction = this.appState.getPendingTabAction();
+                    if (pendingTabAction) {
+                        console.log('🔄 Executing pending tab action after login:', pendingTabAction);
+                        
+                        if (pendingTabAction.type === 'mode_switch') {
+                            this.setMode(pendingTabAction.mode);
+                        }
+                        
+                        this.appState.clearPendingTabAction();
+                    }
+                    
+                    // Update UI with wallet balance
+                    console.log('🎨 Updating auth button UI...');
+                    this.updateAuthButton();
+                    console.log('✅ Auth success callback completed');
+                } catch (error) {
+                    console.error('❌ Error in auth success callback:', error);
+                    // Don't throw - just log and update UI anyway
+                    try {
+                        this.updateAuthButton();
+                    } catch (uiError) {
+                        console.error('❌ Failed to update auth button:', uiError);
+                    }
                 }
-                
-                // Update UI with wallet balance
-                this.updateAuthButton();
             });
 
             this.modalController.setAuthToggleCallback(() => {
@@ -341,47 +357,63 @@ export class ChatResearchApp {
     }
 
     updateAuthButton() {
-        const loginButton = document.getElementById('loginButton');
-        const profileDropdown = document.getElementById('profileDropdown');
-        
-        if (this.authService.isAuthenticated()) {
-            // Hide login button, show profile dropdown
-            if (loginButton) loginButton.style.display = 'none';
-            if (profileDropdown) {
+        try {
+            const loginButton = document.getElementById('loginButton');
+            const profileDropdown = document.getElementById('profileDropdown');
+            
+            if (!loginButton || !profileDropdown) {
+                console.warn('⚠️ Auth button elements not found in DOM');
+                return;
+            }
+            
+            if (this.authService.isAuthenticated()) {
+                // Hide login button, show profile dropdown
+                loginButton.style.display = 'none';
                 profileDropdown.style.display = 'block';
                 
                 // Update profile display
                 const initials = document.getElementById('userInitials');
                 const balance = document.getElementById('userBalance');
                 
+                const userInfo = this.authService.getUserInfo();
+                const userInitials = this.authService.getUserInitials();
+                const walletBalance = this.authService.getWalletBalance();
+                
                 console.log('Updating profile UI:', {
-                    userInfo: this.authService.getUserInfo(),
-                    initials: this.authService.getUserInitials(),
-                    balance: this.authService.getWalletBalance()
+                    userInfo,
+                    initials: userInitials,
+                    balance: walletBalance
                 });
                 
                 if (initials) {
-                    const userInitials = this.authService.getUserInitials();
-                    initials.textContent = userInitials;
+                    initials.textContent = userInitials || 'RI';
                     console.log('Set initials to:', userInitials);
+                } else {
+                    console.warn('⚠️ userInitials element not found');
                 }
-                if (balance && this.authService.isAuthenticated()) {
-                    const walletBalance = this.authService.getWalletBalance();
+                
+                if (balance) {
                     const safeBalance = Number(walletBalance) || 0;
                     balance.textContent = `$${safeBalance.toFixed(2)}`;
                     console.log('Set balance to:', safeBalance);
-                } else if (balance) {
-                    // Hide balance for unauthenticated users
-                    balance.textContent = '$0.00';
+                } else {
+                    console.warn('⚠️ userBalance element not found');
                 }
                 
                 // Add dropdown functionality
-                this.setupProfileDropdown();
+                try {
+                    this.setupProfileDropdown();
+                } catch (dropdownError) {
+                    console.error('⚠️ Error setting up profile dropdown:', dropdownError);
+                }
+            } else {
+                // Show login button, hide profile dropdown
+                loginButton.style.display = 'block';
+                profileDropdown.style.display = 'none';
             }
-        } else {
-            // Show login button, hide profile dropdown
-            if (loginButton) loginButton.style.display = 'block';
-            if (profileDropdown) profileDropdown.style.display = 'none';
+        } catch (error) {
+            console.error('❌ Error in updateAuthButton:', error);
+            // Don't throw - just log the error
         }
     }
 
