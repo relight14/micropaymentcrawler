@@ -141,7 +141,7 @@ export class MessageCoordinator {
             console.log('  Mode:', mode);
             console.log('  Feedback section:', feedbackSection);
             
-            const token = this.authService.getAccessToken();
+            const token = this.authService.getToken();
             console.log('  Token available:', !!token);
             
             const headers = {
