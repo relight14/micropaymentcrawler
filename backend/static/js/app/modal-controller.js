@@ -192,13 +192,12 @@ export class ModalController {
         }
 
         try {
-            const credentials = { email, password };
-            if (type === 'signup') {
-                credentials.first_name = firstName;
-                credentials.last_name = lastName;
+            let result;
+            if (type === 'login') {
+                result = await this.authService.login(email, password);
+            } else if (type === 'signup') {
+                result = await this.authService.signup(email, password, firstName, lastName);
             }
-
-            const result = await this.authService.authenticate(type, credentials);
             
             if (result.success) {
                 // Trigger success callback
