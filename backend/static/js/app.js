@@ -792,54 +792,6 @@ export class ChatResearchApp {
         }
     }
 
-    async handleReportGeneration(button, tier, query, selectedSources) {
-        if (!this.authService.isAuthenticated()) {
-            this.addMessage('system', 'Please log in to generate a report.');
-            return;
-        }
-
-        try {
-            // Extract source IDs from selected sources
-            const selectedSourceIds = selectedSources.map(source => source.id);
-            
-            console.log(`📊 Generating ${tier} report with ${selectedSourceIds.length} selected sources`);
-            
-            // Show progressive loading indicator
-            const loadingMessageElement = this._addProgressiveLoadingMessage();
-            
-            // Call generateReport endpoint with selected source IDs
-            const reportPacket = await this.apiService.generateReport(query, tier, selectedSourceIds);
-            
-            // Remove loading indicator
-            if (loadingMessageElement) {
-                this._removeLoadingMessage(loadingMessageElement);
-            }
-            
-            if (reportPacket) {
-                // Update button state
-                if (button) {
-                    button.textContent = 'Report Generated';
-                    button.disabled = true;
-                }
-                
-                // Display the generated report
-                this._displayGeneratedReport(reportPacket);
-                
-                // Show success message as toast (non-intrusive, won't trigger DOM re-render)
-                this.toastManager.show(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${selectedSourceIds.length} selected sources!`, 'success');
-            }
-        } catch (error) {
-            console.error('Error generating report:', error);
-            this.toastManager.show(`⚠️ Report generation failed: ${error.message}`, 'error');
-            
-            // Reset button state
-            if (button) {
-                button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
-                button.disabled = false;
-            }
-        }
-    }
-
     async handleTierPurchase(button, tierId, price, query = "Research Query", useSelectedSources = false) {
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
@@ -957,255 +909,39 @@ export class ChatResearchApp {
         }
     }
 
-    // Placeholder methods for features to be implemented
-    displayReportBuilderResults(data = null) {
-        const researchData = data || this.appState.getCurrentResearchData();
-        if (!researchData) return;
+    updateSourceSelectionUI() {
+        const selectedSources = this.appState.getSelectedSources();
+        const selectedIds = new Set(selectedSources.map(s => s.id));
         
-        // Add system message to inform user about mode switch (like research mode)
-        this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
-        
-        // Create report builder DOM content
-        const reportBuilderContent = this._generateReportBuilderDOM();
-        
-        // Use MessageRenderer for consistent message structure
-        const reportBuilderMessage = MessageRenderer.createMessageElement({
-            sender: 'system',
-            content: reportBuilderContent,
-            timestamp: new Date()
+        // Update ALL checkbox states to match actual selection state
+        const allCheckboxes = document.querySelectorAll('.source-selection-checkbox');
+        allCheckboxes.forEach(checkbox => {
+            const sourceCard = checkbox.closest('[data-source-id]');
+            if (sourceCard) {
+                const sourceId = sourceCard.getAttribute('data-source-id');
+                const isSelected = selectedIds.has(sourceId);
+                checkbox.checked = isSelected;
+                
+                // Visual feedback for selected cards
+                if (isSelected) {
+                    sourceCard.style.borderColor = 'var(--primary)';
+                    sourceCard.style.backgroundColor = 'var(--primary-light, #f0f9ff)';
+                } else {
+                    sourceCard.style.borderColor = '';
+                    sourceCard.style.backgroundColor = '';
+                }
+            }
         });
         
-        // Add custom class for specific styling if needed
-        reportBuilderMessage.classList.add('report-builder-container');
-        
-        const messagesContainer = document.getElementById('messagesContainer');
-        messagesContainer.appendChild(reportBuilderMessage);
-        this.uiManager.scrollToBottom();
-        
-        // Add event listeners to purchase buttons - now they will work since DOM is live
-        this._attachTierPurchaseListeners();
-    }
-
-    _generateReportBuilderDOM() {
-        const selectedSources = this.appState.getSelectedSources();
-        const sourceCount = selectedSources.length;
-        const totalCost = this.appState.getSelectedSourcesTotal();
-        
-        const containerDiv = document.createElement('div');
-        containerDiv.className = 'tier-cards-section';
-        
-        // Header
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'tier-cards-header';
-        const headerTitle = document.createElement('h3');
-        headerTitle.textContent = 'Choose Your Research Package';
-        const headerDesc = document.createElement('p');
-        headerDesc.textContent = 'Select the perfect research tier for your needs. Report generation begins after purchase confirmation.';
-        headerDiv.appendChild(headerTitle);
-        headerDiv.appendChild(headerDesc);
-        containerDiv.appendChild(headerDiv);
-        
-        // Selected sources list (if any)
-        if (sourceCount > 0) {
-            const sourcesSection = document.createElement('div');
-            sourcesSection.className = 'selected-sources-section';
-            
-            // Section header
-            const sourcesHeader = document.createElement('h4');
-            sourcesHeader.textContent = `Selected Sources (${sourceCount})`;
-            sourcesSection.appendChild(sourcesHeader);
-            
-            // Sources list
-            const sourcesList = document.createElement('div');
-            sourcesList.className = 'selected-sources-list';
-            
-            selectedSources.forEach(source => {
-                const sourceItem = document.createElement('div');
-                sourceItem.className = 'selected-source-item';
-                
-                // Title (clickable if URL available)
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'source-title';
-                if (source.url) {
-                    const titleLink = document.createElement('a');
-                    titleLink.href = source.url;
-                    titleLink.target = '_blank';
-                    titleLink.textContent = source.title || 'Untitled Source';
-                    titleDiv.appendChild(titleLink);
-                } else {
-                    titleDiv.textContent = source.title || 'Untitled Source';
-                }
-                
-                // Author and domain
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'source-meta';
-                const authorText = source.author ? `${source.author} • ` : '';
-                const domainText = source.domain || 'Unknown Domain';
-                metaDiv.textContent = `${authorText}${domainText}`;
-                
-                // Excerpt
-                const excerptDiv = document.createElement('div');
-                excerptDiv.className = 'source-excerpt';
-                excerptDiv.textContent = source.excerpt || 'No preview available.';
-                
-                // Licensing and remove button
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'source-actions';
-                
-                // Licensing protocol badge
-                if (source.licensing_protocol) {
-                    const licenseSpan = document.createElement('span');
-                    licenseSpan.className = `license-badge ${source.licensing_protocol.toLowerCase()}`;
-                    licenseSpan.textContent = source.licensing_protocol;
-                    actionsDiv.appendChild(licenseSpan);
-                }
-                
-                // Remove button
-                const removeBtn = document.createElement('button');
-                removeBtn.className = 'source-remove-btn';
-                removeBtn.textContent = '🗑️';
-                removeBtn.title = 'Remove from selection';
-                removeBtn.onclick = () => {
-                    this.appState.toggleSourceSelection(source.id, source);
-                    sourceItem.remove();
-                    // Update header count
-                    const remaining = this.appState.getSelectedSourcesCount();
-                    sourcesHeader.textContent = `Selected Sources (${remaining})`;
-                    if (remaining === 0) {
-                        sourcesSection.remove();
-                    }
-                };
-                actionsDiv.appendChild(removeBtn);
-                
-                sourceItem.appendChild(titleDiv);
-                sourceItem.appendChild(metaDiv);
-                sourceItem.appendChild(excerptDiv);
-                sourceItem.appendChild(actionsDiv);
-                
-                sourcesList.appendChild(sourceItem);
-            });
-            
-            sourcesSection.appendChild(sourcesList);
-            
-            // Total cost summary
-            const costSummary = document.createElement('div');
-            costSummary.className = 'sources-cost-summary';
-            costSummary.textContent = `Total licensing cost: $${Number(totalCost || 0).toFixed(2)}`;
-            sourcesSection.appendChild(costSummary);
-            
-            containerDiv.appendChild(sourcesSection);
+        // Update report builder if in report mode
+        if (this.appState.getMode() === 'report') {
+            const reportBuilderElement = this.reportBuilder.show();
+            this.addMessage('system', reportBuilderElement);
         }
         
-        // Tier cards
-        const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'tier-cards-container';
-        
-        // Research tier ($0.99 as per plan)
-        cardsContainer.appendChild(this._createTierCard('research', '🔬', 'Research Package', '$0.99',
-            'Professional summary and analysis with source compilation',
-            ['✓ Professional summary and analysis', '✓ Source compilation and citations', '✓ Ready for download'],
-            'Purchase Research Package', true));
-            
-        // Pro tier ($1.99 as per plan)
-        cardsContainer.appendChild(this._createTierCard('pro', '⭐', 'Pro Package', '$1.99',
-            'Everything in Research plus strategic insights and executive formatting',
-            ['✓ Everything in Research Package', '✓ Strategic insights and recommendations', 
-             '✓ Executive summary format', '✓ Enhanced formatting and presentation'],
-            'Purchase Pro Package', false));
-        
-        containerDiv.appendChild(cardsContainer);
-        
-        // Note
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'tier-cards-note';
-        noteDiv.textContent = '💡 Report generation will begin only after purchase confirmation.';
-        containerDiv.appendChild(noteDiv);
-        
-        return containerDiv;
+        // Update selection count display if needed
+        console.log(`Sources selected: ${selectedSources.length}`);
     }
-    
-    _createTierCard(tier, icon, title, price, description, features, buttonText, highlighted) {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = highlighted ? 'tier-card highlighted' : 'tier-card';
-        cardDiv.dataset.tier = tier;
-        
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'tier-icon';
-        iconDiv.textContent = icon;
-        
-        const titleH4 = document.createElement('h4');
-        titleH4.textContent = title;
-        
-        const priceDiv = document.createElement('div');
-        priceDiv.className = 'tier-price';
-        priceDiv.textContent = price;
-        
-        const descP = document.createElement('p');
-        descP.className = 'tier-description';
-        descP.textContent = description;
-        
-        const featuresList = document.createElement('ul');
-        featuresList.className = 'tier-features';
-        features.forEach(feature => {
-            const li = document.createElement('li');
-            li.textContent = feature;
-            featuresList.appendChild(li);
-        });
-        
-        const button = document.createElement('button');
-        button.className = 'tier-purchase-btn';
-        button.dataset.tier = tier;
-        button.dataset.price = price.replace('$', '');
-        button.textContent = buttonText;
-        
-        cardDiv.appendChild(iconDiv);
-        cardDiv.appendChild(titleH4);
-        cardDiv.appendChild(priceDiv);
-        cardDiv.appendChild(descP);
-        cardDiv.appendChild(featuresList);
-        cardDiv.appendChild(button);
-        
-        return cardDiv;
-    }
-    
-    _attachTierPurchaseListeners() {
-        const purchaseButtons = document.querySelectorAll('.tier-purchase-btn');
-        purchaseButtons.forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const tier = e.target.dataset.tier;
-                const price = parseFloat(e.target.dataset.price);
-                const query = this.appState.getCurrentQuery() || "Research Query";
-                
-                e.target.textContent = 'Processing...';
-                e.target.disabled = true;
-                
-                try {
-                    // If in report builder mode with selected sources, use generateReport endpoint
-                    const selectedSources = this.appState.getSelectedSources();
-                    if (selectedSources && selectedSources.length > 0) {
-                        await this.handleReportGeneration(e.target, tier, query, selectedSources);
-                    } else {
-                        // Otherwise use standard purchase flow
-                        await this.handleTierPurchase(e.target, tier, price, query);
-                    }
-                } catch (error) {
-                    e.target.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
-                    e.target.disabled = false;
-                }
-            });
-        });
-    }
-
-    updateSourceSelectionUI() {
-        // Placeholder for source selection UI updates
-        console.log('Source selection UI updated');
-    }
-
-    updateReportBuilderDisplay() {
-        // Placeholder for report builder display updates
-        console.log('Report builder display updated');
-    }
-
 
     _restoreChatMessages() {
         const messagesContainer = document.getElementById('messagesContainer');
@@ -1434,46 +1170,6 @@ export class ChatResearchApp {
         feedbackContainer.appendChild(buttonContainer);
         
         return feedbackContainer;
-    }
-    
-    _displayGeneratedReport(reportData) {
-        console.log('📊 DISPLAY REPORT: Displaying generated report:', reportData);
-        console.log('🔍 CITATION DEBUG: citation_metadata =', reportData.citation_metadata);
-        
-        if (!reportData || !reportData.summary) {
-            console.error('❌ DISPLAY REPORT: Invalid report data:', reportData);
-            return;
-        }
-        
-        // Build report header
-        const headerText = `# Research Report: ${reportData.query}\n**${(reportData.tier || 'research').toUpperCase()} TIER**\n\n`;
-        
-        // Build complete report content
-        let reportContent = headerText + reportData.summary;
-        
-        // Add outline if available
-        if (reportData.outline) {
-            reportContent += '\n\n' + reportData.outline;
-        }
-        
-        // Add insights if available
-        if (reportData.insights) {
-            reportContent += '\n\n' + reportData.insights;
-        }
-        
-        // Add footer
-        const sourceCount = reportData.total_sources || reportData.sources?.length || 0;
-        reportContent += `\n\n---\n*Generated from ${sourceCount} sources*`;
-        
-        // Pass raw markdown to MessageRenderer with citation metadata
-        // MessageRenderer will handle conversion to HTML and inject citation badges
-        this.addMessage('assistant', reportContent, {
-            type: 'research_report',
-            tier: reportData.tier,
-            query: reportData.query,
-            sources_count: sourceCount,
-            citation_metadata: reportData.citation_metadata || null
-        });
     }
     
     async _pollForEnrichedResults(query) {
