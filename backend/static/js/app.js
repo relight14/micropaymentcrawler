@@ -221,6 +221,35 @@ export class ChatResearchApp {
             this.handleSourceUnlock(null, sourceId, price);
         });
         
+        // Feedback button handler (event delegation)
+        document.addEventListener('click', (e) => {
+            const feedbackBtn = e.target.closest('.feedback-btn');
+            if (!feedbackBtn) return;
+            
+            e.preventDefault();
+            
+            // Get the feedback section container
+            const feedbackSection = feedbackBtn.closest('.feedback-section');
+            if (!feedbackSection) return;
+            
+            // Check if already submitted
+            if (feedbackSection.dataset.submitted === 'true') {
+                console.log('Feedback already submitted for this result');
+                return;
+            }
+            
+            // Determine rating based on button class
+            const rating = feedbackBtn.classList.contains('feedback-up') ? 'up' : 'down';
+            
+            // Get feedback data
+            const query = feedbackSection.dataset.query;
+            const sourceIds = JSON.parse(feedbackSection.dataset.sourceIds || '[]');
+            const mode = feedbackSection.dataset.mode || 'research';
+            
+            // Submit feedback
+            this.submitFeedback(query, sourceIds, rating, mode, feedbackSection);
+        });
+        
         // Research mode suggestion button handler (custom event from MessageRenderer)
         document.addEventListener('switchToResearch', (e) => {
             const topicHint = e.detail?.topicHint || '';
@@ -888,6 +917,64 @@ export class ChatResearchApp {
         }
     }
 
+    // Feedback submission
+    async submitFeedback(query, sourceIds, rating, mode, feedbackSection) {
+        try {
+            console.log('📊 Submitting feedback:', { query, sourceIds, rating, mode });
+            
+            // Get authorization token if available
+            const token = this.authService.getAccessToken();
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            // Submit to API
+            const response = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    query: query,
+                    source_ids: sourceIds,
+                    rating: rating,
+                    mode: mode
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to submit feedback');
+            }
+            
+            const result = await response.json();
+            
+            // Mark as submitted to prevent duplicates
+            feedbackSection.dataset.submitted = 'true';
+            
+            // Update UI to show submitted state
+            const feedbackText = feedbackSection.querySelector('p');
+            if (feedbackText) {
+                feedbackText.textContent = result.message || 'Thank you for your feedback!';
+            }
+            
+            const buttonContainer = feedbackSection.querySelector('div');
+            if (buttonContainer) {
+                buttonContainer.style.display = 'none';
+            }
+            
+            // Show success toast
+            this.showToast('✅ ' + (result.message || 'Feedback submitted!'), 'success', 3000);
+            
+            console.log('✅ Feedback submitted successfully');
+            
+        } catch (error) {
+            console.error('❌ Feedback submission error:', error);
+            this.showToast('Failed to submit feedback. Please try again.', 'error', 3000);
+        }
+    }
+    
     // Source and tier management methods
     async handleSourceUnlock(button, sourceId, price) {
         console.log('🔓 UNLOCK: handleSourceUnlock() called!', { button, sourceId, price });
