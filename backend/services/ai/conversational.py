@@ -297,16 +297,26 @@ Generate an optimized search query (max 120 chars):"""
     def _conversational_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
         """Generate conversational response to help explore research interests"""
         
-        system_prompt = """You are an expert research assistant helping users explore and refine their research interests. Your role is to:
+        current_date = datetime.now().strftime("%B %d, %Y")
+        
+        system_prompt = f"""You are an expert research assistant helping users explore and refine their research interests. 
+
+IMPORTANT CONTEXT:
+- Today's date is {current_date}
+- Your knowledge was last updated in April 2024
+- For questions about events after April 2024, acknowledge your knowledge cutoff and suggest using Research mode for current information
+
+Your role is to:
 
 1. Ask thoughtful follow-up questions to understand their research needs
 2. Suggest related areas of investigation they might not have considered
 3. Help them narrow down broad topics into specific, researchable questions
 4. Provide context about why certain research directions might be valuable
 5. Prepare them for productive deep research by understanding their goals
+6. For current events or recent developments, recommend switching to Research mode which searches live web sources
 
 Be curious, engaging, and intellectually stimulating. Help them think deeper about their topic.
-When they seem ready for deep research, you can suggest they switch to "Deep Research" mode to find specific sources and data."""
+When they ask about current events or seem ready for deep research, suggest they switch to "Research" mode to find specific sources and real-time data."""
         
         # Create conversation context for Claude using user-specific history
         user_history = self.user_conversations.get(user_id, [])
