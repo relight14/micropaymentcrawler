@@ -13,14 +13,19 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 
 ## Technical Implementations
 - **Frontend**: Modular layered architecture with separation of concerns:
-  - **Application Controller** (`js/app.js`) - Lightweight orchestrator (reduced from 2018 to 1558 lines) coordinating all components via dependency injection
+  - **Application Controller** (`js/app.js`) - Lightweight orchestrator (reduced from 2,018 → 622 lines, **69% reduction**) coordinating all components via dependency injection
   - **Infrastructure Managers** - Dedicated managers for cross-cutting concerns:
     - `ToastManager` - Centralized toast notification lifecycle
     - `ModalController` - Auth & funding modal orchestration with callback-based integration
     - `EventRouter` - Single point of event listener registration and delegation
+  - **Domain Managers** - Business logic components with AppEvents bus integration:
+    - `SourceManager` (355 lines) - Source card rendering, selection, unlocking, and filtering
+    - `TierManager` (150 lines) - Tier analysis, display, and report generation coordination
+    - `MessageCoordinator` (216 lines) - Loading states, feedback collection, and polling logic
+    - `InteractionHandler` (72 lines) - UI event handlers for citations, suggestions, and user actions
   - **Core Services** - API communication, authentication, state management
   - **UI Components** - Message rendering, source cards, UI updates
-  - All components follow single-responsibility principle with clean interfaces
+  - All components follow single-responsibility principle with clean interfaces and event-driven coordination
 - **Backend**: Developed with FastAPI, employing a unified service architecture for AI processing, content licensing, and research operations. `schemas/domain.py` is the single source of truth for data models. Includes a domain credibility penalty system to downrank low-credibility sources and prioritizes authoritative content, with defensive URL validation. External API calls use async httpx with timeouts and exponential backoff retry logic.
 - **Content Generation**: Employs a hybrid pipeline using Tavily for URL discovery and Anthropic Claude for content refinement and report generation, incorporating licensing detection and graceful API fallbacks. Excerpts are expanded to 1,500-2,000 characters for deep AI analysis.
 - **AI-Powered Query Optimization**: Uses Claude Haiku to optimize search queries based on full conversation context before sending to Tavily API. This method analyzes conversation history and user queries to build precision-targeted search strings by prioritizing specific entities, applying geographic and temporal precision, completing truncated thoughts, and signaling analysis depth.
