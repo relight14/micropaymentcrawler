@@ -152,25 +152,23 @@ For each result, respond with JSON:
                 content = msg.get('content', '')[:200]  # Limit length
                 context_summary += f"{role.upper()}: {content}\n"
         
-        system_prompt = """You are a search query optimization expert. Your job is to convert user queries into highly effective web search queries.
+        system_prompt = """You are a query optimizer. Your job is to rewrite a user's search query for precision while preserving its meaning.
 
-Given a conversation context and user's query, create an optimized search query that:
+Hard rules (must obey):
+1) Do NOT add entities (people, orgs, countries, cities), dates/years, numbers, or locations unless they are explicitly present in the user query or conversation context. No guesses.
+2) Do NOT infer geopolitical context or trends not mentioned by the user.
+3) Preserve topical scope; prefer neutral phrasing over specificity if specificity is not provided.
+4) Keep it 3–15 words. No punctuation unless needed for operators.
+5) Remove filler words like "I want to understand", "really", "help me", but preserve all substantive terms.
 
-1. **Prioritizes Specific Entities**: Use specific names (e.g., "US Federal Reserve" not "central banks")
-2. **Geographic Precision**: Put geographic constraints first (e.g., "US" before topic)
-3. **Temporal Anchoring**: Use specific dates/periods instead of vague terms like "recent"
-4. **Complete Thoughts**: Never truncate mid-word or leave incomplete phrases
-5. **Signal Analysis Depth**: Add hints like "analysis", "expert commentary", "news coverage" based on user intent
-6. **Eliminate Filler**: Remove conversational words like "I want to understand", "really"
+If the input is broad or ambiguous, return a minimally cleaned version (deduped whitespace, casing) without added specificity.
 
 Examples:
-- Bad: "the role of central banks in setting policy, specifically in the us. really understand this recent uptick in inflation"
-- Good: "US Federal Reserve delayed inflation response 2024 post-COVID - why Fed was slow to raise interest rates"
+- Input: "green energy" → Output: "green energy"
+- Input: "the role of central banks in US inflation" → Output: "US central banks inflation role"
+- Input: "what's happening with tech stocks recently" → Output: "tech stocks recent developments"
 
-- Bad: "what's happening with tech stocks recently"
-- Good: "US tech stock market performance October 2025 analysis"
-
-Return ONLY the optimized query (max 120 characters). No explanation."""
+Return ONLY the optimized query. No explanation."""
 
         try:
             user_message = f"""Conversation Context:
@@ -184,7 +182,7 @@ Generate an optimized search query (max 120 chars):"""
             response = self.client.messages.create(
                 model="claude-3-haiku-20240307",  # Fast and cheap
                 max_tokens=150,
-                temperature=0.0,  # Deterministic
+                temperature=0.1,  # Low but not 0.0 - stable without brittleness
                 system=system_prompt,
                 messages=[{
                     "role": "user",
@@ -202,6 +200,11 @@ Generate an optimized search query (max 120 chars):"""
                 print(f"⚠️  Claude returned empty query, using raw query")
                 return raw_query
             
+            # POST-GENERATION GUARD: Check if Claude introduced new entities
+            if not self._validate_no_entity_injection(raw_query, optimized_query, context_summary):
+                print(f"⚠️  Entity injection detected - reverting to raw query")
+                return raw_query
+            
             # Truncate to 120 chars if needed
             if len(optimized_query) > 120:
                 optimized_query = optimized_query[:120].rsplit(' ', 1)[0]
@@ -212,6 +215,43 @@ Generate an optimized search query (max 120 chars):"""
         except Exception as e:
             print(f"⚠️  Query optimization failed (using raw query): {e}")
             return raw_query  # Fallback to raw query on error
+    
+    def _validate_no_entity_injection(self, raw_query: str, optimized_query: str, context_summary: str) -> bool:
+        """
+        Check if optimized query introduces new proper nouns/entities not in raw query or context.
+        Returns True if valid (no injection), False if entities were added.
+        """
+        import re
+        
+        # Extract capitalized words that look like entities (proper nouns)
+        # Pattern: Words starting with capital letter, 2+ chars
+        entity_pattern = r'\b[A-Z][a-zA-Z]{1,}\b'
+        
+        # Get entities from raw query and context
+        raw_entities = set(re.findall(entity_pattern, raw_query))
+        context_entities = set(re.findall(entity_pattern, context_summary)) if context_summary else set()
+        allowed_entities = raw_entities | context_entities
+        
+        # Get entities from optimized query
+        optimized_entities = set(re.findall(entity_pattern, optimized_query))
+        
+        # Check for introduced entities
+        introduced = optimized_entities - allowed_entities
+        
+        # Filter out common non-entity words that might be capitalized
+        common_words = {'October', 'November', 'December', 'January', 'February', 'March', 
+                       'April', 'May', 'June', 'July', 'August', 'September', 'Monday', 
+                       'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'}
+        introduced = introduced - common_words
+        
+        if introduced:
+            print(f"🚨 Entity injection detected: {introduced}")
+            print(f"   Raw entities: {raw_entities}")
+            print(f"   Context entities: {context_entities}")
+            print(f"   Optimized entities: {optimized_entities}")
+            return False
+        
+        return True
     
     def _extract_response_text(self, response) -> str:
         """Safely extract text from Anthropic response."""

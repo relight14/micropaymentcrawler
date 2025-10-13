@@ -823,6 +823,11 @@ async def analyze_research_query(
         classification = None
         enhanced_query = base_query
         
+        # DEBUG: Log pipeline start
+        print(f"\n🔍 QUERY PIPELINE DEBUG:")
+        print(f"   Raw base_query: '{base_query}'")
+        print(f"   Conversation context: {len(research_request.conversation_context) if research_request.conversation_context else 0} messages")
+        
         if research_request.conversation_context and len(research_request.conversation_context) > 0:
             # Build research brief from conversation context
             brief = _build_research_brief(
@@ -835,6 +840,7 @@ async def analyze_research_query(
             
             # Build targeted query from brief (regex-based)
             enhanced_query = _build_query_with_brief(brief, classification)
+            print(f"   After regex enhancement: '{enhanced_query}'")
             
             # AI-POWERED: Optimize query using Claude with full conversation context
             from services.ai.conversational import AIResearchService
@@ -843,11 +849,16 @@ async def analyze_research_query(
                 raw_query=enhanced_query,
                 conversation_context=research_request.conversation_context
             )
+            print(f"   After Claude optimization: '{enhanced_query}'")
+        else:
+            print(f"   No conversation context - skipping enhancement")
         
         # Apply publication constraint based on type
         final_query = enhanced_query
         domain_filter = None
         publication_name = None
+        
+        print(f"   Final query for search: '{final_query}'\n")
         
         if publication_info:
             if publication_info["type"] == "domain_filter":

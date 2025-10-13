@@ -1,0 +1,130 @@
+What’s likely happening
+
+Your “optimize_search_query” prompt literally encourages adding entities/geographies (“use specific names… geographic precision”). With temp=0.0, Claude deterministically “helps” by picking salient entities from training priors (energy → EU crisis → Russia/Ukraine).
+
+Because it’s deterministic, you see the same irrelevant injection repeatedly.
+
+This can be compounded if the search backend boosts newsy entities.
+
+Sanity checks (do once to confirm)
+
+Log the pipeline for a cold query (no history):
+
+raw_query
+
+enhanced_query (from Claude)
+
+final search payload (after any extra processing/boosts)
+
+top 10 domains returned
+
+Verify conversation_context is truly [].
+
+Check search client defaults (e.g., Tavily/Bing/GSerp):
+
+Are you passing any “freshness” or “news” flags?
+
+Any geo bias or QDF boosting enabled?
+
+If (1) shows “Ukraine” only appears in enhanced_query, your agent is right.
+
+Immediate hardening (low-risk, quick)
+1) Rewrite the system prompt (strict constraints)
+
+Use language that forbids adding entities/time/geo unless they’re present in input or you were given explicit context.
+
+System prompt (drop-in replacement):
+
+You are a query optimizer. Your job is to rewrite a user’s search query for precision while preserving its meaning.
+
+Hard rules (must obey):
+1) Do NOT add entities (people, orgs, countries, cities), dates/years, numbers, or locations unless they are explicitly present in the user query or passed context. No guesses.
+2) Do NOT infer geopolitical context or trends not mentioned by the user.
+3) Preserve topical scope; prefer neutral phrasing over specificity if specificity is not provided.
+4) Keep it 3–15 words. No punctuation unless needed for operators.
+
+If the input is broad or ambiguous, return a minimally cleaned version (deduped whitespace, casing) without added specificity.
+
+
+User message template:
+
+Raw query: "{raw_query}"
+Explicit context entities and locations (comma-separated, may be empty): {entities_list}
+Only use items from the above list if you need specificity.
+
+Return only the final query text.
+
+2) Add a post-generation guard (stop-gap)
+
+After Claude returns enhanced_query, reject any new entities that weren’t in the source query.
+
+Pseudocode (Python/FastAPI):
+
+def constrained_rewrite(raw_query: str, enhanced: str, allowed_entities: set[str]) -> str:
+    # very simple guard: if enhanced introduces uppercase tokens that look like entities not allowed, revert
+    import re
+    raw_tokens = set(re.findall(r"[A-Za-z][A-Za-z\-]+", raw_query))
+    enh_tokens = set(re.findall(r"[A-Za-z][A-Za-z\-]+", enhanced))
+
+    # naive “looks-like proper noun” heuristic (can replace with spaCy/Presidio NER)
+    proper_like = {t for t in enh_tokens if t[0].isupper()}
+    introduced = {t for t in proper_like if t not in raw_tokens and t not in allowed_entities}
+
+    if introduced:
+        # too specific → fall back to conservative form (just normalized raw query)
+        return raw_query.strip()
+    return enhanced.strip()
+
+
+Even better: run NER (spaCy) on both raw_query and enhanced_query; if enhanced adds any new PERSON/ORG/GPE/LOC not in raw, revert or strip them.
+
+3) Add a “conservative mode” flag
+
+If the user didn’t give entities/time/geo, set optimizer_mode="conservative" → skip Claude entirely and pass the normalized raw query to search. Flip to “normal” only when the user supplies specifics.
+
+4) Keep temp low, but not 0.0
+
+Use temperature=0.1 or top_p=0.3. You stay stable but reduce brittle determinism around a single spurious association.
+
+Optional improvements (1–2 hours each)
+
+Two-pass optimization:
+
+Extraction pass: “List ONLY entities/locations/dates present in the user query.” (no rewrite)
+
+Rewrite pass: Provide the list as the only allowed specificity.
+
+Diff gate: If enhanced_query adds any token from a global entity lexicon (countries, major conflicts) not present in raw, reject.
+
+Search backend de-bias: turn off “fresh news”/“recent” bias for evergreen queries like “green energy”.
+
+Unit tests:
+
+Input: “green energy” → Output must not contain any country names.
+
+Input: “US green energy subsidies 2022” → Output may include “US”, “2022”, “IRA”.
+
+Example (pytest):
+
+def test_optimizer_no_entity_injection():
+    q = "green energy"
+    out = optimize(q, context=[])
+    assert not any(x in out for x in ["Ukraine","Russia","EU","Europe"])
+
+Triage checklist (to rule out other culprits)
+
+ Cache keys: make sure enrichment caches aren’t keyed loosely (e.g., “energy”) and returning old Ukraine results.
+
+ “Topic hint” feature isn’t leaking prior entities into fresh sessions.
+
+ Any “boost keywords” layer isn’t appending geo tags.
+
+ Your “progressive enrichment” isn’t merging trending news from a generic feed.
+
+My take: should you keep digging?
+
+Yes, but in parallel:
+
+Implement the prompt fix + guardrail now (prevents further noise).
+
+Spend a short cycle validating logs and cache keys to ensure there’s no secondary source of contamination.
