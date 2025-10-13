@@ -17,6 +17,26 @@ class DatabaseConnection:
         """Ensure database file exists and create if needed"""
         if not os.path.exists(self.db_path):
             self._create_database()
+        else:
+            # For existing databases, ensure all tables exist (migration-friendly)
+            self._ensure_tables_exist()
+    
+    def _ensure_tables_exist(self):
+        """Ensure all required tables exist (migration-friendly for existing databases)"""
+        with sqlite3.connect(self.db_path) as conn:
+            # Create feedback table if it doesn't exist
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    query TEXT NOT NULL,
+                    source_ids TEXT NOT NULL,
+                    rating TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
     
     def _create_database(self):
         """Create database with initial schema"""
