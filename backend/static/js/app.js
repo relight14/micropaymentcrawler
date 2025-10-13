@@ -11,6 +11,9 @@ import { ReportBuilder } from './components/report-builder.js';
 import { ToastManager } from './app/toast-manager.js';
 import { ModalController } from './app/modal-controller.js';
 import { EventRouter } from './app/event-router.js';
+import { SourceManager } from './managers/source-manager.js';
+import { TierManager } from './managers/tier-manager.js';
+import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 
 // SourceCard will be loaded globally - access it dynamically when needed
 
@@ -44,6 +47,26 @@ export class ChatResearchApp {
             uiManager: this.uiManager
         });
         
+        // Initialize domain managers
+        this.sourceManager = new SourceManager({
+            appState: this.appState,
+            apiService: this.apiService,
+            authService: this.authService,
+            toastManager: this.toastManager,
+            uiManager: this.uiManager,
+            modalController: this.modalController
+        });
+        
+        this.tierManager = new TierManager({
+            appState: this.appState,
+            apiService: this.apiService,
+            authService: this.authService,
+            toastManager: this.toastManager,
+            uiManager: this.uiManager,
+            reportBuilder: this.reportBuilder,
+            messageCoordinator: this
+        });
+        
         // Setup ReportBuilder event listeners
         this.reportBuilder.addEventListener('reportGenerated', (e) => {
             const { reportData, tier, sourceCount } = e.detail;
@@ -69,7 +92,25 @@ export class ChatResearchApp {
         
         this.reportBuilder.addEventListener('tierPurchase', (e) => {
             const { tier, price, query } = e.detail;
-            this.handleTierPurchase(null, tier, price, query, false);
+            this.tierManager.purchaseTier(null, tier, price, query, false);
+        });
+        
+        // Setup TierManager event listeners
+        this.tierManager.addEventListener('authRequired', (e) => {
+            this.addMessage('system', e.detail.message);
+        });
+        
+        this.tierManager.addEventListener('purchaseCompleted', (e) => {
+            const { reportData, tier, sourceCount } = e.detail;
+            const message = this.reportBuilder.displayReport(reportData);
+            if (message) {
+                this.addMessage(message.sender, message.content, message.metadata);
+            }
+            this.addMessage('system', '✅ AI research report generated successfully!');
+        });
+        
+        this.tierManager.addEventListener('purchaseError', (e) => {
+            this.addMessage('system', e.detail.message);
         });
         
         // Register logout callback to update UI when user is logged out
@@ -216,9 +257,9 @@ export class ChatResearchApp {
             return;
         }
         
-        // Call the existing unlock handler
+        // Call the source manager unlock handler
         console.log('🔖 Citation badge clicked for source:', source.title);
-        this.handleSourceUnlock(null, sourceId, price);
+        this.sourceManager.unlockSource(null, sourceId, price);
     }
 
     handleResearchSuggestion(topicHint) {
@@ -273,8 +314,13 @@ export class ChatResearchApp {
                 // Backend is single source of truth for enrichment status
                 this.appState.setCurrentResearchData(response.research_data);
                 
-                // Display immediate source cards
-                this._displaySourceCards(response.research_data.sources);
+                // Display immediate source cards using SourceManager
+                const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
+                if (cardsResult) {
+                    const feedbackSection = this._createFeedbackComponent(response.research_data.sources);
+                    cardsResult.element.appendChild(feedbackSection);
+                    this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+                }
                 
                 // If enrichment is needed, let the progressive system handle updates
                 // Note: Backend handles progressive enrichment via cache polling automatically
@@ -375,7 +421,7 @@ export class ChatResearchApp {
             await this.apiService.clearConversation();
             this.appState.clearConversation();
             this.uiManager.clearConversationDisplay();
-            this.updateSourceSelectionUI();
+            this.sourceManager.updateSelectionUI();
             this.reportBuilder.update();
         } catch (error) {
             console.error('Error clearing conversation:', error);
@@ -545,9 +591,9 @@ export class ChatResearchApp {
         
         try {
             if (action.type === 'source_unlock') {
-                await this.handleSourceUnlock(action.button, action.sourceId, action.price);
+                await this.sourceManager.unlockSource(action.button, action.sourceId, action.price);
             } else if (action.type === 'tier_purchase') {
-                await this.handleTierPurchase(action.button, action.tierId, action.price);
+                await this.tierManager.purchaseTier(action.button, action.tierId, action.price);
             } else if (action.type === 'mode_switch') {
                 // Switch to the pending mode after login
                 this.setMode(action.mode);
@@ -615,334 +661,8 @@ export class ChatResearchApp {
             this.toastManager.show('Failed to submit feedback. Please try again.', 'error', 3000);
         }
     }
-    
-    // Source and tier management methods
-    async handleSourceUnlock(button, sourceId, price) {
-        console.log('🔓 UNLOCK: handleSourceUnlock() called!', { button, sourceId, price });
-        
-        // Find the source object
-        let sourceToUpdate = null;
-        const researchResults = this.appState.getCurrentResearchData();
-        if (researchResults && researchResults.sources) {
-            sourceToUpdate = researchResults.sources.find(s => s.id === sourceId);
-        }
 
-        // Guard: Check if already unlocked
-        if (sourceToUpdate?.is_unlocked || this.appState.isPurchased(sourceId)) {
-            console.log('🔓 UNLOCK: Source already unlocked, opening directly');
-            if (sourceToUpdate?.url) {
-                window.open(sourceToUpdate.url, '_blank');
-            }
-            return;
-        }
-
-        // LAYER 2 SAFETY: Block unlock if enrichment is still pending
-        if (this.appState.isEnrichmentPending()) {
-            this.toastManager.show('⏳ Pricing is still loading... please wait', 'info', 3000);
-            console.log('🔓 UNLOCK: Blocked - enrichment still pending');
-            return;
-        }
-
-        // Guard: Prevent duplicate unlock attempts
-        if (this.isUnlockInProgress) {
-            console.log('🔓 UNLOCK: Already in progress, ignoring duplicate request');
-            return;
-        }
-
-        // Auth check: Show auth modal if not authenticated
-        if (!this.authService.isAuthenticated()) {
-            this.appState.setPendingAction({ 
-                type: 'source_unlock', 
-                button, 
-                sourceId, 
-                price 
-            });
-            this.modalController.showAuthModal();
-            return;
-        }
-        
-        // LAYER 3 SAFETY: Always fetch fresh server-authoritative pricing before showing modal
-        try {
-            console.log('🔓 UNLOCK: Fetching fresh pricing from server...');
-            const freshPricing = await this.apiService.getFreshSourcePricing(sourceId);
-            
-            // Update source with fresh pricing
-            if (sourceToUpdate) {
-                sourceToUpdate.unlock_price = freshPricing.unlock_price;
-                sourceToUpdate.licensing_protocol = freshPricing.licensing_protocol;
-            }
-            
-            // Use fresh price for modal
-            price = freshPricing.unlock_price;
-            console.log('✅ UNLOCK: Fresh pricing fetched:', freshPricing);
-            
-        } catch (error) {
-            console.error('❌ UNLOCK: Failed to fetch fresh pricing:', error);
-            this.toastManager.show('Failed to load pricing. Please try again.', 'error');
-            return;
-        }
-
-        // Prepare purchase details for checkout modal
-        const purchaseDetails = {
-            tier: 'source_unlock',
-            price: price,
-            titleOverride: 'Unlock Source',
-            customDescription: price === 0 
-                ? 'This source is free to unlock. Click confirm to access.'
-                : `Unlock this ${sourceToUpdate?.license_type || 'licensed'} source for $${Number(price).toFixed(2)}`,
-            selectedSources: sourceToUpdate ? [sourceToUpdate] : [],
-            query: sourceToUpdate?.title || 'Source Access'
-        };
-
-        // Show checkout confirmation modal
-        const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
-        
-        if (!userConfirmed) {
-            // User cancelled - reset button state
-            console.log('🔓 UNLOCK: User cancelled purchase');
-            if (button) {
-                button.innerHTML = '🔓 <span>Unlock</span>';
-                button.disabled = false;
-            }
-            return;
-        }
-
-        // Lock the unlock operation
-        this.isUnlockInProgress = true;
-
-        // Show loading state on button
-        const originalButtonContent = button?.innerHTML;
-        if (button) {
-            button.innerHTML = '🔄 <span>Unlocking...</span>';
-            button.disabled = true;
-        }
-
-        try {
-            const result = await this.apiService.unlockSource(sourceId, price);
-            
-            // Update source state
-            if (sourceToUpdate) {
-                sourceToUpdate.is_unlocked = true;
-            }
-            this.appState.addPurchasedItem(sourceId);
-            
-            // Update wallet balance
-            await this.authService.updateWalletBalance();
-            if (this.authService.isAuthenticated()) {
-                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-            }
-
-            // Show success toast
-            this.toastManager.show('✅ Source unlocked! Redirecting you now…', 'success', 4000);
-
-            // Update button to "View Source" state
-            if (button) {
-                button.innerHTML = '📄 <span>View Source</span>';
-                button.disabled = false;
-                // Update click handler to open source URL
-                const newHandler = () => {
-                    if (sourceToUpdate?.url) {
-                        window.open(sourceToUpdate.url, '_blank');
-                    }
-                };
-                button.removeEventListener('click', button._currentHandler);
-                button.addEventListener('click', newHandler);
-                button._currentHandler = newHandler;
-            }
-
-            // Wait 1.5-2 seconds for UX clarity, then redirect
-            setTimeout(() => {
-                if (sourceToUpdate?.url) {
-                    window.open(sourceToUpdate.url, '_blank');
-                } else {
-                    console.warn('Source URL not found for redirect');
-                }
-            }, 1800);
-
-            // Trigger UI refresh for source cards (shallow copy to force re-render)
-            if (researchResults && researchResults.sources) {
-                this.appState.setCurrentResearchData({
-                    ...researchResults,
-                    sources: [...researchResults.sources]
-                });
-            }
-
-        } catch (error) {
-            console.error('Error unlocking source:', error);
-            
-            // Detailed logging for 422 errors
-            if (error.message.includes('422') || error.message.includes('Unprocessable Entity')) {
-                console.warn('⚠️ Unlock schema validation error - check payload structure:', {
-                    sourceId,
-                    price,
-                    error: error.message
-                });
-            }
-            
-            this.toastManager.show('⚠️ Unlock failed. Please try again.', 'error');
-            
-            // Restore button state on failure
-            if (button && originalButtonContent) {
-                button.innerHTML = originalButtonContent;
-                button.disabled = false;
-            }
-        } finally {
-            // Always unlock the operation
-            this.isUnlockInProgress = false;
-        }
-    }
-
-    async handleTierPurchase(button, tierId, price, query = "Research Query", useSelectedSources = false) {
-        if (!this.authService.isAuthenticated()) {
-            this.appState.setPendingAction({ 
-                type: 'tier_purchase', 
-                button, 
-                tierId, 
-                price 
-            });
-            this.addMessage('system', 'Please log in to purchase this research tier.');
-            return;
-        }
-
-        try {
-            // Prepare purchase details for confirmation modal
-            let selectedSources = [];
-            if (useSelectedSources) {
-                selectedSources = this.appState.getSelectedSources();
-                if (selectedSources.length === 0) {
-                    this.toastManager.show('Please select sources first', 'error');
-                    return;
-                }
-            }
-
-            const purchaseDetails = {
-                tier: tierId,
-                price: price,
-                selectedSources: selectedSources,
-                query: query || this.appState.getCurrentQuery() || "Research Query"
-            };
-
-            // Show purchase confirmation modal and await user decision
-            const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
-            
-            if (!userConfirmed) {
-                // User cancelled the purchase - reset button state
-                if (button) {
-                    button.textContent = useSelectedSources ? 
-                        `Build Report with ${selectedSources.length} Selected Sources` : 
-                        `Purchase ${tierId === 'research' ? 'Research' : 'Pro'} Package`;
-                    button.disabled = false;
-                }
-                return;
-            }
-
-            // User confirmed - proceed with real purchase API call
-            let loadingMessageElement = null;
-            try {
-                // Show progressive loading indicator in chat
-                loadingMessageElement = this._addProgressiveLoadingMessage();
-                
-                // Call real purchase endpoint which generates sources + AI report
-                const purchaseResponse = await this.apiService.purchaseTier(
-                    tierId, 
-                    price, 
-                    query || this.appState.getCurrentQuery() || "Research Query", 
-                    useSelectedSources ? selectedSources : null
-                );
-                
-                // Remove loading indicator
-                if (loadingMessageElement) {
-                    this._removeLoadingMessage(loadingMessageElement);
-                    loadingMessageElement = null;
-                }
-                
-                if (purchaseResponse && purchaseResponse.success && purchaseResponse.packet) {
-                    // Mark as purchased in state
-                    this.appState.addPurchasedItem(tierId);
-                    
-                    // Update UI with success state
-                    if (button) {
-                        button.textContent = 'Purchased';
-                        button.disabled = true;
-                    }
-
-                    // Update wallet balance
-                    await this.authService.updateWalletBalance();
-                    if (this.authService.isAuthenticated()) {
-                        this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-                    }
-
-                    // Display the AI-generated report in the UI
-                    const message = this.reportBuilder.displayReport(purchaseResponse.packet);
-                    if (message) {
-                        this.addMessage(message.sender, message.content, message.metadata);
-                    }
-                    
-                    // Show success message in chat
-                    this.addMessage('system', '✅ AI research report generated successfully!');
-                } else {
-                    throw new Error('Invalid purchase response');
-                }
-            } catch (reportError) {
-                console.error('Error in purchase/report generation:', reportError);
-                
-                // Remove loading indicator on error
-                if (loadingMessageElement) {
-                    this._removeLoadingMessage(loadingMessageElement);
-                }
-                
-                this.addMessage('system', `❌ Purchase failed: ${reportError.message}`);
-                throw reportError;
-            }
-            
-        } catch (error) {
-            console.error('Error in purchase flow:', error);
-            this.addMessage('system', `Failed to complete purchase: ${error.message}`);
-            
-            // Reset button state on error
-            if (button) {
-                button.textContent = useSelectedSources ? 
-                    `Build Report with ${selectedSources.length || 0} Selected Sources` : 
-                    `Purchase ${tierId === 'research' ? 'Research' : 'Pro'} Package`;
-                button.disabled = false;
-            }
-        }
-    }
-
-    updateSourceSelectionUI() {
-        const selectedSources = this.appState.getSelectedSources();
-        const selectedIds = new Set(selectedSources.map(s => s.id));
-        
-        // Update ALL checkbox states to match actual selection state
-        const allCheckboxes = document.querySelectorAll('.source-selection-checkbox');
-        allCheckboxes.forEach(checkbox => {
-            const sourceCard = checkbox.closest('[data-source-id]');
-            if (sourceCard) {
-                const sourceId = sourceCard.getAttribute('data-source-id');
-                const isSelected = selectedIds.has(sourceId);
-                checkbox.checked = isSelected;
-                
-                // Visual feedback for selected cards
-                if (isSelected) {
-                    sourceCard.style.borderColor = 'var(--primary)';
-                    sourceCard.style.backgroundColor = 'var(--primary-light, #f0f9ff)';
-                } else {
-                    sourceCard.style.borderColor = '';
-                    sourceCard.style.backgroundColor = '';
-                }
-            }
-        });
-        
-        // Update report builder if in report mode
-        if (this.appState.getMode() === 'report') {
-            const reportBuilderElement = this.reportBuilder.show();
-            this.addMessage('system', reportBuilderElement);
-        }
-        
-        // Update selection count display if needed
-        console.log(`Sources selected: ${selectedSources.length}`);
-    }
-
+    // Loading messages and display methods
     _restoreChatMessages() {
         const messagesContainer = document.getElementById('messagesContainer');
         
@@ -1041,102 +761,6 @@ export class ChatResearchApp {
         }
     }
     
-    async _displaySourceCards(sources) {
-        // 4. PIPELINE TRACE: Method entry point
-        console.log('🎨 DISPLAY METHOD: _displaySourceCards() ENTRY POINT');
-        console.log('🎨 DISPLAY METHOD: Sources parameter received:', sources);
-        console.log('🎨 DISPLAY METHOD: Sources type:', typeof sources);
-        console.log('🎨 DISPLAY METHOD: Sources is array?', Array.isArray(sources));
-        console.log('🎨 DISPLAY METHOD: Sources length:', sources?.length);
-        
-        if (!sources || sources.length === 0) {
-            console.log('❌ DISPLAY METHOD: Early return - no sources');
-            console.log('❌ DISPLAY METHOD: sources value:', sources);
-            console.log('❌ DISPLAY METHOD: sources.length:', sources?.length);
-            return;
-        }
-        
-        console.log('✅ DISPLAY METHOD: Validation passed, proceeding to create cards');
-        
-        // Wait for SourceCard to be available
-        if (!window.SourceCard) {
-            console.log('Waiting for SourceCard to load...');
-            await new Promise(resolve => {
-                if (window.SourceCard) {
-                    resolve();
-                    return;
-                }
-                document.addEventListener('SourceCardReady', resolve, { once: true });
-            });
-        }
-        
-        // Initialize the SourceCard component with app state  
-        if (!this.sourceCardComponent) {
-            this.sourceCardComponent = new window.SourceCard(this.appState);
-            
-            // Listen for component events
-            document.addEventListener('sourceUnlockRequested', (e) => {
-                console.log('🔓 UNLOCK: Event received in app.js!', e.detail);
-                console.log('🔓 UNLOCK: Calling handleSourceUnlock with:', e.detail.source.id, e.detail.source.unlock_price);
-                this.handleSourceUnlock(null, e.detail.source.id, e.detail.source.unlock_price);
-            });
-            
-            document.addEventListener('sourceDownloadRequested', (e) => {
-                window.open(e.detail.source.url, '_blank');
-            });
-            
-            document.addEventListener('sourceSelectionChanged', (e) => {
-                // Event is handled internally by the component
-            });
-        }
-        
-        // Create the DOM structure that CSS expects
-        const container = document.createElement('div');
-        container.className = 'sources-preview-section';
-        
-        // Create header section
-        const header = document.createElement('div');
-        header.className = 'preview-header';
-        
-        const title = document.createElement('h3');
-        title.textContent = 'Sources Found';
-        
-        const subtitle = document.createElement('p');
-        subtitle.textContent = `Found ${sources.length} sources for your research`;
-        
-        header.appendChild(title);
-        header.appendChild(subtitle);
-        container.appendChild(header);
-        
-        // Create individual source cards
-        sources.forEach((source, index) => {
-            // Use source data as-is from backend
-            const sourceData = {
-                ...source
-            };
-            
-            // Create source card using the component
-            const sourceCard = this.sourceCardComponent.create(sourceData, {
-                showCheckbox: true,
-                showActions: true
-            });
-            
-            // Source card is ready to display with real backend data
-            container.appendChild(sourceCard);
-        });
-        
-        // Add feedback component
-        const feedbackSection = this._createFeedbackComponent(sources);
-        container.appendChild(feedbackSection);
-        
-        // Add the properly structured container to the chat with source data for restoration
-        this.addMessage('assistant', container, {
-            type: 'source_cards',
-            sources: sources,
-            query: this.appState.getCurrentQuery()
-        });
-    }
-    
     _createFeedbackComponent(sources) {
         const feedbackContainer = document.createElement('div');
         feedbackContainer.className = 'feedback-section';
@@ -1187,7 +811,7 @@ export class ChatResearchApp {
                 
                 // If enrichment is complete, update the source cards
                 if (!result.enrichment_needed || result.enrichment_status === 'complete') {
-                    this._updateSourceCards(result.sources);
+                    this.sourceManager.updateCards(result.sources);
                     clearInterval(pollInterval);
                     return;
                 }
@@ -1204,116 +828,8 @@ export class ChatResearchApp {
             }
         }, 5000);
     }
-    
-    _updateSourceCards(enrichedSources) {
-        enrichedSources.forEach(source => {
-            const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
-            if (!sourceCard) return;
-            
-            // Remove loading indicators
-            sourceCard.classList.remove('source-enriching');
-            const loadingIndicator = sourceCard.querySelector('.enrichment-indicator');
-            if (loadingIndicator) loadingIndicator.remove();
-            
-            // Update content with enriched data
-            const titleEl = sourceCard.querySelector('.source-title');
-            if (titleEl && source.title) titleEl.textContent = source.title;
-            
-            const excerptEl = sourceCard.querySelector('.source-excerpt');
-            if (excerptEl && source.excerpt) excerptEl.textContent = source.excerpt;
-            
-            const priceEl = sourceCard.querySelector('.source-price');
-            if (priceEl && source.unlock_price) {
-                const safePrice = Number(source.unlock_price) || 0;
-                priceEl.textContent = `$${safePrice.toFixed(2)}`;
-            }
-            
-            // Add licensing badge if available
-            if (source.licensing_protocol) {
-                const metadataDiv = sourceCard.querySelector('.source-metadata');
-                if (metadataDiv && !metadataDiv.querySelector('.licensing-badge')) {
-                    const licensingBadge = document.createElement('span');
-                    licensingBadge.className = 'licensing-badge';
-                    licensingBadge.textContent = source.licensing_protocol;
-                    metadataDiv.appendChild(licensingBadge);
-                }
-            }
-        });
-        
-        // Show completion message
-        this.toastManager.show('Source enrichment complete! Updated with enhanced details.', 'success');
-    }
-    
-    // Global methods for HTML event handlers (legacy support)
-    async handleSourceUnlockInChat(sourceId, price, title) {
-        // This method is kept for backward compatibility but should not be used
-        // New code should call handleSourceUnlock directly with the button reference
-        console.warn('handleSourceUnlockInChat is deprecated - use handleSourceUnlock directly');
-        return this.handleSourceUnlock(null, sourceId, price);
-    }
-
-    toggleSourceSelection(sourceId, sourceData) {
-        const isSelected = this.appState.toggleSourceSelection(sourceId, sourceData);
-        this.updateSourceSelectionUI();
-        return isSelected;
-    }
-
-    updateSourceSelectionUI() {
-        const selectedSources = this.appState.getSelectedSources();
-        const selectedIds = new Set(selectedSources.map(s => s.id));
-        
-        // Update ALL checkbox states to match actual selection state
-        const allCheckboxes = document.querySelectorAll('.source-selection-checkbox');
-        allCheckboxes.forEach(checkbox => {
-            const sourceCard = checkbox.closest('[data-source-id]');
-            if (sourceCard) {
-                const sourceId = sourceCard.getAttribute('data-source-id');
-                const isSelected = selectedIds.has(sourceId);
-                checkbox.checked = isSelected;
-                
-                // Visual feedback for selected cards
-                if (isSelected) {
-                    sourceCard.style.borderColor = 'var(--primary)';
-                    sourceCard.style.backgroundColor = 'var(--primary-light, #f0f9ff)';
-                } else {
-                    sourceCard.style.borderColor = '';
-                    sourceCard.style.backgroundColor = '';
-                }
-            }
-        });
-        
-        // Update report builder if in report mode
-        if (this.appState.getMode() === 'report') {
-            const reportBuilderElement = this.reportBuilder.show();
-            this.addMessage('system', reportBuilderElement);
-        }
-        
-        // Update selection count display if needed
-        console.log(`Sources selected: ${selectedSources.length}`);
-    }
-
-    _checkBudgetWarning(totalCost) {
-        const researchBudget = 0.99;
-        const proBudget = 1.99;
-        const warningThreshold = 0.8; // 80% of budget
-        
-        // Check Pro tier budget first (higher threshold)
-        if (totalCost >= proBudget) {
-            return `⚠️ Selected sources exceed Pro budget ($${Number(proBudget || 0).toFixed(2)})`;
-        } else if (totalCost >= proBudget * warningThreshold) {
-            return `⚠️ Selected sources approaching Pro budget limit ($${Number(proBudget || 0).toFixed(2)})`;
-        }
-        
-        // Check Research tier budget
-        if (totalCost >= researchBudget) {
-            return `⚠️ Selected sources exceed Research budget ($${Number(researchBudget || 0).toFixed(2)})`;
-        } else if (totalCost >= researchBudget * warningThreshold) {
-            return `⚠️ Selected sources approaching Research budget limit ($${Number(researchBudget || 0).toFixed(2)})`;
-        }
-        
-        return null; // No warning needed
-    }
 }
+
 
 // Initialize the app when DOM is ready  
 document.addEventListener('DOMContentLoaded', () => {
