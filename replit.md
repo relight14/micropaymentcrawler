@@ -31,6 +31,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Token Expiry Handling**: Automatic JWT token validation and a centralized logout callback system for consistent UI updates.
 - **Tab State Persistence After Login**: Preserves user intent by saving desired actions (e.g., mode switch) before authentication and executing them post-login.
 - **Chat-to-Research Transition**: Intelligent mode switching suggests transitioning to research mode for research-worthy conversations after at least 3 user messages (third exchange), leveraging intent classification and providing topic hints for query prefilling.
+- **Feedback System**: User feedback collection for research result quality using thumbs up/down UI after source cards. Features event delegation for dynamically created buttons, duplicate submission prevention, SQLite persistence with JSON source tracking, and confirmation toasts. Supports both authenticated (user ID) and anonymous feedback. Database migration ensures backward compatibility with existing deployments.
 
 ## Feature Specifications
 - **Dynamic Research Services**: Provides query-based research packages with variable pricing ($0.10-$10.00), determined by source count, quality, and licensing complexity.
