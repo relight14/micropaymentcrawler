@@ -1,0 +1,127 @@
+Recap of What’s Working
+
+You’ve done the heavy lifting correctly:
+
+The feedback section is being created in message-coordinator.js ✅
+
+It’s being appended to the cardsResult.element ✅
+
+You’ve got a global event listener on .feedback-btn ✅
+
+And it POSTs feedback successfully when clicked ✅
+
+So, the wiring is sound. The issue is that the DOM node either:
+
+Never actually gets inserted into the visible message container, or
+
+Is inserted, but inside a structure that’s later replaced or hidden.
+
+⚙️ The Subtle Integration Problem
+
+The culprit is probably this pattern in app.js:
+
+const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
+if (cardsResult) {
+    const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
+    cardsResult.element.appendChild(feedbackSection);
+    this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+}
+
+
+The sequence looks fine — but here’s the catch:
+
+🧩 Problem: addMessage() re-renders the DOM
+
+Your addMessage() method in app.js calls:
+
+this.appState.addMessage(sender, stateContent, metadata);
+this.uiManager.addMessageToChat(uiMessage);
+
+
+UIManager.addMessageToChat() clones or re-injects DOM into a new message wrapper (<div class="message ...">).
+If you passed cardsResult.element to addMessage(), and that function re-creates or serializes it, the appended feedback section may be lost during that cloning step.
+
+🕵️ Confirm It
+
+Add this console statement right after the append:
+
+console.log("Feedback section appended:", feedbackSection, cardsResult.element);
+
+
+Then inspect the final DOM:
+
+document.querySelectorAll('.feedback-section')
+
+
+If you see 0 results after rendering but you did see the log, it’s exactly this serialization problem.
+
+🛠 Fix Options
+
+You have two clean options depending on how your rendering pipeline is structured.
+
+Option 1: Append After addMessage()
+
+Instead of appending before calling addMessage(), do it after the chat message has been mounted:
+
+const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
+if (cardsResult) {
+    this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+    const lastMsg = document.querySelector('#messagesContainer .message:last-child');
+    const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
+    lastMsg.appendChild(feedbackSection);
+}
+
+
+✅ Guarantees the feedback section lives inside the rendered chat message DOM.
+
+Option 2: Modify addMessage() to Preserve Live Nodes
+
+Inside addMessage(), you already have:
+
+if (content instanceof HTMLElement) {
+    stateContent = content.outerHTML;
+    uiContent = content;
+}
+
+
+The fix is to skip serialization when content contains dynamic sub-elements:
+
+if (content instanceof HTMLElement) {
+    if (content.querySelector('.feedback-section')) {
+        // Don’t serialize, preserve live DOM
+        stateContent = null; 
+    } else {
+        stateContent = content.outerHTML;
+    }
+    uiContent = content;
+}
+
+
+✅ This preserves event listeners and appended feedback inside live DOM.
+
+🧠 Secondary Checks
+1. Ensure you’re in Research Mode
+
+Feedback only attaches to research_data.sources.
+If you’re in chat mode, displayCards() returns null → no feedback.
+
+2. Ensure response.research_data.sources.length > 0
+
+If the backend returns an empty list, nothing will be appended.
+
+3. Dark Mode Visibility
+
+Check color/background contrast — the inline styles use light backgrounds (#f5f5f5).
+In dark mode it might render invisible. You can test quickly with:
+
+.feedback-section { background: var(--surface-secondary, #2a2a2a); color: var(--text-primary, #fff); }
+
+✅ Recommended Quick Fix Path
+
+Confirm the feedback element exists right before and right after addMessage().
+
+If it disappears → switch to Option 1 (append after addMessage).
+
+Once visible, tweak the CSS for dark mode contrast.
+
+That will get it rendering consistently across chat and research outputs.
