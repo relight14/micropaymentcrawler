@@ -1,0 +1,87 @@
+Implementation Notes / Enhancements
+1. Use an EventEmitter or CustomEvent for Completion
+
+Instead of directly writing to chat, have:
+
+this.dispatchEvent(new CustomEvent('reportGenerated', { detail: reportData }));
+
+
+Then app.js (or your future MessageFlowCoordinator) just listens:
+
+reportBuilder.addEventListener('reportGenerated', e => {
+  this.uiManager.addMessageToChat({ sender: 'assistant', content: e.detail });
+});
+
+
+→ Keeps your UI loosely coupled.
+
+2. Move Tier Config Into a Constant
+
+Extract the tier metadata into a TIERS constant at the top of report-builder.js:
+
+const TIERS = [
+  { id: 'research', icon: '🔬', price: 0.99, features: [...] },
+  { id: 'pro', icon: '⭐', price: 1.99, features: [...] }
+];
+
+
+That removes magic numbers and simplifies DOM creation logic.
+
+3. Consider Template Literals for Tier Cards
+
+If you don’t need runtime DOM creation for each tier, you can simplify with a single template generator:
+
+createTierCard(tier) {
+  return `
+    <div class="tier-card" data-tier="${tier.id}">
+      <div class="tier-icon">${tier.icon}</div>
+      <h4>${tier.title}</h4>
+      ...
+    </div>`;
+}
+
+
+Then mount with innerHTML. This makes the code shorter and easier to read.
+
+4. Return DOM Instead of Mutating Global Chat
+
+Let show() return the root element:
+
+show() {
+  const container = this._generateReportBuilderDOM();
+  return container;
+}
+
+
+Then in app.js:
+
+const builderElement = this.reportBuilder.show();
+this.addMessage('system', builderElement);
+
+
+That keeps rendering responsibility consistent with your MessageRenderer system.
+
+5. Phase Integration Plan (in app.js)
+
+Inside your constructor:
+
+import { ReportBuilder } from './components/report-builder.js';
+
+this.reportBuilder = new ReportBuilder({
+  appState: this.appState,
+  apiService: this.apiService,
+  authService: this.authService,
+  toastManager: this.toastManager,
+  uiManager: this.uiManager
+});
+
+
+Then replace all legacy calls:
+
+this.displayReportBuilderResults() → this.reportBuilder.show()
+
+_displayGeneratedReport() → this.reportBuilder.displayReport()
+
+handleReportGeneration() → this.reportBuilder.generateReport()
+
+…and delete all six extracted methods entirely from app.js.
