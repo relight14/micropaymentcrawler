@@ -1638,12 +1638,51 @@ export class ChatResearchApp {
             container.appendChild(sourceCard);
         });
         
+        // Add feedback component
+        const feedbackSection = this._createFeedbackComponent(sources);
+        container.appendChild(feedbackSection);
+        
         // Add the properly structured container to the chat with source data for restoration
         this.addMessage('assistant', container, {
             type: 'source_cards',
             sources: sources,
             query: this.appState.getCurrentQuery()
         });
+    }
+    
+    _createFeedbackComponent(sources) {
+        const feedbackContainer = document.createElement('div');
+        feedbackContainer.className = 'feedback-section';
+        feedbackContainer.style.cssText = 'margin-top: 20px; padding: 16px; background: var(--surface-secondary, #f5f5f5); border-radius: 8px; text-align: center;';
+        
+        const feedbackText = document.createElement('p');
+        feedbackText.textContent = 'How helpful are these sources?';
+        feedbackText.style.cssText = 'margin: 0 0 12px 0; color: var(--text-primary, #333); font-weight: 500;';
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: center; align-items: center;';
+        
+        const thumbsUpBtn = document.createElement('button');
+        thumbsUpBtn.className = 'feedback-btn feedback-up';
+        thumbsUpBtn.innerHTML = '👍 Helpful';
+        thumbsUpBtn.style.cssText = 'padding: 8px 20px; border: 2px solid var(--primary, #4A90E2); background: white; color: var(--primary, #4A90E2); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;';
+        
+        const thumbsDownBtn = document.createElement('button');
+        thumbsDownBtn.className = 'feedback-btn feedback-down';
+        thumbsDownBtn.innerHTML = '👎 Not helpful';
+        thumbsDownBtn.style.cssText = 'padding: 8px 20px; border: 2px solid #666; background: white; color: #666; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;';
+        
+        // Store data attributes for later submission
+        feedbackContainer.dataset.query = this.appState.getCurrentQuery() || '';
+        feedbackContainer.dataset.sourceIds = JSON.stringify(sources.map(s => s.id));
+        feedbackContainer.dataset.mode = this.appState.getMode();
+        
+        buttonContainer.appendChild(thumbsUpBtn);
+        buttonContainer.appendChild(thumbsDownBtn);
+        feedbackContainer.appendChild(feedbackText);
+        feedbackContainer.appendChild(buttonContainer);
+        
+        return feedbackContainer;
     }
     
     _displayGeneratedReport(reportData) {
