@@ -7,6 +7,7 @@ import { AuthService } from './services/auth.js';
 import { AppState } from './state/app-state.js';
 import { UIManager } from './components/ui-manager.js';
 import { MessageRenderer } from './components/message-renderer.js';
+import { ReportBuilder } from './components/report-builder.js';
 import { ToastManager } from './app/toast-manager.js';
 import { ModalController } from './app/modal-controller.js';
 import { EventRouter } from './app/event-router.js';
@@ -33,6 +34,43 @@ export class ChatResearchApp {
             this.baseURL
         );
         this.eventRouter = new EventRouter();
+        
+        // Initialize UI components
+        this.reportBuilder = new ReportBuilder({
+            appState: this.appState,
+            apiService: this.apiService,
+            authService: this.authService,
+            toastManager: this.toastManager,
+            uiManager: this.uiManager
+        });
+        
+        // Setup ReportBuilder event listeners
+        this.reportBuilder.addEventListener('reportGenerated', (e) => {
+            const { reportData, tier, sourceCount } = e.detail;
+            const message = this.reportBuilder.displayReport(reportData);
+            if (message) {
+                this.addMessage(message.sender, message.content, message.metadata);
+            }
+            this.toastManager.show(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${sourceCount} selected sources!`, 'success');
+        });
+        
+        this.reportBuilder.addEventListener('reportGenerating', (e) => {
+            this._addProgressiveLoadingMessage();
+        });
+        
+        this.reportBuilder.addEventListener('reportError', (e) => {
+            const { error, tier } = e.detail;
+            this.toastManager.show(`⚠️ Report generation failed: ${error.message}`, 'error');
+        });
+        
+        this.reportBuilder.addEventListener('authRequired', (e) => {
+            this.addMessage('system', e.detail.message);
+        });
+        
+        this.reportBuilder.addEventListener('tierPurchase', (e) => {
+            const { tier, price, query } = e.detail;
+            this.handleTierPurchase(null, tier, price, query, false);
+        });
         
         // Register logout callback to update UI when user is logged out
         this.authService.onLogout(() => {
@@ -273,7 +311,9 @@ export class ChatResearchApp {
         
         // Handle mode-specific UI changes
         if (mode === 'report' && this.appState.getCurrentResearchData()) {
-            this.displayReportBuilderResults();
+            this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
+            const reportBuilderElement = this.reportBuilder.show();
+            this.addMessage('system', reportBuilderElement);
         } else {
             // Restore chat messages for non-report modes
             this._restoreChatMessages();
@@ -336,7 +376,7 @@ export class ChatResearchApp {
             this.appState.clearConversation();
             this.uiManager.clearConversationDisplay();
             this.updateSourceSelectionUI();
-            this.updateReportBuilderDisplay();
+            this.reportBuilder.update();
         } catch (error) {
             console.error('Error clearing conversation:', error);
             this.addMessage('system', 'Failed to clear conversation. Please refresh the page to start fresh.');
@@ -881,7 +921,10 @@ export class ChatResearchApp {
                     }
 
                     // Display the AI-generated report in the UI
-                    this._displayGeneratedReport(purchaseResponse.packet);
+                    const message = this.reportBuilder.displayReport(purchaseResponse.packet);
+                    if (message) {
+                        this.addMessage(message.sender, message.content, message.metadata);
+                    }
                     
                     // Show success message in chat
                     this.addMessage('system', '✅ AI research report generated successfully!');
@@ -1545,7 +1588,8 @@ export class ChatResearchApp {
         
         // Update report builder if in report mode
         if (this.appState.getMode() === 'report') {
-            this.displayReportBuilderResults();
+            const reportBuilderElement = this.reportBuilder.show();
+            this.addMessage('system', reportBuilderElement);
         }
         
         // Update selection count display if needed
