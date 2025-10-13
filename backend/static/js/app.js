@@ -232,7 +232,7 @@ export class ChatResearchApp {
                     }
                     
                     // Execute any pending tab state action
-                    const pendingTabAction = this.appState.getPendingTabAction();
+                    const pendingTabAction = this.appState.getPendingAction();
                     if (pendingTabAction) {
                         console.log('🔄 Executing pending tab action after login:', pendingTabAction);
                         
@@ -240,7 +240,7 @@ export class ChatResearchApp {
                             this.setMode(pendingTabAction.mode);
                         }
                         
-                        this.appState.clearPendingTabAction();
+                        this.appState.clearPendingAction();
                     }
                     
                     // Update UI with wallet balance
