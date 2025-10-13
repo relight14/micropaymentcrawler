@@ -1163,8 +1163,8 @@ export class ChatResearchApp {
             
             console.log(`📊 Generating ${tier} report with ${selectedSourceIds.length} selected sources`);
             
-            // Show loading indicator
-            const loadingMessageElement = this._addLoadingMessage('🔬 Generating your research report from selected sources...');
+            // Show progressive loading indicator
+            const loadingMessageElement = this._addProgressiveLoadingMessage();
             
             // Call generateReport endpoint with selected source IDs
             const reportPacket = await this.apiService.generateReport(query, tier, selectedSourceIds);
@@ -1246,8 +1246,8 @@ export class ChatResearchApp {
             // User confirmed - proceed with real purchase API call
             let loadingMessageElement = null;
             try {
-                // Show loading indicator in chat
-                loadingMessageElement = this._addLoadingMessage('🔬 Generating your premium research report...');
+                // Show progressive loading indicator in chat
+                loadingMessageElement = this._addProgressiveLoadingMessage();
                 
                 // Call real purchase endpoint which generates sources + AI report
                 const purchaseResponse = await this.apiService.purchaseTier(
@@ -1635,8 +1635,54 @@ export class ChatResearchApp {
         return loadingMessage;
     }
     
+    _addProgressiveLoadingMessage() {
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Create loading message with initial status
+        const loadingMessage = MessageRenderer.createMessageElement({
+            sender: 'system',
+            content: '📊 Compiling sources...',
+            timestamp: new Date(),
+            variant: 'loading'
+        });
+        
+        messagesContainer.appendChild(loadingMessage);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Progressive status updates
+        const steps = [
+            { delay: 0, text: '📊 Compiling sources...' },
+            { delay: 5000, text: '🔍 Analyzing content...' },
+            { delay: 10000, text: '✍️ Building your report...' }
+        ];
+        
+        const timers = [];
+        
+        steps.forEach((step, index) => {
+            if (index === 0) return; // First step is already shown
+            
+            const timer = setTimeout(() => {
+                const messageContent = loadingMessage.querySelector('.message-content');
+                if (messageContent) {
+                    messageContent.textContent = step.text;
+                }
+            }, step.delay);
+            
+            timers.push(timer);
+        });
+        
+        // Store timers on the element for cleanup
+        loadingMessage._progressTimers = timers;
+        
+        return loadingMessage;
+    }
+    
     _removeLoadingMessage(element) {
         if (element && element.parentNode) {
+            // Clear any progressive timers
+            if (element._progressTimers) {
+                element._progressTimers.forEach(timer => clearTimeout(timer));
+            }
             element.remove();
         }
     }
