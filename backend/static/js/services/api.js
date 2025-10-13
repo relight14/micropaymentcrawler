@@ -192,6 +192,22 @@ export class APIService {
         }
         
         console.log(`⏰ Enrichment polling timed out after ${attempts} attempts`);
+        
+        // Emit timeout event so UI can show fallback state
+        this._emitEnrichmentTimeout(cacheKey);
+    }
+    
+    // Emit timeout event for UI fallback
+    _emitEnrichmentTimeout(cacheKey) {
+        try {
+            const event = new CustomEvent('enrichmentTimeout', {
+                detail: { cacheKey }
+            });
+            window.dispatchEvent(event);
+            console.log(`⏰ Emitted enrichmentTimeout event for cache key`);
+        } catch (error) {
+            console.error('❌ Failed to emit timeout event:', error);
+        }
     }
     
     // Event system for progressive updates with error boundary

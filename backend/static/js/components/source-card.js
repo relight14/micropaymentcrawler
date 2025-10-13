@@ -17,11 +17,13 @@ class SourceCard {
         this.appState = appState;
         this.eventListeners = new Map(); // Track listeners for cleanup
         
-        // Bind enrichment handler for proper cleanup
+        // Bind enrichment handlers for proper cleanup
         this.handleEnrichmentUpdate = this.handleEnrichmentUpdate.bind(this);
+        this.handleEnrichmentTimeout = this.handleEnrichmentTimeout.bind(this);
         
-        // Listen for progressive enrichment updates
+        // Listen for progressive enrichment updates and timeouts
         window.addEventListener('enrichmentComplete', this.handleEnrichmentUpdate);
+        window.addEventListener('enrichmentTimeout', this.handleEnrichmentTimeout);
     }
     
     /**
@@ -29,6 +31,7 @@ class SourceCard {
      */
     destroy() {
         window.removeEventListener('enrichmentComplete', this.handleEnrichmentUpdate);
+        window.removeEventListener('enrichmentTimeout', this.handleEnrichmentTimeout);
         
         // Clean up all tracked event listeners
         this.eventListeners.forEach((listener, element) => {
@@ -174,6 +177,28 @@ class SourceCard {
         sources.forEach(enrichedSource => {
             this.updateCard(enrichedSource);
         });
+    }
+    
+    /**
+     * Handle enrichment timeout - show fallback state for pricing badges
+     */
+    handleEnrichmentTimeout(event) {
+        console.log('⏰ Enrichment timeout event received:', event);
+        
+        // Mark enrichment as complete with timeout state
+        this.appState.setEnrichmentStatus('timeout');
+        console.log('⏰ Enrichment status set to timeout');
+        
+        // Update all cards with loading badges to show fallback
+        const loadingBadges = document.querySelectorAll('.license-badge[data-enrichment-pending="true"]');
+        loadingBadges.forEach(badge => {
+            badge.classList.remove('license-loading');
+            badge.classList.add('license-unavailable');
+            badge.textContent = 'PRICING UNAVAILABLE';
+            badge.removeAttribute('data-enrichment-pending');
+        });
+        
+        console.log(`⏰ Updated ${loadingBadges.length} badges to show fallback state`);
     }
     
     /**

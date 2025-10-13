@@ -744,10 +744,13 @@ async def generate_research_report(
 @limiter.limit("30/minute")
 async def get_enrichment_status(
     request: Request,
-    cache_key: str,
-    user_info: dict = Depends(get_authenticated_user)
+    cache_key: str
 ):
-    """Poll for enriched results after skeleton cards are returned"""
+    """Poll for enriched results after skeleton cards are returned
+    
+    Note: No auth required - possession of cache_key is the authorization.
+    Cache keys are cryptographically secure and expire in 5 minutes.
+    """
     try:
         # Validate cache_key to prevent injection attacks
         if not cache_key or not re.match(r'^[a-zA-Z0-9_:.\-]{8,64}$', cache_key):
