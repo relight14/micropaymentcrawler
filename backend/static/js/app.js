@@ -13,6 +13,8 @@ import { ModalController } from './app/modal-controller.js';
 import { EventRouter } from './app/event-router.js';
 import { SourceManager } from './managers/source-manager.js';
 import { TierManager } from './managers/tier-manager.js';
+import { MessageCoordinator } from './managers/message-coordinator.js';
+import { InteractionHandler } from './managers/interaction-handler.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 
 // SourceCard will be loaded globally - access it dynamically when needed
@@ -64,7 +66,28 @@ export class ChatResearchApp {
             toastManager: this.toastManager,
             uiManager: this.uiManager,
             reportBuilder: this.reportBuilder,
-            messageCoordinator: this
+            messageCoordinator: null  // Will be set after MessageCoordinator is created
+        });
+        
+        this.messageCoordinator = new MessageCoordinator({
+            appState: this.appState,
+            apiService: this.apiService,
+            authService: this.authService,
+            uiManager: this.uiManager,
+            toastManager: this.toastManager,
+            sourceManager: this.sourceManager
+        });
+        
+        // Update TierManager's messageCoordinator reference
+        this.tierManager.messageCoordinator = this.messageCoordinator;
+        
+        this.interactionHandler = new InteractionHandler({
+            appState: this.appState,
+            apiService: this.apiService,
+            modalController: this.modalController,
+            uiManager: this.uiManager,
+            toastManager: this.toastManager,
+            sourceManager: this.sourceManager
         });
         
         // Setup ReportBuilder event listeners
@@ -236,13 +259,19 @@ export class ChatResearchApp {
             this.eventRouter.setHandlers({
                 onSendMessage: () => this.sendMessage(),
                 onModeSwitch: (mode) => this.setMode(mode),
-                onClearConversation: () => this.clearConversation(),
-                onDarkModeToggle: () => this.toggleDarkMode(),
+                onClearConversation: () => this.interactionHandler.clearConversation(
+                    (sender, content) => this.addMessage(sender, content),
+                    () => this.reportBuilder.update()
+                ),
+                onDarkModeToggle: () => this.interactionHandler.toggleDarkMode(),
                 onAuthButtonClick: () => this.handleAuthButtonClick(),
-                onCitationBadgeClick: (sourceId, price) => this.handleCitationBadgeClick(sourceId, price),
+                onCitationBadgeClick: (sourceId, price) => this.interactionHandler.handleCitationClick(sourceId, price),
                 onFeedbackSubmit: (query, sourceIds, rating, mode, feedbackSection) => 
-                    this.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
-                onResearchSuggestion: (topicHint) => this.handleResearchSuggestion(topicHint),
+                    this.messageCoordinator.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
+                onResearchSuggestion: (topicHint) => this.interactionHandler.handleResearchSuggestion(
+                    topicHint,
+                    (mode) => this.setMode(mode)
+                ),
                 onChatInput: (e) => {
                     this.uiManager.updateCharacterCount();
                     this.uiManager.autoResizeTextarea(e.target);
@@ -271,42 +300,6 @@ export class ChatResearchApp {
         } catch (error) {
             console.error('Error initializing app:', error);
             this.addMessage('system', 'Application initialization failed. Please refresh the page.');
-        }
-    }
-
-    // Event router handlers (extracted to helper methods)
-    handleCitationBadgeClick(sourceId, price) {
-        // Extract source data from current research data
-        const researchData = this.appState.getCurrentResearchData();
-        if (!researchData || !researchData.sources) {
-            console.error('Citation badge clicked but no research data available');
-            return;
-        }
-        
-        const source = researchData.sources.find(s => s.id === sourceId);
-        if (!source) {
-            console.error('Citation badge clicked but source not found:', sourceId);
-            return;
-        }
-        
-        // Call the source manager unlock handler
-        console.log('🔖 Citation badge clicked for source:', source.title);
-        this.sourceManager.unlockSource(null, sourceId, price);
-    }
-
-    handleResearchSuggestion(topicHint) {
-        // Switch to research mode
-        this.setMode('research');
-        
-        // Prefill the search query if we have a topic hint
-        if (topicHint) {
-            const chatInput = document.getElementById('newChatInput');
-            if (chatInput) {
-                chatInput.value = topicHint;
-                chatInput.focus();
-                // Update character count
-                this.uiManager.updateCharacterCount();
-            }
         }
     }
 
@@ -349,7 +342,7 @@ export class ChatResearchApp {
                 // Display immediate source cards using SourceManager
                 const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
                 if (cardsResult) {
-                    const feedbackSection = this._createFeedbackComponent(response.research_data.sources);
+                    const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
                     cardsResult.element.appendChild(feedbackSection);
                     this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
                 }
@@ -438,35 +431,7 @@ export class ChatResearchApp {
     }
     
     hideWelcomeScreen() {
-        const welcomeScreen = document.getElementById('welcomeScreen');
-        if (welcomeScreen && welcomeScreen.style.display !== 'none') {
-            welcomeScreen.style.display = 'none';
-        }
-    }
-
-    async clearConversation() {
-        if (!confirm('Clear the entire conversation? This cannot be undone.')) {
-            return;
-        }
-
-        try {
-            await this.apiService.clearConversation();
-            this.appState.clearConversation();
-            this.uiManager.clearConversationDisplay();
-            this.sourceManager.updateSelectionUI();
-            this.reportBuilder.update();
-        } catch (error) {
-            console.error('Error clearing conversation:', error);
-            this.addMessage('system', 'Failed to clear conversation. Please refresh the page to start fresh.');
-        }
-    }
-
-    toggleDarkMode() {
-        const isDark = this.appState.toggleDarkMode();
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        if (darkModeToggle) {
-            darkModeToggle.checked = isDark;
-        }
+        this.interactionHandler.hideWelcome();
     }
 
     // Authentication methods
@@ -636,230 +601,6 @@ export class ChatResearchApp {
         }
     }
 
-    // Feedback submission
-    async submitFeedback(query, sourceIds, rating, mode, feedbackSection) {
-        try {
-            console.log('📊 Submitting feedback:', { query, sourceIds, rating, mode });
-            
-            // Get authorization token if available
-            const token = this.authService.getAccessToken();
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            
-            // Submit to API
-            const response = await fetch('/api/feedback', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify({
-                    query: query,
-                    source_ids: sourceIds,
-                    rating: rating,
-                    mode: mode
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to submit feedback');
-            }
-            
-            const result = await response.json();
-            
-            // Mark as submitted to prevent duplicates
-            feedbackSection.dataset.submitted = 'true';
-            
-            // Update UI to show submitted state
-            const feedbackText = feedbackSection.querySelector('p');
-            if (feedbackText) {
-                feedbackText.textContent = result.message || 'Thank you for your feedback!';
-            }
-            
-            const buttonContainer = feedbackSection.querySelector('div');
-            if (buttonContainer) {
-                buttonContainer.style.display = 'none';
-            }
-            
-            // Show success toast
-            this.toastManager.show('✅ ' + (result.message || 'Feedback submitted!'), 'success', 3000);
-            
-            console.log('✅ Feedback submitted successfully');
-            
-        } catch (error) {
-            console.error('❌ Feedback submission error:', error);
-            this.toastManager.show('Failed to submit feedback. Please try again.', 'error', 3000);
-        }
-    }
-
-    // Loading messages and display methods
-    _restoreChatMessages() {
-        const messagesContainer = document.getElementById('messagesContainer');
-        
-        // Remove report builder UI
-        const reportBuilder = messagesContainer.querySelector('.report-builder-interface');
-        if (reportBuilder) {
-            reportBuilder.remove();
-        }
-        
-        // Clear existing messages to rebuild fresh
-        messagesContainer.innerHTML = '';
-        
-        // Rebuild UI from stored conversation history WITHOUT mutating state
-        const conversationHistory = this.appState.getConversationHistory();
-        
-        conversationHistory.forEach((message) => {
-            // Convert HTML strings back to DOM elements for proper rendering
-            const uiMessage = { ...message };
-            if (typeof message.content === 'string' && message.content.startsWith('<')) {
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = message.content;
-                uiMessage.content = tempDiv.firstChild;
-            }
-            
-            // Call UI manager directly to avoid state mutation during restoration
-            this.uiManager.addMessageToChat(uiMessage);
-        });
-    }
-    
-    _addLoadingMessage(message) {
-        const messagesContainer = document.getElementById('messagesContainer');
-        
-        // Use new MessageRenderer for consistent loading indicators
-        const loadingMessage = MessageRenderer.createMessageElement({
-            sender: 'system',
-            content: message,
-            timestamp: new Date(),
-            variant: 'loading'
-        });
-        
-        messagesContainer.appendChild(loadingMessage);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        return loadingMessage;
-    }
-    
-    _addProgressiveLoadingMessage() {
-        const messagesContainer = document.getElementById('messagesContainer');
-        
-        // Create loading message with initial status
-        const loadingMessage = MessageRenderer.createMessageElement({
-            sender: 'system',
-            content: '📊 Compiling sources...',
-            timestamp: new Date(),
-            variant: 'loading'
-        });
-        
-        messagesContainer.appendChild(loadingMessage);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Progressive status updates
-        const steps = [
-            { delay: 0, text: '📊 Compiling sources...' },
-            { delay: 5000, text: '🔍 Analyzing content...' },
-            { delay: 10000, text: '✍️ Building your report...' }
-        ];
-        
-        const timers = [];
-        
-        steps.forEach((step, index) => {
-            if (index === 0) return; // First step is already shown
-            
-            const timer = setTimeout(() => {
-                const messageText = loadingMessage.querySelector('.message__loading-text');
-                if (messageText) {
-                    messageText.textContent = step.text;
-                }
-            }, step.delay);
-            
-            timers.push(timer);
-        });
-        
-        // Store timers on the element for cleanup
-        loadingMessage._progressTimers = timers;
-        
-        return loadingMessage;
-    }
-    
-    _removeLoadingMessage(element) {
-        if (element && element.parentNode) {
-            // Clear any progressive timers
-            if (element._progressTimers) {
-                element._progressTimers.forEach(timer => clearTimeout(timer));
-            }
-            element.remove();
-        }
-    }
-    
-    _createFeedbackComponent(sources) {
-        const feedbackContainer = document.createElement('div');
-        feedbackContainer.className = 'feedback-section';
-        feedbackContainer.style.cssText = 'margin-top: 20px; padding: 16px; background: var(--surface-secondary, #f5f5f5); border-radius: 8px; text-align: center;';
-        
-        const feedbackText = document.createElement('p');
-        feedbackText.textContent = 'How helpful are these sources?';
-        feedbackText.style.cssText = 'margin: 0 0 12px 0; color: var(--text-primary, #333); font-weight: 500;';
-        
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: center; align-items: center;';
-        
-        const thumbsUpBtn = document.createElement('button');
-        thumbsUpBtn.className = 'feedback-btn feedback-up';
-        thumbsUpBtn.innerHTML = '👍 Helpful';
-        thumbsUpBtn.style.cssText = 'padding: 8px 20px; border: 2px solid var(--primary, #4A90E2); background: white; color: var(--primary, #4A90E2); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;';
-        
-        const thumbsDownBtn = document.createElement('button');
-        thumbsDownBtn.className = 'feedback-btn feedback-down';
-        thumbsDownBtn.innerHTML = '👎 Not helpful';
-        thumbsDownBtn.style.cssText = 'padding: 8px 20px; border: 2px solid #666; background: white; color: #666; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;';
-        
-        // Store data attributes for later submission
-        feedbackContainer.dataset.query = this.appState.getCurrentQuery() || '';
-        feedbackContainer.dataset.sourceIds = JSON.stringify(sources.map(s => s.id));
-        feedbackContainer.dataset.mode = this.appState.getMode();
-        
-        buttonContainer.appendChild(thumbsUpBtn);
-        buttonContainer.appendChild(thumbsDownBtn);
-        feedbackContainer.appendChild(feedbackText);
-        feedbackContainer.appendChild(buttonContainer);
-        
-        return feedbackContainer;
-    }
-    
-    async _pollForEnrichedResults(query) {
-        if (!query) return;
-        
-        // Poll every 5 seconds for up to 30 seconds to get enriched results
-        let attempts = 0;
-        const maxAttempts = 6;
-        
-        const pollInterval = setInterval(async () => {
-            attempts++;
-            
-            try {
-                const result = await this.apiService.analyzeQueryForTier(query, 10.0, 15);
-                
-                // If enrichment is complete, update the source cards
-                if (!result.enrichment_needed || result.enrichment_status === 'complete') {
-                    this.sourceManager.updateCards(result.sources);
-                    clearInterval(pollInterval);
-                    return;
-                }
-                
-                // Stop polling after max attempts
-                if (attempts >= maxAttempts) {
-                    clearInterval(pollInterval);
-                    console.log('Stopped polling for enriched results after max attempts');
-                }
-                
-            } catch (error) {
-                console.error('Error polling for enriched results:', error);
-                clearInterval(pollInterval);
-            }
-        }, 5000);
-    }
 }
 
 
