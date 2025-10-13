@@ -1662,9 +1662,9 @@ export class ChatResearchApp {
             if (index === 0) return; // First step is already shown
             
             const timer = setTimeout(() => {
-                const messageContent = loadingMessage.querySelector('.message-content');
-                if (messageContent) {
-                    messageContent.textContent = step.text;
+                const messageText = loadingMessage.querySelector('.message__loading-text');
+                if (messageText) {
+                    messageText.textContent = step.text;
                 }
             }, step.delay);
             
