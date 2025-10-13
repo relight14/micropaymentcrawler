@@ -342,9 +342,15 @@ export class ChatResearchApp {
                 // Display immediate source cards using SourceManager
                 const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
                 if (cardsResult) {
-                    const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
-                    cardsResult.element.appendChild(feedbackSection);
+                    // First add the message with source cards
                     this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+                    
+                    // Then append feedback AFTER message is in DOM (avoids serialization loss)
+                    const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
+                    if (lastMsg) {
+                        const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
+                        lastMsg.appendChild(feedbackSection);
+                    }
                 }
                 
                 // If enrichment is needed, let the progressive system handle updates
