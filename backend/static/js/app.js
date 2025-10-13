@@ -300,17 +300,20 @@ export class ChatResearchApp {
             // Update UI
             this.uiManager.updateModeDisplay();
             
-            // Validate token and update auth UI (this will auto-logout if expired)
+            // Validate token and fetch balance if authenticated
             const isAuthenticated = this.authService.isAuthenticated();
+            
+            if (isAuthenticated && this.authService.isAuthenticated()) {
+                // Fetch wallet balance from API before updating UI
+                await this.authService.updateWalletBalance();
+            }
+            
+            // Update auth UI after balance is fetched (or if not authenticated)
             this.updateAuthButton();
             
-            // Update wallet balance if authenticated (and still authenticated after validation)
-            if (isAuthenticated && this.authService.isAuthenticated()) {
-                await this.authService.updateWalletBalance();
-                // Safe wallet display update - only if user is still authenticated
-                if (this.authService.isAuthenticated()) {
-                    this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-                }
+            // Also update wallet display if authenticated
+            if (this.authService.isAuthenticated()) {
+                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
         } catch (error) {
             console.error('Error initializing app:', error);
