@@ -134,9 +134,16 @@ export class MessageCoordinator {
 
     async submitFeedback(query, sourceIds, rating, mode, feedbackSection) {
         try {
-            console.log('📊 Submitting feedback:', { query, sourceIds, rating, mode });
+            console.log('📊 FEEDBACK SUBMISSION START');
+            console.log('  Query:', query);
+            console.log('  Source IDs:', sourceIds);
+            console.log('  Rating:', rating);
+            console.log('  Mode:', mode);
+            console.log('  Feedback section:', feedbackSection);
             
             const token = this.authService.getAccessToken();
+            console.log('  Token available:', !!token);
+            
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -145,22 +152,34 @@ export class MessageCoordinator {
                 headers['Authorization'] = `Bearer ${token}`;
             }
             
+            const requestBody = {
+                query: query,
+                source_ids: sourceIds,
+                rating: rating,
+                mode: mode
+            };
+            
+            console.log('  Request body:', JSON.stringify(requestBody, null, 2));
+            console.log('  Headers:', headers);
+            
+            console.log('🌐 Sending POST request to /api/feedback...');
             const response = await fetch('/api/feedback', {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify({
-                    query: query,
-                    source_ids: sourceIds,
-                    rating: rating,
-                    mode: mode
-                })
+                body: JSON.stringify(requestBody)
             });
             
+            console.log('  Response status:', response.status);
+            console.log('  Response ok:', response.ok);
+            
             if (!response.ok) {
-                throw new Error('Failed to submit feedback');
+                const errorText = await response.text();
+                console.error('  Error response body:', errorText);
+                throw new Error(`Failed to submit feedback: ${response.status} - ${errorText}`);
             }
             
             const result = await response.json();
+            console.log('  Success response:', result);
             
             feedbackSection.dataset.submitted = 'true';
             
@@ -176,10 +195,13 @@ export class MessageCoordinator {
             
             this.toastManager.show('✅ ' + (result.message || 'Feedback submitted!'), 'success', 3000);
             
-            console.log('✅ Feedback submitted successfully');
+            console.log('✅ FEEDBACK SUBMISSION COMPLETE');
             
         } catch (error) {
-            console.error('❌ Feedback submission error:', error);
+            console.error('❌ FEEDBACK SUBMISSION ERROR:', error);
+            console.error('  Error name:', error.name);
+            console.error('  Error message:', error.message);
+            console.error('  Error stack:', error.stack);
             this.toastManager.show('Failed to submit feedback. Please try again.', 'error', 3000);
         }
     }

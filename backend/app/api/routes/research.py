@@ -8,6 +8,7 @@ import html
 import os
 import anthropic
 import logging
+import traceback
 from datetime import datetime, timedelta
 
 # Setup structured logging
@@ -1074,16 +1075,27 @@ async def submit_feedback(
 ):
     """Submit user feedback on research results quality."""
     try:
+        logger.info("📊 FEEDBACK ENDPOINT HIT")
+        logger.info(f"  Request body: query={feedback.query[:50]}, rating={feedback.rating}, mode={feedback.mode}, source_count={len(feedback.source_ids)}")
+        logger.info(f"  Authorization header present: {bool(authorization)}")
+        
         # Extract user ID from token if provided, otherwise use anonymous
         user_id = "anonymous"
         if authorization:
             try:
+                logger.info("  Extracting bearer token...")
                 access_token = extract_bearer_token(authorization)
+                logger.info("  Fetching user ID from LedeWire...")
                 balance_result = ledewire.get_wallet_balance(access_token)
                 if "user_id" in balance_result:
                     user_id = balance_result["user_id"]
-            except:
-                pass  # If token is invalid, just use anonymous
+                    logger.info(f"  User ID extracted: {user_id}")
+                else:
+                    logger.warning("  No user_id in balance result, using anonymous")
+            except Exception as auth_error:
+                logger.warning(f"  Auth extraction failed: {str(auth_error)}, using anonymous")
+        
+        logger.info(f"  Final user_id for feedback: {user_id}")
         
         # Import database connection
         from data.db import db
@@ -1091,8 +1103,10 @@ async def submit_feedback(
         # Store source_ids as JSON string
         import json
         source_ids_json = json.dumps(feedback.source_ids)
+        logger.info(f"  Source IDs JSON: {source_ids_json}")
         
         # Insert feedback into database
+        logger.info("  Inserting feedback into database...")
         db.execute_write(
             """
             INSERT INTO feedback (user_id, query, source_ids, rating, mode, created_at)
@@ -1101,7 +1115,7 @@ async def submit_feedback(
             (user_id, feedback.query, source_ids_json, feedback.rating, feedback.mode, datetime.now().isoformat())
         )
         
-        print(f"📊 Feedback recorded: user={user_id}, query={feedback.query[:50]}, rating={feedback.rating}, sources={len(feedback.source_ids)}")
+        logger.info(f"✅ Feedback recorded successfully: user={user_id}, query={feedback.query[:50]}, rating={feedback.rating}, sources={len(feedback.source_ids)}")
         
         return {
             "success": True,
@@ -1109,5 +1123,6 @@ async def submit_feedback(
         }
         
     except Exception as e:
-        print(f"❌ Feedback submission error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to submit feedback")
+        logger.error(f"❌ FEEDBACK SUBMISSION ERROR: {type(e).__name__}: {str(e)}")
+        logger.error(f"   Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
