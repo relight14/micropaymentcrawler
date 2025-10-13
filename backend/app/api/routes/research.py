@@ -47,7 +47,7 @@ class GenerateReportRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     """Request model for user feedback on research results"""
     query: str = Field(..., min_length=1, max_length=500)
-    source_ids: List[str] = Field(..., min_items=1)
+    source_ids: List[str] = Field(..., min_length=1)
     rating: str = Field(..., pattern="^(up|down)$")  # thumbs up or down
     mode: str = Field(default="research")
 
