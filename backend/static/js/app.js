@@ -1,13 +1,15 @@
 /**
  * Main Application Controller
- * Clean, focused orchestration layer replacing the 2,670-line monolith
+ * Clean, focused orchestration layer with modular infrastructure
  */
 import { APIService } from './services/api.js';
 import { AuthService } from './services/auth.js';
 import { AppState } from './state/app-state.js';
 import { UIManager } from './components/ui-manager.js';
 import { MessageRenderer } from './components/message-renderer.js';
-import { debounce } from './utils/helpers.js';
+import { ToastManager } from './app/toast-manager.js';
+import { ModalController } from './app/modal-controller.js';
+import { EventRouter } from './app/event-router.js';
 
 // SourceCard will be loaded globally - access it dynamically when needed
 
@@ -16,23 +18,31 @@ export class ChatResearchApp {
         // Initialize base URL for API calls
         this.baseURL = window.location.origin;
         
-        // Initialize services and state (dependency injection)
+        // Initialize core services and state (dependency injection)
         this.authService = new AuthService();
         this.apiService = new APIService(this.authService);
         this.appState = new AppState();
         this.uiManager = new UIManager(this.appState);
         
+        // Initialize infrastructure managers
+        this.toastManager = new ToastManager();
+        this.modalController = new ModalController(
+            this.authService, 
+            this.appState, 
+            this.toastManager, 
+            this.baseURL
+        );
+        this.eventRouter = new EventRouter();
+        
         // Register logout callback to update UI when user is logged out
         this.authService.onLogout(() => {
             console.log('🔐 Logout callback triggered - updating UI');
             this.updateAuthButton();
-            this.showToast('Session expired. Please log in again.', 'info');
+            this.toastManager.show('Session expired. Please log in again.', 'info');
         });
         
-        // Toast notification system
-        this.toasts = [];
-        this.toastContainer = null;
-        this.isUnlockInProgress = false; // Debounce flag for unlock operations
+        // Debounce flag for unlock operations
+        this.isUnlockInProgress = false;
         
         // Initialize the application
         this.initializeApp();
@@ -49,8 +59,71 @@ export class ChatResearchApp {
 
     async initializeApp() {
         try {
-            this.initializeEventListeners();
-            this.initializeToastSystem();
+            // Setup modal controller callbacks
+            this.modalController.setAuthSuccessCallback(async (type) => {
+                // Close the auth modal
+                this.modalController.closeAuthModal();
+                
+                // Show success toast
+                this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
+
+                // Auto-trigger funding modal if balance is $0
+                if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
+                    setTimeout(() => {
+                        this.modalController.showFundingModal();
+                    }, 500);
+                }
+                
+                // Execute any pending tab state action
+                const pendingTabAction = this.appState.getPendingTabAction();
+                if (pendingTabAction) {
+                    console.log('🔄 Executing pending tab action after login:', pendingTabAction);
+                    
+                    if (pendingTabAction.type === 'mode_switch') {
+                        this.setMode(pendingTabAction.mode);
+                    }
+                    
+                    this.appState.clearPendingTabAction();
+                }
+                
+                // Update UI
+                this.updateAuthButton();
+            });
+
+            this.modalController.setAuthToggleCallback(() => {
+                this.toggleAuthMode();
+            });
+
+            this.modalController.setFundingSuccessCallback(async () => {
+                // Refresh wallet balance
+                await this.authService.updateWalletBalance();
+                if (this.authService.isAuthenticated()) {
+                    this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+                }
+            });
+
+            // Setup event router handlers
+            this.eventRouter.setHandlers({
+                onSendMessage: () => this.sendMessage(),
+                onModeSwitch: (mode) => this.setMode(mode),
+                onClearConversation: () => this.clearConversation(),
+                onDarkModeToggle: () => this.toggleDarkMode(),
+                onAuthButtonClick: () => this.handleAuthButtonClick(),
+                onCitationBadgeClick: (sourceId, price) => this.handleCitationBadgeClick(sourceId, price),
+                onFeedbackSubmit: (query, sourceIds, rating, mode, feedbackSection) => 
+                    this.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
+                onResearchSuggestion: (topicHint) => this.handleResearchSuggestion(topicHint),
+                onChatInput: (e) => {
+                    this.uiManager.updateCharacterCount();
+                    this.uiManager.autoResizeTextarea(e.target);
+                },
+                getDarkModeState: () => this.appState.isDarkModeEnabled()
+            });
+
+            // Initialize event listeners
+            this.eventRouter.initialize();
+            
+            // Update UI
             this.uiManager.updateModeDisplay();
             
             // Validate token and update auth UI (this will auto-logout if expired)
@@ -71,204 +144,40 @@ export class ChatResearchApp {
         }
     }
 
-    initializeToastSystem() {
-        this.toastContainer = document.getElementById('toastContainer');
-        if (!this.toastContainer) {
-            console.warn('Toast container not found, creating fallback');
-            this.toastContainer = document.createElement('div');
-            this.toastContainer.className = 'toast-container';
-            document.body.appendChild(this.toastContainer);
+    // Event router handlers (extracted to helper methods)
+    handleCitationBadgeClick(sourceId, price) {
+        // Extract source data from current research data
+        const researchData = this.appState.getCurrentResearchData();
+        if (!researchData || !researchData.sources) {
+            console.error('Citation badge clicked but no research data available');
+            return;
         }
-    }
-
-    showToast(message, type = 'info', duration = 3000) {
-        const toastId = Date.now();
-        const icons = {
-            success: '✅',
-            error: '⚠️', 
-            info: 'ℹ️'
-        };
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.dataset.toastId = toastId;
         
-        toast.innerHTML = `
-            <span class="toast-icon">${icons[type] || icons.info}</span>
-            <span class="toast-content">${message}</span>
-            <button class="toast-dismiss" aria-label="Dismiss">×</button>
-        `;
-
-        // Add dismiss functionality
-        const dismissBtn = toast.querySelector('.toast-dismiss');
-        dismissBtn.addEventListener('click', () => this.dismissToast(toastId));
-
-        // Add to container and tracking
-        this.toastContainer.appendChild(toast);
-        this.toasts.push({ id: toastId, element: toast });
-
-        // Auto-dismiss after duration
-        if (duration > 0) {
-            setTimeout(() => this.dismissToast(toastId), duration);
+        const source = researchData.sources.find(s => s.id === sourceId);
+        if (!source) {
+            console.error('Citation badge clicked but source not found:', sourceId);
+            return;
         }
-
-        return toastId;
-    }
-
-    dismissToast(toastId) {
-        const toastIndex = this.toasts.findIndex(t => t.id === toastId);
-        if (toastIndex === -1) return;
-
-        const toast = this.toasts[toastIndex];
-        toast.element.classList.add('dismissing');
         
-        // Remove after animation
-        setTimeout(() => {
-            if (toast.element.parentNode) {
-                toast.element.parentNode.removeChild(toast.element);
-            }
-            this.toasts.splice(toastIndex, 1);
-        }, 300);
+        // Call the existing unlock handler
+        console.log('🔖 Citation badge clicked for source:', source.title);
+        this.handleSourceUnlock(null, sourceId, price);
     }
 
-    initializeEventListeners() {
-        // Get DOM elements
-        const chatInput = document.getElementById('newChatInput');
-        const sendButton = document.getElementById('newSendButton');
-        const clearButton = document.getElementById('clearButton');
-        const newChatBtn = document.getElementById('newChatBtn');
-        const chatModeBtn = document.getElementById('chatModeBtn');
-        const researchModeBtn = document.getElementById('researchModeBtn');
-        const reportModeBtn = document.getElementById('reportModeBtn');
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        const loginButton = document.getElementById('loginButton');
-        const authToggleButton = document.getElementById('authToggleButton');
-
-        // Chat functionality
-        if (sendButton) {
-            sendButton.addEventListener('click', () => {
-                this.sendMessage();
-            });
-        }
-        if (chatInput) {
-            chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendMessage();
-                }
-            });
-            
-            chatInput.addEventListener('input', debounce((e) => {
-                if (sendButton) sendButton.disabled = !e.target.value.trim();
+    handleResearchSuggestion(topicHint) {
+        // Switch to research mode
+        this.setMode('research');
+        
+        // Prefill the search query if we have a topic hint
+        if (topicHint) {
+            const chatInput = document.getElementById('newChatInput');
+            if (chatInput) {
+                chatInput.value = topicHint;
+                chatInput.focus();
+                // Update character count
                 this.uiManager.updateCharacterCount();
-                this.uiManager.autoResizeTextarea(e.target);
-            }, 100));
+            }
         }
-
-        // Mode switching
-        if (chatModeBtn) chatModeBtn.addEventListener('click', () => this.setMode('chat'));
-        if (researchModeBtn) researchModeBtn.addEventListener('click', () => this.setMode('research'));
-        if (reportModeBtn) reportModeBtn.addEventListener('click', () => this.setMode('report'));
-
-        // Clear conversation
-        if (clearButton) clearButton.addEventListener('click', () => this.clearConversation());
-        if (newChatBtn) newChatBtn.addEventListener('click', () => this.clearConversation());
-
-        // Dark mode toggle
-        if (darkModeToggle) {
-            darkModeToggle.checked = this.appState.isDarkModeEnabled();
-            darkModeToggle.addEventListener('change', () => this.toggleDarkMode());
-        }
-
-        // Authentication
-        if (loginButton) loginButton.addEventListener('click', () => this.handleAuthButtonClick());
-        if (authToggleButton) authToggleButton.addEventListener('click', () => this.toggleAuthMode());
-        
-        // Check if user is already authenticated on page load
-        if (this.authService.isAuthenticated()) {
-            this.updateAuthButton();
-            this.authService.updateWalletBalance().then(() => {
-                this.updateAuthButton(); // Update again with fresh balance
-            });
-        }
-        
-        // Citation badge click handlers (event delegation on document)
-        document.addEventListener('click', (e) => {
-            const badge = e.target.closest('.citation-badge');
-            if (!badge) return;
-            
-            e.preventDefault();
-            
-            // Extract source data from badge attributes
-            const sourceId = badge.getAttribute('data-source-id');
-            const price = parseFloat(badge.getAttribute('data-price')) || 0;
-            
-            // Find the source in current research data
-            const researchData = this.appState.getCurrentResearchData();
-            if (!researchData || !researchData.sources) {
-                console.error('Citation badge clicked but no research data available');
-                return;
-            }
-            
-            const source = researchData.sources.find(s => s.id === sourceId);
-            if (!source) {
-                console.error('Citation badge clicked but source not found:', sourceId);
-                return;
-            }
-            
-            // Call the existing unlock handler
-            console.log('🔖 Citation badge clicked for source:', source.title);
-            this.handleSourceUnlock(null, sourceId, price);
-        });
-        
-        // Feedback button handler (event delegation)
-        document.addEventListener('click', (e) => {
-            const feedbackBtn = e.target.closest('.feedback-btn');
-            if (!feedbackBtn) return;
-            
-            e.preventDefault();
-            
-            // Get the feedback section container
-            const feedbackSection = feedbackBtn.closest('.feedback-section');
-            if (!feedbackSection) return;
-            
-            // Check if already submitted
-            if (feedbackSection.dataset.submitted === 'true') {
-                console.log('Feedback already submitted for this result');
-                return;
-            }
-            
-            // Determine rating based on button class
-            const rating = feedbackBtn.classList.contains('feedback-up') ? 'up' : 'down';
-            
-            // Get feedback data
-            const query = feedbackSection.dataset.query;
-            const sourceIds = JSON.parse(feedbackSection.dataset.sourceIds || '[]');
-            const mode = feedbackSection.dataset.mode || 'research';
-            
-            // Submit feedback
-            this.submitFeedback(query, sourceIds, rating, mode, feedbackSection);
-        });
-        
-        // Research mode suggestion button handler (custom event from MessageRenderer)
-        document.addEventListener('switchToResearch', (e) => {
-            const topicHint = e.detail?.topicHint || '';
-            console.log('💡 Switching to research mode with topic:', topicHint);
-            
-            // Switch to research mode
-            this.setMode('research');
-            
-            // Prefill the search query if we have a topic hint
-            if (topicHint) {
-                const chatInput = document.getElementById('newChatInput');
-                if (chatInput) {
-                    chatInput.value = topicHint;
-                    chatInput.focus();
-                    // Update character count
-                    this.uiManager.updateCharacterCount();
-                }
-            }
-        });
     }
 
     async sendMessage() {
@@ -334,7 +243,7 @@ export class ChatResearchApp {
                 type: 'mode_switch', 
                 mode: 'research' 
             });
-            this.showAuthModal();
+            this.modalController.showAuthModal();
             return;
         }
         
@@ -425,350 +334,7 @@ export class ChatResearchApp {
 
     // Authentication methods
     async handleAuthButtonClick() {
-        this.showAuthModal();
-    }
-
-    showAuthModalMessage(message, type = 'error') {
-        const messageEl = document.getElementById('authModalMessage');
-        if (!messageEl) return;
-        
-        messageEl.textContent = message;
-        messageEl.className = `auth-modal-message ${type}`;
-        messageEl.style.display = 'block';
-        
-        // Auto-hide success messages after 3 seconds
-        if (type === 'success') {
-            setTimeout(() => {
-                messageEl.style.display = 'none';
-            }, 3000);
-        }
-    }
-
-    showAuthModal() {
-        // Remove any existing modal
-        const existingModal = document.getElementById('authModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        // Create modal HTML
-        const isLogin = this.appState.isInLoginMode();
-        const modalHTML = `
-            <div id="authModal" class="modal-overlay">
-                <div class="modal-content auth-modal">
-                    <div class="auth-modal-header">
-                        <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
-                        <h2 id="authTitle">${isLogin ? 'Welcome back!' : 'Create Account'}</h2>
-                        <p>${isLogin ? 'Sign in to unlock full research access' : 'Join LedeWire to access premium features'}</p>
-                        <button class="modal-close" onclick="document.getElementById('authModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
-                    </div>
-                    <div class="auth-modal-content">
-                        <div id="authModalMessage" class="auth-modal-message" style="display: none;"></div>
-                        <form class="auth-form" id="authForm">
-                            ${!isLogin ? `
-                                <div class="auth-form-group">
-                                    <label for="authFirstName">First Name *</label>
-                                    <input type="text" id="authFirstName" placeholder="" required>
-                                </div>
-                                <div class="auth-form-group">
-                                    <label for="authLastName">Last Name *</label>
-                                    <input type="text" id="authLastName" placeholder="" required>
-                                </div>
-                            ` : ''}
-                            <div class="auth-form-group">
-                                <label for="authEmail">Email *</label>
-                                <input type="email" id="authEmail" placeholder="" required>
-                            </div>
-                            <div class="auth-form-group">
-                                <label for="authPassword">Password *</label>
-                                <input type="password" id="authPassword" placeholder="" required>
-                            </div>
-                            <button type="submit" class="auth-btn" id="authSubmitBtn">
-                                ${isLogin ? 'Log In' : 'Sign Up'}
-                            </button>
-                        </form>
-                        <div class="auth-links">
-                            ${isLogin ? '<a href="#" class="auth-link" id="forgotPasswordLink">Forgot Password?</a>' : ''}
-                            <a href="#" class="auth-link" id="authToggleButton">
-                                ${isLogin ? 'Need an account? Sign up' : 'Have an account? Log in'}
-                            </a>
-                        </div>
-                    </div>
-                    <div class="auth-modal-footer">
-                        Powered by LedeWire
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Add modal to page
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        // Add event listeners
-        const authForm = document.getElementById('authForm');
-        const authToggleButton = document.getElementById('authToggleButton');
-
-        if (authForm) {
-            authForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const type = this.appState.isInLoginMode() ? 'login' : 'signup';
-                await this.handleAuth(type);
-            });
-        }
-
-        if (authToggleButton) {
-            authToggleButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleAuthMode();
-                this.showAuthModal(); // Refresh modal with new mode
-            });
-        }
-
-        // Add forgot password link handler
-        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
-        if (forgotPasswordLink) {
-            forgotPasswordLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                // TODO: Implement forgot password functionality
-                this.showAuthModalMessage('Forgot password functionality coming soon. Please contact support for assistance.', 'info');
-            });
-        }
-
-        // Close modal when clicking outside
-        const modalOverlay = document.getElementById('authModal');
-        if (modalOverlay) {
-            modalOverlay.addEventListener('click', (e) => {
-                if (e.target === modalOverlay) {
-                    modalOverlay.remove();
-                }
-            });
-        }
-    }
-
-    async showFundingModal() {
-        // Remove any existing funding modal
-        const existingModal = document.getElementById('fundingModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        const modalHTML = `
-            <div id="fundingModal" class="modal-overlay">
-                <div class="modal-content auth-modal">
-                    <div class="auth-modal-header">
-                        <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
-                        <h2>Add Funds to Your Wallet</h2>
-                        <p>Choose an amount to add to your LedeWire wallet</p>
-                        <button class="modal-close" onclick="document.getElementById('fundingModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
-                    </div>
-                    <div class="auth-modal-content">
-                        <div class="funding-amounts">
-                            <button class="funding-amount-btn" data-amount="500">
-                                <span class="amount">$5</span>
-                            </button>
-                            <button class="funding-amount-btn" data-amount="1000">
-                                <span class="amount">$10</span>
-                            </button>
-                            <button class="funding-amount-btn" data-amount="2000">
-                                <span class="amount">$20</span>
-                            </button>
-                        </div>
-                        <div id="stripePaymentElement" style="display: none; margin-top: 1.5rem;"></div>
-                        <button id="stripeSubmitBtn" class="auth-btn" style="display: none; margin-top: 1rem;">
-                            Complete Payment
-                        </button>
-                        <div id="fundingStatus" style="margin-top: 1rem; text-align: center; color: #666;"></div>
-                    </div>
-                    <div class="auth-modal-footer">
-                        Powered by LedeWire • Secured by Stripe
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        // Add event listeners to amount buttons
-        const amountButtons = document.querySelectorAll('.funding-amount-btn');
-        amountButtons.forEach(btn => {
-            btn.addEventListener('click', async () => {
-                // Remove selected class from all buttons
-                amountButtons.forEach(b => b.classList.remove('selected'));
-                // Add selected class to clicked button
-                btn.classList.add('selected');
-                
-                const amount = parseInt(btn.dataset.amount);
-                await this.handleFundingAmountSelection(amount);
-            });
-        });
-
-        // Close modal when clicking outside
-        const modal = document.getElementById('fundingModal');
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            });
-        }
-    }
-
-    async handleFundingAmountSelection(amountCents) {
-        const statusEl = document.getElementById('fundingStatus');
-        statusEl.textContent = 'Preparing payment...';
-
-        try {
-            // Call backend to create payment session
-            const response = await fetch(`${this.baseURL}/api/wallet/payment-session`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.authService.getToken()}`
-                },
-                body: JSON.stringify({
-                    amount_cents: amountCents,
-                    currency: 'usd'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create payment session');
-            }
-
-            const { client_secret, public_key } = await response.json();
-
-            // Initialize Stripe with public key from LedeWire
-            const stripe = Stripe(public_key);
-            const elements = stripe.elements({ clientSecret: client_secret });
-            const paymentElement = elements.create('payment');
-            
-            // Mount payment element
-            const container = document.getElementById('stripePaymentElement');
-            container.style.display = 'block';
-            paymentElement.mount('#stripePaymentElement');
-
-            // Show submit button
-            const submitBtn = document.getElementById('stripeSubmitBtn');
-            submitBtn.style.display = 'block';
-            statusEl.textContent = '';
-
-            // Handle payment submission
-            submitBtn.onclick = async () => {
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Processing...';
-                statusEl.textContent = 'Processing payment...';
-
-                const { error } = await stripe.confirmPayment({
-                    elements,
-                    confirmParams: {
-                        return_url: window.location.href
-                    },
-                    redirect: 'if_required'
-                });
-
-                if (error) {
-                    statusEl.textContent = `Payment failed: ${error.message}`;
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Complete Payment';
-                } else {
-                    statusEl.textContent = '✅ Payment successful! Updating balance...';
-                    
-                    // Refresh wallet balance
-                    await this.authService.updateWalletBalance();
-                    if (this.authService.isAuthenticated()) {
-                        this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-                    }
-
-                    // Close modal after success
-                    setTimeout(() => {
-                        document.getElementById('fundingModal')?.remove();
-                        this.showToast('💰 Wallet funded successfully!', 'success', 3000);
-                    }, 1500);
-                }
-            };
-
-        } catch (error) {
-            console.error('Payment session error:', error);
-            statusEl.textContent = 'Failed to initialize payment. Please try again.';
-        }
-    }
-
-    async handleAuth(type) {
-        const emailInput = document.getElementById('authEmail');
-        const passwordInput = document.getElementById('authPassword');
-        const firstNameInput = document.getElementById('authFirstName');
-        const lastNameInput = document.getElementById('authLastName');
-        
-        const email = emailInput?.value?.trim();
-        const password = passwordInput?.value?.trim();
-        const firstName = firstNameInput?.value?.trim();
-        const lastName = lastNameInput?.value?.trim();
-        
-        if (!email || !password) {
-            this.showAuthModalMessage('Please enter both email and password.');
-            return;
-        }
-        
-        if (type === 'signup' && (!firstName || !lastName)) {
-            this.showAuthModalMessage('Please enter your first and last name.');
-            return;
-        }
-
-        // Disable submit button during processing
-        const submitBtn = document.getElementById('authSubmitBtn');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Processing...';
-        }
-
-        try {
-            let result;
-            if (type === 'login') {
-                result = await this.authService.login(email, password);
-            } else {
-                result = await this.authService.signup(email, password, firstName, lastName);
-            }
-            
-            // Safe wallet display update - only if user is authenticated
-            if (this.authService.isAuthenticated()) {
-                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
-            }
-            
-            // Close the auth modal
-            const authModal = document.getElementById('authModal');
-            if (authModal) {
-                authModal.remove();
-            }
-            
-            // Show success toast
-            this.showToast(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
-
-            // Auto-trigger funding modal if balance is $0
-            if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
-                setTimeout(() => {
-                    this.showFundingModal();
-                }, 500);
-            }
-            
-            // Update button text to show logged in state
-            this.updateAuthButton();
-            
-            // Execute any pending action
-            if (this.appState.getPendingAction()) {
-                await this.executePendingAction();
-            }
-            
-        } catch (error) {
-            console.error(`${type} error:`, error);
-            this.showAuthModalMessage(`${type === 'login' ? 'Login' : 'Signup'} failed: ${error.message}`);
-            
-            // Re-enable submit button on error
-            const submitBtn = document.getElementById('authSubmitBtn');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = type === 'login' ? 'Login' : 'Sign Up';
-            }
-        }
+        this.modalController.showAuthModal();
     }
 
     updateAuthButton() {
@@ -850,7 +416,7 @@ export class ChatResearchApp {
                 e.preventDefault();
                 console.log('Top Up clicked');
                 dropdownMenu.classList.remove('show'); // Close dropdown
-                this.showFundingModal(); // Launch funding modal
+                this.modalController.showFundingModal(); // Launch funding modal
             });
         }
         
@@ -965,13 +531,13 @@ export class ChatResearchApp {
             }
             
             // Show success toast
-            this.showToast('✅ ' + (result.message || 'Feedback submitted!'), 'success', 3000);
+            this.toastManager.show('✅ ' + (result.message || 'Feedback submitted!'), 'success', 3000);
             
             console.log('✅ Feedback submitted successfully');
             
         } catch (error) {
             console.error('❌ Feedback submission error:', error);
-            this.showToast('Failed to submit feedback. Please try again.', 'error', 3000);
+            this.toastManager.show('Failed to submit feedback. Please try again.', 'error', 3000);
         }
     }
     
@@ -997,7 +563,7 @@ export class ChatResearchApp {
 
         // LAYER 2 SAFETY: Block unlock if enrichment is still pending
         if (this.appState.isEnrichmentPending()) {
-            this.showToast('⏳ Pricing is still loading... please wait', 'info', 3000);
+            this.toastManager.show('⏳ Pricing is still loading... please wait', 'info', 3000);
             console.log('🔓 UNLOCK: Blocked - enrichment still pending');
             return;
         }
@@ -1016,7 +582,7 @@ export class ChatResearchApp {
                 sourceId, 
                 price 
             });
-            this.showAuthModal();
+            this.modalController.showAuthModal();
             return;
         }
         
@@ -1037,7 +603,7 @@ export class ChatResearchApp {
             
         } catch (error) {
             console.error('❌ UNLOCK: Failed to fetch fresh pricing:', error);
-            this.showToast('Failed to load pricing. Please try again.', 'error');
+            this.toastManager.show('Failed to load pricing. Please try again.', 'error');
             return;
         }
 
@@ -1092,7 +658,7 @@ export class ChatResearchApp {
             }
 
             // Show success toast
-            this.showToast('✅ Source unlocked! Redirecting you now…', 'success', 4000);
+            this.toastManager.show('✅ Source unlocked! Redirecting you now…', 'success', 4000);
 
             // Update button to "View Source" state
             if (button) {
@@ -1138,7 +704,7 @@ export class ChatResearchApp {
                 });
             }
             
-            this.showToast('⚠️ Unlock failed. Please try again.', 'error');
+            this.toastManager.show('⚠️ Unlock failed. Please try again.', 'error');
             
             // Restore button state on failure
             if (button && originalButtonContent) {
@@ -1185,11 +751,11 @@ export class ChatResearchApp {
                 this._displayGeneratedReport(reportPacket);
                 
                 // Show success message as toast (non-intrusive, won't trigger DOM re-render)
-                this._showToast(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${selectedSourceIds.length} selected sources!`, 'success');
+                this.toastManager.show(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${selectedSourceIds.length} selected sources!`, 'success');
             }
         } catch (error) {
             console.error('Error generating report:', error);
-            this.showToast(`⚠️ Report generation failed: ${error.message}`, 'error');
+            this.toastManager.show(`⚠️ Report generation failed: ${error.message}`, 'error');
             
             // Reset button state
             if (button) {
@@ -1217,7 +783,7 @@ export class ChatResearchApp {
             if (useSelectedSources) {
                 selectedSources = this.appState.getSelectedSources();
                 if (selectedSources.length === 0) {
-                    this._showToast('Please select sources first', 'error');
+                    this.toastManager.show('Please select sources first', 'error');
                     return;
                 }
             }
@@ -1592,32 +1158,6 @@ export class ChatResearchApp {
         });
     }
     
-    _showToast(message, type = 'info') {
-        // Simple toast implementation - could be enhanced
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
-        `;
-        
-        document.body.appendChild(toast);
-        
-        // Auto-remove after 3 seconds
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease-in';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
-    
     _addLoadingMessage(message) {
         const messagesContainer = document.getElementById('messagesContainer');
         
@@ -1927,7 +1467,7 @@ export class ChatResearchApp {
         });
         
         // Show completion message
-        this._showToast('Source enrichment complete! Updated with enhanced details.', 'success');
+        this.toastManager.show('Source enrichment complete! Updated with enhanced details.', 'success');
     }
     
     // Global methods for HTML event handlers (legacy support)
