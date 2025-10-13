@@ -12,7 +12,15 @@ Preferred communication style: Simple, everyday language.
 The frontend is a responsive, modern Single Page Application (SPA) built with vanilla HTML/CSS/JavaScript, utilizing a modular ES6 architecture. It features tier selection cards, dynamic content loading, story cards with quotes and descriptions for source articles, and professional presentation of search results with transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️). UI includes intelligent scroll behavior: AI responses scroll to the message top, while user messages scroll to the bottom.
 
 ## Technical Implementations
-- **Frontend**: Consolidated architecture with `js/app.js` as the main controller, dedicated services for API communication, authentication, centralized state management, and consistent UI message rendering. Source card generation logic and styling are unified.
+- **Frontend**: Modular layered architecture with separation of concerns:
+  - **Application Controller** (`js/app.js`) - Lightweight orchestrator (reduced from 2018 to 1558 lines) coordinating all components via dependency injection
+  - **Infrastructure Managers** - Dedicated managers for cross-cutting concerns:
+    - `ToastManager` - Centralized toast notification lifecycle
+    - `ModalController` - Auth & funding modal orchestration with callback-based integration
+    - `EventRouter` - Single point of event listener registration and delegation
+  - **Core Services** - API communication, authentication, state management
+  - **UI Components** - Message rendering, source cards, UI updates
+  - All components follow single-responsibility principle with clean interfaces
 - **Backend**: Developed with FastAPI, employing a unified service architecture for AI processing, content licensing, and research operations. `schemas/domain.py` is the single source of truth for data models. Includes a domain credibility penalty system to downrank low-credibility sources and prioritizes authoritative content, with defensive URL validation. External API calls use async httpx with timeouts and exponential backoff retry logic.
 - **Content Generation**: Employs a hybrid pipeline using Tavily for URL discovery and Anthropic Claude for content refinement and report generation, incorporating licensing detection and graceful API fallbacks. Excerpts are expanded to 1,500-2,000 characters for deep AI analysis.
 - **AI-Powered Query Optimization**: Uses Claude Haiku to optimize search queries based on full conversation context before sending to Tavily API. This method analyzes conversation history and user queries to build precision-targeted search strings by prioritizing specific entities, applying geographic and temporal precision, completing truncated thoughts, and signaling analysis depth.
