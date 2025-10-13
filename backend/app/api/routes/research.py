@@ -229,37 +229,9 @@ def _extract_timeframe(text: str, output_bias: str = 'general') -> str:
 
 
 def _extract_entities(text: str) -> List[str]:
-    """Extract key entities (places, organizations, people)."""
-    entities = []
-    
-    # Common entities to look for (expandable)
-    entity_patterns = {
-        # Gaza/Israel related
-        r'\b(gaza|israel|hamas|egypt|qatar|un|united nations)\b': ['Gaza', 'Israel', 'Hamas', 'Egypt', 'Qatar', 'UN'],
-        
-        # Organizations
-        r'\b(fed|federal reserve|ecb|imf|world bank)\b': ['Federal Reserve', 'ECB', 'IMF', 'World Bank'],
-        
-        # Countries
-        r'\b(china|russia|ukraine|iran|us|usa|united states)\b': ['China', 'Russia', 'Ukraine', 'Iran', 'United States'],
-        
-        # Tech companies
-        r'\b(openai|anthropic|google|meta|microsoft|apple)\b': ['OpenAI', 'Anthropic', 'Google', 'Meta', 'Microsoft', 'Apple']
-    }
-    
-    for pattern, entity_list in entity_patterns.items():
-        if re.search(pattern, text):
-            entities.extend(entity_list)
-    
-    # Remove duplicates, keep order
-    seen = set()
-    unique_entities = []
-    for e in entities:
-        if e not in seen:
-            seen.add(e)
-            unique_entities.append(e)
-    
-    return unique_entities[:5]  # Top 5 most relevant
+    """REMOVED: Entity extraction was causing false positives (injecting China/Russia into US queries).
+    Now returns empty list - user intent is preserved through direct query pass-through."""
+    return []
 
 
 def _extract_topic(query: str, context: str) -> str:
@@ -477,38 +449,24 @@ def _classify_intent_and_temporal(brief: Dict[str, Any]) -> Dict[str, str]:
 
 
 def _build_query_with_brief(brief: Dict[str, Any], classification: Dict[str, Any]) -> str:
-    """Build targeted Tavily query from research brief."""
+    """Build targeted Tavily query from research brief - simplified to preserve user intent."""
     
     topic = brief["topic"]
-    entities = brief["entities"]
     timeframe = brief["timeframe"]
     
-    # Start with core topic
-    query_parts = [topic]
+    # Start with user's topic (their actual query) - no entity injection
+    query = topic
     
-    # Add entities for precision
-    if entities:
-        query_parts.extend(entities[:3])  # Top 3 entities
+    # Optionally add minimal temporal keyword for breaking news only
+    # Don't pollute the query with temporal keywords unless it's truly breaking news
+    if timeframe == "T0":
+        # Breaking news - add "latest" to prioritize very recent content
+        query = f"{query} latest"
     
-    # Add temporal keywords based on bucket
-    temporal_keywords = {
-        "T0": ["today", "current", "latest", "breaking", "announced"],
-        "T1": ["recent", "this week", "latest developments"],
-        "T7": ["recent weeks", "current situation"],
-        "TH": ["history", "background", "evolution", "context"]
-    }
-    
-    if timeframe in temporal_keywords:
-        # Add one temporal keyword
-        query_parts.append(temporal_keywords[timeframe][0])
-    
-    # Join into coherent query
-    query = " ".join(query_parts)
-    
-    # Clean up
+    # Clean up whitespace
     query = re.sub(r'\s+', ' ', query).strip()
     
-    logger.info(f"🔍 Built query: '{query}'")
+    logger.info(f"🔍 Built query (user intent preserved): '{query}'")
     
     return query
 
