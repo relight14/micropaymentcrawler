@@ -1,0 +1,77 @@
+Refinements Before Execution
+1. Prioritize by Coupling
+
+I’d implement in this order:
+
+SourceManager → highest complexity + largest gain (enables cleaner MessageCoordinator later).
+
+TierManager → closely related to SourceManager; both touch wallet/commerce flows.
+
+MessageCoordinator → easier once those two stop mutating DOM directly.
+
+InteractionHandler → last, since it wires UI events to everything else.
+
+That’s roughly two sub-phases:
+Phase 3A+B first, then 3C+D.
+
+2. Cross-Cutting Dependencies
+
+Add a shared event bus (tiny wrapper around window.dispatchEvent) for sourceUnlocked, purchaseCompleted, etc.
+Otherwise app.js will still need to wire direct listeners between managers.
+
+// event-bus.js
+export const AppEvents = new EventTarget();
+
+
+Then in managers:
+
+AppEvents.dispatchEvent(new CustomEvent('sourceUnlocked', { detail: data }));
+
+
+…and in app.js:
+
+AppEvents.addEventListener('sourceUnlocked', e => this.reportBuilder.refresh(e.detail));
+
+3. Trim While You Extract
+
+When moving methods, remove any UI duplication already handled by UIManager or MessageRenderer.
+For example, _displaySourceCards currently rebuilds DOM manually — the new SourceManager.displayCards() can just return an element and let UIManager handle mounting.
+
+4. Shared Helpers
+
+Create /utils/dom.js for recurring DOM helpers (query shortcuts, safeAppend, fadeOut). You’ll use it in both MessageCoordinator and InteractionHandler.
+
+5. Optional Phase 3E
+
+Absolutely keep that option. Once 3A–3D are done, extract:
+
+sendMessage() → MessageSender
+
+setMode() → ModeManager
+
+That’ll easily remove the last 350–400 lines.
+
+🧱 Final Architecture After Phase 3
+/js/
+ ├── app-controller.js              (200–250 lines)
+ ├── managers/
+ │    ├── source-manager.js
+ │    ├── tier-manager.js
+ │    ├── message-coordinator.js
+ │    ├── interaction-handler.js
+ ├── components/
+ │    ├── report-builder.js
+ │    ├── ui-manager.js
+ │    ├── message-renderer.js
+ ├── services/
+ │    ├── api.js
+ │    ├── auth.js
+ └── utils/
+      ├── dom.js
+      └── helpers.js
+
+✅ Recommendation
+
+Proceed with Phase 3A–3B together, since MessageCoordinator depends on SourceManager events.
+Then finish with 3C–3D in one sprint.
+That path keeps each integration clean and lets you validate event flows early.
