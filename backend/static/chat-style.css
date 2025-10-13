@@ -2926,6 +2926,32 @@ input:checked + .slider:before {
     margin-top: auto;
 }
 
+.tier-purchase-btn {
+    width: 100%;
+    padding: 12px 24px;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: auto;
+    background: #fff38D !important;
+    color: black !important;
+}
+
+.tier-purchase-btn:hover {
+    background: #f5e65c !important;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.tier-purchase-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-basic {
     background: var(--secondary);
     color: var(--foreground);
