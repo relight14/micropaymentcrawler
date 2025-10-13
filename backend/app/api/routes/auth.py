@@ -167,13 +167,18 @@ async def get_wallet_balance(authorization: str = Header(None, alias="Authorizat
         # Get wallet balance from LedeWire
         balance_result = ledewire.get_wallet_balance(access_token)
         
+        print(f"🔍 LedeWire API balance response: {balance_result}")
+        
         if "error" in balance_result:
             error_message = ledewire.handle_api_error(balance_result)
             raise HTTPException(status_code=401, detail=f"Authentication failed: {error_message}")
         
+        # Handle both "balance" and "balance_cents" field names
+        balance_cents = balance_result.get("balance_cents") or balance_result.get("balance", 0)
+        
         return WalletBalanceResponse(
-            balance_cents=balance_result["balance_cents"],
-            balance_display=f"${balance_result['balance_cents'] / 100:.2f}",
+            balance_cents=balance_cents,
+            balance_display=f"${balance_cents / 100:.2f}",
             currency="USD"
         )
         
