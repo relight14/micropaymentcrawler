@@ -44,6 +44,14 @@ class GenerateReportRequest(BaseModel):
     selected_source_ids: Optional[List[str]] = None  # User's selected sources for report
 
 
+class FeedbackRequest(BaseModel):
+    """Request model for user feedback on research results"""
+    query: str = Field(..., min_length=1, max_length=500)
+    source_ids: List[str] = Field(..., min_items=1)
+    rating: str = Field(..., pattern="^(up|down)$")  # thumbs up or down
+    mode: str = Field(default="research")
+
+
 def extract_bearer_token(authorization: str) -> str:
     """Extract and validate Bearer token from Authorization header."""
     if not authorization:
@@ -1086,3 +1094,51 @@ async def get_source_details(
         # Log actual error but return generic message
         print(f"Source details error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error occurred while fetching source details")
+
+
+@router.post("/feedback")
+@limiter.limit("30/minute")
+async def submit_feedback(
+    request: Request,
+    feedback: FeedbackRequest,
+    authorization: str = Header(None)
+):
+    """Submit user feedback on research results quality."""
+    try:
+        # Extract user ID from token if provided, otherwise use anonymous
+        user_id = "anonymous"
+        if authorization:
+            try:
+                access_token = extract_bearer_token(authorization)
+                balance_result = ledewire.get_wallet_balance(access_token)
+                if "user_id" in balance_result:
+                    user_id = balance_result["user_id"]
+            except:
+                pass  # If token is invalid, just use anonymous
+        
+        # Import database connection
+        from data.db import db
+        
+        # Store source_ids as JSON string
+        import json
+        source_ids_json = json.dumps(feedback.source_ids)
+        
+        # Insert feedback into database
+        db.execute_write(
+            """
+            INSERT INTO feedback (user_id, query, source_ids, rating, mode, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, feedback.query, source_ids_json, feedback.rating, feedback.mode, datetime.now().isoformat())
+        )
+        
+        print(f"📊 Feedback recorded: user={user_id}, query={feedback.query[:50]}, rating={feedback.rating}, sources={len(feedback.source_ids)}")
+        
+        return {
+            "success": True,
+            "message": "Thank you for your feedback!"
+        }
+        
+    except Exception as e:
+        print(f"❌ Feedback submission error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit feedback")
