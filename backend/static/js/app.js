@@ -101,11 +101,19 @@ export class ChatResearchApp {
         });
         
         this.reportBuilder.addEventListener('reportGenerating', (e) => {
-            this._addProgressiveLoadingMessage();
+            // Show progressive loading message and store reference for cleanup
+            this.currentReportLoadingMessage = this.messageCoordinator.showProgressiveLoading();
         });
         
         this.reportBuilder.addEventListener('reportError', (e) => {
             const { error, tier } = e.detail;
+            
+            // Remove progressive loading message if it exists
+            if (this.currentReportLoadingMessage) {
+                this.messageCoordinator.removeLoading(this.currentReportLoadingMessage);
+                this.currentReportLoadingMessage = null;
+            }
+            
             this.toastManager.show(`⚠️ Report generation failed: ${error.message}`, 'error');
         });
         
@@ -125,6 +133,13 @@ export class ChatResearchApp {
         
         this.tierManager.addEventListener('purchaseCompleted', (e) => {
             const { reportData, tier, sourceCount } = e.detail;
+            
+            // Remove progressive loading message if it exists
+            if (this.currentReportLoadingMessage) {
+                this.messageCoordinator.removeLoading(this.currentReportLoadingMessage);
+                this.currentReportLoadingMessage = null;
+            }
+            
             const message = this.reportBuilder.displayReport(reportData);
             if (message) {
                 this.addMessage(message.sender, message.content, message.metadata);
