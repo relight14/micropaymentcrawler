@@ -113,6 +113,38 @@ export class ChatResearchApp {
             this.addMessage('system', e.detail.message);
         });
         
+        // Setup centralized AppEvents bus listeners for cross-component coordination
+        AppEvents.addEventListener(EVENT_TYPES.SOURCE_SELECTED, (e) => {
+            console.log('📡 AppEvents: Source selected', e.detail);
+            // Update report builder when sources are selected
+            if (this.appState.getMode() === 'report') {
+                const reportBuilderElement = this.reportBuilder.show();
+                this.addMessage('system', reportBuilderElement);
+            }
+        });
+        
+        AppEvents.addEventListener(EVENT_TYPES.SOURCE_DESELECTED, (e) => {
+            console.log('📡 AppEvents: Source deselected', e.detail);
+            // Update report builder when sources are deselected
+            if (this.appState.getMode() === 'report') {
+                const reportBuilderElement = this.reportBuilder.show();
+                this.addMessage('system', reportBuilderElement);
+            }
+        });
+        
+        AppEvents.addEventListener(EVENT_TYPES.SOURCE_UNLOCKED, (e) => {
+            console.log('📡 AppEvents: Source unlocked', e.detail);
+        });
+        
+        AppEvents.addEventListener(EVENT_TYPES.BUDGET_WARNING, (e) => {
+            console.log('📡 AppEvents: Budget warning', e.detail);
+            this.toastManager.show(e.detail.warning, 'warning');
+        });
+        
+        AppEvents.addEventListener(EVENT_TYPES.TIER_PURCHASED, (e) => {
+            console.log('📡 AppEvents: Tier purchased', e.detail);
+        });
+        
         // Register logout callback to update UI when user is logged out
         this.authService.onLogout(() => {
             console.log('🔐 Logout callback triggered - updating UI');
