@@ -162,8 +162,8 @@ export class MessageCoordinator {
             console.log('  Request body:', JSON.stringify(requestBody, null, 2));
             console.log('  Headers:', headers);
             
-            console.log('🌐 Sending POST request to /api/feedback...');
-            const response = await fetch('/api/feedback', {
+            console.log('🌐 Sending POST request to /api/research/feedback...');
+            const response = await fetch('/api/research/feedback', {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(requestBody)
