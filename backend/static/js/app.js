@@ -67,6 +67,9 @@ export class ChatResearchApp {
                 // Show success toast
                 this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
 
+                // Fetch wallet balance from API
+                await this.authService.updateWalletBalance();
+                
                 // Auto-trigger funding modal if balance is $0
                 if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
                     setTimeout(() => {
@@ -86,7 +89,7 @@ export class ChatResearchApp {
                     this.appState.clearPendingTabAction();
                 }
                 
-                // Update UI
+                // Update UI with wallet balance
                 this.updateAuthButton();
             });
 
