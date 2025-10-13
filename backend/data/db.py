@@ -49,6 +49,18 @@ class DatabaseConnection:
                 )
             """)
             
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    query TEXT NOT NULL,
+                    source_ids TEXT NOT NULL,
+                    rating TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             conn.commit()
     
     @contextmanager
