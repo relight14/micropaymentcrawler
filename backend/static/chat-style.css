@@ -1297,6 +1297,57 @@ input:checked + .slider:before {
     border-color: #f5e65c !important;
 }
 
+/* Report Download Button */
+.report-download-container {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.report-download-btn {
+    background: var(--primary) !important;
+    color: var(--primary-foreground) !important;
+    border: 1px solid var(--primary) !important;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.report-download-btn:hover {
+    background: var(--muted-foreground) !important;
+    border-color: var(--muted-foreground) !important;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.report-download-btn:active {
+    transform: translateY(0);
+}
+
+/* Dark Mode Download Button */
+.dark .report-download-container {
+    border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark .report-download-btn {
+    background: var(--accent) !important;
+    color: black !important;
+    border-color: var(--accent) !important;
+}
+
+.dark .report-download-btn:hover {
+    background: #f5e65c !important;
+    border-color: #f5e65c !important;
+}
+
 /* Dark Mode Message Overrides */
 .dark .message__content {
     background: rgba(255, 255, 255, 0.08);
