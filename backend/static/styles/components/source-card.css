@@ -205,6 +205,22 @@
     background-color: var(--primary-light, #f0f9ff) !important;
 }
 
+/* Dark mode selected state - ensure text contrast */
+.dark .source-card.selected {
+    background-color: #e0f2fe !important;
+}
+
+.dark .source-card.selected .source-title,
+.dark .source-card.selected .source-meta,
+.dark .source-card.selected .source-excerpt,
+.dark .source-card.selected .source-url {
+    color: #1e293b !important;
+}
+
+.dark .source-card.selected .relevance-badge {
+    color: #334155 !important;
+}
+
 /* =============================================================================
    SOURCE HEADER
    ============================================================================= */
