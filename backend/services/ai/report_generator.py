@@ -228,12 +228,12 @@ class ReportGeneratorService:
                 "source_id": source.id,
                 "locked": not source.is_unlocked,
                 "title": source.title,
-                "domain": source.domain
+                "domain": source.domain,
+                "protocol": source.licensing_protocol  # Always include protocol for icon display
             }
             
-            # Add protocol and price for locked sources
+            # Add price for locked sources
             if not source.is_unlocked:
-                metadata["protocol"] = source.licensing_protocol
                 metadata["price"] = source.unlock_price
             
             citation_metadata[citation_num] = metadata
