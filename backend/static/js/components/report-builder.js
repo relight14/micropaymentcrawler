@@ -385,24 +385,18 @@ export class ReportBuilder extends EventTarget {
                 const price = parseFloat(e.target.dataset.price);
                 const query = this.appState.getCurrentQuery() || "Research Query";
                 
-                e.target.textContent = 'Processing...';
-                e.target.disabled = true;
+                const selectedSources = this.appState.getSelectedSources();
+                const useSelectedSources = selectedSources && selectedSources.length > 0;
                 
-                try {
-                    const selectedSources = this.appState.getSelectedSources();
-                    if (selectedSources && selectedSources.length > 0) {
-                        // Generate report from selected sources
-                        await this.generateReport(e.target, tier, query, selectedSources);
-                    } else {
-                        // Dispatch purchase event for tier without selected sources
-                        this.dispatchEvent(new CustomEvent('tierPurchase', {
-                            detail: { tier, price, query }
-                        }));
+                this.dispatchEvent(new CustomEvent('tierPurchase', {
+                    detail: { 
+                        tier, 
+                        price, 
+                        query,
+                        button: e.target,
+                        useSelectedSources
                     }
-                } catch (error) {
-                    e.target.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
-                    e.target.disabled = false;
-                }
+                }));
             });
         });
     }

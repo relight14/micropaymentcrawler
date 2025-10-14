@@ -28,7 +28,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && python main.py"
+args = "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000"
 waitForPort = 5000
 
 [[ports]]
@@ -36,12 +36,8 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 34281
+localPort = 38407
 externalPort = 8081
-
-[[ports]]
-localPort = 36995
-externalPort = 9000
 
 [[ports]]
 localPort = 38873
