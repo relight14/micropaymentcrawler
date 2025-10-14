@@ -61,6 +61,67 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
+     * Generates a report from selected sources
+     * @param {HTMLButtonElement} button - The purchase button
+     * @param {string} tier - Tier ID (research/pro)
+     * @param {string} query - Research query
+     * @param {Array} selectedSources - Selected sources array
+     */
+    async generateReport(button, tier, query, selectedSources) {
+        if (!this.authService.isAuthenticated()) {
+            this.dispatchEvent(new CustomEvent('authRequired', {
+                detail: { message: 'Please log in to generate a report.' }
+            }));
+            return;
+        }
+
+        try {
+            // Extract source IDs
+            const selectedSourceIds = selectedSources.map(source => source.id);
+            
+            console.log(`📊 Generating ${tier} report with ${selectedSourceIds.length} selected sources`);
+            
+            // Dispatch loading event
+            this.dispatchEvent(new CustomEvent('reportGenerating', {
+                detail: { tier, sourceCount: selectedSourceIds.length }
+            }));
+            
+            // Call API to generate report
+            const reportPacket = await this.apiService.generateReport(query, tier, selectedSourceIds);
+            
+            if (reportPacket) {
+                // Update button state
+                if (button) {
+                    button.textContent = 'Report Generated';
+                    button.disabled = true;
+                }
+                
+                // Dispatch success event with report data
+                this.dispatchEvent(new CustomEvent('reportGenerated', {
+                    detail: {
+                        reportData: reportPacket,
+                        tier,
+                        sourceCount: selectedSourceIds.length
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            
+            // Dispatch error event
+            this.dispatchEvent(new CustomEvent('reportError', {
+                detail: { error, tier }
+            }));
+            
+            // Reset button state
+            if (button) {
+                button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
+                button.disabled = false;
+            }
+        }
+    }
+
+    /**
      * Displays a generated report
      * @param {Object} reportData - Report data from API
      * @returns {Object} Message object ready for display
@@ -319,7 +380,7 @@ export class ReportBuilder extends EventTarget {
     _attachTierPurchaseListeners() {
         const purchaseButtons = document.querySelectorAll('.tier-purchase-btn');
         purchaseButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
+            button.addEventListener('click', async (e) => {
                 const tier = e.target.dataset.tier;
                 const price = parseFloat(e.target.dataset.price);
                 const query = this.appState.getCurrentQuery() || "Research Query";
@@ -327,19 +388,21 @@ export class ReportBuilder extends EventTarget {
                 e.target.textContent = 'Processing...';
                 e.target.disabled = true;
                 
-                const selectedSources = this.appState.getSelectedSources();
-                const useSelectedSources = selectedSources && selectedSources.length > 0;
-                
-                // Always dispatch purchase event - this ensures the modal always shows
-                this.dispatchEvent(new CustomEvent('tierPurchase', {
-                    detail: { 
-                        tier, 
-                        price, 
-                        query,
-                        useSelectedSources,
-                        button: e.target
+                try {
+                    const selectedSources = this.appState.getSelectedSources();
+                    if (selectedSources && selectedSources.length > 0) {
+                        // Generate report from selected sources
+                        await this.generateReport(e.target, tier, query, selectedSources);
+                    } else {
+                        // Dispatch purchase event for tier without selected sources
+                        this.dispatchEvent(new CustomEvent('tierPurchase', {
+                            detail: { tier, price, query }
+                        }));
                     }
-                }));
+                } catch (error) {
+                    e.target.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
+                    e.target.disabled = false;
+                }
             });
         });
     }

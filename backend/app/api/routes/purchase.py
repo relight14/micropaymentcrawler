@@ -8,17 +8,16 @@ import time
 
 from schemas.api import PurchaseRequest, PurchaseResponse
 from schemas.domain import TierType, ResearchPacket
+from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 
-# Import shared crawler instance
-from shared_services import crawler
-
 router = APIRouter()
 
-# Initialize other services
+# Initialize services
+crawler = ContentCrawlerStub()
 report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
@@ -162,36 +161,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         
         # Handle FREE TIER
         if config["price"] == 0.00:
-            # Check if user selected specific sources
-            if purchase_request.selected_source_ids:
-                print(f"📊 FREE TIER: Using {len(purchase_request.selected_source_ids)} selected sources")
-                print(f"🔍 DEBUG: Cache has {len(crawler._cache)} entries")
-                print(f"🔍 DEBUG: Looking for source IDs: {purchase_request.selected_source_ids}")
-                
-                # Retrieve selected sources from crawler cache (same logic as /generate-report)
-                selected_sources = []
-                for cache_key, cache_value in crawler._cache.items():
-                    print(f"🔍 DEBUG: Checking cache_key={cache_key}, type={type(cache_value)}")
-                    if isinstance(cache_value, tuple) and len(cache_value) == 2:
-                        cached_sources, timestamp = cache_value
-                        if isinstance(cached_sources, list):
-                            for source in cached_sources:
-                                if hasattr(source, 'id') and source.id in purchase_request.selected_source_ids:
-                                    print(f"✅ Found source: {source.id}")
-                                    selected_sources.append(source)
-                
-                print(f"📊 DEBUG: Retrieved {len(selected_sources)} sources from cache")
-                
-                if not selected_sources:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Selected sources not found. Please run a search first before generating a report."
-                    )
-                
-                sources = selected_sources
-            else:
-                # No selection - generate sources
-                sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
+            # Generate sources for free tier
+            sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             
             # Generate AI report
             report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
@@ -232,28 +203,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         budget_limit = config["price"] * 0.60
         max_sources = config["max_sources"]
         
-        # Check if user selected specific sources
-        if purchase_request.selected_source_ids:
-            print(f"📊 PAID TIER: Using {len(purchase_request.selected_source_ids)} selected sources")
-            
-            # Retrieve selected sources from crawler cache (same logic as /generate-report)
-            selected_sources = []
-            for cache_key, (cached_sources, timestamp) in crawler._cache.items():
-                if isinstance(cached_sources, list):
-                    for source in cached_sources:
-                        if source.id in purchase_request.selected_source_ids:
-                            selected_sources.append(source)
-            
-            if not selected_sources:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Selected sources not found. Please run a search first before generating a report."
-                )
-            
-            sources = selected_sources
-        else:
-            # No selection - generate sources
-            sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
+        # Generate sources
+        sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         
         # Generate AI report (with fallback handling built-in)
         report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)

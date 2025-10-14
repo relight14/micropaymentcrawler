@@ -33,8 +33,10 @@ async def get_system_stats():
 async def get_source_pricing(source_id: str, request: Request):
     """Fetch fresh server-authoritative pricing for a specific source (Layer 3 safety check)"""
     try:
-        # Import shared crawler instance to access cache
-        from shared_services import crawler
+        from services.research.crawler import ContentCrawlerStub
+        
+        # Access crawler instance to search cache
+        crawler = ContentCrawlerStub()
         
         # Search all cached results for the source
         source = None

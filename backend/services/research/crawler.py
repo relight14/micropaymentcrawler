@@ -755,6 +755,129 @@ class ContentCrawlerStub:
     
     # Removed fake quality multiplier - real licensing APIs determine authentic pricing
     
+    def _extract_key_topics(self, query: str) -> List[str]:
+        """Extract key topics from long query text."""
+        import re
+        
+        # Remove common research phrases and extract core topics
+        clean_query = re.sub(r'(research query|search terms|based on|comprehensive|analysis|report)', '', query.lower())
+        
+        # Extract quoted terms and key phrases
+        quoted_terms = re.findall(r'"([^"]+)"', query)
+        
+        # If we have quoted terms, use those as primary topics
+        if quoted_terms:
+            return [term.strip() for term in quoted_terms[:3]]  # Take first 3
+        
+        # Fallback: extract key noun phrases
+        words = query.split()
+        key_terms = []
+        for i, word in enumerate(words[:20]):  # Look at first 20 words
+            if len(word) > 4 and word.lower() not in ['based', 'used', 'improve', 'materials', 'research', 'writing', 'report']:
+                key_terms.append(word)
+                if len(key_terms) >= 3:
+                    break
+        
+        # Default fallback
+        if not key_terms:
+            key_terms = ['advanced materials', 'emerging technologies', 'innovation']
+        
+        return key_terms[:3]
+    
+    def _generate_title(self, query: str, index: int) -> str:
+        """Generate diverse, compelling titles based on source type."""
+        topics = self._extract_key_topics(query)
+        main_topic = topics[0] if topics else 'emerging technologies'
+        
+        # Define different source types with unique title patterns
+        source_types = [
+            # Academic Research Papers
+            {
+                'templates': [
+                    f"Breakthrough Advances in {main_topic}: A Systematic Review",
+                    f"Novel {main_topic} Applications: Performance Analysis and Future Outlook",
+                    f"Optimizing {main_topic}: Computational Models and Experimental Validation",
+                    f"Next-Generation {main_topic}: Materials Science Perspectives"
+                ]
+            },
+            # Industry Reports
+            {
+                'templates': [
+                    f"Market Analysis: {main_topic} Industry Trends and Forecasts 2024",
+                    f"Commercial Deployment of {main_topic}: Case Studies and ROI Analysis",
+                    f"Industry Insight: Scaling {main_topic} for Mass Production",
+                    f"Technical Brief: {main_topic} Implementation Strategies"
+                ]
+            },
+            # Case Studies
+            {
+                'templates': [
+                    f"Real-World Success: {main_topic} Implementation at Global Tech Company",
+                    f"Case Study: Transforming Infrastructure with {main_topic}",
+                    f"Pilot Project Results: {main_topic} Performance in Live Environment",
+                    f"Field Trial Analysis: {main_topic} Deployment Outcomes"
+                ]
+            },
+            # News & Analysis
+            {
+                'templates': [
+                    f"Breaking: Major {main_topic} Breakthrough Changes Industry Landscape",
+                    f"Expert Analysis: Why {main_topic} is the Future of Technology",
+                    f"Industry Leaders Bet Big on {main_topic} Innovation",
+                    f"Emerging Trends: How {main_topic} is Disrupting Traditional Markets"
+                ]
+            }
+        ]
+        
+        # Cycle through source types to ensure variety
+        source_type = source_types[index % len(source_types)]
+        template_index = (index // len(source_types)) % len(source_type['templates'])
+        
+        return source_type['templates'][template_index]
+    
+    def _generate_excerpt(self, query: str, title: str) -> str:
+        """Generate compelling, diverse excerpts based on source type."""
+        topics = self._extract_key_topics(query)
+        main_topic = topics[0] if topics else 'emerging technologies'
+        
+        # Determine source type from title pattern
+        title_lower = title.lower()
+        
+        if any(word in title_lower for word in ['breakthrough', 'systematic review', 'novel', 'optimizing']):
+            # Academic research excerpts
+            excerpts = [
+                f"This groundbreaking study reveals how {main_topic} can achieve 40% efficiency improvements over conventional approaches, with experimental validation across three independent test facilities.",
+                f"Our research team discovered a novel mechanism in {main_topic} that could revolutionize current industry standards, offering both cost reduction and performance enhancement.",
+                f"Through rigorous testing and peer review, we demonstrate that {main_topic} applications show consistent performance gains of 25-50% in real-world deployment scenarios.",
+                f"This comprehensive analysis of {main_topic} identifies three critical breakthrough areas that promise to transform how the industry approaches next-generation solutions."
+            ]
+        elif any(word in title_lower for word in ['market', 'industry', 'commercial', 'technical brief']):
+            # Industry report excerpts
+            excerpts = [
+                f"Industry analysis shows {main_topic} market growing at 23% CAGR, with major corporations investing $2.3B in R&D and commercial deployment initiatives.",
+                f"Leading manufacturers report 35% cost reduction and 60% performance improvement after implementing {main_topic} solutions in their production lines.",
+                f"Market research indicates {main_topic} adoption will reach 45% of enterprise customers by 2025, driven by compelling ROI and regulatory advantages.",
+                f"Executive survey reveals 78% of industry leaders consider {main_topic} a strategic priority, with 67% planning major investments within 18 months."
+            ]
+        elif any(word in title_lower for word in ['case study', 'real-world', 'pilot project', 'field trial']):
+            # Case study excerpts
+            excerpts = [
+                f"Fortune 500 company reports 42% efficiency gain and $3.2M annual savings after implementing {main_topic} across their global infrastructure.",
+                f"Six-month pilot program demonstrates {main_topic} reduces operational costs by 38% while improving system reliability to 99.7% uptime.",
+                f"Multi-site deployment shows {main_topic} delivers consistent 30-45% performance improvements across diverse environmental conditions and usage patterns.",
+                f"Customer testimonials highlight dramatic improvements in both efficiency and user satisfaction following {main_topic} implementation."
+            ]
+        else:
+            # News/analysis excerpts
+            excerpts = [
+                f"Industry experts predict {main_topic} will disrupt the $150B market within five years, with early adopters already reporting significant competitive advantages.",
+                f"Major breakthrough in {main_topic} technology promises to address critical industry challenges while creating new opportunities for innovation and growth.",
+                f"Recent developments in {main_topic} are attracting attention from venture capitalists, with three startups raising $89M in Series A funding this quarter.",
+                f"Technology leaders describe {main_topic} as a 'game-changer' that could fundamentally alter industry dynamics and create new market categories."
+            ]
+        
+        return random.choice(excerpts)
+    
     def _calculate_unlock_price(self, domain: str) -> float:
         """Calculate dynamic pricing based on source characteristics."""
         base_price = 0.10  # Minimum price
