@@ -223,6 +223,9 @@ class ReportGeneratorService:
             
             source = sources[source_index]
             
+            # Debug logging for licensing protocol
+            print(f"🔍 Citation [{citation_num}] source: {source.domain}, protocol={source.licensing_protocol}, is_unlocked={source.is_unlocked}, unlock_price={source.unlock_price}")
+            
             # Build metadata dict
             metadata = {
                 "source_id": source.id,
@@ -236,6 +239,7 @@ class ReportGeneratorService:
             if not source.is_unlocked:
                 metadata["price"] = source.unlock_price
             
+            print(f"📊 Citation [{citation_num}] metadata: protocol={metadata.get('protocol')}, locked={metadata.get('locked')}, price={metadata.get('price')}")
             citation_metadata[citation_num] = metadata
         
         return citation_metadata
