@@ -46,6 +46,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Tab State Persistence After Login**: Preserves user intent by saving desired actions (e.g., mode switch) before authentication and executing them post-login.
 - **Chat-to-Research Transition**: Intelligent mode switching suggests transitioning to research mode for research-worthy conversations after at least 3 user messages (third exchange), leveraging intent classification and providing topic hints for query prefilling.
 - **Feedback System**: User feedback collection for research result quality using thumbs up/down UI after source cards. Features event delegation for dynamically created buttons, duplicate submission prevention, SQLite persistence with JSON source tracking, and confirmation toasts. Supports both authenticated (user ID) and anonymous feedback. Database migration ensures backward compatibility with existing deployments.
+- **Report Download**: Research reports include a download button that exports the full markdown content as a .md file. Filenames are auto-generated from the query and date (e.g., "nuclear-power-expansion-2024-10-14.md") with sanitization for safe filesystem usage. Uses browser's Blob API for client-side download without server round-trip.
 
 ## Feature Specifications
 - **Dynamic Research Services**: Provides query-based research packages with variable pricing ($0.10-$10.00), determined by source count, quality, and licensing complexity.
