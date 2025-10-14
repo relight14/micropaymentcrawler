@@ -8,7 +8,6 @@ import time
 
 from schemas.api import PurchaseRequest, PurchaseResponse
 from schemas.domain import TierType, ResearchPacket
-from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
@@ -16,8 +15,11 @@ from utils.rate_limit import limiter
 
 router = APIRouter()
 
-# Initialize services
-crawler = ContentCrawlerStub()
+# Import shared crawler instance after router to avoid circular imports
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from shared_services import crawler
 report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()

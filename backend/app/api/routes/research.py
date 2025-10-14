@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import TierType, ResearchPacket, SourceCard
-from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
@@ -26,8 +25,11 @@ router = APIRouter()
 # Initialize services
 ledewire = LedeWireAPI()
 
-# Initialize crawler for dynamic research
-crawler = ContentCrawlerStub()
+# Import shared crawler instance - MUST be after router to avoid circular imports
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from shared_services import crawler
 
 # Initialize report generator for AI reports
 report_generator = ReportGeneratorService()

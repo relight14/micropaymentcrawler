@@ -501,6 +501,10 @@ class ContentCrawlerStub:
             # Step 3: Return skeleton cards immediately (NO BLOCKING)
             print(f"🚀 Returning {len(immediate_sources)} skeleton cards immediately...")
             
+            # Cache skeleton sources IMMEDIATELY so they're available for purchase
+            self._store_in_cache(cache_key, immediate_sources)
+            print(f"💾 Skeleton sources cached (will be updated after enrichment)")
+            
             # Step 4: Start background enrichment (licensing + content polishing) 
             asyncio.create_task(self._enrich_sources_progressive(
                 immediate_sources, query, cache_key, classification
