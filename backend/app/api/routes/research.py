@@ -42,7 +42,7 @@ class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
     query: str = Field(..., min_length=3, max_length=500, description="Research query between 3-500 characters")
     tier: TierType
-    selected_source_ids: Optional[List[str]] = None  # User's selected sources for report
+    selected_source_ids: Optional[List[str]] = Field(None, min_length=1)  # User's selected sources for report (must have at least 1 if provided)
 
 
 class FeedbackRequest(BaseModel):
@@ -625,16 +625,21 @@ async def generate_research_report(
             selected_sources = []
             
             # Try to find sources in cache by checking all cached results
+            cache_size = len(crawler._cache)
+            print(f"🔍 Searching for {len(report_request.selected_source_ids)} sources in cache (cache has {cache_size} entries)")
+            
             for cache_key, (cached_sources, timestamp) in crawler._cache.items():
                 if isinstance(cached_sources, list):
                     for source in cached_sources:
                         if source.id in report_request.selected_source_ids:
                             selected_sources.append(source)
             
+            print(f"✅ Found {len(selected_sources)} sources in cache")
+            
             if not selected_sources:
                 raise HTTPException(
                     status_code=400, 
-                    detail="Selected sources not found. Please run a search first before generating a report."
+                    detail="Sources not available. Please run a new search before generating a report. (Note: Sources are cleared when the server restarts)"
                 )
             
             # Generate AI report with selected sources
@@ -835,6 +840,9 @@ async def analyze_research_query(
         
         # Use progressive search for faster initial response with fallback
         try:
+            # DEBUG: Verify crawler instance
+            print(f"🔍 [ANALYZE] Crawler instance ID: {id(crawler)}, cache entries: {len(crawler._cache)}")
+            
             result = await crawler.generate_sources_progressive(
                 final_query, 
                 max_sources, 
