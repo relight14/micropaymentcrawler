@@ -380,7 +380,7 @@ export class ReportBuilder extends EventTarget {
     _attachTierPurchaseListeners() {
         const purchaseButtons = document.querySelectorAll('.tier-purchase-btn');
         purchaseButtons.forEach(button => {
-            button.addEventListener('click', async (e) => {
+            button.addEventListener('click', (e) => {
                 const tier = e.target.dataset.tier;
                 const price = parseFloat(e.target.dataset.price);
                 const query = this.appState.getCurrentQuery() || "Research Query";
@@ -388,21 +388,19 @@ export class ReportBuilder extends EventTarget {
                 e.target.textContent = 'Processing...';
                 e.target.disabled = true;
                 
-                try {
-                    const selectedSources = this.appState.getSelectedSources();
-                    if (selectedSources && selectedSources.length > 0) {
-                        // Generate report from selected sources
-                        await this.generateReport(e.target, tier, query, selectedSources);
-                    } else {
-                        // Dispatch purchase event for tier without selected sources
-                        this.dispatchEvent(new CustomEvent('tierPurchase', {
-                            detail: { tier, price, query }
-                        }));
+                const selectedSources = this.appState.getSelectedSources();
+                const useSelectedSources = selectedSources && selectedSources.length > 0;
+                
+                // Always dispatch purchase event - this ensures the modal always shows
+                this.dispatchEvent(new CustomEvent('tierPurchase', {
+                    detail: { 
+                        tier, 
+                        price, 
+                        query,
+                        useSelectedSources,
+                        button: e.target
                     }
-                } catch (error) {
-                    e.target.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
-                    e.target.disabled = false;
-                }
+                }));
             });
         });
     }
