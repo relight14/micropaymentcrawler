@@ -705,7 +705,7 @@ body {
 }
 
 .logo-image {
-    height: 32px;
+    height: 56px;
     width: auto;
 }
 
@@ -734,6 +734,7 @@ body {
     border-radius: calc(var(--radius) - 4px);
     font-size: 0.875rem;
     font-weight: var(--font-weight-medium);
+    font-family: 'Montserrat', sans-serif;
     cursor: pointer;
     transition: all 0.15s ease;
 }
