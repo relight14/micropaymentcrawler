@@ -358,7 +358,7 @@ export class MessageRenderer {
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-+|-+$/g, '')
-                .substring(0, 50); // Limit length
+                .substring(0, 50) || 'research-report'; // Fallback for edge cases
             
             const date = new Date().toISOString().split('T')[0];
             const filename = `${sanitizedQuery}-${date}.md`;
