@@ -79,3 +79,21 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Anthropic Claude API**: For AI-powered content polishing, conversational AI, and report generation.
 - **LedeWire Wallet API**: Integrated for user authentication, wallet balance management, and purchase processing.
 - **Tollbit API**: For content licensing and dynamic pricing of sources.
+
+# Recent Updates (October 14, 2025)
+
+## Branding & Design
+- ✅ Rebranded to "Clearcite" with Montserrat font (weights 300-800) applied globally
+- ✅ New wide logo implemented: Three blue dots + "CLEARCITE AI" text at 60px height in header
+- ✅ Favicon updated with new Clearcite logo
+- ✅ Dark mode header background lightened to rgba(90, 90, 90, 0.8) for better logo contrast
+- ✅ Citation badges now show consistent protocol icons matching source card badges (☁️ Cloudflare for major publishers, 🔒 RSL for academic sources)
+
+## Technical Fixes
+- ✅ Fixed citation badge protocol mapping: Citations inherit demo protocols (Cloudflare/RSL) when actual protocol is None, ensuring UI consistency
+- ✅ Removed unused old logo files for cleaner deployment
+
+## Deployment Configuration
+- ✅ Configured for autoscale deployment (stateless web app)
+- ✅ Production server: uvicorn with multiple workers on port 5000
+- ✅ Ready for 100-user test rollout
