@@ -170,7 +170,7 @@
     transition: all 0.15s ease !important;
     box-shadow: var(--shadow-sm) !important;
     position: relative !important;
-    font-family: var(--font-sans, sans-serif) !important;
+    font-family: 'Montserrat', var(--font-sans, sans-serif) !important;
 }
 
 .source-card.filtered-hidden {

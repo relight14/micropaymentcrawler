@@ -596,11 +596,11 @@ export class ChatResearchApp {
         if (this.appState.isInLoginMode()) {
             if (loginButton) loginButton.textContent = 'Login';
             if (authToggleButton) authToggleButton.textContent = 'Need an account? Sign up';
-            if (authTitle) authTitle.textContent = 'Login to LedeWire';
+            if (authTitle) authTitle.textContent = 'Login to Clearcite';
         } else {
             if (loginButton) loginButton.textContent = 'Sign Up';
             if (authToggleButton) authToggleButton.textContent = 'Have an account? Login';
-            if (authTitle) authTitle.textContent = 'Create LedeWire Account';
+            if (authTitle) authTitle.textContent = 'Create Clearcite Account';
         }
     }
 

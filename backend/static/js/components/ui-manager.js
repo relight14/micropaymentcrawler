@@ -348,7 +348,7 @@ export class UIManager {
                 <div id="purchaseModal" class="modal-overlay">
                     <div class="modal-content auth-modal">
                         <div class="auth-modal-header">
-                            <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
+                            <img src="/static/clearcite-logo.png" alt="Clearcite" class="auth-modal-logo">
                             <h2>${modalTitle}</h2>
                             <p>${modalDescription}</p>
                             <button class="modal-close" id="purchaseModalClose" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
@@ -398,7 +398,7 @@ export class UIManager {
                             </div>
                         </div>
                         <div class="auth-modal-footer">
-                            Powered by LedeWire
+                            Powered by LedeWire Wallet
                         </div>
                     </div>
                 </div>

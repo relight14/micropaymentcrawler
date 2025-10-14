@@ -52,9 +52,9 @@ export class ModalController {
             <div id="authModal" class="modal-overlay">
                 <div class="modal-content auth-modal">
                     <div class="auth-modal-header">
-                        <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
+                        <img src="/static/clearcite-logo.png" alt="Clearcite" class="auth-modal-logo">
                         <h2 id="authTitle">${isLogin ? 'Welcome back!' : 'Create Account'}</h2>
-                        <p>${isLogin ? 'Sign in to unlock full research access' : 'Join LedeWire to access premium features'}</p>
+                        <p>${isLogin ? 'Sign in to unlock full research access' : 'Join Clearcite to access premium features'}</p>
                         <button class="modal-close" onclick="document.getElementById('authModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
                     <div class="auth-modal-content">
@@ -90,7 +90,7 @@ export class ModalController {
                         </div>
                     </div>
                     <div class="auth-modal-footer">
-                        Powered by LedeWire
+                        Powered by LedeWire Wallet
                     </div>
                 </div>
             </div>
@@ -232,9 +232,9 @@ export class ModalController {
             <div id="fundingModal" class="modal-overlay">
                 <div class="modal-content auth-modal">
                     <div class="auth-modal-header">
-                        <img src="/static/ledewire-logo.png" alt="LedeWire" class="auth-modal-logo">
+                        <img src="/static/clearcite-logo.png" alt="Clearcite" class="auth-modal-logo">
                         <h2>Add Funds to Your Wallet</h2>
-                        <p>Choose an amount to add to your LedeWire wallet</p>
+                        <p>Choose an amount to add to your wallet</p>
                         <button class="modal-close" onclick="document.getElementById('fundingModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
                     <div class="auth-modal-content">
@@ -256,7 +256,7 @@ export class ModalController {
                         <div id="fundingStatus" style="margin-top: 1rem; text-align: center; color: #666;"></div>
                     </div>
                     <div class="auth-modal-footer">
-                        Powered by LedeWire • Secured by Stripe
+                        Powered by LedeWire Wallet • Secured by Stripe
                     </div>
                 </div>
             </div>
