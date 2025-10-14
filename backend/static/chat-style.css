@@ -705,7 +705,7 @@ body {
 }
 
 .logo-image {
-    height: 56px;
+    height: 80px;
     width: auto;
 }
 
@@ -2182,7 +2182,7 @@ input:checked + .slider:before {
 }
 
 .auth-modal-logo {
-    height: 64px;
+    height: 88px;
     width: auto;
     margin: 0 auto 1rem auto;
     display: block;
