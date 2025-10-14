@@ -223,8 +223,15 @@ class ReportGeneratorService:
             
             source = sources[source_index]
             
-            # Debug logging for licensing protocol
-            print(f"🔍 Citation [{citation_num}] source: {source.domain}, protocol={source.licensing_protocol}, is_unlocked={source.is_unlocked}, unlock_price={source.unlock_price}")
+            # Determine protocol - use actual protocol or demo protocol for UI consistency
+            protocol = source.licensing_protocol
+            if not protocol:
+                # Apply same demo logic as frontend for visual consistency
+                domain = source.domain or ''
+                if domain.endswith('.edu') or domain.endswith('.edu/') or 'research' in domain.lower() or 'journal' in domain.lower():
+                    protocol = "RSL"
+                elif any(pub in domain.lower() for pub in ['nytimes', 'wsj', 'economist', 'reuters']):
+                    protocol = "CLOUDFLARE"
             
             # Build metadata dict
             metadata = {
@@ -232,14 +239,13 @@ class ReportGeneratorService:
                 "locked": not source.is_unlocked,
                 "title": source.title,
                 "domain": source.domain,
-                "protocol": source.licensing_protocol  # Always include protocol for icon display
+                "protocol": protocol  # Use actual or demo protocol for consistent icons
             }
             
             # Add price for locked sources
             if not source.is_unlocked:
                 metadata["price"] = source.unlock_price
             
-            print(f"📊 Citation [{citation_num}] metadata: protocol={metadata.get('protocol')}, locked={metadata.get('locked')}, price={metadata.get('price')}")
             citation_metadata[citation_num] = metadata
         
         return citation_metadata
