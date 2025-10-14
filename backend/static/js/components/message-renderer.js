@@ -199,6 +199,12 @@ export class MessageRenderer {
             bodyDiv.appendChild(suggestionElement);
         }
         
+        // Add download button for research reports
+        if (message.metadata?.type === 'research_report') {
+            const downloadButton = this._createDownloadButton(message.content, message.metadata);
+            bodyDiv.appendChild(downloadButton);
+        }
+        
         return bodyDiv;
     }
     
@@ -331,6 +337,50 @@ export class MessageRenderer {
         suggestionDiv.appendChild(button);
         
         return suggestionDiv;
+    }
+    
+    /**
+     * Create download button for research reports
+     * @private
+     */
+    static _createDownloadButton(reportContent, metadata) {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'report-download-container';
+        
+        const downloadBtn = document.createElement('button');
+        downloadBtn.className = 'report-download-btn';
+        downloadBtn.innerHTML = '📥 Download Report';
+        
+        downloadBtn.onclick = () => {
+            // Create filename from query and date
+            const query = metadata.query || 'research-report';
+            const sanitizedQuery = query
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .substring(0, 50); // Limit length
+            
+            const date = new Date().toISOString().split('T')[0];
+            const filename = `${sanitizedQuery}-${date}.md`;
+            
+            // Create blob from markdown content
+            const blob = new Blob([reportContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create temporary link and trigger download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        buttonContainer.appendChild(downloadBtn);
+        return buttonContainer;
     }
     
     /**
