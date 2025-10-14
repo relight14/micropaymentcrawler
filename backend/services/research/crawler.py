@@ -125,13 +125,16 @@ class ContentCrawlerStub:
     
     def _get_domain_authority(self, domain: str) -> float:
         """Get authority weight for domain."""
+        # Normalize domain by removing www. prefix for consistent matching
+        normalized_domain = domain.lower().removeprefix('www.')
+        
         # Check exact matches
-        if domain in self.domain_weights:
-            return self.domain_weights[domain]
+        if normalized_domain in self.domain_weights:
+            return self.domain_weights[normalized_domain]
         
         # Check suffix matches (e.g., .edu)
         for pattern, weight in self.domain_weights.items():
-            if pattern.startswith('.') and domain.endswith(pattern):
+            if pattern.startswith('.') and normalized_domain.endswith(pattern):
                 return weight
         
         return 0.0  # Unknown domain
