@@ -163,13 +163,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         
         # Handle FREE TIER
         if config["price"] == 0.00:
-            #DEBUG: Check for selected sources
-            print(f"🔍 [PURCHASE FREE] Crawler instance ID: {id(crawler)}, cache entries: {len(crawler._cache)}")
-            
             # If user selected specific sources, retrieve them from cache
             if purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
-                print(f"📊 FREE TIER: Using {len(purchase_request.selected_source_ids)} selected sources")
-                
                 # Retrieve selected sources from crawler cache
                 selected_sources = []
                 for cache_key in crawler._cache:
@@ -181,9 +176,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 
                 if len(selected_sources) > 0:
                     sources = selected_sources
-                    print(f"✅ Retrieved {len(sources)} sources from cache")
                 else:
-                    print(f"⚠️ No sources found in cache, generating fresh")
+                    # Fallback: generate fresh if cache is empty/expired
                     sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             else:
                 # No selected sources - generate fresh
@@ -228,13 +222,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         budget_limit = config["price"] * 0.60
         max_sources = config["max_sources"]
         
-        # DEBUG: Check for selected sources
-        print(f"🔍 [PURCHASE PAID] Crawler instance ID: {id(crawler)}, cache entries: {len(crawler._cache)}")
-        
         # If user selected specific sources, retrieve them from cache
         if purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
-            print(f"📊 PAID TIER: Using {len(purchase_request.selected_source_ids)} selected sources")
-            
             # Retrieve selected sources from crawler cache
             selected_sources = []
             for cache_key in crawler._cache:
@@ -246,9 +235,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             
             if len(selected_sources) > 0:
                 sources = selected_sources
-                print(f"✅ Retrieved {len(sources)} sources from cache")
             else:
-                print(f"⚠️ No sources found in cache, generating fresh")
+                # Fallback: generate fresh if cache is empty/expired
                 sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         else:
             # No selected sources - generate fresh
