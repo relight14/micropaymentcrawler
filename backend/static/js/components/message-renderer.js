@@ -213,7 +213,8 @@ export class MessageRenderer {
         const protocolIcons = {
             'rsl': '🔒',
             'tollbit': '⚡',
-            'cloudflare': '☁️'
+            'cloudflare': '☁️',
+            'web': '🌐'  // For sources without specific licensing system
         };
         
         // Find all text nodes that might contain citations
@@ -252,14 +253,14 @@ export class MessageRenderer {
                 // Add badge for all sources to show licensing system icon
                 if (citationData) {
                     const badge = document.createElement('span');
-                    const protocol = (citationData.protocol || 'rsl').toLowerCase();
+                    const protocol = (citationData.protocol || 'web').toLowerCase();
                     badge.className = `citation-badge citation-badge--${protocol}`;
                     badge.setAttribute('data-source-id', citationData.source_id);
                     badge.setAttribute('data-protocol', protocol);
                     badge.setAttribute('data-price', citationData.price || 0);
                     badge.setAttribute('data-title', citationData.title || 'Source');
                     
-                    const icon = protocolIcons[protocol] || '🔒';
+                    const icon = protocolIcons[protocol] || '🌐';
                     
                     if (citationData.locked) {
                         // Locked source - show price

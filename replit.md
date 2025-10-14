@@ -9,7 +9,7 @@ Preferred communication style: Simple, everyday language.
 # System Architecture
 
 ## UI/UX Decisions
-The frontend is a responsive, modern Single Page Application (SPA) built with vanilla HTML/CSS/JavaScript, utilizing a modular ES6 architecture. It features tier selection cards, dynamic content loading, story cards with quotes and descriptions for source articles, and professional presentation of search results with transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️). UI includes intelligent scroll behavior: AI responses scroll to the message top, while user messages scroll to the bottom.
+The frontend is a responsive, modern Single Page Application (SPA) built with vanilla HTML/CSS/JavaScript, utilizing a modular ES6 architecture. It features tier selection cards, dynamic content loading, story cards with quotes and descriptions for source articles, and professional presentation of search results with transparent licensing badges (RSL 🔒, Tollbit ⚡, Cloudflare ☁️, Web 🌐 for sources without specific licensing). UI includes intelligent scroll behavior: AI responses scroll to the message top, while user messages scroll to the bottom.
 
 ## Technical Implementations
 - **Frontend**: Modular layered architecture with separation of concerns:
