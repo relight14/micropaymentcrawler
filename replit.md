@@ -57,10 +57,15 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Wallet Integration**: Securely integrates with LedeWire for real-time wallet balance checks, purchase processing, and content access, including idempotency keys.
 
 ## System Design Choices
-- **Data Storage**: Uses SQLite for lightweight persistence, tracking purchases, source unlocks, and audit trails, storing complex data structures as JSON.
+- **Data Storage**: Uses PostgreSQL for production (multi-user concurrent access) and SQLite for development, tracking purchases, source unlocks, audit trails, and API usage/budgets.
 - **Simulation Layer**: A `ContentCrawlerStub` simulates content crawling and pricing algorithms for testing.
 - **API-First Architecture**: All pricing decisions are backend-centric, making the frontend a pure presentation layer.
-- **Production Readiness**: Architect-approved implementations ensure robust error handling, security, and scalability.
+- **Production Readiness**: Comprehensive production-grade infrastructure including:
+  - **Security**: CORS locked down via ALLOWED_ORIGINS, configuration validation blocks unsafe deployments
+  - **Cost Controls**: Per-user daily budgets ($10/100 API calls), global spending caps ($1000/day), API cost tracking for Tavily/Claude/Tollbit
+  - **Reliability**: Global error handling middleware, structured JSON logging, graceful API failure handling
+  - **Scalability**: PostgreSQL with proper indexes, distributed rate limiting, concurrent-safe operations
+  - **Operations**: Environment validation at startup, .env.example with deployment checklist, configuration summary logging
 
 # External Dependencies
 
