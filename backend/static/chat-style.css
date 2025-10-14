@@ -687,7 +687,7 @@ body {
 }
 
 .dark .modern-header {
-    background: linear-gradient(135deg, rgba(30, 30, 50, 0.95), rgba(50, 50, 80, 0.95));
+    background: rgba(70, 70, 70, 0.8);
 }
 
 .header-content {
@@ -705,7 +705,7 @@ body {
 }
 
 .logo-image {
-    height: 72px;
+    height: 60px;
     width: auto;
 }
 
