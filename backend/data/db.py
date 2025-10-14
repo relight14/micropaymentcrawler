@@ -110,7 +110,7 @@ class DatabaseConnection:
         with self.get_connection() as conn:
             cursor = conn.execute(query, params)
             conn.commit()
-            return cursor.lastrowid
+            return cursor.lastrowid or 0
 
 
 # Global database instance
