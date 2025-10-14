@@ -78,16 +78,22 @@ class ContentCrawlerStub:
         
         # Domain authority weights for ranking
         self.domain_weights = {
-            # News wire services
+            # Premium tier - exceptional quality + licensed sources (0.7)
+            'economist.com': 0.7, 'time.com': 0.7,
+            'nytimes.com': 0.7, 'wsj.com': 0.7, 'ft.com': 0.7,
+            'theatlantic.com': 0.7, 'foreignaffairs.com': 0.7, 'foreignpolicy.com': 0.7,
+            'hbr.org': 0.7,
+            # Premium academic/archives (0.7)
+            'arxiv.org': 0.7, 'nature.com': 0.7, 'science.org': 0.7, 'jstor.org': 0.7,
+            # News wire services (0.6)
             'reuters.com': 0.6, 'apnews.com': 0.6, 'bloomberg.com': 0.6,
-            # Major news outlets
-            'nytimes.com': 0.45, 'wsj.com': 0.45, 'ft.com': 0.45,
+            # Academic institutions (0.5)
+            '.edu': 0.5, 'nber.org': 0.5,
+            # Major news outlets (0.45)
             'theguardian.com': 0.45, 'bbc.com': 0.45,
-            # Policy/think tanks
+            # Policy/think tanks (0.4)
             'brookings.edu': 0.4, 'carnegieendowment.org': 0.4,
-            'csis.org': 0.4, 'mei.edu': 0.4,
-            # Academic
-            '.edu': 0.5, 'nber.org': 0.5
+            'csis.org': 0.4, 'mei.edu': 0.4
         }
     
     def _calculate_recency_score(self, published_date: Optional[str], timeframe: str = "T1") -> float:
