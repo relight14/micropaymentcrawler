@@ -710,7 +710,7 @@ body {
 }
 
 .dark .logo-image {
-    filter: invert(1);
+    /* Logo already has good contrast in dark mode */
 }
 
 /* Mode Switcher */
@@ -2182,8 +2182,8 @@ input:checked + .slider:before {
 }
 
 .auth-modal-logo {
-    width: 40px;
-    height: 40px;
+    height: 64px;
+    width: auto;
     margin: 0 auto 1rem auto;
     display: block;
 }
