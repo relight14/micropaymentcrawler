@@ -249,8 +249,8 @@ export class MessageRenderer {
                 // Add citation number
                 fragments.push(document.createTextNode(match[0]));
                 
-                // Add badge if source is locked
-                if (citationData && citationData.locked) {
+                // Add badge for all sources to show licensing system icon
+                if (citationData) {
                     const badge = document.createElement('span');
                     const protocol = (citationData.protocol || 'rsl').toLowerCase();
                     badge.className = `citation-badge citation-badge--${protocol}`;
@@ -260,10 +260,18 @@ export class MessageRenderer {
                     badge.setAttribute('data-title', citationData.title || 'Source');
                     
                     const icon = protocolIcons[protocol] || '🔒';
-                    const price = Number(citationData.price || 0).toFixed(2);
-                    const priceText = price === '0.00' ? 'Free Source' : `$${price}`;
-                    badge.textContent = `${icon} ${priceText}`;
-                    badge.title = `Unlock: ${citationData.title || 'Source'} - $${price}`;
+                    
+                    if (citationData.locked) {
+                        // Locked source - show price
+                        const price = Number(citationData.price || 0).toFixed(2);
+                        const priceText = price === '0.00' ? 'Free Source' : `$${price}`;
+                        badge.textContent = `${icon} ${priceText}`;
+                        badge.title = `Unlock: ${citationData.title || 'Source'} - $${price}`;
+                    } else {
+                        // Free/unlocked source - show just the licensing system icon
+                        badge.textContent = `${icon}`;
+                        badge.title = `${citationData.title || 'Source'} (${protocol.toUpperCase()})`;
+                    }
                     
                     fragments.push(badge);
                 }
