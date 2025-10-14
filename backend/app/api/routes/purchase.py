@@ -8,16 +8,17 @@ import time
 
 from schemas.api import PurchaseRequest, PurchaseResponse
 from schemas.domain import TierType, ResearchPacket
-from services.research.crawler import ContentCrawlerStub
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 
+# Import shared crawler instance
+from shared_services import crawler
+
 router = APIRouter()
 
-# Initialize services
-crawler = ContentCrawlerStub()
+# Initialize other services
 report_generator = ReportGeneratorService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
@@ -164,14 +165,22 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             # Check if user selected specific sources
             if purchase_request.selected_source_ids:
                 print(f"📊 FREE TIER: Using {len(purchase_request.selected_source_ids)} selected sources")
+                print(f"🔍 DEBUG: Cache has {len(crawler._cache)} entries")
+                print(f"🔍 DEBUG: Looking for source IDs: {purchase_request.selected_source_ids}")
                 
                 # Retrieve selected sources from crawler cache (same logic as /generate-report)
                 selected_sources = []
-                for cache_key, (cached_sources, timestamp) in crawler._cache.items():
-                    if isinstance(cached_sources, list):
-                        for source in cached_sources:
-                            if source.id in purchase_request.selected_source_ids:
-                                selected_sources.append(source)
+                for cache_key, cache_value in crawler._cache.items():
+                    print(f"🔍 DEBUG: Checking cache_key={cache_key}, type={type(cache_value)}")
+                    if isinstance(cache_value, tuple) and len(cache_value) == 2:
+                        cached_sources, timestamp = cache_value
+                        if isinstance(cached_sources, list):
+                            for source in cached_sources:
+                                if hasattr(source, 'id') and source.id in purchase_request.selected_source_ids:
+                                    print(f"✅ Found source: {source.id}")
+                                    selected_sources.append(source)
+                
+                print(f"📊 DEBUG: Retrieved {len(selected_sources)} sources from cache")
                 
                 if not selected_sources:
                     raise HTTPException(
