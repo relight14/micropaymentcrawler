@@ -80,20 +80,42 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **LedeWire Wallet API**: Integrated for user authentication, wallet balance management, and purchase processing.
 - **Tollbit API**: For content licensing and dynamic pricing of sources.
 
-# Recent Updates (October 14, 2025)
+# Recent Updates
 
-## Branding & Design
+## October 20, 2025
+
+### User Experience Enhancements
+- ✅ **Onboarding Tutorial**: Added 3-slide first-time user tutorial introducing Clearcite's value proposition, tab functionality, and workflow
+  - **Slide 1**: Brand introduction with "Real research, real sources, real citations" messaging
+  - **Slide 2**: Explanation of three tabs (Chat, Sources, Report Builder) with login requirements clearly marked
+  - **Slide 3**: Step-by-step workflow guide (Submit Query → Unlock Content → Build Reports)
+  - Modal appears automatically on first visit, uses localStorage persistence to show only once
+  - Smooth animations, navigation dots, Skip/Next buttons, dark mode support
+- ✅ **Tab Clarity Improvement**: Renamed "Research" tab to "Sources" for better user comprehension
+  - Updated tab icon from 🔍 to 📚 (books emoji) to visually represent source materials
+  - Clarified that this tab discovers articles, papers, and authoritative content
+  - All user-facing strings updated (mode descriptions, placeholders, system messages)
+
+### Technical Implementation
+- ✅ Created `OnboardingModal` component (`js/components/onboarding-modal.js`) with modular slide structure
+- ✅ Added comprehensive CSS styling with responsive design and dark mode support
+- ✅ Integrated onboarding into app initialization flow without blocking critical path
+- ✅ Fixed mode switching bug (removed non-existent `_restoreChatMessages` call)
+
+## October 14, 2025
+
+### Branding & Design
 - ✅ Rebranded to "Clearcite" with Montserrat font (weights 300-800) applied globally
 - ✅ New wide logo implemented: Three blue dots + "CLEARCITE AI" text at 60px height in header
 - ✅ Favicon updated with new Clearcite logo
 - ✅ Dark mode header background lightened to rgba(90, 90, 90, 0.8) for better logo contrast
 - ✅ Citation badges now show consistent protocol icons matching source card badges (☁️ Cloudflare for major publishers, 🔒 RSL for academic sources)
 
-## Technical Fixes
+### Technical Fixes
 - ✅ Fixed citation badge protocol mapping: Citations inherit demo protocols (Cloudflare/RSL) when actual protocol is None, ensuring UI consistency
 - ✅ Removed unused old logo files for cleaner deployment
 
-## Deployment Configuration
+### Deployment Configuration
 - ✅ Configured for autoscale deployment (stateless web app)
 - ✅ Production server: uvicorn with multiple workers on port 5000
 - ✅ Ready for 100-user test rollout

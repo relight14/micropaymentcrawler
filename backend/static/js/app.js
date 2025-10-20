@@ -8,6 +8,7 @@ import { AppState } from './state/app-state.js';
 import { UIManager } from './components/ui-manager.js';
 import { MessageRenderer } from './components/message-renderer.js';
 import { ReportBuilder } from './components/report-builder.js';
+import { OnboardingModal } from './components/onboarding-modal.js';
 import { ToastManager } from './app/toast-manager.js';
 import { ModalController } from './app/modal-controller.js';
 import { EventRouter } from './app/event-router.js';
@@ -315,6 +316,10 @@ export class ChatResearchApp {
             if (this.authService.isAuthenticated()) {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
+            
+            // Show onboarding modal for first-time users
+            const onboarding = new OnboardingModal();
+            onboarding.show();
         } catch (error) {
             console.error('Error initializing app:', error);
             this.addMessage('system', 'Application initialization failed. Please refresh the page.');
@@ -410,14 +415,11 @@ export class ChatResearchApp {
             const reportBuilderElement = this.reportBuilder.show();
             this.addMessage('system', reportBuilderElement);
         } else {
-            // Restore chat messages for non-report modes
-            this._restoreChatMessages();
-            
             // Add mode change message if there's history
             if (this.appState.getConversationHistory().length > 0) {
                 const modeMessages = {
                     'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation.",
-                    'research': "🔍 Switched to Research mode - I'll find and license authoritative sources."
+                    'research': "📚 Switched to Sources mode - I'll find and license authoritative sources."
                 };
                 if (modeMessages[mode]) {
                     this.addMessage('system', modeMessages[mode]);

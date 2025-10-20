@@ -19,7 +19,7 @@ export class UIManager {
         // Mode descriptions - configurable
         this.modeDescriptions = options.modeDescriptions || {
             'chat': '💬 Conversational AI mode - Explore topics through natural dialogue',
-            'research': '🔍 Research mode - Find and license authoritative sources',
+            'research': '📚 Sources mode - Find and license authoritative sources',
             'report': '📊 Report Builder - Create comprehensive research packages'
         };
         
@@ -69,8 +69,8 @@ export class UIManager {
         
         const hasMessages = this.appState.getConversationHistory().length > 0;
         const placeholders = {
-            'chat': hasMessages ? 'Continue the conversation...' : 'Ask me anything or say "research mode" for sources...',
-            'research': hasMessages ? 'Ask another research question...' : 'What would you like to research? I\'ll find authoritative sources...',
+            'chat': hasMessages ? 'Continue the conversation...' : 'Ask me anything or switch to Sources for articles...',
+            'research': hasMessages ? 'Search for more sources...' : 'What would you like to research? I\'ll find authoritative sources...',
             'report': hasMessages ? 'Add more sources or create report...' : 'Build a research report from licensed sources...'
         };
         
