@@ -22,6 +22,18 @@ Preferred communication style: Simple, everyday language.
 - ✅ **Deployment Configuration**: Set up Autoscale deployment with proper backend directory handling (`cd backend && uvicorn main:app`)
 - ✅ **Google Analytics**: Integrated GA4 tracking (G-M80FVXBCSG) in header following Google's setup specifications
 
+### Comprehensive Analytics Implementation
+- ✅ **Centralized Analytics Module**: Created `analytics.js` utility with lazy gtag loading, graceful degradation, and clean API for all tracking
+- ✅ **Complete Event Coverage**: Tracks all critical user interactions including:
+  - Mode switches (Chat ↔ Sources ↔ Report Builder)
+  - Search queries and chat messages (with query length and mode metadata)
+  - Source interactions (view, unlock, purchase with domain and pricing data)
+  - Report generation and downloads (with source count, tier, and filename)
+  - Onboarding flow (completion, skip with slide number)
+  - Authentication (login, logout)
+  - User feedback (thumbs up/down with context)
+- ✅ **Production-Ready**: Lazy gtag resolution ensures events fire after GA loads, proper ES6 module imports, comprehensive metadata tracking (timestamps, prices, domains, counts)
+
 ### Onboarding & UI Improvements
 - ✅ **3-slide Onboarding Tutorial**: Shows on first visit with localStorage persistence, navigation dots, and Skip/Next controls
 - ✅ **Tab Rename**: Renamed "Research" to "Sources" (📚 icon) for clarity across all UI components
@@ -34,6 +46,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 
 ## Technical Implementations
 - **Frontend**: Modular layered architecture with separation of concerns, including an Application Controller, Infrastructure Managers (Toast, Modal, EventRouter), Domain Managers (Source, Tier, Message, Interaction), Core Services, and UI Components. All components follow single-responsibility principle with clean interfaces and event-driven coordination.
+- **Analytics & Instrumentation**: Production-grade Google Analytics 4 integration with centralized tracking utility (`analytics.js`), lazy gtag loading for graceful degradation, and comprehensive event coverage across all user interactions. Events include rich metadata (prices, domains, source counts, timestamps) for deep behavioral analysis.
 - **Backend**: Developed with FastAPI, employing a unified service architecture for AI processing, content licensing, and research operations. `schemas/domain.py` is the single source of truth for data models. Includes a domain credibility penalty system and defensive URL validation. External API calls use async httpx with timeouts and exponential backoff retry logic.
 - **Content Generation**: Employs a hybrid pipeline using Tavily for URL discovery and Anthropic Claude for content refinement and report generation, incorporating licensing detection and graceful API fallbacks.
 - **AI-Powered Query Optimization**: Uses Claude Haiku to optimize search queries based on full conversation context, with strict no-injection constraints and post-generation entity validation.
