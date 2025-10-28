@@ -6,6 +6,27 @@ This project is an AI-powered research tool MVP designed to deliver dynamic rese
 
 Preferred communication style: Simple, everyday language.
 
+# Recent Changes
+
+## October 28, 2025
+
+### Input Field UX Refinement
+- ✅ **Multi-line Textarea**: Replaced single-line input with auto-expanding textarea supporting up to 200px height
+- ✅ **Cleaner Layout**: Removed redundant paperclip 📎 and microphone 🎤 buttons
+- ✅ **Inline Send Button**: Moved send button to same row as textarea with proper flex alignment
+- ✅ **Wider Input Container**: Increased max-width to 1400px (~70% of page width on desktop)
+- ✅ **Overflow Prevention**: Text wraps to new lines instead of overlapping controls
+- ✅ **Mobile Optimized**: Responsive gap and button sizing for small screens (640px breakpoint)
+
+### Production Deployment
+- ✅ **Deployment Configuration**: Set up Autoscale deployment with proper backend directory handling (`cd backend && uvicorn main:app`)
+- ✅ **Google Analytics**: Integrated GA4 tracking (G-M80FVXBCSG) in header following Google's setup specifications
+
+### Onboarding & UI Improvements
+- ✅ **3-slide Onboarding Tutorial**: Shows on first visit with localStorage persistence, navigation dots, and Skip/Next controls
+- ✅ **Tab Rename**: Renamed "Research" to "Sources" (📚 icon) for clarity across all UI components
+- ✅ **Runtime Fix**: Removed non-existent `_restoreChatMessages` method call
+
 # System Architecture
 
 ## UI/UX Decisions
