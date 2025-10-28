@@ -65,6 +65,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Shared Crawler Singleton**: Both research and purchase routes use a shared crawler instance to ensure cache visibility across requests, enabling user-curated research reports.
 - **Inline Citation Badges**: AI-generated reports feature contextual purchase badges next to locked source citations.
 - **Chat-to-Research Transition**: Intelligent mode switching suggests transitioning to research mode for research-worthy conversations after at least 3 user messages.
+- **Authentication-Gated Features**: Both Sources and Report Builder tabs require user authentication, automatically triggering the login modal when accessed by unauthenticated users.
 - **Feedback System**: User feedback collection for research result quality using thumbs up/down UI, with SQLite persistence and support for authenticated and anonymous feedback.
 - **Report Download**: Research reports include a download button that exports the full markdown content as a .md file with auto-generated filenames.
 

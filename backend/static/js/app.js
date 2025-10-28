@@ -410,6 +410,17 @@ export class ChatResearchApp {
             return;
         }
         
+        // Check authentication for report builder mode
+        if (mode === 'report' && !this.authService.isAuthenticated()) {
+            // Save pending mode switch and show login modal
+            this.appState.setPendingAction({ 
+                type: 'mode_switch', 
+                mode: 'report' 
+            });
+            this.modalController.showAuthModal();
+            return;
+        }
+        
         const modeChanged = this.appState.setMode(mode);
         if (!modeChanged) return;
 
