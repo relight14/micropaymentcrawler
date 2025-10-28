@@ -4,6 +4,8 @@
  * Uses event-based architecture for loose coupling
  */
 
+import { analytics } from '../utils/analytics.js';
+
 // Tier configuration constant
 const TIERS = [
     {
@@ -90,6 +92,9 @@ export class ReportBuilder extends EventTarget {
             const reportPacket = await this.apiService.generateReport(query, tier, selectedSourceIds);
             
             if (reportPacket) {
+                // Track report generation
+                analytics.trackReportGenerate(selectedSourceIds.length, tier);
+                
                 // Update button state
                 if (button) {
                     button.textContent = 'Report Generated';

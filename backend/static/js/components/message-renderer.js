@@ -38,6 +38,8 @@
  * </div>
  */
 
+import { analytics } from '../utils/analytics.js';
+
 export class MessageRenderer {
     
     static MESSAGE_TYPES = {
@@ -362,6 +364,9 @@ export class MessageRenderer {
             
             const date = new Date().toISOString().split('T')[0];
             const filename = `${sanitizedQuery}-${date}.md`;
+            
+            // Track report download
+            analytics.trackReportDownload(filename);
             
             // Create blob from markdown content
             const blob = new Blob([reportContent], { type: 'text/markdown' });

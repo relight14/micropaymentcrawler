@@ -1,4 +1,5 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
+import { analytics } from '../utils/analytics.js';
 
 export class TierManager extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager, reportBuilder, messageCoordinator }) {
@@ -55,6 +56,9 @@ export class TierManager extends EventTarget {
                 }
                 return;
             }
+            
+            // Track tier selection
+            analytics.trackTierSelect(tierId);
 
             let loadingMessageElement = null;
             try {
@@ -78,6 +82,10 @@ export class TierManager extends EventTarget {
                 
                 if (purchaseResponse && purchaseResponse.success && purchaseResponse.packet) {
                     this.appState.addPurchasedItem(tierId);
+                    
+                    // Track purchase
+                    const sourceCount = useSelectedSources ? selectedSources.length : purchaseResponse.packet?.sources?.length || 0;
+                    analytics.trackPurchase(price, sourceCount);
                     
                     if (button) {
                         button.textContent = 'Purchased';

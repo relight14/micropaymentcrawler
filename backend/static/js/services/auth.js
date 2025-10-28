@@ -2,6 +2,9 @@
  * Authentication Service - Handles user authentication and wallet operations
  * Extracted from the monolithic ChatResearchApp
  */
+
+import { analytics } from '../utils/analytics.js';
+
 export class AuthService {
     constructor() {
         this.baseURL = window.location.origin;
@@ -91,6 +94,9 @@ export class AuthService {
     }
 
     clearToken() {
+        // Track logout
+        analytics.trackLogout();
+        
         this.token = null;
         this.refreshToken = null;
         this.userInfo = null;
@@ -153,6 +159,9 @@ export class AuthService {
         
         // Get wallet balance after login
         await this.updateWalletBalance();
+        
+        // Track successful login
+        analytics.trackLogin('ledewire');
         
         return data;
     }

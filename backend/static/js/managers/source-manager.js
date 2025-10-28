@@ -1,4 +1,5 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
+import { analytics } from '../utils/analytics.js';
 
 export class SourceManager extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager, modalController }) {
@@ -25,6 +26,9 @@ export class SourceManager extends EventTarget {
         if (sourceToUpdate?.is_unlocked || this.appState.isPurchased(sourceId)) {
             console.log('🔓 UNLOCK: Source already unlocked, opening directly');
             if (sourceToUpdate?.url) {
+                // Track source view
+                const domain = new URL(sourceToUpdate.url).hostname;
+                analytics.trackSourceView(sourceId, domain);
                 window.open(sourceToUpdate.url, '_blank');
             }
             return;
@@ -108,6 +112,10 @@ export class SourceManager extends EventTarget {
             }
             this.appState.addPurchasedItem(sourceId);
             
+            // Track source unlock
+            const domain = sourceToUpdate?.url ? new URL(sourceToUpdate.url).hostname : 'unknown';
+            analytics.trackSourceUnlock(sourceId, price, domain);
+            
             await this.authService.updateWalletBalance();
             if (this.authService.isAuthenticated()) {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
@@ -130,6 +138,9 @@ export class SourceManager extends EventTarget {
 
             setTimeout(() => {
                 if (sourceToUpdate?.url) {
+                    // Track source view (already unlocked)
+                    const domain = new URL(sourceToUpdate.url).hostname;
+                    analytics.trackSourceView(sourceId, domain);
                     window.open(sourceToUpdate.url, '_blank');
                 } else {
                     console.warn('Source URL not found for redirect');

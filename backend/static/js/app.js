@@ -17,6 +17,7 @@ import { TierManager } from './managers/tier-manager.js';
 import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
+import { analytics } from './utils/analytics.js';
 
 // SourceCard will be loaded globally - access it dynamically when needed
 
@@ -332,8 +333,13 @@ export class ChatResearchApp {
         
         if (!message) return;
         
+        const currentMode = this.appState.getMode();
 
         try {
+            // Track search/message
+            analytics.trackSearch(message, currentMode);
+            analytics.trackChatMessage(message.length, currentMode);
+            
             // Clear input and show user message
             chatInput.value = '';
             this.uiManager.updateCharacterCount();
@@ -406,6 +412,9 @@ export class ChatResearchApp {
         
         const modeChanged = this.appState.setMode(mode);
         if (!modeChanged) return;
+
+        // Track mode switch
+        analytics.trackModeSwitch(mode);
 
         this.uiManager.updateModeDisplay();
         

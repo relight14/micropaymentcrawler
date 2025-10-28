@@ -3,6 +3,8 @@
  * Shows a 3-slide tutorial on first visit to introduce Clearcite's features
  */
 
+import { analytics } from '../utils/analytics.js';
+
 export class OnboardingModal {
     constructor() {
         this.currentSlide = 0;
@@ -164,10 +166,15 @@ export class OnboardingModal {
     }
     
     skip() {
+        analytics.trackOnboardingSkip(this.currentSlide + 1);
         this.complete();
     }
     
     complete() {
+        if (this.currentSlide === this.totalSlides - 1) {
+            analytics.trackOnboardingComplete();
+        }
+        
         localStorage.setItem(this.localStorageKey, 'true');
         
         this.modal?.classList.remove('show');

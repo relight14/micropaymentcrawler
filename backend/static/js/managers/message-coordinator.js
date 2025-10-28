@@ -1,4 +1,5 @@
 import { MessageRenderer } from '../components/message-renderer.js';
+import { analytics } from '../utils/analytics.js';
 
 export class MessageCoordinator {
     constructor({ appState, apiService, authService, uiManager, toastManager, sourceManager }) {
@@ -140,6 +141,9 @@ export class MessageCoordinator {
             console.log('  Rating:', rating);
             console.log('  Mode:', mode);
             console.log('  Feedback section:', feedbackSection);
+            
+            // Track feedback
+            analytics.trackFeedback(rating, mode);
             
             const token = this.authService.getToken();
             console.log('  Token available:', !!token);
