@@ -225,34 +225,62 @@ Generate an optimized search query (max 120 chars):"""
         """
         Check if optimized query introduces new proper nouns/entities not in raw query or context.
         Returns True if valid (no injection), False if entities were added.
+        
+        Case-insensitive validation that supports:
+        - Acronyms in any case (wsj, WSJ, Wsj all match)
+        - Multi-word topics from context (federal reserve policy)
+        - Context-aware follow-up queries
         """
         import re
         
-        # Extract capitalized words that look like entities (proper nouns)
-        # Pattern: Words starting with capital letter, 2+ chars
-        entity_pattern = r'\b[A-Z][a-zA-Z]{1,}\b'
+        def extract_all_words(text: str) -> set:
+            """Extract ALL words (case-insensitive) including potential entities and acronyms."""
+            if not text:
+                return set()
+            # Get all words (2+ chars), normalize to lowercase
+            all_words = re.findall(r'\b[a-zA-Z]{2,}\b', text)
+            return {w.lower() for w in all_words}
         
-        # Get entities from raw query and context
-        raw_entities = set(re.findall(entity_pattern, raw_query))
-        context_entities = set(re.findall(entity_pattern, context_summary)) if context_summary else set()
-        allowed_entities = raw_entities | context_entities
+        def extract_entities(text: str) -> set:
+            """Extract likely entities: proper nouns and all-caps acronyms."""
+            if not text:
+                return set()
+            # Pattern 1: Capitalized words (proper nouns)
+            proper_nouns = set(re.findall(r'\b[A-Z][a-zA-Z]{1,}\b', text))
+            # Pattern 2: All-caps acronyms (2+ letters)
+            acronyms = set(re.findall(r'\b[A-Z]{2,}\b', text))
+            # Normalize to lowercase for case-insensitive comparison
+            return {e.lower() for e in (proper_nouns | acronyms)}
+        
+        # Get ALL words from raw query (case-insensitive) - includes lowercase acronyms like "wsj"
+        raw_words = extract_all_words(raw_query)
+        
+        # Get entities from context
+        context_entities = extract_entities(context_summary)
+        
+        # Also extract ALL words from context (for multi-word topics)
+        context_words = extract_all_words(context_summary)
+        
+        # Allowed words/entities = anything from raw query OR context
+        allowed_words = raw_words | context_words | context_entities
         
         # Get entities from optimized query
-        optimized_entities = set(re.findall(entity_pattern, optimized_query))
+        optimized_entities = extract_entities(optimized_query)
         
-        # Check for introduced entities
-        introduced = optimized_entities - allowed_entities
+        # Check for introduced entities (not in allowed set)
+        introduced = optimized_entities - allowed_words
         
         # Filter out common non-entity words that might be capitalized
-        common_words = {'October', 'November', 'December', 'January', 'February', 'March', 
-                       'April', 'May', 'June', 'July', 'August', 'September', 'Monday', 
-                       'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'}
+        common_words = {'october', 'november', 'december', 'january', 'february', 'march', 
+                       'april', 'may', 'june', 'july', 'august', 'september', 'monday', 
+                       'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                       'today', 'yesterday', 'tomorrow', 'morning', 'evening', 'night'}
         introduced = introduced - common_words
         
         if introduced:
             print(f"🚨 Entity injection detected: {introduced}")
-            print(f"   Raw entities: {raw_entities}")
-            print(f"   Context entities: {context_entities}")
+            print(f"   Raw words: {raw_words}")
+            print(f"   Context words (sampled): {list(context_words)[:10]}")
             print(f"   Optimized entities: {optimized_entities}")
             return False
         
