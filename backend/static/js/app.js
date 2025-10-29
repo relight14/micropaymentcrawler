@@ -18,8 +18,10 @@ import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
+import { summaryPopover } from './components/summary-popover.js';
 
-// SourceCard will be loaded globally - access it dynamically when needed
+// SourceCard and SummaryPopover loaded globally - access them dynamically when needed
+window.summaryPopover = summaryPopover;
 
 export class ChatResearchApp {
     constructor() {
