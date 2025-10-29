@@ -1487,6 +1487,36 @@ input:checked + .slider:before {
     padding: 1.5rem;
 }
 
+/* Preview Header for Source Results */
+.preview-header {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.preview-header h3 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--foreground);
+    margin: 0 0 0.5rem 0;
+}
+
+.preview-header p {
+    font-size: var(--text-sm);
+    color: var(--muted-foreground);
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* Dark mode specific adjustments for better contrast */
+.dark .preview-header h3 {
+    color: #ffffff;
+}
+
+.dark .preview-header p {
+    color: rgba(255, 255, 255, 0.85);
+}
+
 /* Research Tiers Section */
 .research-tiers-section {
     background: var(--bg-card);
