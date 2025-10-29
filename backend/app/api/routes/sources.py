@@ -120,6 +120,16 @@ async def scrape_article_content(url: str, timeout: int = 10) -> str:
             # Limit to reasonable length (first ~5000 chars for summarization)
             return text[:5000]
             
+    except httpx.HTTPStatusError as e:
+        print(f"⚠️ Failed to scrape {url}: HTTP {e.response.status_code}")
+        # Detect paywall/authentication errors
+        if e.response.status_code in [401, 403]:
+            raise HTTPException(
+                status_code=403, 
+                detail="This article is behind a paywall and cannot be summarized. Please visit the publisher's website to read the full article."
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"Could not fetch article: HTTP {e.response.status_code}")
     except Exception as e:
         print(f"⚠️ Failed to scrape {url}: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Could not fetch article content: {str(e)}")
@@ -277,7 +287,17 @@ Summary:"""
         print(f"✅ Summary generated and cached for source {summarize_request.source_id}")
         return SummarizeResponse(**response_data)
         
-    except HTTPException:
+    except HTTPException as http_exc:
+        # Clean up idempotency status before re-raising
+        print(f"❌ HTTP error during summarization: {http_exc.status_code} - {http_exc.detail}")
+        if user_id and summarize_request.idempotency_key:
+            ledger.set_idempotency_status(
+                user_id=user_id,
+                idempotency_key=summarize_request.idempotency_key,
+                operation_type="summarize",
+                status="failed",
+                response_data={"error": http_exc.detail}
+            )
         raise
     except Exception as e:
         print(f"❌ Summarization failed: {str(e)}")
