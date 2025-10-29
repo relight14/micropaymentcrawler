@@ -60,6 +60,21 @@ class ResearchLedger:
                 )
             """)
             
+            # Table for tracking summaries
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS summaries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    price_cents INTEGER NOT NULL,
+                    transaction_id TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, source_id)
+                )
+            """)
+            
             conn.commit()
     
     def record_purchase(self, 
@@ -248,4 +263,46 @@ class ResearchLedger:
                     except (json.JSONDecodeError, Exception):
                         continue
             
+            return None
+    
+    def set_idempotency_status(self, user_id: str, idempotency_key: str, operation_type: str, status: str, response_data: Dict):
+        """Update or create idempotency status."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO idempotency_keys 
+                (user_id, idempotency_key, operation_type, status, response_data, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, idempotency_key, operation_type, status, json.dumps(response_data)))
+            conn.commit()
+    
+    def record_summary_purchase(self, user_id: str, source_id: str, url: str, price_cents: int, transaction_id: str, summary: str):
+        """Record a summary purchase."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO summaries 
+                (user_id, source_id, url, price_cents, transaction_id, summary, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, source_id, url, price_cents, transaction_id, summary))
+            conn.commit()
+    
+    def get_summary(self, user_id: str, source_id: str) -> Optional[Dict]:
+        """Get cached summary for a source."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT summary, price_cents, transaction_id, timestamp 
+                FROM summaries 
+                WHERE user_id = ? AND source_id = ?
+            """, (user_id, source_id))
+            
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "summary": result[0],
+                    "price_cents": result[1],
+                    "transaction_id": result[2],
+                    "timestamp": result[3]
+                }
             return None
