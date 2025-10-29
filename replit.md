@@ -8,6 +8,13 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+## October 29, 2025
+
+### Conversation Context Fix for Follow-Up Queries
+- ✅ **Field Mismatch Fix**: Backend now correctly reads 'sender' field from frontend conversation context (was looking for 'role')
+- ✅ **Enhanced Query Optimization**: AI prompt now explicitly incorporates conversation topics into follow-up queries (e.g., "more sources from WSJ" after discussing "federal reserve policy" becomes "federal reserve policy WSJ NYT")
+- ✅ **Case-Insensitive Validation**: Entity injection validator now handles acronyms (wsj → WSJ), context phrases (federal reserve policy), and maintains security without blocking legitimate context-based optimization
+
 ## October 28, 2025
 
 ### Input Field UX Refinement
