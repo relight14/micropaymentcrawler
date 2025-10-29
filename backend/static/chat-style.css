@@ -3880,6 +3880,25 @@ body.dark-mode .login-required {
     font-weight: var(--font-weight-semibold);
 }
 
+.summary-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.summary-type-full {
+    background: hsl(142, 76%, 36%);
+    color: white;
+}
+
+.summary-type-excerpt {
+    background: hsl(48, 96%, 53%);
+    color: hsl(25, 95%, 16%);
+}
+
 .summary-close-btn {
     flex-shrink: 0;
     width: 32px;

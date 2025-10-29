@@ -275,10 +275,11 @@ export class AppState {
     }
 
     // Summary management
-    cacheSummary(sourceId, summary, price) {
+    cacheSummary(sourceId, summary, price, summaryType = 'full') {
         this.purchasedSummaries[sourceId] = {
             summary,
             price,
+            summary_type: summaryType,  // "full" or "excerpt" for transparency
             timestamp: new Date().toISOString()
         };
         this._saveToStorage('purchasedSummaries', this.purchasedSummaries);

@@ -196,7 +196,7 @@ export class SourceManager extends EventTarget {
         const cached = this.appState.getCachedSummary(source.id);
         if (cached) {
             console.log('✨ SUMMARIZE: Using cached summary');
-            this.showSummaryPopover(source, cached.summary, cached.price);
+            this.showSummaryPopover(source, cached.summary, cached.price, cached.summary_type || 'full');
             analytics.trackSummaryViewed(source.id, new URL(source.url).hostname, cached.price, true);
             return;
         }
@@ -242,13 +242,14 @@ export class SourceManager extends EventTarget {
                 source.id,
                 source.url,
                 source.title,
+                source.excerpt || '',  // Pass Tavily excerpt for paywall fallback
                 source.license_cost || 0
             );
             
             console.log('✨ SUMMARIZE: API response:', result);
             
-            // Cache the summary
-            this.appState.cacheSummary(source.id, result.summary, result.price);
+            // Cache the summary with type for transparency
+            this.appState.cacheSummary(source.id, result.summary, result.price, result.summary_type);
             
             // Update wallet
             await this.authService.updateWalletBalance();
@@ -256,8 +257,8 @@ export class SourceManager extends EventTarget {
                 this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
             }
             
-            // Show summary popover
-            this.showSummaryPopover(source, result.summary, result.price);
+            // Show summary popover with transparency badge
+            this.showSummaryPopover(source, result.summary, result.price, result.summary_type);
             
             // Track analytics
             const domain = new URL(source.url).hostname;
@@ -278,7 +279,7 @@ export class SourceManager extends EventTarget {
         }
     }
 
-    showSummaryPopover(source, summary, price) {
+    showSummaryPopover(source, summary, price, summaryType = 'full') {
         // Dynamically import and show the popover
         if (window.summaryPopover) {
             const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
@@ -286,6 +287,7 @@ export class SourceManager extends EventTarget {
                 anchorElement: sourceCard,
                 summary: summary,
                 price: price,
+                summaryType: summaryType,  // "full" or "excerpt" for transparency badge
                 sourceTitle: source.title,
                 sourceUrl: source.url
             });

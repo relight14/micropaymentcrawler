@@ -270,7 +270,7 @@ export class APIService {
         }, 'Source unlock failed');
     }
 
-    async summarizeSource(sourceId, url, title, licenseCost) {
+    async summarizeSource(sourceId, url, title, excerpt, licenseCost) {
         // Generate idempotency key for summary purchase
         const userId = this.authService.getUserId();
         const idempotencyKey = generateIdempotencyKey(userId, `summary_${sourceId}`);
@@ -282,6 +282,7 @@ export class APIService {
                 source_id: sourceId,
                 url: url,
                 title: title,
+                excerpt: excerpt,  // Tavily excerpt for paywall fallback
                 license_cost: licenseCost,
                 idempotency_key: idempotencyKey
             })

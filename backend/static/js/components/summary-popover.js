@@ -17,10 +17,11 @@ class SummaryPopover {
      * @param {HTMLElement} params.anchorElement - Element to position above
      * @param {string} params.summary - Summary text to display
      * @param {number} params.price - Price paid for summary
+     * @param {string} params.summaryType - Type of summary ("full" or "excerpt")
      * @param {string} params.sourceTitle - Title of the article
      * @param {string} params.sourceUrl - URL of the article
      */
-    show({ anchorElement, summary, price, sourceTitle, sourceUrl }) {
+    show({ anchorElement, summary, price, summaryType = 'full', sourceTitle, sourceUrl }) {
         // Clean up any existing popover first
         this.hide();
 
@@ -33,12 +34,17 @@ class SummaryPopover {
         this.activePopover = document.createElement('div');
         this.activePopover.className = 'summary-popover';
         
-        // Popover content
+        // Determine badge text based on summary type
+        const typeBadgeText = summaryType === 'full' ? '📰 Full Article' : '📄 From Preview';
+        const typeBadgeClass = summaryType === 'full' ? 'summary-type-full' : 'summary-type-excerpt';
+        
+        // Popover content with transparency badge
         this.activePopover.innerHTML = `
             <div class="summary-header">
                 <div class="summary-title-section">
                     <h4 class="summary-article-title">${this._escapeHtml(sourceTitle)}</h4>
                     <div class="summary-meta">
+                        <span class="summary-type-badge ${typeBadgeClass}">${typeBadgeText}</span>
                         <span class="summary-price-badge">Purchased for $${price.toFixed(2)}</span>
                     </div>
                 </div>

@@ -26,6 +26,7 @@ class SummarizeRequest(BaseModel):
     source_id: str
     url: str
     title: str
+    excerpt: Optional[str] = None  # Tavily excerpt for fallback
     license_cost: Optional[float] = None
     idempotency_key: Optional[str] = None
 
@@ -33,6 +34,7 @@ class SummarizeRequest(BaseModel):
 class SummarizeResponse(BaseModel):
     source_id: str
     summary: str
+    summary_type: str  # "full" or "excerpt" - for transparency badge
     price_cents: int
     price: float  # Price in dollars for frontend compatibility
     transaction_id: str
@@ -220,17 +222,48 @@ async def summarize_source(
         # Calculate price (for display purposes - mock purchase)
         price_cents = calculate_summary_price(summarize_request.license_cost)
         
-        # Scrape article content
-        print(f"📄 Scraping article: {summarize_request.url}")
-        article_content = await scrape_article_content(summarize_request.url)
+        # Try to scrape full article, fallback to excerpt if paywalled
+        article_content = None
+        summary_type = "full"
+        
+        try:
+            print(f"📄 Attempting to scrape full article: {summarize_request.url}")
+            article_content = await scrape_article_content(summarize_request.url)
+            print(f"✅ Successfully scraped full article content")
+            summary_type = "full"
+        except HTTPException as e:
+            if e.status_code == 403:
+                # Paywall detected - use Tavily excerpt instead
+                print(f"🔒 Paywall detected, falling back to Tavily excerpt")
+                if summarize_request.excerpt:
+                    article_content = summarize_request.excerpt
+                    summary_type = "excerpt"
+                else:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Article is paywalled and no preview content available"
+                    )
+            else:
+                raise
         
         # Generate summary using Claude Haiku
-        print(f"🤖 Generating summary with Claude Haiku...")
-        prompt = f"""Please provide a concise summary of the following article in 2-3 sentences. Focus on the main points and key takeaways.
+        print(f"🤖 Generating summary with Claude Haiku (type: {summary_type})...")
+        
+        if summary_type == "full":
+            prompt = f"""Please provide a concise summary of the following article in 2-3 sentences. Focus on the main points and key takeaways.
 
 Article Title: {summarize_request.title}
 
 Article Content:
+{article_content}
+
+Summary:"""
+        else:
+            prompt = f"""Please provide a concise summary based on this article preview in 2-3 sentences. Focus on the main points visible in the excerpt.
+
+Article Title: {summarize_request.title}
+
+Article Preview:
 {article_content}
 
 Summary:"""
@@ -270,6 +303,7 @@ Summary:"""
         response_data = {
             "source_id": summarize_request.source_id,
             "summary": summary,
+            "summary_type": summary_type,  # "full" or "excerpt" for transparency
             "price_cents": price_cents,
             "price": price_cents / 100.0,  # Convert cents to dollars for frontend
             "transaction_id": transaction_id
