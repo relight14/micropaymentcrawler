@@ -212,6 +212,23 @@ export class SourceManager extends EventTarget {
             return;
         }
         
+        // Show purchase confirmation modal (matching tier purchase UX)
+        const purchaseDetails = {
+            tier: 'summary',
+            price: price,
+            titleOverride: 'Confirm Summary Purchase',
+            customDescription: `Get an AI-generated summary of this article for $${Number(price).toFixed(2)}`,
+            selectedSources: [],
+            query: source.title || 'Article Summary'
+        };
+
+        const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
+        
+        if (!userConfirmed) {
+            console.log('✨ SUMMARIZE: User cancelled purchase');
+            return;
+        }
+        
         // Show loading state on button
         const originalButtonContent = buttonElement?.innerHTML;
         if (buttonElement) {
@@ -220,7 +237,7 @@ export class SourceManager extends EventTarget {
         }
         
         try {
-            // Call API to purchase and generate summary
+            // Call API to generate summary (mock purchase already confirmed)
             const result = await this.apiService.summarizeSource(
                 source.id,
                 source.url,

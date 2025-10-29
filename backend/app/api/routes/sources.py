@@ -207,20 +207,8 @@ async def summarize_source(
             response_data={}
         )
         
-        # Calculate price
+        # Calculate price (for display purposes - mock purchase)
         price_cents = calculate_summary_price(summarize_request.license_cost)
-        
-        # Check wallet balance
-        balance_result = ledewire.get_wallet_balance(access_token)
-        if balance_result.get('balance_cents', 0) < price_cents:
-            ledger.set_idempotency_status(
-                user_id=user_id,
-                idempotency_key=summarize_request.idempotency_key,
-                operation_type="summarize",
-                status="failed",
-                response_data={"error": "Insufficient balance"}
-            )
-            raise HTTPException(status_code=402, detail="Insufficient wallet balance")
         
         # Scrape article content
         print(f"📄 Scraping article: {summarize_request.url}")
@@ -253,45 +241,10 @@ Summary:"""
         if not summary or len(summary) < 10:
             raise HTTPException(status_code=500, detail="Failed to generate summary")
         
-        # Process payment
+        # Mock purchase processing (matching research report flow)
+        # Frontend shows confirmation modal before calling this endpoint
         transaction_id = f"summary_{summarize_request.source_id}_{int(time.time())}"
-        
-        if price_cents > 0:
-            print(f"💳 Processing payment: ${price_cents / 100:.2f}")
-            try:
-                purchase_result = ledewire.create_purchase(
-                    access_token=access_token,
-                    content_id=f"summary_{summarize_request.source_id}",
-                    price_cents=price_cents,
-                    idempotency_key=summarize_request.idempotency_key
-                )
-                
-                if "error" in purchase_result:
-                    error_message = ledewire.handle_api_error(purchase_result)
-                    ledger.set_idempotency_status(
-                        user_id=user_id,
-                        idempotency_key=summarize_request.idempotency_key,
-                        operation_type="summarize",
-                        status="failed",
-                        response_data={"error": error_message}
-                    )
-                    raise HTTPException(status_code=402, detail=error_message)
-                
-                transaction_id = purchase_result.get('transaction_id', transaction_id)
-                print(f"✅ Payment successful: {transaction_id}")
-                
-            except HTTPException:
-                raise
-            except Exception as e:
-                print(f"❌ Payment failed: {str(e)}")
-                ledger.set_idempotency_status(
-                    user_id=user_id,
-                    idempotency_key=summarize_request.idempotency_key,
-                    operation_type="summarize",
-                    status="failed",
-                    response_data={"error": str(e)}
-                )
-                raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
+        print(f"✅ Mock purchase processed: ${price_cents / 100:.2f} - {transaction_id}")
         
         # Record summary purchase in ledger
         ledger.record_summary_purchase(
