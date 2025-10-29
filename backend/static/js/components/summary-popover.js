@@ -133,29 +133,64 @@ class SummaryPopover {
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
+        const margin = 16;
+        const gap = 12;
+        
         // Calculate horizontal position (centered on anchor)
         let left = anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2);
         
         // Prevent horizontal overflow
-        const minLeft = 16; // 16px margin from edge
-        const maxLeft = viewportWidth - popoverRect.width - 16;
+        const minLeft = margin;
+        const maxLeft = viewportWidth - popoverRect.width - margin;
         left = Math.max(minLeft, Math.min(left, maxLeft));
         
-        // Calculate vertical position (above anchor with gap)
-        const gap = 12;
-        let top = anchorRect.top - popoverRect.height - gap;
+        // Calculate vertical positions for both above and below
+        const topIfAbove = anchorRect.top - popoverRect.height - gap;
+        const topIfBelow = anchorRect.bottom + gap;
+        const bottomIfBelow = topIfBelow + popoverRect.height;
         
-        // If not enough space above, show below instead
-        if (top < 16) {
-            top = anchorRect.bottom + gap;
-            this.activePopover.classList.add('position-below');
-        } else {
-            this.activePopover.classList.add('position-above');
+        let top;
+        let position;
+        
+        // Try positioning above first
+        if (topIfAbove >= margin) {
+            top = topIfAbove;
+            position = 'above';
+        }
+        // If not enough space above, try below
+        else if (bottomIfBelow <= viewportHeight - margin) {
+            top = topIfBelow;
+            position = 'below';
+        }
+        // If neither fits perfectly, choose the position with more space
+        else {
+            const spaceAbove = anchorRect.top;
+            const spaceBelow = viewportHeight - anchorRect.bottom;
+            
+            if (spaceAbove > spaceBelow) {
+                // More space above - center in available space above
+                top = Math.max(margin, anchorRect.top - popoverRect.height - gap);
+                position = 'above';
+            } else {
+                // More space below or equal - position at top with scrollable content
+                top = Math.min(topIfBelow, viewportHeight - popoverRect.height - margin);
+                position = 'below';
+            }
         }
         
-        // Apply position
+        // Apply position class
+        this.activePopover.classList.add(`position-${position}`);
+        
+        // Apply position styles
         this.activePopover.style.left = `${left}px`;
         this.activePopover.style.top = `${top}px`;
+        
+        // Ensure popover is constrained to viewport height if needed
+        const maxHeight = viewportHeight - (2 * margin);
+        if (popoverRect.height > maxHeight) {
+            this.activePopover.style.maxHeight = `${maxHeight}px`;
+            this.activePopover.style.overflowY = 'auto';
+        }
     }
 
     /**
