@@ -10,6 +10,12 @@ Preferred communication style: Simple, everyday language.
 
 ## October 29, 2025
 
+### Smart Summary Button State (New Feature)
+- ✅ **Dynamic Button Text**: Summary buttons change from "Summarize for $X" to "Review Summary" after purchase
+- ✅ **Persistent Cache Check**: Buttons check cached summaries on render to show correct state immediately
+- ✅ **Instant UI Update**: Button text updates without page refresh after successful summary purchase
+- ✅ **No Duplicate Purchases**: Clicking "Review Summary" shows cached content, avoiding re-purchase
+
 ### Conversation Context Fix for Follow-Up Queries
 - ✅ **Field Mismatch Fix**: Backend now correctly reads 'sender' field from frontend conversation context (was looking for 'role')
 - ✅ **Enhanced Query Optimization**: AI prompt now explicitly incorporates conversation topics into follow-up queries (e.g., "more sources from WSJ" after discussing "federal reserve policy" becomes "federal reserve policy WSJ NYT")

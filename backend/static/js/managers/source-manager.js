@@ -260,6 +260,15 @@ export class SourceManager extends EventTarget {
             // Show summary popover with transparency badge
             this.showSummaryPopover(source, result.summary, result.price, result.summary_type);
             
+            // Update button text to "Review Summary"
+            if (buttonElement) {
+                const textSpan = buttonElement.querySelector('span');
+                if (textSpan) {
+                    textSpan.textContent = 'Review Summary';
+                }
+                buttonElement.disabled = false;
+            }
+            
             // Track analytics
             const domain = new URL(source.url).hostname;
             analytics.trackSummaryPurchased(source.id, domain, result.price);
@@ -270,8 +279,8 @@ export class SourceManager extends EventTarget {
         } catch (error) {
             console.error('✨ SUMMARIZE: Error:', error);
             this.toastManager.show('⚠️ Summarization failed. Please try again.', 'error');
-        } finally {
-            // Restore button state
+            
+            // Restore button state only on error
             if (buttonElement && originalButtonContent) {
                 buttonElement.innerHTML = originalButtonContent;
                 buttonElement.disabled = false;

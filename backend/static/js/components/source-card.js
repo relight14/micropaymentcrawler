@@ -616,8 +616,11 @@ class SourceCard {
         const licenseCost = source.license_cost || 0;
         const price = this._calculateSummaryPrice(source);
         
-        // Track pricing analytics
-        if (window.analytics && source.url) {
+        // Check if summary is already cached
+        const hasCachedSummary = this.appState.hasCachedSummary(source.id);
+        
+        // Track pricing analytics (only if not cached)
+        if (!hasCachedSummary && window.analytics && source.url) {
             try {
                 const domain = new URL(source.url).hostname;
                 const pricingTier = (licenseCost * 1.25 >= 0.02) ? 'markup' : 'minimum';
@@ -632,7 +635,10 @@ class SourceCard {
         icon.textContent = '✨';
         
         const text = document.createElement('span');
-        text.textContent = `Summarize for $${price.toFixed(2)}`;
+        // Change button text based on whether summary is cached
+        text.textContent = hasCachedSummary 
+            ? 'Review Summary' 
+            : `Summarize for $${price.toFixed(2)}`;
         
         button.appendChild(icon);
         button.appendChild(text);
