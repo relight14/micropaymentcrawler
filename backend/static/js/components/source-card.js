@@ -123,6 +123,9 @@ class SourceCard {
             } else if (action === 'download') {
                 e.preventDefault();
                 this._handleDownload(sourceId);
+            } else if (action === 'summarize') {
+                e.preventDefault();
+                this._handleSummarize(sourceId, actionBtn);
             }
             // view-external opens naturally via href, no handler needed
         };
@@ -469,15 +472,15 @@ class SourceCard {
         const rightSide = document.createElement('div');
         rightSide.className = 'source-actions__right';
 
-        // View Source button
+        // View Source button (always show for publisher traffic)
         if (source.url) {
             const viewBtn = this._createViewButton(source);
             rightSide.appendChild(viewBtn);
         }
 
-        // Unlock/Download button
-        const actionBtn = this._createActionButton(source);
-        rightSide.appendChild(actionBtn);
+        // Summarize button (replaces unlock button for quick article summaries)
+        const summarizeBtn = this._createSummarizeButton(source);
+        rightSide.appendChild(summarizeBtn);
 
         actions.appendChild(leftSide);
         actions.appendChild(rightSide);
@@ -582,6 +585,41 @@ class SourceCard {
         
         const text = document.createElement('span');
         text.textContent = 'View Source';
+        
+        button.appendChild(icon);
+        button.appendChild(text);
+        
+        return button;
+    }
+
+    /**
+     * Calculate summary price from license cost
+     * Price = license_cost × 1.25 OR $0.02 minimum
+     */
+    _calculateSummaryPrice(source) {
+        const licenseCost = source.license_cost || 0;
+        const platformFee = 1.25;
+        const calculatedPrice = licenseCost * platformFee;
+        const minimumPrice = 0.02;
+        
+        return Math.max(calculatedPrice, minimumPrice);
+    }
+
+    /**
+     * Create summarize button
+     */
+    _createSummarizeButton(source) {
+        const button = document.createElement('button');
+        button.className = 'summarize-btn';
+        button.setAttribute('data-action', 'summarize');
+        
+        const price = this._calculateSummaryPrice(source);
+        
+        const icon = document.createElement('span');
+        icon.textContent = '✨';
+        
+        const text = document.createElement('span');
+        text.textContent = `Summarize for $${price.toFixed(2)}`;
         
         button.appendChild(icon);
         button.appendChild(text);
@@ -703,6 +741,47 @@ class SourceCard {
             document.dispatchEvent(event);
         } catch (error) {
             console.error('Failed to download source:', error);
+        }
+    }
+
+    /**
+     * Handle article summarize request
+     */
+    async _handleSummarize(sourceId, buttonElement) {
+        console.log('✨ SUMMARIZE: Button clicked! SourceID:', sourceId);
+        
+        // Lookup source from appState
+        const researchData = this.appState?.getCurrentResearchData();
+        if (!researchData || !researchData.sources) {
+            console.error('✨ SUMMARIZE: No research data available');
+            return;
+        }
+        
+        const source = researchData.sources.find(s => s.id === sourceId);
+        if (!source) {
+            console.error('✨ SUMMARIZE: Source not found for ID:', sourceId);
+            return;
+        }
+        
+        console.log('✨ SUMMARIZE: Source found:', source.title);
+        
+        try {
+            // Calculate price
+            const price = this._calculateSummaryPrice(source);
+            
+            // Dispatch event for app to handle
+            const event = new CustomEvent('sourceSummarizeRequested', {
+                detail: { 
+                    source, 
+                    price,
+                    buttonElement // Pass button for potential loading state
+                }
+            });
+            console.log('✨ SUMMARIZE: Dispatching event with detail:', event.detail);
+            document.dispatchEvent(event);
+            console.log('✨ SUMMARIZE: Event dispatched successfully');
+        } catch (error) {
+            console.error('✨ SUMMARIZE: ERROR in _handleSummarize:', error);
         }
     }
 

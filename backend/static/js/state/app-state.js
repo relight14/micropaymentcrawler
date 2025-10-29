@@ -18,6 +18,7 @@ export class AppState {
         this.selectedSources = this._loadFromStorage('selectedSources', []);
         this.currentResearchData = this._loadFromStorage('currentResearchData', null);
         this.purchasedItems = new Set(this._loadFromStorage('purchasedItems', []));
+        this.purchasedSummaries = this._loadFromStorage('purchasedSummaries', {}); // sourceId -> {summary, price, timestamp}
         this.pendingAction = null;
         
         // Enrichment tracking
@@ -271,5 +272,28 @@ export class AppState {
 
     getCurrentQuery() {
         return this.currentQuery;
+    }
+
+    // Summary management
+    cacheSummary(sourceId, summary, price) {
+        this.purchasedSummaries[sourceId] = {
+            summary,
+            price,
+            timestamp: new Date().toISOString()
+        };
+        this._saveToStorage('purchasedSummaries', this.purchasedSummaries);
+    }
+
+    getCachedSummary(sourceId) {
+        return this.purchasedSummaries[sourceId] || null;
+    }
+
+    hasCachedSummary(sourceId) {
+        return !!this.purchasedSummaries[sourceId];
+    }
+
+    clearCachedSummaries() {
+        this.purchasedSummaries = {};
+        this._saveToStorage('purchasedSummaries', {});
     }
 }
