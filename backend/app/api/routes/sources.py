@@ -140,7 +140,7 @@ def calculate_summary_price(license_cost: Optional[float]) -> int:
         return 2  # 2 cents
 
 
-@router.post("/api/sources/summarize", response_model=SummarizeResponse)
+@router.post("/summarize", response_model=SummarizeResponse)
 @limiter.limit("20/minute")
 async def summarize_source(
     request: Request,
