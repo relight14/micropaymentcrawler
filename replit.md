@@ -10,6 +10,10 @@ Preferred communication style: Simple, everyday language.
 
 ## October 29, 2025
 
+### UX Clarity Improvements
+- ✅ **Clear Conversation Button Renamed**: Changed "Clear All" to "Start a New Search" to make purpose clearer and encourage users to reset between different research topics
+- ✅ **Prevents Source Accumulation**: Clearer button label helps users understand they should start fresh for new topics, avoiding mixing sources from unrelated queries
+
 ### Smart Summary Button State (New Feature)
 - ✅ **Dynamic Button Text**: Summary buttons change from "Summarize for $X" to "Review Summary" after purchase
 - ✅ **Persistent Cache Check**: Buttons check cached summaries on render to show correct state immediately
