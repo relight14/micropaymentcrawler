@@ -3789,3 +3789,193 @@ body.dark-mode .login-required {
         font-size: 1.5rem;
     }
 }
+
+/* ========================================
+   SUMMARY POPOVER COMPONENT
+   ======================================== */
+
+/* Backdrop overlay */
+.summary-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 9998;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.summary-backdrop.visible {
+    opacity: 1;
+}
+
+/* Popover container */
+.summary-popover {
+    position: fixed;
+    z-index: 9999;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg), 0 20px 40px rgba(0, 0, 0, 0.15);
+    max-width: 600px;
+    width: calc(100vw - 32px);
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.summary-popover.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.summary-popover.position-below {
+    transform: translateY(8px);
+}
+
+.summary-popover.position-below.visible {
+    transform: translateY(0);
+}
+
+/* Header */
+.summary-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.25rem 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.summary-title-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.summary-article-title {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--foreground);
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
+}
+
+.summary-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-price-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    background: var(--accent);
+    color: var(--accent-foreground);
+    border-radius: var(--radius);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.summary-close-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius);
+    color: var(--muted-foreground);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.summary-close-btn:hover {
+    background: var(--secondary);
+    color: var(--foreground);
+}
+
+/* Content */
+.summary-content {
+    padding: 1.25rem;
+}
+
+.summary-text {
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    color: var(--foreground);
+    margin: 0;
+}
+
+/* Footer */
+.summary-footer {
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.summary-view-full {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--primary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.summary-view-full:hover {
+    color: var(--foreground);
+    text-decoration: underline;
+}
+
+/* Dark mode */
+body.dark-mode .summary-backdrop {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .summary-popover {
+    background: var(--card);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-lg), 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .summary-article-title {
+    color: var(--foreground);
+}
+
+body.dark-mode .summary-text {
+    color: var(--muted-foreground);
+}
+
+body.dark-mode .summary-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+    .summary-popover {
+        max-width: calc(100vw - 24px);
+    }
+    
+    .summary-header {
+        padding: 1rem 1rem 0.75rem 1rem;
+    }
+    
+    .summary-content {
+        padding: 1rem;
+    }
+    
+    .summary-footer {
+        padding: 0.75rem 1rem 1rem 1rem;
+    }
+    
+    .summary-article-title {
+        font-size: var(--text-sm);
+    }
+}
