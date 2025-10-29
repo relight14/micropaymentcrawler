@@ -12,7 +12,11 @@ Preferred communication style: Simple, everyday language.
 
 ### UX Clarity Improvements
 - ✅ **Clear Conversation Button Renamed**: Changed "Clear All" to "Start a New Search" to make purpose clearer and encourage users to reset between different research topics
-- ✅ **Prevents Source Accumulation**: Clearer button label helps users understand they should start fresh for new topics, avoiding mixing sources from unrelated queries
+- ✅ **Conversation-Scoped Source Selection**: Implemented automatic source scoping to prevent contamination across research topics
+  - Each conversation gets unique ID; sources tagged with conversation ID
+  - Stale sources from previous conversations auto-cleaned on initialization
+  - User can refine queries and accumulate sources within same conversation
+  - "Start a New Search" generates fresh conversation ID, preventing cross-topic pollution
 
 ### Smart Summary Button State (New Feature)
 - ✅ **Dynamic Button Text**: Summary buttons change from "Summarize for $X" to "Review Summary" after purchase

@@ -15,11 +15,21 @@ export class AppState {
         // Core state with persistence
         this.currentMode = 'chat';
         this.conversationHistory = this._loadFromStorage('conversationHistory', []);
-        this.selectedSources = this._loadFromStorage('selectedSources', []);
         this.currentResearchData = this._loadFromStorage('currentResearchData', null);
         this.purchasedItems = new Set(this._loadFromStorage('purchasedItems', []));
         this.purchasedSummaries = this._loadFromStorage('purchasedSummaries', {}); // sourceId -> {summary, price, timestamp}
         this.pendingAction = null;
+        
+        // Conversation scoping to prevent source contamination across topics
+        this.conversationId = this._loadFromStorage('conversationId', null);
+        if (!this.conversationId) {
+            this.conversationId = this._generateConversationId();
+            this._saveToStorage('conversationId', this.conversationId);
+        }
+        this.selectedSources = this._loadFromStorage('selectedSources', []);
+        
+        // Clean up sources from previous conversations on initialization
+        this._cleanStaleSources();
         
         // Enrichment tracking
         this.enrichmentStatus = 'idle'; // idle | processing | complete
@@ -66,6 +76,25 @@ export class AppState {
         }
     }
 
+    // Conversation ID management
+    _generateConversationId() {
+        return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    }
+
+    _cleanStaleSources() {
+        // Remove sources that don't belong to current conversation
+        const cleanedSources = this.selectedSources.filter(source => 
+            source.conversationId === this.conversationId
+        );
+        
+        // If any sources were removed, update storage
+        if (cleanedSources.length !== this.selectedSources.length) {
+            console.log(`🧹 Cleaned ${this.selectedSources.length - cleanedSources.length} stale sources from previous conversation`);
+            this.selectedSources = cleanedSources;
+            this._saveToStorage('selectedSources', this.selectedSources);
+        }
+    }
+
     // Conversation management with deduplication
     addMessage(sender, content, metadata = null) {
         const messageId = `${sender}_${Date.now()}_${content.substring(0, 50)}`;
@@ -102,9 +131,13 @@ export class AppState {
         this.currentResearchData = null;
         this.pendingAction = null;
         
+        // Generate new conversation ID for fresh start
+        this.conversationId = this._generateConversationId();
+        
         // Clear persisted state
         this._saveToStorage('conversationHistory', []);
         this._saveToStorage('selectedSources', []);
+        this._saveToStorage('conversationId', this.conversationId);
     }
 
     getConversationHistory() {
@@ -121,11 +154,12 @@ export class AppState {
             this._saveToStorage('selectedSources', this.selectedSources);
             return false; // Deselected
         } else {
-            // Immutable addition
+            // Immutable addition with conversation scoping
             const newSource = {
                 id: sourceId,
                 ...sourceData,
-                selectedAt: new Date()
+                selectedAt: new Date(),
+                conversationId: this.conversationId // Link to current conversation
             };
             this.selectedSources = [...this.selectedSources, newSource];
             this._saveToStorage('selectedSources', this.selectedSources);
