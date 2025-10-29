@@ -106,7 +106,7 @@ export class MessageCoordinator {
         
         const feedbackText = document.createElement('p');
         feedbackText.textContent = 'How helpful are these sources?';
-        feedbackText.style.cssText = 'margin: 0 0 12px 0; color: var(--text-primary, #333); font-weight: 500;';
+        feedbackText.style.cssText = 'margin: 0 0 12px 0; color: var(--text-primary, #1a1a1a); font-weight: 500; filter: contrast(1.2);';
         
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: center; align-items: center;';
@@ -114,12 +114,12 @@ export class MessageCoordinator {
         const thumbsUpBtn = document.createElement('button');
         thumbsUpBtn.className = 'feedback-btn feedback-up';
         thumbsUpBtn.innerHTML = '👍 Helpful';
-        thumbsUpBtn.style.cssText = 'padding: 8px 20px; border: 2px solid var(--primary, #4A90E2); background: white; color: var(--primary, #4A90E2); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;';
+        thumbsUpBtn.style.cssText = 'padding: 8px 20px; border: 2px solid var(--primary, #4A90E2); background: var(--surface-primary, white); color: var(--primary, #4A90E2); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;';
         
         const thumbsDownBtn = document.createElement('button');
         thumbsDownBtn.className = 'feedback-btn feedback-down';
         thumbsDownBtn.innerHTML = '👎 Not helpful';
-        thumbsDownBtn.style.cssText = 'padding: 8px 20px; border: 2px solid #666; background: white; color: #666; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;';
+        thumbsDownBtn.style.cssText = 'padding: 8px 20px; border: 2px solid var(--text-secondary, #666); background: var(--surface-primary, white); color: var(--text-secondary, #666); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;';
         
         feedbackContainer.dataset.query = this.appState.getCurrentQuery() || '';
         feedbackContainer.dataset.sourceIds = JSON.stringify(sources.map(s => s.id));

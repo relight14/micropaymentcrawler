@@ -13,7 +13,12 @@ Preferred communication style: Simple, everyday language.
 ### Conversation Context Fix for Follow-Up Queries
 - ✅ **Field Mismatch Fix**: Backend now correctly reads 'sender' field from frontend conversation context (was looking for 'role')
 - ✅ **Enhanced Query Optimization**: AI prompt now explicitly incorporates conversation topics into follow-up queries (e.g., "more sources from WSJ" after discussing "federal reserve policy" becomes "federal reserve policy WSJ NYT")
-- ✅ **Case-Insensitive Validation**: Entity injection validator now handles acronyms (wsj → WSJ), context phrases (federal reserve policy), and maintains security without blocking legitimate context-based optimization
+- ✅ **Secure Case-Insensitive Validation**: Entity injection validator extracts all words from raw query/context (case-insensitive), allows context-based entities, blocks truly new entities without security bypass
+
+### Dark Mode Contrast Improvements
+- ✅ **Feedback Modal Text**: Increased contrast with darker text color (#1a1a1a), added contrast filter (1.2x), and increased font weight (600)
+- ✅ **CSS Variables**: Added --surface-primary and --surface-secondary with proper dark mode values (#334155 and #475569)
+- ✅ **Button Styling**: Updated feedback buttons to use CSS variables for better dark mode compatibility
 
 ## October 28, 2025
 

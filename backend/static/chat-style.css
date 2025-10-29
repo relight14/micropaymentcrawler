@@ -42,6 +42,8 @@
     --medium-grey: var(--muted-foreground);
     --silver: var(--muted-foreground);
     --accent-color: var(--accent);
+    --surface-primary: var(--card);
+    --surface-secondary: var(--secondary);
     
     /* Additional missing tokens */
     --radius-lg: calc(var(--radius) + 2px);
@@ -2668,6 +2670,8 @@ input:checked + .slider:before {
         --border-color: #475569;
         --border-light: #475569;
         --secondary-color: #334155;
+        --surface-primary: #334155;
+        --surface-secondary: #475569;
     }
     
     body {
