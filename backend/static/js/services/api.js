@@ -270,6 +270,24 @@ export class APIService {
         }, 'Source unlock failed');
     }
 
+    async summarizeSource(sourceId, url, title, licenseCost) {
+        // Generate idempotency key for summary purchase
+        const userId = this.authService.getUserId();
+        const idempotencyKey = generateIdempotencyKey(userId, `summary_${sourceId}`);
+        
+        return await this._fetchWithRetry(`${this.baseURL}/api/sources/summarize`, {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({
+                source_id: sourceId,
+                url: url,
+                title: title,
+                license_cost: licenseCost,
+                idempotency_key: idempotencyKey
+            })
+        }, 'Article summarization failed');
+    }
+
     async purchaseTier(tierId, price, query = "Research Query", selectedSources = null) {
         // Generate stable idempotency key for this purchase attempt
         const userId = this.authService.getUserId();

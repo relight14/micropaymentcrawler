@@ -142,6 +142,38 @@ class Analytics {
             timestamp: new Date().toISOString()
         });
     }
+
+    trackSummaryPurchased(sourceId, domain, price) {
+        this.track('summary_purchased', {
+            source_id: sourceId,
+            domain: domain,
+            price: price,
+            value: price,
+            currency: 'USD',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    trackSummaryViewed(sourceId, domain, price, isCached) {
+        this.track('summary_viewed', {
+            source_id: sourceId,
+            domain: domain,
+            price: price,
+            is_cached: isCached,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    trackSummaryPricing(sourceId, domain, licenseCost, calculatedPrice, pricingTier) {
+        this.track('summary_pricing', {
+            source_id: sourceId,
+            domain: domain,
+            license_cost: licenseCost,
+            calculated_price: calculatedPrice,
+            pricing_tier: pricingTier, // 'minimum' or 'markup'
+            timestamp: new Date().toISOString()
+        });
+    }
 }
 
 export const analytics = new Analytics();

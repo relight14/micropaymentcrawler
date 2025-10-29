@@ -613,7 +613,20 @@ class SourceCard {
         button.className = 'summarize-btn';
         button.setAttribute('data-action', 'summarize');
         
+        const licenseCost = source.license_cost || 0;
         const price = this._calculateSummaryPrice(source);
+        
+        // Track pricing analytics
+        if (window.analytics && source.url) {
+            try {
+                const domain = new URL(source.url).hostname;
+                const pricingTier = (licenseCost * 1.25 >= 0.02) ? 'markup' : 'minimum';
+                window.analytics.trackSummaryPricing(source.id, domain, licenseCost, price, pricingTier);
+            } catch (e) {
+                // Silently fail if URL parsing fails
+                console.warn('Failed to track summary pricing:', e);
+            }
+        }
         
         const icon = document.createElement('span');
         icon.textContent = '✨';

@@ -3979,3 +3979,49 @@ body.dark-mode .summary-close-btn:hover {
         font-size: var(--text-sm);
     }
 }
+
+/* ========================================
+   SUMMARIZE BUTTON
+   ======================================== */
+
+.summarize-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    background: var(--accent);
+    color: var(--accent-foreground);
+    border: none;
+    border-radius: var(--radius);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.summarize-btn:hover:not(:disabled) {
+    background: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-yellow);
+}
+
+.summarize-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+.summarize-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Dark mode */
+body.dark-mode .summarize-btn {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+body.dark-mode .summarize-btn:hover:not(:disabled) {
+    box-shadow: var(--shadow-yellow);
+}

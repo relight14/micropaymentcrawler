@@ -189,6 +189,94 @@ export class SourceManager extends EventTarget {
         return this.unlockSource(null, sourceId, price);
     }
 
+    async summarizeSource(source, price, buttonElement) {
+        console.log('✨ SUMMARIZE: summarizeSource() called!', { source, price });
+        
+        // Check if already cached
+        const cached = this.appState.getCachedSummary(source.id);
+        if (cached) {
+            console.log('✨ SUMMARIZE: Using cached summary');
+            this.showSummaryPopover(source, cached.summary, cached.price);
+            analytics.trackSummaryViewed(source.id, new URL(source.url).hostname, cached.price, true);
+            return;
+        }
+        
+        // Check authentication
+        if (!this.authService.isAuthenticated()) {
+            this.appState.setPendingAction({ 
+                type: 'source_summarize', 
+                source, 
+                price 
+            });
+            this.modalController.showAuthModal();
+            return;
+        }
+        
+        // Show loading state on button
+        const originalButtonContent = buttonElement?.innerHTML;
+        if (buttonElement) {
+            buttonElement.innerHTML = '⏳ <span>Summarizing...</span>';
+            buttonElement.disabled = true;
+        }
+        
+        try {
+            // Call API to purchase and generate summary
+            const result = await this.apiService.summarizeSource(
+                source.id,
+                source.url,
+                source.title,
+                source.license_cost || 0
+            );
+            
+            console.log('✨ SUMMARIZE: API response:', result);
+            
+            // Cache the summary
+            this.appState.cacheSummary(source.id, result.summary, result.price);
+            
+            // Update wallet
+            await this.authService.updateWalletBalance();
+            if (this.authService.isAuthenticated()) {
+                this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            }
+            
+            // Show summary popover
+            this.showSummaryPopover(source, result.summary, result.price);
+            
+            // Track analytics
+            const domain = new URL(source.url).hostname;
+            analytics.trackSummaryPurchased(source.id, domain, result.price);
+            analytics.trackSummaryViewed(source.id, domain, result.price, false);
+            
+            this.toastManager.show('✅ Article summarized successfully!', 'success');
+            
+        } catch (error) {
+            console.error('✨ SUMMARIZE: Error:', error);
+            this.toastManager.show('⚠️ Summarization failed. Please try again.', 'error');
+        } finally {
+            // Restore button state
+            if (buttonElement && originalButtonContent) {
+                buttonElement.innerHTML = originalButtonContent;
+                buttonElement.disabled = false;
+            }
+        }
+    }
+
+    showSummaryPopover(source, summary, price) {
+        // Dynamically import and show the popover
+        if (window.summaryPopover) {
+            const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
+            window.summaryPopover.show({
+                anchorElement: sourceCard,
+                summary: summary,
+                price: price,
+                sourceTitle: source.title,
+                sourceUrl: source.url
+            });
+        } else {
+            console.error('✨ SUMMARIZE: Summary popover not loaded');
+        }
+    }
+
     toggleSelection(sourceId, sourceData) {
         const isSelected = this.appState.toggleSourceSelection(sourceId, sourceData);
         this.updateSelectionUI();
@@ -258,6 +346,11 @@ export class SourceManager extends EventTarget {
             
             document.addEventListener('sourceDownloadRequested', (e) => {
                 window.open(e.detail.source.url, '_blank');
+            });
+            
+            document.addEventListener('sourceSummarizeRequested', (e) => {
+                console.log('✨ SUMMARIZE: Event received in SourceManager!', e.detail);
+                this.summarizeSource(e.detail.source, e.detail.price, e.detail.buttonElement);
             });
         }
         

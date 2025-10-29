@@ -34,6 +34,7 @@ class SummarizeResponse(BaseModel):
     source_id: str
     summary: str
     price_cents: int
+    price: float  # Price in dollars for frontend compatibility
     transaction_id: str
 
 
@@ -307,6 +308,7 @@ Summary:"""
             "source_id": summarize_request.source_id,
             "summary": summary,
             "price_cents": price_cents,
+            "price": price_cents / 100.0,  # Convert cents to dollars for frontend
             "transaction_id": transaction_id
         }
         
