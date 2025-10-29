@@ -153,21 +153,25 @@ For each result, respond with JSON:
                 content = msg.get('content', '')[:200]  # Limit length
                 context_summary += f"{role.upper()}: {content}\n"
         
-        system_prompt = """You are a query optimizer. Your job is to rewrite a user's search query for precision while preserving its meaning.
+        system_prompt = """You are a query optimizer. Your job is to rewrite a user's search query for precision by incorporating relevant context from the conversation.
 
 Hard rules (must obey):
-1) Do NOT add entities (people, orgs, countries, cities), dates/years, numbers, or locations unless they are explicitly present in the user query or conversation context. No guesses.
-2) Do NOT infer geopolitical context or trends not mentioned by the user.
-3) Preserve topical scope; prefer neutral phrasing over specificity if specificity is not provided.
-4) Keep it 3–15 words. No punctuation unless needed for operators.
-5) Remove filler words like "I want to understand", "really", "help me", but preserve all substantive terms.
+1) When the user asks a follow-up question (e.g., "more sources about...", "what about...", "from publications like..."), incorporate the main topic from the conversation context.
+2) Extract key entities and topics from the conversation context that are relevant to the user's query.
+3) Do NOT add entities that are unrelated to both the query and conversation context.
+4) Keep it 5–15 words. No punctuation unless needed for operators.
+5) Remove filler words like "I want to understand", "really", "help me", "can we", "find", but preserve all substantive terms.
 
-If the input is broad or ambiguous, return a minimally cleaned version (deduped whitespace, casing) without added specificity.
+Examples with context:
+- Context: "USER: federal reserve policy... ASSISTANT: sources about fed policy"
+  Query: "can we find more sources from wsj and nyt?"
+  Output: "federal reserve policy WSJ NYT economist"
 
-Examples:
-- Input: "green energy" → Output: "green energy"
-- Input: "the role of central banks in US inflation" → Output: "US central banks inflation role"
-- Input: "what's happening with tech stocks recently" → Output: "tech stocks recent developments"
+- Context: "USER: climate change solutions... ASSISTANT: renewable energy sources"
+  Query: "what about solar panels?"
+  Output: "climate change solar panels"
+
+- Query without context: "green energy" → Output: "green energy"
 
 Return ONLY the optimized query. No explanation."""
 
