@@ -148,7 +148,8 @@ For each result, respond with JSON:
         context_summary = ""
         if conversation_context:
             for msg in conversation_context[-6:]:
-                role = msg.get('role', 'unknown')
+                # Frontend sends 'sender' field, not 'role'
+                role = msg.get('sender', msg.get('role', 'unknown'))
                 content = msg.get('content', '')[:200]  # Limit length
                 context_summary += f"{role.upper()}: {content}\n"
         
