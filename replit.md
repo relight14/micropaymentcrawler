@@ -17,6 +17,7 @@ Preferred communication style: Simple, everyday language.
   - Stale sources from previous conversations auto-cleaned on initialization
   - User can refine queries and accumulate sources within same conversation
   - "Start a New Search" generates fresh conversation ID, preventing cross-topic pollution
+- ✅ **Report Builder Query Auto-Switch**: Queries submitted from Report Builder tab automatically switch to Chat mode to build conversational context before delivering sources, preventing invisible source generation
 
 ### Smart Summary Button State (New Feature)
 - ✅ **Dynamic Button Text**: Summary buttons change from "Summarize for $X" to "Review Summary" after purchase

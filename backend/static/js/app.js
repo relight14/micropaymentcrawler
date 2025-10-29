@@ -336,6 +336,12 @@ export class ChatResearchApp {
         if (!message) return;
         
         const currentMode = this.appState.getMode();
+        
+        // Auto-switch to Chat mode if query submitted from Report Builder
+        if (currentMode === 'report') {
+            console.log('🔄 Query from Report Builder detected - switching to Chat mode');
+            this.setMode('chat');
+        }
 
         try {
             // Track search/message
