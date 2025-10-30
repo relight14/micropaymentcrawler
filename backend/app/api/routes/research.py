@@ -39,6 +39,10 @@ claude_client = anthropic.Anthropic(
     api_key=os.environ.get('ANTHROPIC_API_KEY')
 )
 
+# Conversation state storage: {conversation_id: {"topic": str, "first_query": str}}
+# In-memory storage - cleared on server restart
+conversation_topics: Dict[str, Dict[str, str]] = {}
+
 
 class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
@@ -129,6 +133,100 @@ def validate_query_input(query: str) -> str:
         raise HTTPException(status_code=400, detail="Query became too short after validation")
     
     return sanitized
+
+
+def extract_topic_from_query(query: str, sources: List[SourceCard] = None) -> str:
+    """
+    Extract main research topic from the first query.
+    Uses the query itself as the topic (cleaned up).
+    """
+    # Clean up the query to get the core topic
+    topic = query.strip().lower()
+    
+    # Remove common query prefixes
+    prefixes_to_remove = [
+        "i want to research",
+        "i want to know about",
+        "tell me about",
+        "show me",
+        "find me",
+        "search for",
+        "looking for",
+        "i need information on",
+    ]
+    
+    for prefix in prefixes_to_remove:
+        if topic.startswith(prefix):
+            topic = topic[len(prefix):].strip()
+    
+    # Remove trailing question marks and punctuation
+    topic = topic.rstrip("?!.,")
+    
+    # If sources available, use most common keywords from top source titles
+    if sources and len(sources) >= 3:
+        # Extract keywords from top 3 source titles
+        from collections import Counter
+        keywords = []
+        for source in sources[:3]:
+            # Extract words longer than 3 chars from title
+            words = re.findall(r'\b[a-z]{4,}\b', source.title.lower())
+            keywords.extend(words)
+        
+        # Get most common keyword that's also in the query
+        common_keywords = [word for word, count in Counter(keywords).most_common(5) if word in query.lower()]
+        if common_keywords:
+            # Use the top common keyword as the core topic
+            topic = common_keywords[0]
+    
+    logger.info(f"📌 Extracted topic: '{topic}' from query: '{query}'")
+    return topic
+
+
+async def check_topic_change(new_query: str, stored_topic: str) -> bool:
+    """
+    Use Claude to check if user wants to change research topics.
+    Returns True if user is pivoting to a NEW topic, False if refining current topic.
+    """
+    try:
+        system_prompt = """You are a topic change detector. Your job is to determine if the user wants to research a DIFFERENT topic or is just refining their current research.
+
+Return ONLY "YES" if the user is explicitly changing topics to something unrelated.
+Return ONLY "NO" if the user is refining, adding details, or asking follow-up questions about the same topic.
+
+Examples:
+- Current topic: "renewable energy"
+  Query: "anything from time magazine" → NO (refinement - still about renewable energy)
+  Query: "can we find paid sources?" → NO (refinement - still about renewable energy)
+  Query: "what about solar panels?" → NO (subtopic of renewable energy)
+  Query: "let's look at electric cars instead" → YES (completely different topic)
+  Query: "I want to research cryptocurrency now" → YES (completely different topic)
+
+Be conservative: only return YES for clear topic switches."""
+
+        user_message = f"""Current research topic: "{stored_topic}"
+New query from user: "{new_query}"
+
+Is this a topic change? (YES/NO only):"""
+
+        logger.info(f"🔍 Checking if '{new_query}' changes topic from '{stored_topic}'")
+        
+        response = claude_client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=10,
+            temperature=0.0,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        
+        answer = response.content[0].text.strip().upper()
+        is_topic_change = answer == "YES"
+        
+        logger.info(f"{'🔄' if is_topic_change else '✅'} Topic change detection: {answer}")
+        return is_topic_change
+        
+    except Exception as e:
+        logger.warning(f"⚠️  Topic change detection failed: {e}, assuming NO change")
+        return False  # Fail safe - assume no topic change
 
 
 def sanitize_context_text(context: str) -> str:
@@ -802,6 +900,28 @@ async def analyze_research_query(
         print(f"   Raw base_query: '{base_query}'")
         print(f"   Conversation context: {len(research_request.conversation_context) if research_request.conversation_context else 0} messages")
         
+        # TOPIC PERSISTENCE: Manage conversation topic
+        user_id = user_info.get('user_id', 'anonymous')
+        stored_topic = None
+        
+        # Handle topic reset (from "Start a New Search" button)
+        if research_request.reset_topic:
+            if user_id in conversation_topics:
+                logger.info(f"🔄 Resetting topic for user {user_id}")
+                del conversation_topics[user_id]
+        
+        # Check if we have a stored topic for this user
+        if user_id in conversation_topics:
+            stored_topic = conversation_topics[user_id].get('topic')
+            logger.info(f"📌 Found stored topic for user: '{stored_topic}'")
+            
+            # Check if user wants to change topics
+            topic_changed = await check_topic_change(base_query, stored_topic)
+            if topic_changed:
+                logger.info(f"🔄 Topic change detected - clearing old topic")
+                del conversation_topics[user_id]
+                stored_topic = None
+        
         if research_request.conversation_context and len(research_request.conversation_context) > 0:
             # Build research brief from conversation context
             brief = _build_research_brief(
@@ -821,9 +941,16 @@ async def analyze_research_query(
             ai_service = AIResearchService()
             enhanced_query = await ai_service.optimize_search_query(
                 raw_query=enhanced_query,
-                conversation_context=research_request.conversation_context
+                conversation_context=research_request.conversation_context,
+                pinned_topic=stored_topic  # Pass stored topic as constraint
             )
             print(f"   After Claude optimization: '{enhanced_query}'")
+            
+            # POST-OPTIMIZATION GUARD: Ensure topic is anchored
+            if stored_topic and stored_topic.lower() not in enhanced_query.lower():
+                logger.info(f"⚠️  Claude dropped topic - prepending '{stored_topic}'")
+                enhanced_query = f"{stored_topic} {enhanced_query}"
+                print(f"   After topic guard: '{enhanced_query}'")
         else:
             print(f"   No conversation context - skipping enhancement")
         
@@ -862,6 +989,16 @@ async def analyze_research_query(
                 publication_name=publication_name
             )
             sources = result["sources"]
+            
+            # TOPIC PERSISTENCE: Store topic after first successful search
+            if not stored_topic and sources and len(sources) > 0:
+                # Extract topic from first query
+                topic = extract_topic_from_query(base_query, sources)
+                conversation_topics[user_id] = {
+                    "topic": topic,
+                    "first_query": base_query
+                }
+                logger.info(f"💾 Stored topic for user {user_id}: '{topic}'")
         except Exception as crawler_error:
             print(f"⚠️ Progressive search failed: {crawler_error}")
             # Fallback: return minimal skeleton data to prevent total failure

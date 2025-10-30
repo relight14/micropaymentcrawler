@@ -131,13 +131,14 @@ For each result, respond with JSON:
             print(f"⚠️  Claude filtering error (using all results): {e}")
             return results  # Fallback to all results on error
     
-    async def optimize_search_query(self, raw_query: str, conversation_context: List[Dict[str, Any]]) -> str:
+    async def optimize_search_query(self, raw_query: str, conversation_context: List[Dict[str, Any]], pinned_topic: str = None) -> str:
         """
         Use Claude to optimize a search query based on conversation context.
         
         Args:
             raw_query: User's raw query string
             conversation_context: List of conversation messages for context
+            pinned_topic: Optional pinned research topic to anchor the query
         
         Returns:
             Optimized query string for Tavily search API
@@ -153,7 +154,28 @@ For each result, respond with JSON:
                 content = msg.get('content', '')[:200]  # Limit length
                 context_summary += f"{role.upper()}: {content}\n"
         
-        system_prompt = """You are a query optimizer. Your job is to rewrite a user's search query for precision by incorporating relevant context from the conversation.
+        # Build system prompt with topic constraint if available
+        if pinned_topic:
+            system_prompt = f"""You are a query optimizer. Your job is to rewrite a user's search query for precision by incorporating relevant context from the conversation.
+
+CRITICAL CONSTRAINT: The user is researching "{pinned_topic}". ALL queries must remain anchored to this topic. Do NOT change topics.
+
+Hard rules (must obey):
+1) Keep the topic "{pinned_topic}" in your optimized query. This is MANDATORY.
+2) Treat all queries as refinements of "{pinned_topic}" (e.g., adding publication filters, requesting more sources).
+3) Extract key entities and topics from the conversation context that are relevant to the user's query.
+4) Do NOT add entities that are unrelated to both the query and conversation context.
+5) Keep it 5–15 words. No punctuation unless needed for operators.
+6) Remove filler words like "I want to understand", "really", "help me", "can we", "find", but preserve all substantive terms.
+
+Examples with topic constraint:
+- Topic: "renewable energy", Query: "anything from time magazine" → Output: "renewable energy time magazine"
+- Topic: "renewable energy", Query: "can we find paid sources?" → Output: "renewable energy credible paid sources"
+- Topic: "federal reserve", Query: "more from wsj" → Output: "federal reserve WSJ"
+
+Return ONLY the optimized query. No explanation."""
+        else:
+            system_prompt = """You are a query optimizer. Your job is to rewrite a user's search query for precision by incorporating relevant context from the conversation.
 
 Hard rules (must obey):
 1) When the user asks a follow-up question (e.g., "more sources about...", "what about...", "from publications like..."), incorporate the main topic from the conversation context.
