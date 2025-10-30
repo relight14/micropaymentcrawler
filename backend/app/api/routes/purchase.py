@@ -97,8 +97,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Calculate pricing
         tier_base_prices = {
             TierType.BASIC: 0.00,
-            TierType.RESEARCH: 0.99,  
-            TierType.PRO: 1.99
+            TierType.RESEARCH: 0.35,  
+            TierType.PRO: 0.65
         }
         base_price = tier_base_prices[purchase_request.tier]
         
@@ -155,8 +155,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Tier configurations
         tier_configs = {
             TierType.BASIC: {"price": 0.00, "max_sources": 10},
-            TierType.RESEARCH: {"price": 0.99, "max_sources": 20}, 
-            TierType.PRO: {"price": 1.99, "max_sources": 40}
+            TierType.RESEARCH: {"price": 0.35, "max_sources": 20}, 
+            TierType.PRO: {"price": 0.65, "max_sources": 40}
         }
         
         config = tier_configs[purchase_request.tier]

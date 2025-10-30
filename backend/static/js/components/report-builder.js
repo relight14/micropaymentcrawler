@@ -12,7 +12,7 @@ const TIERS = [
         id: 'research',
         icon: '🔬',
         title: 'Research Package',
-        price: 0.99,
+        price: 0.35,
         description: 'Professional summary and analysis with source compilation',
         features: [
             '✓ Professional summary and analysis',
@@ -26,7 +26,7 @@ const TIERS = [
         id: 'pro',
         icon: '⭐',
         title: 'Pro Package',
-        price: 1.99,
+        price: 0.65,
         description: 'Everything in Research plus strategic insights and executive formatting',
         features: [
             '✓ Everything in Research Package',

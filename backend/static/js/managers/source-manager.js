@@ -450,8 +450,8 @@ export class SourceManager extends EventTarget {
     }
 
     checkBudget(totalCost) {
-        const researchBudget = 0.99;
-        const proBudget = 1.99;
+        const researchBudget = 0.35;
+        const proBudget = 0.65;
         const warningThreshold = 0.8;
         
         if (totalCost >= proBudget) {
