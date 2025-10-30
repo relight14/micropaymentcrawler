@@ -2,6 +2,7 @@
 
 import hashlib
 import httpx
+import logging
 from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -13,6 +14,8 @@ from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from services.ai.conversational import AIResearchService
 from utils.rate_limit import get_user_or_ip_key, limiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -123,7 +126,7 @@ async def scrape_article_content(url: str, timeout: int = 10) -> str:
             return text[:5000]
             
     except httpx.HTTPStatusError as e:
-        print(f"⚠️ Failed to scrape {url}: HTTP {e.response.status_code}")
+        logger.warning(f"Failed to scrape {url}: HTTP {e.response.status_code}")
         # Detect paywall/authentication errors
         if e.response.status_code in [401, 403]:
             raise HTTPException(
@@ -133,7 +136,7 @@ async def scrape_article_content(url: str, timeout: int = 10) -> str:
         else:
             raise HTTPException(status_code=400, detail=f"Could not fetch article: HTTP {e.response.status_code}")
     except Exception as e:
-        print(f"⚠️ Failed to scrape {url}: {str(e)}")
+        logger.warning(f"Failed to scrape {url}: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Could not fetch article content: {str(e)}")
 
 
@@ -227,14 +230,14 @@ async def summarize_source(
         summary_type = "full"
         
         try:
-            print(f"📄 Attempting to scrape full article: {summarize_request.url}")
+            logger.info(f"Attempting to scrape full article: {summarize_request.url}")
             article_content = await scrape_article_content(summarize_request.url)
-            print(f"✅ Successfully scraped full article content")
+            logger.info(f"Successfully scraped full article content")
             summary_type = "full"
         except HTTPException as e:
             if e.status_code == 403:
                 # Paywall detected - use Tavily excerpt instead
-                print(f"🔒 Paywall detected, falling back to Tavily excerpt")
+                logger.info(f"Paywall detected, falling back to Tavily excerpt")
                 if summarize_request.excerpt:
                     article_content = summarize_request.excerpt
                     summary_type = "excerpt"
@@ -247,7 +250,7 @@ async def summarize_source(
                 raise
         
         # Generate summary using Claude Haiku
-        print(f"🤖 Generating summary with Claude Haiku (type: {summary_type})...")
+        logger.info(f"Generating summary with Claude Haiku (type: {summary_type})...")
         
         if summary_type == "full":
             prompt = f"""Please provide a concise summary of the following article in 2-3 sentences. Focus on the main points and key takeaways.
@@ -287,7 +290,7 @@ Summary:"""
         # Mock purchase processing (matching research report flow)
         # Frontend shows confirmation modal before calling this endpoint
         transaction_id = f"summary_{summarize_request.source_id}_{int(time.time())}"
-        print(f"✅ Mock purchase processed: ${price_cents / 100:.2f} - {transaction_id}")
+        logger.info(f"Mock purchase processed: ${price_cents / 100:.2f} - {transaction_id}")
         
         # Record summary purchase in ledger
         ledger.record_summary_purchase(
@@ -318,12 +321,12 @@ Summary:"""
             response_data=response_data
         )
         
-        print(f"✅ Summary generated and cached for source {summarize_request.source_id}")
+        logger.info(f"Summary generated and cached for source {summarize_request.source_id}")
         return SummarizeResponse(**response_data)
         
     except HTTPException as http_exc:
         # Clean up idempotency status before re-raising
-        print(f"❌ HTTP error during summarization: {http_exc.status_code} - {http_exc.detail}")
+        logger.error(f"HTTP error during summarization: {http_exc.status_code} - {http_exc.detail}")
         if user_id and summarize_request.idempotency_key:
             ledger.set_idempotency_status(
                 user_id=user_id,
@@ -334,7 +337,7 @@ Summary:"""
             )
         raise
     except Exception as e:
-        print(f"❌ Summarization failed: {str(e)}")
+        logger.error(f"Summarization failed: {str(e)}")
         if user_id and summarize_request.idempotency_key:
             ledger.set_idempotency_status(
                 user_id=user_id,
