@@ -158,10 +158,22 @@ class ContentCrawlerStub:
             )
             authority = self._get_domain_authority(source.domain)
             
+            # DYNAMIC BOOST: Apply 1.3x multiplier to paid sources' authority (capped at 1.0)
+            is_paid_source = (source.unlock_price and source.unlock_price > 0 and 
+                            source.licensing_protocol and source.licensing_protocol.upper() != 'FREE')
+            if is_paid_source and authority > 0:
+                authority = min(1.0, authority * 1.3)  # Cap at 1.0 to prevent overflow
+            
             # Weighted combination (must sum to 1.0)
-            # Higher recency_weight means more emphasis on freshness
-            topicality_weight = 0.35
-            authority_weight = max(0, 1.0 - recency_weight - topicality_weight)  # Ensure non-negative
+            # ADJUSTED: Reduced topicality from 0.35 to 0.28 for more authority room
+            topicality_weight = 0.28
+            # MINIMUM FLOOR: Ensure authority_weight never drops below 0.25
+            authority_weight = max(0.25, 1.0 - recency_weight - topicality_weight)
+            
+            # Recalculate recency_weight to maintain sum = 1.0 with authority floor
+            if authority_weight == 0.25 and (recency_weight + topicality_weight + 0.25) > 1.0:
+                # Need to reduce recency_weight to accommodate authority floor
+                recency_weight = max(0, 1.0 - topicality_weight - 0.25)
             
             # Normalize if needed (safety check)
             total_weight = recency_weight + topicality_weight + authority_weight
