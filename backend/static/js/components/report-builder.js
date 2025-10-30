@@ -78,22 +78,19 @@ export class ReportBuilder extends EventTarget {
         }
 
         try {
-            // Extract source IDs
-            const selectedSourceIds = selectedSources.map(source => source.id);
-            
-            console.log(`📊 Generating ${tier} report with ${selectedSourceIds.length} selected sources`);
+            console.log(`📊 Generating ${tier} report with ${selectedSources.length} selected sources`);
             
             // Dispatch loading event
             this.dispatchEvent(new CustomEvent('reportGenerating', {
-                detail: { tier, sourceCount: selectedSourceIds.length }
+                detail: { tier, sourceCount: selectedSources.length }
             }));
             
-            // Call API to generate report
-            const reportPacket = await this.apiService.generateReport(query, tier, selectedSourceIds);
+            // Call API to generate report with full source objects (frontend is source of truth)
+            const reportPacket = await this.apiService.generateReport(query, tier, selectedSources);
             
             if (reportPacket) {
                 // Track report generation
-                analytics.trackReportGenerate(selectedSourceIds.length, tier);
+                analytics.trackReportGenerate(selectedSources.length, tier);
                 
                 // Update button state
                 if (button) {
@@ -106,7 +103,7 @@ export class ReportBuilder extends EventTarget {
                     detail: {
                         reportData: reportPacket,
                         tier,
-                        sourceCount: selectedSourceIds.length
+                        sourceCount: selectedSources.length
                     }
                 }));
             }

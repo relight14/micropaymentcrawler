@@ -382,17 +382,17 @@ export class APIService {
         }
     }
     
-    async generateReport(query, tier, selectedSourceIds = null) {
+    async generateReport(query, tier, selectedSources = null) {
         try {
             const requestBody = {
                 query: query,
                 tier: tier
             };
             
-            // Include selected source IDs if provided
-            if (selectedSourceIds && selectedSourceIds.length > 0) {
-                requestBody.selected_source_ids = selectedSourceIds;
-                console.log(`📊 Generating report with ${selectedSourceIds.length} selected sources`);
+            // Include selected sources if provided (full objects, not just IDs)
+            if (selectedSources && selectedSources.length > 0) {
+                requestBody.selected_sources = selectedSources;
+                console.log(`📊 Generating report with ${selectedSources.length} selected sources`);
             }
             
             const response = await fetch(`${this.baseURL}/api/research/generate-report`, {
