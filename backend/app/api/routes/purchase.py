@@ -163,9 +163,13 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         
         # Handle FREE TIER
         if config["price"] == 0.00:
-            # If user selected specific sources, retrieve them from cache
-            if purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
-                # Retrieve selected sources from crawler cache
+            # Use provided sources directly (frontend is source of truth)
+            if purchase_request.selected_sources and len(purchase_request.selected_sources) > 0:
+                # Convert dict objects to SourceCard instances
+                from schemas.domain import SourceCard
+                sources = [SourceCard(**source_dict) for source_dict in purchase_request.selected_sources]
+            elif purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
+                # Legacy fallback: try cache lookup for backward compatibility
                 selected_sources = []
                 for cache_key in crawler._cache:
                     cached_sources, timestamp = crawler._cache[cache_key]
@@ -177,8 +181,10 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 if len(selected_sources) > 0:
                     sources = selected_sources
                 else:
-                    # Fallback: generate fresh if cache is empty/expired
-                    sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Selected sources not available. Please refresh your search and select sources again."
+                    )
             else:
                 # No selected sources - generate fresh
                 sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
@@ -222,9 +228,13 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         budget_limit = config["price"] * 0.60
         max_sources = config["max_sources"]
         
-        # If user selected specific sources, retrieve them from cache
-        if purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
-            # Retrieve selected sources from crawler cache
+        # Use provided sources directly (frontend is source of truth)
+        if purchase_request.selected_sources and len(purchase_request.selected_sources) > 0:
+            # Convert dict objects to SourceCard instances
+            from schemas.domain import SourceCard
+            sources = [SourceCard(**source_dict) for source_dict in purchase_request.selected_sources]
+        elif purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
+            # Legacy fallback: try cache lookup for backward compatibility
             selected_sources = []
             for cache_key in crawler._cache:
                 cached_sources, timestamp = crawler._cache[cache_key]
@@ -236,8 +246,10 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             if len(selected_sources) > 0:
                 sources = selected_sources
             else:
-                # Fallback: generate fresh if cache is empty/expired
-                sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
+                raise HTTPException(
+                    status_code=422,
+                    detail="Selected sources not available. Please refresh your search and select sources again."
+                )
         else:
             # No selected sources - generate fresh
             sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
