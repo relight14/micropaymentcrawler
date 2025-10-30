@@ -44,7 +44,8 @@ class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
     query: str = Field(..., min_length=3, max_length=500, description="Research query between 3-500 characters")
     tier: TierType
-    selected_source_ids: Optional[List[str]] = Field(None, min_length=1)  # User's selected sources for report (must have at least 1 if provided)
+    selected_sources: Optional[List[Dict[str, Any]]] = None  # Full source objects (preferred)
+    selected_source_ids: Optional[List[str]] = Field(None, min_length=1)  # DEPRECATED: Use selected_sources instead
 
 
 class FeedbackRequest(BaseModel):

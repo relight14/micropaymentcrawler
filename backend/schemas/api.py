@@ -71,7 +71,8 @@ class DynamicResearchResponse(BaseModel):
 class PurchaseRequest(BaseModel):
     query: str
     tier: TierType
-    selected_source_ids: Optional[List[str]] = None  # Specific sources to unlock
+    selected_sources: Optional[List[Dict[str, Any]]] = None  # Full source objects (preferred)
+    selected_source_ids: Optional[List[str]] = None  # DEPRECATED: Use selected_sources instead
     budget_limit_dollars: Optional[float] = None  # Total budget for research
     idempotency_key: Optional[str] = None
 
