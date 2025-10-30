@@ -78,13 +78,13 @@ class ContentCrawlerStub:
         
         # Domain authority weights for ranking
         self.domain_weights = {
-            # Premium tier - exceptional quality + licensed sources (0.7)
-            'economist.com': 0.7, 'time.com': 0.7,
-            'nytimes.com': 0.7, 'wsj.com': 0.7, 'ft.com': 0.7,
-            'theatlantic.com': 0.7, 'foreignaffairs.com': 0.7, 'foreignpolicy.com': 0.7,
-            'hbr.org': 0.7,
-            # Premium academic/archives (0.7)
-            'arxiv.org': 0.7, 'nature.com': 0.7, 'science.org': 0.7, 'jstor.org': 0.7,
+            # Premium tier - exceptional quality + licensed sources (0.85 - BOOSTED)
+            'economist.com': 0.85, 'time.com': 0.85,
+            'nytimes.com': 0.85, 'wsj.com': 0.85, 'ft.com': 0.85,
+            'theatlantic.com': 0.85, 'foreignaffairs.com': 0.85, 'foreignpolicy.com': 0.85,
+            'hbr.org': 0.85,
+            # Premium academic/archives (0.85 - BOOSTED)
+            'arxiv.org': 0.85, 'nature.com': 0.85, 'science.org': 0.85, 'jstor.org': 0.85,
             # News wire services (0.6)
             'reuters.com': 0.6, 'apnews.com': 0.6, 'bloomberg.com': 0.6,
             # Academic institutions (0.5)
