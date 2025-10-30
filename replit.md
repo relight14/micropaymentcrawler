@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## October 30, 2025
 
+### Critical Bug Fix - Source Selection Architecture
+- ✅ **Frontend as Source of Truth**: Eliminated cache dependency for source selection by making frontend send complete source objects to backend
+  - Updated API schemas: `selected_sources` (full objects) now preferred over `selected_source_ids`
+  - Modified purchase.py and research.py to use provided source objects directly (Dict → SourceCard conversion)
+  - Updated frontend API service and report-builder component to send full source objects in report generation requests
+  - Legacy fallback: `selected_source_ids` still supported for backward compatibility with cache validity checks
+- ✅ **Bug Resolution**: Fixed critical issue where displayed sources in Report Builder didn't match report generation sources due to cache TTL/invalidation
+- ✅ **Architect Review**: Architecture approved - full source objects route end-to-end without breaking compatibility, no security issues or serialization drift
+
 ### Production Readiness - Logging Migration
 - ✅ **Comprehensive Logging Overhaul**: Replaced all 56 print() statements across backend with structured logging
   - content_licensing.py: 24 print() → logger calls (debug, info, warning, error)
