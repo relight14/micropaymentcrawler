@@ -1,5 +1,6 @@
 """Authentication routes"""
 
+import logging
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
@@ -9,6 +10,7 @@ from integrations.ledewire import LedeWireAPI
 from schemas.api import LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Initialize LedeWire API integration
 ledewire = LedeWireAPI()
@@ -43,7 +45,7 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
             raise HTTPException(status_code=401, detail=f"Login failed: {error_msg}")
         
         # Handle conversation migration from anonymous to authenticated user
-        print(f"🔍 Migration check: x_previous_user_id={x_previous_user_id}, has_access_token={bool(result.get('access_token'))}")
+        logger.debug(f"Migration check: x_previous_user_id={x_previous_user_id}, has_access_token={bool(result.get('access_token'))}")
         
         if x_previous_user_id and result.get("access_token"):
             from app.api.routes.chat import extract_user_id_from_token, ai_service
@@ -52,20 +54,20 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
             if x_previous_user_id == "anonymous" or x_previous_user_id.startswith("anon_"):
                 # Get the new authenticated user ID
                 new_user_id = extract_user_id_from_token(result["access_token"])
-                print(f"🔄 Attempting migration from '{x_previous_user_id}' to '{new_user_id}'")
+                logger.info(f"Attempting migration from '{x_previous_user_id}' to '{new_user_id}'")
                 
                 # Migrate conversation history using the shared AI service instance
                 migrated = ai_service.migrate_conversation(x_previous_user_id, new_user_id)
                 if migrated:
-                    print(f"✅ Migrated conversation from {x_previous_user_id} to {new_user_id}")
+                    logger.info(f"Migrated conversation from {x_previous_user_id} to {new_user_id}")
                 else:
-                    print(f"⚠️ No conversation to migrate from {x_previous_user_id}")
+                    logger.warning(f"No conversation to migrate from {x_previous_user_id}")
             else:
-                print(f"⚠️ Rejected migration attempt for suspicious user_id: {x_previous_user_id}")
+                logger.warning(f"Rejected migration attempt for suspicious user_id: {x_previous_user_id}")
         elif x_previous_user_id:
-            print(f"🚫 Migration skipped: Missing access token for user_id {x_previous_user_id}")
+            logger.warning(f"Migration skipped: Missing access token for user_id {x_previous_user_id}")
         else:
-            print(f"🔍 No previous user ID provided for migration")
+            logger.debug(f"No previous user ID provided for migration")
         
         return AuthResponse(
             access_token=result["access_token"],
@@ -78,12 +80,12 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
         raise  # Re-raise FastAPI exceptions as-is
     except requests.HTTPError as e:
         # Extract the actual error message from the HTTPError
-        print(f"Login error for {request.email}: {e}")
+        logger.error(f"Login error for {request.email}: {e}")
         error_message = str(e).split(',')[0] if ',' in str(e) else str(e)
         raise HTTPException(status_code=401, detail=error_message)
     except Exception as e:
         # Log the full error for debugging while returning safe message to user
-        print(f"Unexpected login error for {request.email}: {e}")
+        logger.error(f"Unexpected login error for {request.email}: {e}")
         raise HTTPException(status_code=500, detail="Authentication service unavailable")
 
 
@@ -117,7 +119,7 @@ async def signup(request: SignupRequest):
         raise  # Re-raise FastAPI exceptions as-is
     except requests.HTTPError as e:
         # Extract the actual error message from the HTTPError
-        print(f"Signup error for {request.email}: {e}")
+        logger.error(f"Signup error for {request.email}: {e}")
         error_message = str(e).split(',')[0] if ',' in str(e) else str(e)
         # Determine appropriate status code based on error message
         if "already exists" in error_message.lower():
@@ -127,7 +129,7 @@ async def signup(request: SignupRequest):
         else:
             raise HTTPException(status_code=400, detail=error_message)
     except Exception as e:
-        print(f"Unexpected signup error for {request.email}: {e}")
+        logger.error(f"Unexpected signup error for {request.email}: {e}")
         raise HTTPException(status_code=500, detail="Account creation service unavailable")
 
 
@@ -150,10 +152,10 @@ async def refresh_token(request: RefreshRequest):
         if "Invalid or expired refresh token" in str(e):
             raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
         else:
-            print(f"Token refresh error: {str(e)}")
+            logger.error(f"Token refresh error: {str(e)}")
             raise HTTPException(status_code=503, detail="Unable to refresh token")
     except Exception as e:
-        print(f"Token refresh error: {e}")
+        logger.error(f"Token refresh error: {e}")
         raise HTTPException(status_code=500, detail="Token refresh service unavailable")
 
 
@@ -167,7 +169,7 @@ async def get_wallet_balance(authorization: str = Header(None, alias="Authorizat
         # Get wallet balance from LedeWire
         balance_result = ledewire.get_wallet_balance(access_token)
         
-        print(f"🔍 LedeWire API balance response: {balance_result}")
+        logger.debug(f"LedeWire API balance response: {balance_result}")
         
         if "error" in balance_result:
             error_message = ledewire.handle_api_error(balance_result)
@@ -186,5 +188,5 @@ async def get_wallet_balance(authorization: str = Header(None, alias="Authorizat
         raise
     except Exception as e:
         # Network or connection errors
-        print(f"Wallet balance error: {e}")
+        logger.error(f"Wallet balance error: {e}")
         raise HTTPException(status_code=503, detail="Wallet service temporarily unavailable")

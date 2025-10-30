@@ -4,9 +4,12 @@ AI Report Generation Service for tiered research reports using Claude.
 import os
 import re
 import time
+import logging
 from typing import List, Optional, Dict, Tuple
 from anthropic import Anthropic
 from schemas.domain import SourceCard, TierType
+
+logger = logging.getLogger(__name__)
 
 # <important_code_snippet_instructions>
 # The newest Anthropic model is "claude-sonnet-4-20250514", not "claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022" nor "claude-3-sonnet-20240229". 
@@ -161,14 +164,14 @@ class ReportGeneratorService:
         if not anthropic_key:
             self.client = None
             self.enabled = False
-            print("Warning: ANTHROPIC_API_KEY not found, report generation disabled")
+            logger.warning("ANTHROPIC_API_KEY not found, report generation disabled")
         else:
             try:
                 self.client = Anthropic(api_key=anthropic_key)
                 self.enabled = True
-                print(f"✅ Report Generator initialized with model: {REPORT_MODEL}")
+                logger.info(f"Report Generator initialized with model: {REPORT_MODEL}")
             except Exception as e:
-                print(f"Failed to initialize Anthropic client: {e}")
+                logger.error(f"Failed to initialize Anthropic client: {e}")
                 self.client = None
                 self.enabled = False
         
@@ -218,7 +221,7 @@ class ReportGeneratorService:
             
             # Handle edge case: citation number doesn't match sources array
             if source_index < 0 or source_index >= len(sources):
-                print(f"Warning: Citation [{citation_num}] has no corresponding source (index {source_index} out of range)")
+                logger.warning(f"Citation [{citation_num}] has no corresponding source (index {source_index} out of range)")
                 continue
             
             source = sources[source_index]
@@ -267,7 +270,7 @@ class ReportGeneratorService:
         cache_key = self._get_cache_key(query, tier, sources)
         cached_report = self._get_cached_report(cache_key)
         if cached_report:
-            print(f"✅ Returning cached report for tier {tier.value} with {len(sources)} sources")
+            logger.info(f"Returning cached report for tier {tier.value} with {len(sources)} sources")
             # Extract citation metadata from cached report
             citation_metadata = self._extract_citation_metadata(cached_report, sources)
             return cached_report, citation_metadata
@@ -283,7 +286,7 @@ class ReportGeneratorService:
             citation_metadata = self._extract_citation_metadata(report, sources)
             return report, citation_metadata
         except Exception as e:
-            print(f"Report generation failed, using fallback: {e}")
+            logger.error(f"Report generation failed, using fallback: {e}")
             return self._generate_fallback_report(query, sources, tier)
     
     def _get_cache_key(self, query: str, tier: TierType, sources: Optional[List[SourceCard]] = None) -> str:
@@ -324,7 +327,7 @@ class ReportGeneratorService:
         total = self._cache_stats["hits"] + self._cache_stats["misses"]
         if total > 0:
             hit_rate = (self._cache_stats["hits"] / total) * 100
-            print(f"📊 Cache stats: {self._cache_stats['hits']} hits, {self._cache_stats['misses']} misses ({hit_rate:.1f}% hit rate, {len(self._cache)} cached)")
+            logger.info(f"Cache stats: {self._cache_stats['hits']} hits, {self._cache_stats['misses']} misses ({hit_rate:.1f}% hit rate, {len(self._cache)} cached)")
     
     def _cache_report(self, cache_key: str, report: str):
         """Store report in cache with timestamp."""
@@ -352,10 +355,10 @@ class ReportGeneratorService:
         # Log context size for monitoring
         prompt_length = len(prompt)
         estimated_tokens = prompt_length // 4  # Rough estimate: 4 chars per token
-        print(f"📊 Generating {tier.value} report:")
-        print(f"   - Sources: {len(sources)}")
-        print(f"   - Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
-        print(f"   - Model: {REPORT_MODEL}")
+        logger.info(f"Generating {tier.value} report:")
+        logger.info(f"   - Sources: {len(sources)}")
+        logger.info(f"   - Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
+        logger.info(f"   - Model: {REPORT_MODEL}")
         
         # Call Claude with upgraded model
         start_time = time.time()
@@ -381,9 +384,9 @@ class ReportGeneratorService:
             output_cost = (output_tokens / 1_000_000) * 15.0
             total_cost = input_cost + output_cost
             
-            print(f"   ✅ Report generated in {generation_time:.2f}s")
-            print(f"   - Tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
-            print(f"   - Est. cost: ${total_cost:.4f} (input: ${input_cost:.4f}, output: ${output_cost:.4f})")
+            logger.info(f"   Report generated in {generation_time:.2f}s")
+            logger.info(f"   - Tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
+            logger.info(f"   - Est. cost: ${total_cost:.4f} (input: ${input_cost:.4f}, output: ${output_cost:.4f})")
         
         # Extract text
         report = self._extract_response_text(response)

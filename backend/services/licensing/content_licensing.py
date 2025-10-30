@@ -8,12 +8,15 @@ import httpx
 import defusedxml.ElementTree as ET
 import json
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse, quote_plus, quote
 from functools import wraps
+
+logger = logging.getLogger(__name__)
 
 def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base=2):
     """
@@ -36,7 +39,7 @@ def async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0, exponential_base
                         raise
                     
                     delay = min(base_delay * (exponential_base ** attempt), max_delay)
-                    print(f"⚠️  API call failed (attempt {attempt + 1}/{max_attempts}): {str(e)[:100]}. Retrying in {delay:.1f}s...")
+                    logger.warning(f"API call failed (attempt {attempt + 1}/{max_attempts}): {str(e)[:100]}. Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
         
         return wrapper
@@ -111,7 +114,7 @@ class RSLProtocolHandler(ProtocolHandler):
                     
             return None
         except Exception as e:
-            print(f"RSL check failed for {url}: {e}")
+            logger.error(f"RSL check failed for {url}: {e}")
             return None
     
     def _parse_rsl_xml(self, xml_content: str, rsl_url: str) -> Optional[LicenseTerms]:
@@ -179,7 +182,7 @@ class RSLProtocolHandler(ProtocolHandler):
                 
             return None
         except ET.ParseError as e:
-            print(f"Failed to parse RSL XML: {e}")
+            logger.error(f"Failed to parse RSL XML: {e}")
             return None
     
     async def request_license(self, url: str, license_type: str = "ai-include") -> Optional[LicenseToken]:
@@ -214,16 +217,16 @@ class TollbitProtocolHandler(ProtocolHandler):
     async def check_source(self, url: str) -> Optional[LicenseTerms]:
         """Check for Tollbit licensing availability and get real pricing from API"""
         if not self.api_key:
-            print("Warning: TOLLBIT_API_KEY not available for pricing discovery")
+            logger.warning("TOLLBIT_API_KEY not available for pricing discovery")
             return None
             
         try:
             domain = urlparse(url).netloc
-            print(f"🎯 Checking Tollbit API for: {domain}")
+            logger.debug(f"Checking Tollbit API for: {domain}")
             
             pricing_data = await self._check_pricing(url)
             if pricing_data:
-                print(f"✅ Tollbit pricing found for {domain}: ${pricing_data.get('ai_include_price', 0.05)}")
+                logger.info(f"Tollbit pricing found for {domain}: ${pricing_data.get('ai_include_price', 0.05)}")
                 return LicenseTerms(
                     protocol="tollbit",
                     ai_include_price=pricing_data.get('ai_include_price', 0.05),
@@ -234,17 +237,17 @@ class TollbitProtocolHandler(ProtocolHandler):
                     permits_search=True
                 )
             else:
-                print(f"❌ No Tollbit pricing available for {domain}")
+                logger.warning(f"No Tollbit pricing available for {domain}")
                 
         except Exception as e:
-            print(f"Tollbit check failed for {url}: {e}")
+            logger.error(f"Tollbit check failed for {url}: {e}")
             
         return None
     
     async def request_license(self, url: str, license_type: str = "ai-include") -> Optional[LicenseToken]:
         """Request real Tollbit license token"""
         if not self.api_key:
-            print("Warning: TOLLBIT_API_KEY not available")
+            logger.warning("TOLLBIT_API_KEY not available")
             return None
             
         try:
@@ -263,7 +266,7 @@ class TollbitProtocolHandler(ProtocolHandler):
                     license_type=license_type
                 )
         except Exception as e:
-            print(f"Tollbit token request failed for {url}: {e}")
+            logger.error(f"Tollbit token request failed for {url}: {e}")
             
         return None
     
@@ -295,7 +298,7 @@ class TollbitProtocolHandler(ProtocolHandler):
                 
                 if response.status_code == 200:
                     data = response.json()
-                    print(f"✅ Real Tollbit pricing discovered for {target_url}: {data}")
+                    logger.info(f"Real Tollbit pricing discovered for {target_url}: {data}")
                     
                     if isinstance(data, list) and len(data) > 0:
                         ai_include_price = None
@@ -315,12 +318,12 @@ class TollbitProtocolHandler(ProtocolHandler):
                                 ai_include_price = price_usd
                                 if not license_path:
                                     license_path = license_info.get('licensePath')
-                                print(f"🎯 AI Include (ON_DEMAND_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
+                                logger.debug(f"AI Include (ON_DEMAND_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
                             elif license_type == 'ON_DEMAND_FULL_USE_LICENSE':
                                 purchase_price = price_usd
                                 if not license_path:
                                     license_path = license_info.get('licensePath')
-                                print(f"🎯 Full Purchase (ON_DEMAND_FULL_USE_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
+                                logger.debug(f"Full Purchase (ON_DEMAND_FULL_USE_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
                             
                             currency = price_info.get('currency', 'USD')
                         
@@ -343,16 +346,16 @@ class TollbitProtocolHandler(ProtocolHandler):
                             'license_type': 'ON_DEMAND'
                         }
                 else:
-                    print(f"Tollbit rate API response: {response.status_code} - {response.text[:200]}")
+                    logger.info(f"Tollbit rate API response: {response.status_code} - {response.text[:200]}")
                     
             except httpx.HTTPError as e:
-                print(f"Tollbit rate API request failed: {e}")
+                logger.error(f"Tollbit rate API request failed: {e}")
             
-            print(f"🔄 Tollbit rate API not accessible for {target_url} - no licensing available")
+            logger.info(f"Tollbit rate API not accessible for {target_url} - no licensing available")
             return None
                 
         except Exception as e:
-            print(f"Tollbit pricing discovery error: {e}")
+            logger.error(f"Tollbit pricing discovery error: {e}")
             return None
 
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
@@ -397,16 +400,16 @@ class TollbitProtocolHandler(ProtocolHandler):
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    print(f"Tollbit API response: {response.status_code}")
+                    logger.info(f"Tollbit API response: {response.status_code}")
                     
             except httpx.HTTPError as e:
-                print(f"Tollbit API connection failed: {e}")
+                logger.error(f"Tollbit API connection failed: {e}")
             
-            print(f"Tollbit API not accessible for {target_url} - no token available")
+            logger.warning(f"Tollbit API not accessible for {target_url} - no token available")
             return None
                 
         except Exception as e:
-            print(f"Tollbit API error: {e}")
+            logger.error(f"Tollbit API error: {e}")
             return None
     
     def _extract_publisher(self, url: str) -> str:
@@ -495,7 +498,7 @@ class ContentLicenseService:
                     self._cache[cache_key] = result
                     return result
             except Exception as e:
-                print(f"Protocol {protocol_name} check failed for {source_url}: {e}")
+                logger.error(f"Protocol {protocol_name} check failed for {source_url}: {e}")
                 continue
         
         self._cache[cache_key] = None
@@ -517,7 +520,7 @@ class ContentLicenseService:
             source_url = source_info.get('source_url', '')
             return await handler.request_license(source_url, license_type)
         except Exception as e:
-            print(f"License request failed: {e}")
+            logger.error(f"License request failed: {e}")
             return None
     
     def get_license_summary(self, sources: List[Dict]) -> Dict[str, Any]:
