@@ -1,0 +1,89 @@
+Yep—this one’s a lightweight state/guard problem, not an AI problem. The most minimal fix:
+
+1) Pin the topic once, keep it in sessionStorage
+
+When the first “real” query succeeds, save it as your pinned context.
+
+sessionStorage survives reloads but clears when the browser closes—exactly what you want.
+
+// when a query returns good results:
+const pinned = deriveTopicFrom(query) ?? query;   // or just use the raw query
+appState.pinnedContext = pinned;
+sessionStorage.setItem('pinnedContext', pinned);
+
+
+On app boot:
+
+appState.pinnedContext = sessionStorage.getItem('pinnedContext') || null;
+
+
+Add a visible “New topic” button that does:
+
+appState.pinnedContext = null;
+sessionStorage.removeItem('pinnedContext');
+
+2) Never let the optimizer drop the context (two-line guard)
+
+Before calling Claude (or after it returns), force-include the pinned context:
+
+function buildFinalQuery(userInput: string, pinned?: string) {
+  if (!pinned) return userInput.trim();
+
+  // If user input is a refinement (“anything from…”, “more”, “what about…”) OR
+  // the optimizer result doesn't contain the pinned topic, prepend it.
+  const optimized = optimize(userInput, pinned);  // your Claude call
+  const needsPrepend =
+    isRefinement(userInput) || !optimized.toLowerCase().includes(pinned.toLowerCase());
+
+  return needsPrepend ? `${pinned} ${optimized}` : optimized;
+}
+
+function isRefinement(q: string) {
+  return /^(anything|more|what about|from|by|latest|recent|credible|paid)/i.test(q.trim());
+}
+
+
+If you want zero dependency on the optimizer for refinements, short-circuit:
+
+if (isRefinement(userInput) && appState.pinnedContext) {
+  return `${appState.pinnedContext} ${userInput}`; // skip optimize()
+}
+
+3) Tell the backend what you intended (optional but tiny)
+
+Send the pinned context along so server logs/metrics make sense and you can debug later:
+
+await api.post('/search', {
+  user_query: userInput,
+  pinned_context: appState.pinnedContext,
+  final_query: buildFinalQuery(userInput, appState.pinnedContext),
+});
+
+
+On the backend, don’t override final_query. Use it as-is.
+
+4) One-line prompt nudge (if you keep the optimizer)
+
+When you do call Claude, add this single instruction:
+
+“You must keep the topic anchored to: ‘{pinned_context}’. If the user input is generic, prepend that topic. Do not change topics.”
+
+And still keep the guard in step 2—defense in depth.
+
+What this fixes
+
+Query 3 (“anything from Time magazine?”) becomes:
+renewable energy anything from time magazine
+even if the optimizer tries to wander.
+
+Why this is minimal
+
+No schema changes required.
+
+No server state or TTLs.
+
+Just a tiny FE state pin + a post-opt guard.
+
+Clears automatically when the browser is closed; manual New topic clears during a session.
+
+Drop these handful of lines in and your context will stick unless the user explicitly resets it.
