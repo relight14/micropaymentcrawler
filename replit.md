@@ -23,7 +23,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Research Brief Extraction System**: Uses regex-based pattern matching to extract structured research briefs from conversation context.
 - **Dual Classification Pipeline (Intent × Temporal)**: Classifies queries into intent types with tailored recency weights.
 - **Recency-Weighted Reranking**: Implements a composite scoring algorithm (recency + topicality + authority) that prioritizes fresh content.
-- **Premium Source Authority System**: Features a tiered domain authority hierarchy with premium sources receiving ranking boosts.
+- **Premium Source Authority System**: Features a tiered domain authority hierarchy with aggressive upranking for premium paid sources. Premium domains (WSJ, NYT, Economist, etc.) have 0.85 base authority (up from 0.7), paid sources receive a 1.3x authority multiplier (capped at 1.0), topicality weight reduced to 0.28 to provide more authority room, and authority weight has a 0.25 minimum floor to prevent recency from overwhelming premium source signals. This ensures premium paid sources consistently rank in top results across all query types.
 - **Source Type Classification & Blending**: Classifies sources by type and uses weighted sampling to blend results based on research intent, with frontend filter chips.
 - **Hybrid Publication Search**: Allows users to search within specific publications using a two-tier approach.
 - **Dual-Mode AI Experience**: Supports both conversational AI and deep research modes, including access to licensed sources and dynamic pricing.
