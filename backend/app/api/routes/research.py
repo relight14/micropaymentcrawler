@@ -620,11 +620,17 @@ async def generate_research_report(
         sanitized_query = validate_query_input(report_request.query)
         
         # If user selected specific sources, use those for the report
-        if report_request.selected_source_ids:
-            print(f"📊 Generating report with {len(report_request.selected_source_ids)} selected sources")
+        if report_request.selected_sources:
+            print(f"📊 Generating report with {len(report_request.selected_sources)} provided sources")
             
-            # Fetch selected sources from the latest research results
-            # Sources are stored in crawler cache or need to be retrieved
+            # Use provided sources directly (frontend is source of truth)
+            # Convert dict objects to SourceCard instances
+            selected_sources = [SourceCard(**source_dict) for source_dict in report_request.selected_sources]
+            
+        elif report_request.selected_source_ids:
+            print(f"📊 Generating report with {len(report_request.selected_source_ids)} selected sources (legacy mode)")
+            
+            # Legacy fallback: try cache lookup for backward compatibility
             selected_sources = []
             
             # Try to find sources in cache by checking all cached results
@@ -641,10 +647,11 @@ async def generate_research_report(
             
             if not selected_sources:
                 raise HTTPException(
-                    status_code=400, 
-                    detail="Sources not available. Please run a new search before generating a report. (Note: Sources are cleared when the server restarts)"
+                    status_code=422, 
+                    detail="Selected sources not available. Please refresh your search and select sources again."
                 )
             
+        if report_request.selected_sources or report_request.selected_source_ids:
             # Generate AI report with selected sources
             ai_report, citation_metadata = report_generator.generate_report(
                 sanitized_query, 
