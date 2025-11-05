@@ -670,13 +670,6 @@ body {
     color: var(--foreground);
 }
 
-.app-container {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--background);
-}
-
 /* Modern Header Styles */
 .modern-header {
     background: rgba(255, 255, 255, 0.8);
