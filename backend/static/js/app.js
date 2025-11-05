@@ -552,6 +552,24 @@ export class ChatResearchApp {
                 return;
             }
             
+            // Skip report builder UI (tier selection cards) - it's ephemeral and should regenerate fresh
+            // Only filter DOM elements with tier-cards-section as root class, not text content mentioning it
+            // Always preserve research reports (metadata.type === 'research_report')
+            if (metadata?.type !== 'research_report' && content.startsWith('<')) {
+                try {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = content;
+                    const firstChild = tempDiv.firstElementChild;
+                    if (firstChild && firstChild.classList.contains('tier-cards-section')) {
+                        console.log(`⏭️ Skipping report builder UI persistence for project ${activeProjectId}`);
+                        return;
+                    }
+                } catch (e) {
+                    // If parsing fails, allow the content to be saved
+                    console.warn('Failed to parse HTML for filtering, allowing save:', e);
+                }
+            }
+            
             const messageData = metadata ? { metadata } : null;
             
             await this.apiService.saveMessage(activeProjectId, normalizedSender, content, messageData);
