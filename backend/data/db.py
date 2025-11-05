@@ -87,6 +87,12 @@ class DatabaseConnection:
                 )
             """)
             
+            # Create index for efficient message queries
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_messages_project_created 
+                ON messages(project_id, created_at)
+            """)
+            
             conn.commit()
     
     def _create_database(self):
@@ -180,6 +186,12 @@ class DatabaseConnection:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
                 )
+            """)
+            
+            # Create index for efficient message queries
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_messages_project_created 
+                ON messages(project_id, created_at)
             """)
             
             conn.commit()
