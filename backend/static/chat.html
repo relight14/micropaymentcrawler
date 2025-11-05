@@ -27,15 +27,14 @@
     <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body class="bg-background text-foreground">
-    <!-- Project List Sidebar (Left) -->
-    <div id="project-sidebar"></div>
-    
-    <!-- Outline Builder (Right) -->
-    <div id="outline-builder"></div>
-    
     <div class="app-container">
-        <!-- Clean Header with Mode Switcher -->
-        <header class="modern-header">
+        <!-- Project List Sidebar (Left) -->
+        <div id="project-sidebar"></div>
+        
+        <!-- Main Content Area -->
+        <div id="main-content">
+            <!-- Clean Header with Mode Switcher -->
+            <header class="modern-header">
             <div class="header-content">
                 <div class="logo-section">
                     <img src="/static/clearcite-wide-logo.png" alt="Clearcite" class="logo-image">
@@ -138,8 +137,12 @@
                 </div>
             </div>
         </div>
+        <!-- /main-content -->
+        
+        <!-- Outline Builder (Right) -->
+        <div id="outline-builder"></div>
     </div>
-
+    <!-- /app-container -->
 
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>

@@ -188,19 +188,15 @@ export class ProjectManager {
             return projectStore.state.activeProjectId;
         }
 
-        // Don't auto-create if not authenticated
-        if (!this.authService.isAuthenticated()) {
-            return null;
-        }
-
-        // Auto-create project from query
+        // Auto-create project from query (works for both authenticated and anonymous users)
         this.hasAutoCreatedProject = true;
         const project = await this.sidebar.autoCreateProject(query);
         
         if (project) {
             analytics.track('project_auto_created', {
                 project_id: project.id,
-                from_query: true
+                from_query: true,
+                is_authenticated: this.authService.isAuthenticated()
             });
             return project.id;
         }

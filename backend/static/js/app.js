@@ -364,9 +364,7 @@ export class ChatResearchApp {
 
         try {
             // Auto-create project from first query if user has no projects
-            if (this.authService.isAuthenticated()) {
-                await this.projectManager.ensureActiveProject(message);
-            }
+            await this.projectManager.ensureActiveProject(message);
             
             // Track search/message
             analytics.trackSearch(message, currentMode);
