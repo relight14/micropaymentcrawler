@@ -29,6 +29,9 @@ export class ChatResearchApp {
         // Initialize base URL for API calls
         this.baseURL = window.location.origin;
         
+        // Flag to prevent saving messages during restoration
+        this.isRestoringMessages = false;
+        
         // Initialize core services and state (dependency injection)
         this.authService = new AuthService();
         this.apiService = new APIService(this.authService);
@@ -198,24 +201,15 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Tier purchased', e.detail);
         });
         
-        // Handle project switching - clear chat to provide fresh workspace per project
-        AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, (e) => {
+        // Handle project switching - load conversation history for the project
+        AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, async (e) => {
             console.log('📡 AppEvents: Project switched', {
                 projectId: e.detail.projectData.id,
                 projectTitle: e.detail.projectData.title
             });
             
-            // Clear chat interface for fresh project workspace (skip confirmation)
-            this.interactionHandler.clearConversation(
-                (sender, content) => this.addMessage(sender, content),
-                () => this.reportBuilder.update(),
-                true  // skipConfirmation = true for automatic project switching
-            );
-            
-            // Show welcome message for the project
-            this.addMessage('system', `🎯 Switched to project: "${e.detail.projectData.title}"`);
-            
-            console.log('✅ Chat cleared for new project workspace');
+            // Load messages for this project
+            await this.loadProjectMessages(e.detail.projectData.id, e.detail.projectData.title);
         });
         
         // Register logout callback to update UI when user is logged out
@@ -531,6 +525,11 @@ export class ChatResearchApp {
     
     async saveMessageToProject(sender, content, metadata) {
         try {
+            // Skip saving if we're restoring messages from database
+            if (this.isRestoringMessages) {
+                return;
+            }
+            
             const activeProjectId = this.projectManager.getActiveProjectId();
             
             if (!activeProjectId) {
@@ -556,6 +555,50 @@ export class ChatResearchApp {
         } catch (error) {
             console.error('Failed to save message to project:', error);
             // Don't throw - message already displayed to user
+        }
+    }
+    
+    async loadProjectMessages(projectId, projectTitle) {
+        try {
+            console.log(`📥 Loading messages for project ${projectId}...`);
+            
+            // Clear current conversation display (skip confirmation)
+            this.appState.clearConversation();
+            this.uiManager.clearConversationDisplay();
+            this.sourceManager.updateSelectionUI();
+            this.reportBuilder.update();
+            
+            // Fetch messages from backend
+            const response = await this.apiService.getProjectMessages(projectId);
+            const messages = response.messages || [];
+            
+            console.log(`📥 Loaded ${messages.length} messages for project ${projectId}`);
+            
+            if (messages.length === 0) {
+                // Show welcome message for empty project (don't save it)
+                this.isRestoringMessages = true;
+                this.addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`);
+                this.isRestoringMessages = false;
+            } else {
+                // Restore messages to chat interface (without saving them again)
+                this.isRestoringMessages = true;
+                
+                for (const msg of messages) {
+                    // Add message to state and UI
+                    const metadata = msg.message_data?.metadata || null;
+                    const message = this.appState.addMessage(msg.sender, msg.content, metadata);
+                    this.uiManager.addMessageToChat(message);
+                }
+                
+                this.isRestoringMessages = false;
+                console.log(`✅ Restored ${messages.length} messages to chat interface`);
+            }
+            
+            this.hideWelcomeScreen();
+            
+        } catch (error) {
+            console.error('Failed to load project messages:', error);
+            this.addMessage('system', `Failed to load conversation history for this project. Starting fresh.`);
         }
     }
     
