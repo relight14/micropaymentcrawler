@@ -50,6 +50,7 @@ class GenerateReportRequest(BaseModel):
     tier: TierType
     selected_sources: Optional[List[Dict[str, Any]]] = None  # Full source objects (preferred)
     selected_source_ids: Optional[List[str]] = Field(None, min_length=1)  # DEPRECATED: Use selected_sources instead
+    outline_structure: Optional[Dict[str, Any]] = None  # Custom outline structure from project outline builder
 
 
 class FeedbackRequest(BaseModel):
@@ -754,7 +755,8 @@ async def generate_research_report(
             ai_report, citation_metadata = report_generator.generate_report(
                 sanitized_query, 
                 selected_sources, 
-                report_request.tier
+                report_request.tier,
+                outline_structure=report_request.outline_structure
             )
             
             # Build packet directly with AI report (no packet_builder needed)
@@ -788,7 +790,8 @@ async def generate_research_report(
             ai_report, citation_metadata = report_generator.generate_report(
                 sanitized_query,
                 generated_sources,
-                report_request.tier
+                report_request.tier,
+                outline_structure=report_request.outline_structure
             )
             
             # Build packet directly

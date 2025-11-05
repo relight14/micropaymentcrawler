@@ -253,7 +253,7 @@ class ReportGeneratorService:
         
         return citation_metadata
     
-    def generate_report(self, query: str, sources: List[SourceCard], tier: TierType) -> Tuple[str, Dict[int, Dict]]:
+    def generate_report(self, query: str, sources: List[SourceCard], tier: TierType, outline_structure: Optional[Dict] = None) -> Tuple[str, Dict[int, Dict]]:
         """
         Generate a tiered research report using Claude.
         
@@ -261,6 +261,7 @@ class ReportGeneratorService:
             query: Research query
             sources: List of source cards with content
             tier: Tier type (RESEARCH or PRO)
+            outline_structure: Optional custom outline structure from project outline builder
             
         Returns:
             Tuple of (formatted markdown report, citation metadata dict)
@@ -280,7 +281,7 @@ class ReportGeneratorService:
             return self._generate_fallback_report(query, sources, tier)
         
         try:
-            report = self._generate_claude_report(query, sources, tier)
+            report = self._generate_claude_report(query, sources, tier, outline_structure)
             self._cache_report(cache_key, report)
             # Extract citation metadata from generated report
             citation_metadata = self._extract_citation_metadata(report, sources)
@@ -338,7 +339,7 @@ class ReportGeneratorService:
             oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
             del self._cache[oldest_key]
     
-    def _generate_claude_report(self, query: str, sources: List[SourceCard], tier: TierType) -> str:
+    def _generate_claude_report(self, query: str, sources: List[SourceCard], tier: TierType, outline_structure: Optional[Dict] = None) -> str:
         """Generate report using Claude API with token logging."""
         if not self.client:
             raise ValueError("Anthropic client not initialized")
@@ -346,11 +347,21 @@ class ReportGeneratorService:
         # Format sources for prompt
         sources_text = self._format_sources_for_prompt(sources)
         
-        # Select prompt based on tier
+        # Select and customize prompt based on tier and outline structure
         if tier == TierType.PRO:
-            prompt = PRO_REPORT_PROMPT.format(query=query, sources=sources_text)
+            base_prompt = PRO_REPORT_PROMPT
         else:
-            prompt = RESEARCH_REPORT_PROMPT.format(query=query, sources=sources_text)
+            base_prompt = RESEARCH_REPORT_PROMPT
+        
+        # Add custom outline section if provided
+        if outline_structure and outline_structure.get('sections'):
+            outline_guidance = self._format_outline_guidance(outline_structure)
+            prompt = base_prompt.replace(
+                "3. **Research Outline**",
+                f"3. **Research Outline** (Follow this structure):\n\n{outline_guidance}\n\n⚠️ IMPORTANT: Generate content following the exact section titles above"
+            ).format(query=query, sources=sources_text)
+        else:
+            prompt = base_prompt.format(query=query, sources=sources_text)
         
         # Log context size for monitoring
         prompt_length = len(prompt)
@@ -391,6 +402,20 @@ class ReportGeneratorService:
         # Extract text
         report = self._extract_response_text(response)
         return report
+    
+    def _format_outline_guidance(self, outline_structure: Dict) -> str:
+        """Format custom outline structure for Claude prompt."""
+        sections = outline_structure.get('sections', [])
+        guidance = []
+        
+        for i, section in enumerate(sections, 1):
+            section_title = section.get('title', f'Section {i}')
+            guidance.append(f"**{i}. {section_title}**")
+            guidance.append("   - Analyze relevant sources for this section")
+            guidance.append("   - Include specific evidence and numbered citations [N]")
+            guidance.append("   - Write 2-3 sentences of analysis\n")
+        
+        return "\n".join(guidance)
     
     def _format_sources_for_prompt(self, sources: List[SourceCard]) -> str:
         """Format sources with rich metadata for Claude prompt."""
