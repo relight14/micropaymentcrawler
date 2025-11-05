@@ -511,3 +511,184 @@ async def delete_project(
     except Exception as e:
         logger.error(f"Error deleting project: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
+
+
+class Message(BaseModel):
+    """Message model for conversation history"""
+    id: Optional[int] = None
+    project_id: int
+    user_id: str
+    sender: str  # 'user', 'ai', 'system'
+    content: str
+    message_data: Optional[Dict[str, Any]] = None  # JSON metadata (sources, etc.)
+    created_at: Optional[datetime] = None
+
+
+class CreateMessageRequest(BaseModel):
+    """Request to create a new message"""
+    sender: str = Field(..., pattern="^(user|ai|system)$")
+    content: str = Field(..., min_length=1)
+    message_data: Optional[Dict[str, Any]] = None
+
+
+@router.get("/{project_id}/messages")
+@limiter.limit("60/minute")
+async def get_project_messages(
+    request: Request,
+    project_id: int,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """Get all messages for a project"""
+    try:
+        access_token = extract_bearer_token(authorization)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Verify project ownership
+        project_query = """
+            SELECT id FROM projects WHERE id = ? AND user_id = ?
+        """ if not Config.USE_POSTGRES else """
+            SELECT id FROM projects WHERE id = %s AND user_id = %s
+        """
+        
+        project_result = db.execute_query(project_query, (project_id, user_id))
+        
+        if not project_result:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Fetch messages
+        messages_query = """
+            SELECT id, project_id, user_id, sender, content, message_data, created_at
+            FROM messages
+            WHERE project_id = ?
+            ORDER BY created_at ASC
+        """ if not Config.USE_POSTGRES else """
+            SELECT id, project_id, user_id, sender, content, message_data, created_at
+            FROM messages
+            WHERE project_id = %s
+            ORDER BY created_at ASC
+        """
+        
+        messages_results = db.execute_many(messages_query, (project_id,))
+        
+        messages = []
+        for row in messages_results:
+            message_data = None
+            if row.get('message_data'):
+                try:
+                    message_data = json.loads(row['message_data'])
+                except:
+                    message_data = None
+            
+            messages.append({
+                'id': row['id'],
+                'project_id': row['project_id'],
+                'user_id': row['user_id'],
+                'sender': row['sender'],
+                'content': row['content'],
+                'message_data': message_data,
+                'created_at': row['created_at'].isoformat() if isinstance(row['created_at'], datetime) else str(row['created_at'])
+            })
+        
+        return {"messages": messages}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching messages: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
+
+
+@router.post("/{project_id}/messages")
+@limiter.limit("60/minute")
+async def create_message(
+    request: Request,
+    project_id: int,
+    message_request: CreateMessageRequest,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """Create a new message in a project"""
+    try:
+        access_token = extract_bearer_token(authorization)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Verify project ownership
+        project_query = """
+            SELECT id FROM projects WHERE id = ? AND user_id = ?
+        """ if not Config.USE_POSTGRES else """
+            SELECT id FROM projects WHERE id = %s AND user_id = %s
+        """
+        
+        project_result = db.execute_query(project_query, (project_id, user_id))
+        
+        if not project_result:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Serialize message_data to JSON
+        message_data_json = json.dumps(message_request.message_data) if message_request.message_data else None
+        
+        # Insert message
+        insert_query = """
+            INSERT INTO messages (project_id, user_id, sender, content, message_data)
+            VALUES (?, ?, ?, ?, ?)
+        """ if not Config.USE_POSTGRES else """
+            INSERT INTO messages (project_id, user_id, sender, content, message_data)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, created_at
+        """
+        
+        if Config.USE_POSTGRES:
+            with db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(insert_query, (
+                        project_id,
+                        user_id,
+                        message_request.sender,
+                        message_request.content,
+                        message_data_json
+                    ))
+                    result = cursor.fetchone()
+                    conn.commit()
+                    
+                    return {
+                        "status": "success",
+                        "message": {
+                            "id": result['id'],
+                            "project_id": project_id,
+                            "user_id": user_id,
+                            "sender": message_request.sender,
+                            "content": message_request.content,
+                            "message_data": message_request.message_data,
+                            "created_at": result['created_at'].isoformat()
+                        }
+                    }
+        else:
+            message_id = db.execute_insert(insert_query, (
+                project_id,
+                user_id,
+                message_request.sender,
+                message_request.content,
+                message_data_json
+            ))
+            
+            # Fetch the created message
+            fetch_query = "SELECT * FROM messages WHERE id = ?"
+            message_result = db.execute_query(fetch_query, (message_id,))
+            
+            return {
+                "status": "success",
+                "message": {
+                    "id": message_result['id'],
+                    "project_id": message_result['project_id'],
+                    "user_id": message_result['user_id'],
+                    "sender": message_result['sender'],
+                    "content": message_result['content'],
+                    "message_data": json.loads(message_result['message_data']) if message_result.get('message_data') else None,
+                    "created_at": message_result['created_at']
+                }
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating message: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create message: {str(e)}")
