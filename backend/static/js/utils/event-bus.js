@@ -8,5 +8,22 @@ export const EVENT_TYPES = {
     BUDGET_WARNING: 'budgetWarning',
     TIER_PURCHASED: 'tierPurchased',
     TIER_PURCHASE_ERROR: 'tierPurchaseError',
-    REPORT_REQUESTED: 'reportRequested'
+    REPORT_REQUESTED: 'reportRequested',
+    
+    // Project events
+    PROJECT_CREATED: 'projectCreated',
+    PROJECT_LOADED: 'projectLoaded',
+    PROJECT_SWITCHED: 'projectSwitched',
+    PROJECT_DELETED: 'projectDeleted',
+    PROJECT_UPDATED: 'projectUpdated',
+    
+    // Outline events
+    OUTLINE_UPDATED: 'outlineUpdated',
+    OUTLINE_SECTION_ADDED: 'outlineSectionAdded',
+    OUTLINE_SECTION_DELETED: 'outlineSectionDeleted',
+    OUTLINE_SOURCE_ADDED: 'outlineSourceAdded',
+    OUTLINE_SOURCE_REMOVED: 'outlineSourceRemoved',
+    
+    // Sources selection
+    SOURCES_SELECTION_CHANGED: 'sourcesSelectionChanged'
 };
