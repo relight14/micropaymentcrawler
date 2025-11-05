@@ -1,0 +1,68 @@
+Here’s the no-BS take—tight and actionable:
+What’s strong
+
+
+Clear separation (ProjectManager vs UI).
+
+
+Event-driven decoupling keeps app.js lean.
+
+
+Hooks for auth → project bootstrap are sensible.
+
+
+What to change
+
+
+Single source of truth: add a ProjectStore (state slice) and make UI subscribe; avoid ProjectManager → OutlineBuilder.setX(). Managers dispatch events/actions only.
+
+
+Typed event bus: use a small, typed pub/sub (or state machine) to avoid stringly-typed “AppEvents” chaos.
+
+
+URL as state: route /:projectId so refresh/share goes to the same project; ProjectManager derives active project from router.
+
+
+Outline data model: explicit schema:
+
+
+Nodes: {id, parentId|null, type: 'section'|'item', title, notes, sourceRefs: [id], order}
+
+
+Keep a flat map + children arrays; compute tree in selector.
+
+
+
+
+Ordering strategy: use fractional ordering (e.g., 1.0, 1.5, 2.0) to make drag-drop O(1) without reindex storms.
+
+
+Persistence contracts: ProjectRepo interface (create/load/save/delete, saveOutlinePatch(patch)) so you can swap localStorage ↔ API.
+
+
+Autosave & durability: optimistic local save + debounced server patch; show save state (saving/saved/error). Include offline queue.
+
+
+Undo/redo: maintain an operation log for outline edits (drag, add, delete, rename) to enable CTRL-Z reliably.
+
+
+ReportBuilder coupling: ReportBuilder should read a serialized outline snapshot from store/selectors; don’t reach back into ProjectManager.
+
+
+Auth & multitenancy: project ownership enforced at repo layer; never trust activeProjectId from client without server check.
+
+
+Performance: virtualize long outlines; memoized selectors; lazy-load project contents.
+
+
+Extensibility: version your project/outline schema; add a lightweight migrator.
+
+
+IDs: generate ULIDs client-side to prevent collisions across offline edits.
+
+
+Future collab: if real-time is likely, keep mutations as CRDT-friendly ops (moveNode(id, beforeId) etc.).
+
+
+Verdict
+Good direction. Promote events into a typed store layer, make ReportBuilder consume snapshots, add autosave/undo, routing, and a robust outline schema. This will stay scalable and testable.
