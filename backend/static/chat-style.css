@@ -4089,6 +4089,7 @@ body.dark-mode .summarize-btn:hover:not(:disabled) {
 
 /* Project sidebar - left */
 #project-sidebar {
+    display: none;
     width: 250px;
     min-width: 250px;
     background: var(--card);
@@ -4096,6 +4097,10 @@ body.dark-mode .summarize-btn:hover:not(:disabled) {
     overflow-y: auto;
     flex-shrink: 0;
     transition: transform 0.3s ease;
+}
+
+#project-sidebar.active {
+    display: block;
 }
 
 .project-sidebar.collapsed {
@@ -4114,6 +4119,7 @@ body.dark-mode .summarize-btn:hover:not(:disabled) {
 
 /* Outline builder - right */
 #outline-builder {
+    display: none;
     width: 300px;
     min-width: 300px;
     background: var(--card);
@@ -4121,6 +4127,10 @@ body.dark-mode .summarize-btn:hover:not(:disabled) {
     overflow-y: auto;
     flex-shrink: 0;
     transition: transform 0.3s ease;
+}
+
+#outline-builder.active {
+    display: block;
 }
 
 /* Mobile responsive */
