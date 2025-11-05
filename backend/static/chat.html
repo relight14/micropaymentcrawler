@@ -22,9 +22,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/chat-style.css">
     <link rel="stylesheet" href="/static/styles/components/source-card.css">
+    <link rel="stylesheet" href="/static/styles/components/project-sidebar.css">
+    <link rel="stylesheet" href="/static/styles/components/outline-builder.css">
     <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body class="bg-background text-foreground">
+    <!-- Project List Sidebar (Left) -->
+    <div id="project-sidebar"></div>
+    
+    <!-- Outline Builder (Right) -->
+    <div id="outline-builder"></div>
+    
     <div class="app-container">
         <!-- Clean Header with Mode Switcher -->
         <header class="modern-header">
@@ -143,6 +151,18 @@
     <script type="module">
         import { summaryPopover } from '/static/js/components/summary-popover.js';
         window.summaryPopover = summaryPopover;
+    </script>
+    
+    <!-- Project Sidebar Component -->
+    <script type="module">
+        import { ProjectListSidebar } from '/static/js/components/project-sidebar.js';
+        window.ProjectListSidebar = ProjectListSidebar;
+    </script>
+    
+    <!-- Outline Builder Component -->
+    <script type="module">
+        import { OutlineBuilder } from '/static/js/components/outline-builder.js';
+        window.OutlineBuilder = OutlineBuilder;
     </script>
     
     <!-- Modular Chat app JavaScript -->

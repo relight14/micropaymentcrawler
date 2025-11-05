@@ -1,0 +1,187 @@
+/* Project Sidebar Styles */
+
+#project-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 250px;
+    background: var(--background-dark, #1a1a1a);
+    border-right: 1px solid var(--border-color, #333);
+    z-index: 100;
+    transition: transform 0.3s ease;
+}
+
+.project-sidebar {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-sidebar.collapsed {
+    width: 50px;
+}
+
+.project-sidebar.collapsed #project-sidebar {
+    width: 50px;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #fff);
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.toggle-btn:hover {
+    background-color: var(--hover-bg, rgba(255, 255, 255, 0.1));
+}
+
+.new-project-btn {
+    margin: 16px;
+    padding: 10px 16px;
+    background: var(--primary-color, #4CAF50);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.new-project-btn:hover {
+    background: var(--primary-hover, #45a049);
+    transform: translateY(-1px);
+}
+
+.projects-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.project-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    margin-bottom: 6px;
+    background: var(--item-bg, rgba(255, 255, 255, 0.05));
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.project-item:hover {
+    background: var(--item-hover-bg, rgba(255, 255, 255, 0.1));
+    border-color: var(--border-hover, #444);
+}
+
+.project-item.active {
+    background: var(--primary-color, #4CAF50);
+    border-color: var(--primary-color, #4CAF50);
+}
+
+.project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary, #fff);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-item.active .project-title {
+    color: white;
+}
+
+.project-timestamp {
+    font-size: 12px;
+    color: var(--text-secondary, #999);
+}
+
+.project-item.active .project-timestamp {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.delete-project-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.project-item:hover .delete-project-btn {
+    opacity: 1;
+}
+
+.delete-project-btn:hover {
+    background-color: var(--danger-color, #f44336);
+    color: white;
+}
+
+.project-item.active .delete-project-btn {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.project-item.active .delete-project-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary, #999);
+}
+
+.empty-state p {
+    margin: 8px 0;
+}
+
+.empty-state .hint {
+    font-size: 12px;
+    color: var(--text-tertiary, #666);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    #project-sidebar {
+        transform: translateX(-100%);
+    }
+    
+    #project-sidebar.visible {
+        transform: translateX(0);
+    }
+}
