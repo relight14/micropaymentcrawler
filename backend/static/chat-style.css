@@ -4074,3 +4074,100 @@ body.dark-mode .summarize-btn {
 body.dark-mode .summarize-btn:hover:not(:disabled) {
     box-shadow: var(--shadow-yellow);
 }
+
+/* ========================================
+   THREE-COLUMN LAYOUT FOR PROJECTS
+   ======================================== */
+
+/* Main app container with three-column layout */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    position: relative;
+}
+
+/* Project sidebar - left */
+#project-sidebar {
+    width: 250px;
+    min-width: 250px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.project-sidebar.collapsed {
+    width: 50px;
+    min-width: 50px;
+}
+
+/* Main content area - center */
+#main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* Outline builder - right */
+#outline-builder {
+    width: 300px;
+    min-width: 300px;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+/* Mobile responsive */
+@media (max-width: 1024px) {
+    /* Hide sidebars on tablet */
+    #project-sidebar,
+    #outline-builder {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        transform: translateX(-100%);
+    }
+    
+    #project-sidebar {
+        left: 0;
+        box-shadow: var(--shadow-lg);
+    }
+    
+    #project-sidebar.visible {
+        transform: translateX(0);
+    }
+    
+    #outline-builder {
+        right: 0;
+        transform: translateX(100%);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    #outline-builder.visible {
+        transform: translateX(0);
+    }
+}
+
+@media (max-width: 640px) {
+    /* Full width sidebars on mobile */
+    #project-sidebar,
+    #outline-builder {
+        width: 100%;
+        max-width: 320px;
+    }
+}
+
+/* Dark mode */
+body.dark-mode #project-sidebar,
+body.dark-mode #outline-builder {
+    background: var(--card);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
