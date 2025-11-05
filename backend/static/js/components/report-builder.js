@@ -5,6 +5,7 @@
  */
 
 import { analytics } from '../utils/analytics.js';
+import { projectStore } from '../state/project-store.js';
 
 // Tier configuration constant
 const TIERS = [
@@ -85,8 +86,11 @@ export class ReportBuilder extends EventTarget {
                 detail: { tier, sourceCount: selectedSources.length }
             }));
             
-            // Call API to generate report with full source objects (frontend is source of truth)
-            const reportPacket = await this.apiService.generateReport(query, tier, selectedSources);
+            // Get outline structure from project store
+            const outlineStructure = projectStore.getOutlineSnapshot();
+            
+            // Call API to generate report with full source objects and outline structure
+            const reportPacket = await this.apiService.generateReport(query, tier, selectedSources, outlineStructure);
             
             if (reportPacket) {
                 // Track report generation

@@ -382,7 +382,7 @@ export class APIService {
         }
     }
     
-    async generateReport(query, tier, selectedSources = null) {
+    async generateReport(query, tier, selectedSources = null, outlineStructure = null) {
         try {
             const requestBody = {
                 query: query,
@@ -393,6 +393,12 @@ export class APIService {
             if (selectedSources && selectedSources.length > 0) {
                 requestBody.selected_sources = selectedSources;
                 console.log(`📊 Generating report with ${selectedSources.length} selected sources`);
+            }
+            
+            // Include outline structure if provided
+            if (outlineStructure && outlineStructure.sections && outlineStructure.sections.length > 0) {
+                requestBody.outline_structure = outlineStructure;
+                console.log(`📋 Using custom outline with ${outlineStructure.sections.length} sections`);
             }
             
             const response = await fetch(`${this.baseURL}/api/research/generate-report`, {
