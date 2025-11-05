@@ -16,6 +16,7 @@ import { SourceManager } from './managers/source-manager.js';
 import { TierManager } from './managers/tier-manager.js';
 import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
+import { ProjectManager } from './managers/project-manager.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
 import { summaryPopover } from './components/summary-popover.js';
@@ -94,6 +95,12 @@ export class ChatResearchApp {
             sourceManager: this.sourceManager
         });
         
+        this.projectManager = new ProjectManager({
+            apiService: this.apiService,
+            authService: this.authService,
+            toastManager: this.toastManager
+        });
+        
         // Setup ReportBuilder event listeners
         this.reportBuilder.addEventListener('reportGenerated', (e) => {
             const { reportData, tier, sourceCount } = e.detail;
@@ -163,6 +170,8 @@ export class ChatResearchApp {
                 const reportBuilderElement = this.reportBuilder.show();
                 this.addMessage('system', reportBuilderElement);
             }
+            // Update project store with selected sources
+            this.projectManager.updateSelectedSources(this.appState.getSelectedSources());
         });
         
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_DESELECTED, (e) => {
@@ -172,6 +181,8 @@ export class ChatResearchApp {
                 const reportBuilderElement = this.reportBuilder.show();
                 this.addMessage('system', reportBuilderElement);
             }
+            // Update project store with selected sources
+            this.projectManager.updateSelectedSources(this.appState.getSelectedSources());
         });
         
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_UNLOCKED, (e) => {
@@ -251,6 +262,11 @@ export class ChatResearchApp {
                     console.log('🎨 Updating auth button UI...');
                     this.updateAuthButton();
                     console.log('✅ Auth success callback completed');
+                    
+                    // Dispatch auth state changed event for project manager
+                    AppEvents.dispatchEvent(new CustomEvent('authStateChanged', {
+                        detail: { isAuthenticated: true }
+                    }));
                 } catch (error) {
                     console.error('❌ Error in auth success callback:', error);
                     // Don't throw - just log and update UI anyway
@@ -323,6 +339,9 @@ export class ChatResearchApp {
             // Show onboarding modal for first-time users
             const onboarding = new OnboardingModal();
             onboarding.show();
+            
+            // Initialize project manager
+            await this.projectManager.init();
         } catch (error) {
             console.error('Error initializing app:', error);
             this.addMessage('system', 'Application initialization failed. Please refresh the page.');
@@ -344,6 +363,11 @@ export class ChatResearchApp {
         }
 
         try {
+            // Auto-create project from first query if user has no projects
+            if (this.authService.isAuthenticated()) {
+                await this.projectManager.ensureActiveProject(message);
+            }
+            
             // Track search/message
             analytics.trackSearch(message, currentMode);
             analytics.trackChatMessage(message.length, currentMode);
