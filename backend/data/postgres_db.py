@@ -133,6 +133,20 @@ class PostgreSQLConnection:
                     )
                 """)
                 
+                # Create messages table for conversation history
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id SERIAL PRIMARY KEY,
+                        project_id INTEGER NOT NULL,
+                        user_id TEXT NOT NULL,
+                        sender TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        message_data TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                    )
+                """)
+                
                 # Create indexes for better query performance
                 cursor.execute("""
                     CREATE INDEX IF NOT EXISTS idx_projects_user_id 
@@ -147,6 +161,11 @@ class PostgreSQLConnection:
                 cursor.execute("""
                     CREATE INDEX IF NOT EXISTS idx_outline_sources_section_id 
                     ON outline_sources(section_id, order_index)
+                """)
+                
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_messages_project_id 
+                    ON messages(project_id, created_at)
                 """)
                 
                 conn.commit()
