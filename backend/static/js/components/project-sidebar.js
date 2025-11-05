@@ -104,11 +104,24 @@ export class ProjectListSidebar extends EventTarget {
             });
 
             if (response.ok) {
-                const projectData = await response.json();
+                const response_data = await response.json();
+                
+                // API returns {project: {...}, outline: [...]}
+                // Flatten for easier use in the frontend
+                const projectData = {
+                    id: response_data.project.id,
+                    user_id: response_data.project.user_id,
+                    title: response_data.project.title,
+                    created_at: response_data.project.created_at,
+                    updated_at: response_data.project.updated_at,
+                    is_active: response_data.project.is_active,
+                    outline: response_data.outline
+                };
+                
                 console.log(`✅ [ProjectSidebar] Project data loaded:`, {
                     id: projectData.id,
                     title: projectData.title,
-                    outlineSections: projectData.outline?.sections?.length || 0
+                    outlineSections: projectData.outline?.length || 0
                 });
                 
                 this.activeProjectId = projectId;

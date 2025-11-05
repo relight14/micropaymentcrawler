@@ -1,0 +1,93 @@
+GET https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/api/chat/user-id 401 (Unauthorized)
+login @ auth.js:121
+_handleAuth @ modal-controller.js:197
+(anonymous) @ modal-controller.js:110Understand this error
+api.js:252  GET https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/api/projects/undefined/messages 422 (Unprocessable Entity)
+getProjectMessages @ api.js:252
+loadProjectMessages @ app.js:572
+(anonymous) @ app.js:212
+handleProjectLoaded @ project-manager.js:151
+(anonymous) @ project-manager.js:57
+loadProject @ project-sidebar.js:121
+await in loadProject
+loadInitialData @ project-manager.js:100
+await in loadInitialData
+(anonymous) @ project-manager.js:67
+(anonymous) @ app.js:281
+await in (anonymous)
+_handleAuth @ modal-controller.js:205
+await in _handleAuth
+(anonymous) @ modal-controller.js:110Understand this error
+api.js:264 Error fetching messages: Error: Failed to fetch messages
+    at APIService.getProjectMessages (api.js:259:23)
+    at async ChatResearchApp.loadProjectMessages (app.js:572:30)
+    at async EventTarget.<anonymous> (app.js:212:13)
+getProjectMessages @ api.js:264
+await in getProjectMessages
+loadProjectMessages @ app.js:572
+(anonymous) @ app.js:212
+handleProjectLoaded @ project-manager.js:151
+(anonymous) @ project-manager.js:57
+loadProject @ project-sidebar.js:121
+await in loadProject
+loadInitialData @ project-manager.js:100
+await in loadInitialData
+(anonymous) @ project-manager.js:67
+(anonymous) @ app.js:281
+await in (anonymous)
+_handleAuth @ modal-controller.js:205
+await in _handleAuth
+(anonymous) @ modal-controller.js:110Understand this error
+app.js:600 Failed to load project messages: Error: Failed to fetch messages
+    at APIService.getProjectMessages (api.js:259:23)
+    at async ChatResearchApp.loadProjectMessages (app.js:572:30)
+    at async EventTarget.<anonymous> (app.js:212:13)
+loadProjectMessages @ app.js:600
+await in loadProjectMessages
+(anonymous) @ app.js:212
+handleProjectLoaded @ project-manager.js:151
+(anonymous) @ project-manager.js:57
+loadProject @ project-sidebar.js:121
+await in loadProject
+loadInitialData @ project-manager.js:100
+await in loadInitialData
+(anonymous) @ project-manager.js:67
+(anonymous) @ app.js:281
+await in (anonymous)
+_handleAuth @ modal-controller.js:205
+await in _handleAuth
+(anonymous) @ modal-controller.js:110Understand this error
+api.js:252  GET https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/api/projects/undefined/messages 422 (Unprocessable Entity)
+getProjectMessages @ api.js:252
+loadProjectMessages @ app.js:572
+(anonymous) @ app.js:212
+handleProjectLoaded @ project-manager.js:151
+(anonymous) @ project-manager.js:57
+loadProject @ project-sidebar.js:121
+await in loadProject
+(anonymous) @ project-sidebar.js:294Understand this error
+api.js:264 Error fetching messages: Error: Failed to fetch messages
+    at APIService.getProjectMessages (api.js:259:23)
+    at async ChatResearchApp.loadProjectMessages (app.js:572:30)
+    at async EventTarget.<anonymous> (app.js:212:13)
+getProjectMessages @ api.js:264
+await in getProjectMessages
+loadProjectMessages @ app.js:572
+(anonymous) @ app.js:212
+handleProjectLoaded @ project-manager.js:151
+(anonymous) @ project-manager.js:57
+loadProject @ project-sidebar.js:121
+await in loadProject
+(anonymous) @ project-sidebar.js:294Understand this error
+app.js:600 Failed to load project messages: Error: Failed to fetch messages
+    at APIService.getProjectMessages (api.js:259:23)
+    at async ChatResearchApp.loadProjectMessages (app.js:572:30)
+    at async EventTarget.<anonymous> (app.js:212:13)
+loadProjectMessages @ app.js:600
+await in loadProjectMessages
+(anonymous) @ app.js:212
+handleProjectLoaded @ project-manager.js:151
+(anonymous) @ project-manager.js:57
+loadProject @ project-sidebar.js:121
+await in loadProject
+(anonymous) @ project-sidebar.js:294Understand this error
