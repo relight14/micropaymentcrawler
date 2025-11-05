@@ -36,6 +36,43 @@ class DatabaseConnection:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            
+            # Create projects table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_active BOOLEAN DEFAULT 1
+                )
+            """)
+            
+            # Create outline_sections table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS outline_sections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                )
+            """)
+            
+            # Create outline_sources table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS outline_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    section_id INTEGER NOT NULL,
+                    source_data_json TEXT NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (section_id) REFERENCES outline_sections(id) ON DELETE CASCADE
+                )
+            """)
+            
             conn.commit()
     
     def _create_database(self):
@@ -81,6 +118,42 @@ class DatabaseConnection:
                 )
             """)
             
+            # Create projects table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_active BOOLEAN DEFAULT 1
+                )
+            """)
+            
+            # Create outline_sections table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS outline_sections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                )
+            """)
+            
+            # Create outline_sources table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS outline_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    section_id INTEGER NOT NULL,
+                    source_data_json TEXT NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (section_id) REFERENCES outline_sections(id) ON DELETE CASCADE
+                )
+            """)
+            
             conn.commit()
     
     @contextmanager
@@ -88,6 +161,7 @@ class DatabaseConnection:
         """Get database connection context manager"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row  # Enable dict-like access
+        conn.execute("PRAGMA foreign_keys = ON")  # Enable foreign key constraints
         try:
             yield conn
         finally:
@@ -111,6 +185,14 @@ class DatabaseConnection:
             cursor = conn.execute(query, params)
             conn.commit()
             return cursor.lastrowid or 0
+    
+    def execute_update(self, query: str, params: tuple = ()) -> int:
+        """Execute UPDATE/DELETE query and return number of affected rows"""
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            affected_rows = cursor.rowcount
+            conn.commit()
+            return affected_rows
 
 
 # Global database instance

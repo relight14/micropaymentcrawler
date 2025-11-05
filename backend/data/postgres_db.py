@@ -97,6 +97,58 @@ class PostgreSQLConnection:
                     ON rate_limit_log(user_key, endpoint, hit_at)
                 """)
                 
+                # Create projects table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS projects (
+                        id SERIAL PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        is_active BOOLEAN DEFAULT TRUE
+                    )
+                """)
+                
+                # Create outline_sections table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS outline_sections (
+                        id SERIAL PRIMARY KEY,
+                        project_id INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        order_index INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                    )
+                """)
+                
+                # Create outline_sources table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS outline_sources (
+                        id SERIAL PRIMARY KEY,
+                        section_id INTEGER NOT NULL,
+                        source_data_json TEXT NOT NULL,
+                        order_index INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (section_id) REFERENCES outline_sections(id) ON DELETE CASCADE
+                    )
+                """)
+                
+                # Create indexes for better query performance
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_projects_user_id 
+                    ON projects(user_id, is_active)
+                """)
+                
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_outline_sections_project_id 
+                    ON outline_sections(project_id, order_index)
+                """)
+                
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_outline_sources_section_id 
+                    ON outline_sources(section_id, order_index)
+                """)
+                
                 conn.commit()
     
     @contextmanager
