@@ -58,6 +58,7 @@ export class MessageRenderer {
     static AVATARS = {
         user: '👤',
         assistant: '🤖',
+        ai: '🤖',  // Alias for assistant (backend uses 'ai', frontend uses 'assistant')
         system: 'ℹ️',
         loading: '🔬'
     };

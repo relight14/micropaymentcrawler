@@ -537,20 +537,24 @@ export class ChatResearchApp {
                 return;
             }
             
+            // Normalize sender type for consistency
+            // Frontend uses 'assistant' but backend expects 'ai'
+            const normalizedSender = sender === 'assistant' ? 'ai' : sender;
+            
             // Only save user, ai, and system messages (skip ephemeral UI elements)
-            if (!['user', 'ai', 'system'].includes(sender)) {
+            if (!['user', 'ai', 'system'].includes(normalizedSender)) {
                 return;
             }
             
-            // Skip saving HTML content (DOM elements) - only persist text messages
-            if (typeof content !== 'string' || content.startsWith('<')) {
-                console.log(`⏭️ Skipping HTML/DOM message persistence for project ${activeProjectId}`);
+            // Ensure content is a string (should already be serialized by addMessage)
+            if (typeof content !== 'string') {
+                console.warn(`⚠️ Non-string content passed to saveMessageToProject, skipping:`, typeof content);
                 return;
             }
             
             const messageData = metadata ? { metadata } : null;
             
-            await this.apiService.saveMessage(activeProjectId, sender, content, messageData);
+            await this.apiService.saveMessage(activeProjectId, normalizedSender, content, messageData);
             console.log(`💾 Message saved to project ${activeProjectId}`);
         } catch (error) {
             console.error('Failed to save message to project:', error);
