@@ -523,7 +523,40 @@ export class ChatResearchApp {
         // Hide welcome screen after first message is sent
         this.hideWelcomeScreen();
         
+        // Save message to backend if there's an active project
+        this.saveMessageToProject(sender, stateContent, metadata);
+        
         return message;
+    }
+    
+    async saveMessageToProject(sender, content, metadata) {
+        try {
+            const activeProjectId = this.projectManager.getActiveProjectId();
+            
+            if (!activeProjectId) {
+                // No active project, skip saving
+                return;
+            }
+            
+            // Only save user, ai, and system messages (skip ephemeral UI elements)
+            if (!['user', 'ai', 'system'].includes(sender)) {
+                return;
+            }
+            
+            // Skip saving HTML content (DOM elements) - only persist text messages
+            if (typeof content !== 'string' || content.startsWith('<')) {
+                console.log(`⏭️ Skipping HTML/DOM message persistence for project ${activeProjectId}`);
+                return;
+            }
+            
+            const messageData = metadata ? { metadata } : null;
+            
+            await this.apiService.saveMessage(activeProjectId, sender, content, messageData);
+            console.log(`💾 Message saved to project ${activeProjectId}`);
+        } catch (error) {
+            console.error('Failed to save message to project:', error);
+            // Don't throw - message already displayed to user
+        }
     }
     
     hideWelcomeScreen() {

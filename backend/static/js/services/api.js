@@ -222,6 +222,50 @@ export class APIService {
         return await response.json();
     }
 
+    async saveMessage(projectId, sender, content, messageData = null) {
+        try {
+            const response = await fetch(`${this.baseURL}/api/projects/${projectId}/messages`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({
+                    sender,
+                    content,
+                    message_data: messageData
+                })
+            });
+            
+            if (!response.ok) {
+                this._handle401(response);
+                console.error('Failed to save message:', response.statusText);
+                return null;
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving message:', error);
+            return null;
+        }
+    }
+
+    async getProjectMessages(projectId) {
+        try {
+            const response = await fetch(`${this.baseURL}/api/projects/${projectId}/messages`, {
+                method: 'GET',
+                headers: this.getAuthHeaders()
+            });
+            
+            if (!response.ok) {
+                this._handle401(response);
+                throw new Error('Failed to fetch messages');
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+            throw error;
+        }
+    }
+
     async analyzeQueryForTier(query, maxBudget, preferredSourceCount, tierType) {
         const response = await fetch(`${this.baseURL}/api/research/analyze`, {
             method: 'POST',
