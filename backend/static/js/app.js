@@ -205,10 +205,11 @@ export class ChatResearchApp {
                 projectTitle: e.detail.projectData.title
             });
             
-            // Clear chat interface for fresh project workspace
+            // Clear chat interface for fresh project workspace (skip confirmation)
             this.interactionHandler.clearConversation(
                 (sender, content) => this.addMessage(sender, content),
-                () => this.reportBuilder.update()
+                () => this.reportBuilder.update(),
+                true  // skipConfirmation = true for automatic project switching
             );
             
             // Show welcome message for the project

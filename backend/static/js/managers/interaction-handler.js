@@ -38,8 +38,8 @@ export class InteractionHandler {
         }
     }
 
-    async clearConversation(addMessageCallback, reportBuilderUpdateCallback) {
-        if (!confirm('Clear the entire conversation? This cannot be undone.')) {
+    async clearConversation(addMessageCallback, reportBuilderUpdateCallback, skipConfirmation = false) {
+        if (!skipConfirmation && !confirm('Clear the entire conversation? This cannot be undone.')) {
             return;
         }
 
