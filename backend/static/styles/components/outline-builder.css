@@ -1,16 +1,5 @@
 /* Outline Builder Styles */
-
-#outline-builder {
-    position: fixed;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 300px;
-    background: var(--background-dark, #1a1a1a);
-    border-left: 1px solid var(--border-color, #333);
-    z-index: 100;
-    overflow-y: auto;
-}
+/* Layout positioning handled by chat-style.css three-column layout */
 
 .outline-builder {
     height: 100%;
