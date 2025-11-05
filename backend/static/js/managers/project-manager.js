@@ -129,12 +129,23 @@ export class ProjectManager {
      * Handle project loaded event
      */
     handleProjectLoaded(projectData) {
+        console.log(`📊 [ProjectManager] Handling project switch:`, {
+            newProjectId: projectData.id,
+            newProjectTitle: projectData.title,
+            currentAppState: {
+                mode: window.app?.appState?.getMode(),
+                messageCount: window.app?.appState?.state?.messages?.length || 0
+            }
+        });
+        
         // Update store
         projectStore.setActiveProject(projectData.id, projectData.title);
         projectStore.setOutline(projectData.outline);
         
         // Update outline builder
         this.outlineBuilder.setProject(projectData.id, projectData);
+        
+        console.log(`⚠️ [ProjectManager] Chat interface NOT updated - projects don't store messages`);
         
         // Emit global event
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_SWITCHED, {

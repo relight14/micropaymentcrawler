@@ -198,6 +198,25 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Tier purchased', e.detail);
         });
         
+        // Handle project switching - clear chat to provide fresh workspace per project
+        AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, (e) => {
+            console.log('📡 AppEvents: Project switched', {
+                projectId: e.detail.projectData.id,
+                projectTitle: e.detail.projectData.title
+            });
+            
+            // Clear chat interface for fresh project workspace
+            this.interactionHandler.clearConversation(
+                (sender, content) => this.addMessage(sender, content),
+                () => this.reportBuilder.update()
+            );
+            
+            // Show welcome message for the project
+            this.addMessage('system', `🎯 Switched to project: "${e.detail.projectData.title}"`);
+            
+            console.log('✅ Chat cleared for new project workspace');
+        });
+        
         // Register logout callback to update UI when user is logged out
         this.authService.onLogout(() => {
             console.log('🔐 Logout callback triggered - updating UI');

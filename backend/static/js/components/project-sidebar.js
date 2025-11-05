@@ -96,6 +96,7 @@ export class ProjectListSidebar extends EventTarget {
      */
     async loadProject(projectId) {
         try {
+            console.log(`🔄 [ProjectSidebar] Loading project ${projectId}...`);
             const response = await fetch(`/api/projects/${projectId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.authService.getToken()}`
@@ -104,6 +105,12 @@ export class ProjectListSidebar extends EventTarget {
 
             if (response.ok) {
                 const projectData = await response.json();
+                console.log(`✅ [ProjectSidebar] Project data loaded:`, {
+                    id: projectData.id,
+                    title: projectData.title,
+                    outlineSections: projectData.outline?.sections?.length || 0
+                });
+                
                 this.activeProjectId = projectId;
                 this.render();
                 
