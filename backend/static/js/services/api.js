@@ -354,9 +354,9 @@ export class APIService {
             idempotency_key: idempotencyKey
         };
         
-        // Include selected sources if provided (for custom report generation)
+        // Include full source objects if provided (frontend is source of truth)
         if (selectedSources && selectedSources.length > 0) {
-            requestBody.selected_source_ids = selectedSources.map(source => source.id);
+            requestBody.selected_sources = selectedSources;
         }
         
         return await this._fetchWithRetry(`${this.baseURL}/api/purchase`, {
