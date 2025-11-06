@@ -24,6 +24,15 @@ export class OutlineBuilder extends EventTarget {
      */
     setProject(projectId, projectData) {
         this.currentProjectId = projectId;
+        
+        // If no project (logout scenario), clear sections
+        if (!projectId) {
+            this.sections = [];
+            this.render();
+            return;
+        }
+        
+        // Has project - use its outline or defaults
         if (projectData && projectData.outline) {
             this.sections = projectData.outline;
         } else {
@@ -257,7 +266,8 @@ export class OutlineBuilder extends EventTarget {
         const container = document.getElementById('outline-builder');
         if (!container) return;
 
-        if (!this.authService.isAuthenticated() || !this.currentProjectId) {
+        // Not authenticated - show empty state
+        if (!this.authService.isAuthenticated()) {
             container.innerHTML = `
                 <div class="outline-builder">
                     <div class="outline-header">
@@ -265,11 +275,23 @@ export class OutlineBuilder extends EventTarget {
                     </div>
                     <div class="empty-outline-state">
                         <p>📝</p>
-                        <p>Select a project to view your research outline</p>
+                        <p>Log in to organize sources with custom outlines</p>
                     </div>
                 </div>
             `;
             return;
+        }
+
+        // Authenticated but no project - show default template
+        if (!this.currentProjectId) {
+            if (!this.sections || this.sections.length === 0) {
+                this.sections = this.getDefaultSections();
+            }
+        }
+
+        // If still no sections (edge case), initialize with defaults
+        if (!this.sections || this.sections.length === 0) {
+            this.sections = this.getDefaultSections();
         }
 
         container.innerHTML = `
