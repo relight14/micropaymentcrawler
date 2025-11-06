@@ -201,6 +201,13 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Tier purchased', e.detail);
         });
         
+        // Listen for source selection changes and sync to ProjectStore
+        document.addEventListener('sourceSelectionChanged', (e) => {
+            console.log('📡 Source selection changed:', e.detail);
+            // Sync appState selections to ProjectStore for outline builder
+            this.projectManager.updateSelectedSources(this.appState.getSelectedSources());
+        });
+        
         // Handle project switching - load conversation history for the project
         AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, async (e) => {
             console.log('📡 AppEvents: Project switched', {
