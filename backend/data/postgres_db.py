@@ -172,8 +172,11 @@ class PostgreSQLConnection:
     
     @contextmanager
     def get_connection(self):
-        """Get database connection context manager"""
-        conn = psycopg2.connect(self.database_url)
+        """Get database connection context manager with RealDictCursor"""
+        conn = psycopg2.connect(
+            self.database_url,
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
         try:
             yield conn
         finally:
