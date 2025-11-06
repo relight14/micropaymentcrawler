@@ -12,6 +12,29 @@ export class SourceManager extends EventTarget {
         this.modalController = modalController;
         this.isUnlockInProgress = false;
         this.sourceCardComponent = null;
+        
+        // Set up global event listeners for source card actions
+        // These persist across all projects since SourceManager is a singleton
+        this._setupGlobalEventListeners();
+    }
+    
+    _setupGlobalEventListeners() {
+        console.log('🎯 SourceManager: Setting up global event listeners');
+        
+        document.addEventListener('sourceUnlockRequested', (e) => {
+            console.log('🔓 UNLOCK: Event received in SourceManager!', e.detail);
+            this.unlockSource(null, e.detail.source.id, e.detail.source.unlock_price);
+        });
+        
+        document.addEventListener('sourceDownloadRequested', (e) => {
+            console.log('📥 DOWNLOAD: Event received in SourceManager!', e.detail);
+            window.open(e.detail.source.url, '_blank');
+        });
+        
+        document.addEventListener('sourceSummarizeRequested', (e) => {
+            console.log('✨ SUMMARIZE: Event received in SourceManager!', e.detail);
+            this.summarizeSource(e.detail.source, e.detail.price, e.detail.buttonElement);
+        });
     }
 
     async unlockSource(button, sourceId, price) {
@@ -366,20 +389,6 @@ export class SourceManager extends EventTarget {
         
         if (!this.sourceCardComponent) {
             this.sourceCardComponent = new window.SourceCard(this.appState);
-            
-            document.addEventListener('sourceUnlockRequested', (e) => {
-                console.log('🔓 UNLOCK: Event received in SourceManager!', e.detail);
-                this.unlockSource(null, e.detail.source.id, e.detail.source.unlock_price);
-            });
-            
-            document.addEventListener('sourceDownloadRequested', (e) => {
-                window.open(e.detail.source.url, '_blank');
-            });
-            
-            document.addEventListener('sourceSummarizeRequested', (e) => {
-                console.log('✨ SUMMARIZE: Event received in SourceManager!', e.detail);
-                this.summarizeSource(e.detail.source, e.detail.price, e.detail.buttonElement);
-            });
         }
         
         const container = document.createElement('div');
