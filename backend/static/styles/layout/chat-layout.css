@@ -59,23 +59,8 @@
     display: block;
 }
 
-/* Tablet and smaller screens - make outline a slide-over panel */
-@media (max-width: 1200px) {
-    #outline-builder {
-        position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1000;
-        transform: translateX(100%);
-        box-shadow: var(--shadow-lg);
-    }
-    
-    #outline-builder.visible {
-        transform: translateX(0);
-    }
-    
-    /* Project sidebar responsive */
+/* Laptop screens - hide project sidebar, keep outline beside chat */
+@media (max-width: 1400px) {
     #project-sidebar {
         position: fixed;
         top: 0;
@@ -87,6 +72,23 @@
     }
     
     #project-sidebar.visible {
+        transform: translateX(0);
+    }
+}
+
+/* Tablet screens - make outline a slide-over panel */
+@media (max-width: 1024px) {
+    #outline-builder {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        transform: translateX(100%);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    #outline-builder.visible {
         transform: translateX(0);
     }
 }
