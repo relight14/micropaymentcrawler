@@ -474,7 +474,7 @@ export class ChatResearchApp {
         this.uiManager.updateModeDisplay();
         
         // Handle mode-specific UI changes
-        if (mode === 'report' && this.appState.getCurrentResearchData()) {
+        if (mode === 'report') {
             this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
             const reportBuilderElement = this.reportBuilder.show();
             this.addMessage('system', reportBuilderElement);
@@ -605,11 +605,29 @@ export class ChatResearchApp {
                 // Restore messages to chat interface (without saving them again)
                 this.isRestoringMessages = true;
                 
+                // Track the most recent research data while restoring messages
+                let mostRecentResearchData = null;
+                
                 for (const msg of messages) {
                     // Add message to state and UI
                     const metadata = msg.message_data?.metadata || null;
                     const message = this.appState.addMessage(msg.sender, msg.content, metadata);
                     this.uiManager.addMessageToChat(message);
+                    
+                    // Extract research data from source cards metadata for restoration
+                    if (metadata?.type === 'source_cards' && metadata?.sources) {
+                        mostRecentResearchData = {
+                            sources: metadata.sources,
+                            query: metadata.query || '',
+                            enrichment_status: 'complete'
+                        };
+                    }
+                }
+                
+                // Restore the most recent research data to appState
+                if (mostRecentResearchData) {
+                    this.appState.setCurrentResearchData(mostRecentResearchData);
+                    console.log(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
                 }
                 
                 this.isRestoringMessages = false;
