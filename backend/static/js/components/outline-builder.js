@@ -258,12 +258,19 @@ export class OutlineBuilder extends EventTarget {
         if (!container) return;
 
         if (!this.authService.isAuthenticated() || !this.currentProjectId) {
-            container.innerHTML = '';
-            container.style.display = 'none';
+            container.innerHTML = `
+                <div class="outline-builder">
+                    <div class="outline-header">
+                        <h3>Research Outline</h3>
+                    </div>
+                    <div class="empty-outline-state">
+                        <p>📝</p>
+                        <p>Select a project to view your research outline</p>
+                    </div>
+                </div>
+            `;
             return;
         }
-
-        container.style.display = 'block';
 
         container.innerHTML = `
             <div class="outline-builder">

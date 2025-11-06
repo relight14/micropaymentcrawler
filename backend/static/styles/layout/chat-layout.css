@@ -14,8 +14,8 @@
 /* Project sidebar - left */
 #project-sidebar {
     display: none;
-    width: 250px;
-    min-width: 250px;
+    width: 200px;
+    min-width: 200px;
     background: var(--card);
     border-right: 1px solid var(--border);
     overflow-y: auto;
@@ -27,7 +27,7 @@
     display: block;
 }
 
-.project-sidebar.collapsed {
+#project-sidebar.collapsed {
     width: 50px;
     min-width: 50px;
 }
