@@ -271,13 +271,4 @@
     transform: translateY(-1px);
 }
 
-/* Mobile responsive */
-@media (max-width: 1024px) {
-    #outline-builder {
-        display: none;
-    }
-    
-    #outline-builder.visible {
-        display: block;
-    }
-}
+/* Mobile responsive - layout positioning handled by layout/chat-layout.css */

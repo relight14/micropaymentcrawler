@@ -1,0 +1,108 @@
+/**
+ * Chat Application Layout
+ * Three-column flexbox structure: Project Sidebar | Main Content | Outline Builder
+ */
+
+/* Main app container with three-column layout */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    position: relative;
+}
+
+/* Project sidebar - left */
+#project-sidebar {
+    display: none;
+    width: 250px;
+    min-width: 250px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+#project-sidebar.active {
+    display: block;
+}
+
+.project-sidebar.collapsed {
+    width: 50px;
+    min-width: 50px;
+}
+
+/* Main content area - center */
+#main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* Outline builder - right sidebar */
+#outline-builder {
+    display: block;
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+/* Keep .active class for compatibility */
+#outline-builder.active {
+    display: block;
+}
+
+/* Tablet and smaller screens - make outline a slide-over panel */
+@media (max-width: 1200px) {
+    #outline-builder {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        transform: translateX(100%);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    #outline-builder.visible {
+        transform: translateX(0);
+    }
+    
+    /* Project sidebar responsive */
+    #project-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 1000;
+        transform: translateX(-100%);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    #project-sidebar.visible {
+        transform: translateX(0);
+    }
+}
+
+/* Mobile - full width panels */
+@media (max-width: 640px) {
+    #project-sidebar,
+    #outline-builder {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* Dark mode */
+body.dark-mode #project-sidebar,
+body.dark-mode #outline-builder {
+    background: var(--card);
+    border-color: rgba(255, 255, 255, 0.1);
+}

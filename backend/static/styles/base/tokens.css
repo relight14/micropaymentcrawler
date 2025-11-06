@@ -1,0 +1,99 @@
+/**
+ * Design System Tokens
+ * Single source of truth for all design variables
+ */
+
+:root {
+    /* Core Design System Colors */
+    --font-size: 16px;
+    --background: #ffffff;
+    --foreground: #464646;
+    --card: #ffffff;
+    --card-foreground: #464646;
+    --popover: #ffffff;
+    --popover-foreground: #464646;
+    --primary: #464646;
+    --primary-foreground: #ffffff;
+    --secondary: #F1F1F1;
+    --secondary-foreground: #464646;
+    --muted: #F1F1F1;
+    --muted-foreground: #464646;
+    --accent: #fff38D;
+    --accent-foreground: #464646;
+    --destructive: #d4183d;
+    --destructive-foreground: #ffffff;
+    --border: rgba(70, 70, 70, 0.1);
+    --input: transparent;
+    --input-background: #F1F1F1;
+    --switch-background: #F1F1F1;
+    --font-weight-medium: 500;
+    --font-weight-normal: 400;
+    --ring: oklch(0.708 0 0);
+    --radius: 0.625rem;
+    
+    /* Backward compatibility aliases */
+    --ledewire-yellow: var(--accent);
+    --yellow-hover: var(--accent);
+    --yellow-light: rgba(255, 243, 141, 0.1);
+    --bg-card: var(--card);
+    --bg-secondary: var(--secondary);
+    --bg-primary: var(--background);
+    --border-light: var(--border);
+    --border-color: var(--border);
+    --text-primary: var(--foreground);
+    --text-secondary: var(--muted-foreground);
+    --text-muted: var(--muted-foreground);
+    --charcoal: var(--primary);
+    --medium-grey: var(--muted-foreground);
+    --silver: var(--muted-foreground);
+    --accent-color: var(--accent);
+    --surface-primary: var(--card);
+    --surface-secondary: var(--secondary);
+    
+    /* Additional missing tokens */
+    --radius-lg: calc(var(--radius) + 2px);
+    --radius-xl: calc(var(--radius) + 4px);
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --pure-white: #ffffff;
+    --light-grey: #9ca3af;
+    --error-color: var(--destructive);
+    --warning-color: var(--accent);
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    --shadow-yellow: 0 4px 12px 0 rgb(255 243 141 / 0.25);
+    
+    /* Typography */
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --line-clamp-2: -webkit-line-clamp: 2;
+    --line-clamp-3: -webkit-line-clamp: 3;
+}
+
+/* Dark Mode Overrides */
+body.dark-mode {
+    --background: #1a1a1a;
+    --foreground: #e5e5e5;
+    --card: #262626;
+    --card-foreground: #e5e5e5;
+    --popover: #262626;
+    --popover-foreground: #e5e5e5;
+    --primary: #e5e5e5;
+    --primary-foreground: #1a1a1a;
+    --secondary: #333333;
+    --secondary-foreground: #e5e5e5;
+    --muted: #333333;
+    --muted-foreground: #a3a3a3;
+    --accent: #fff38D;
+    --accent-foreground: #1a1a1a;
+    --border: rgba(255, 255, 255, 0.1);
+    --input-background: #333333;
+    --switch-background: #333333;
+}
