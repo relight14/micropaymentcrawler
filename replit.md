@@ -11,6 +11,10 @@ Preferred communication style: Simple, everyday language.
 ## UI/UX Decisions
 The frontend is a responsive, modern Single Page Application (SPA) built with vanilla HTML/CSS/JavaScript, utilizing a modular ES6 architecture. It features tier selection cards, dynamic content loading, story cards with quotes and descriptions for source articles, and professional presentation of search results with transparent licensing badges. UI includes intelligent scroll behavior: AI responses scroll to the message top, while user messages scroll to the bottom. Dark mode has improved contrast.
 
+**Layout Structure**: The app uses a three-column flexbox layout with `.app-container` as the flex parent containing three direct children: `#project-sidebar` (left, 200px), `#main-content` (center, flex-grow), and `#outline-builder` (right, 320px). This ensures proper side-by-side layout of all components.
+
+**Responsive Strategy**: Desktop (>1400px) displays all three columns. Laptop (1024-1400px) collapses the project sidebar into a slide-over overlay while keeping chat and outline side-by-side. Tablet (<1024px) converts the outline into a slide-over overlay, showing only the chat. Mobile (<640px) uses full-width panels for all components.
+
 ## Technical Implementations
 - **Frontend**: Modular layered architecture with an Application Controller, Infrastructure Managers (Toast, Modal, EventRouter), Domain Managers (Source, Tier, Message, Interaction), Core Services, and UI Components. CSS architecture is modular with component-specific stylesheets: tier-selection.css (309 lines), modals.css (583 lines), research-results.css (207 lines), toast.css, header.css, messages.css, source-card.css, project-sidebar.css, outline-builder.css, and layout files. Main chat-style.css reduced from 3,295 lines to 2,107 lines (36% reduction) ensuring maintainability.
 - **Analytics & Instrumentation**: Production-grade Google Analytics 4 integration with a centralized tracking utility (`analytics.js`), lazy gtag loading, and comprehensive event coverage across all user interactions with rich metadata.
