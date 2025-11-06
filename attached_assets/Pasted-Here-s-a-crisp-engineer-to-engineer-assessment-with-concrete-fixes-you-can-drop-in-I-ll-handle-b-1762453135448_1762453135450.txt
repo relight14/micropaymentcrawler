@@ -1,0 +1,236 @@
+Here’s a crisp, “engineer-to-engineer” assessment with concrete fixes you can drop in. I’ll handle both the tuple/dict bug (primary) and the purchase-request robustness (secondary), and make sure it stays cross-DB (Postgres + SQLite).
+
+What’s going wrong (confirmed)
+
+Postgres tuple vs dict
+
+psycopg2’s default cursor returns tuples. Your code uses row['id'] → TypeError: tuple indices must be integers.
+
+This likely appears in message-save and also in the purchase logging path, which then masks the original 422 with a 500.
+
+Purchase request shape / empty sources
+
+Frontend sends tier: "research" + selected_source_ids: [].
+
+Backend expects an enum (TierType) and at least one resolvable source.
+
+When the selected list is empty (or cache is cold), you raise 422 (“Selected sources not available”). On the way out, your error logging hits the tuple bug and upgrades it to 500.
+
+Recommended Fixes (safe for Postgres + SQLite)
+A) Normalize DB row shape to “dict-like” everywhere
+
+Option 1 (quick + localized): add a tiny helper to convert a single tuple row into a dict using cursor.description.
+
+# backend/app/db/utils.py
+def fetchone_as_dict(cursor):
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    cols = [desc[0] for desc in cursor.description]
+    return dict(zip(cols, row))
+
+
+Then in projects.py (your lines ~649–662):
+
+from app.db.utils import fetchone_as_dict
+
+cursor.execute(
+    """
+    INSERT INTO messages(project_id, body, created_at)
+    VALUES (%s, %s, NOW())
+    RETURNING id, created_at
+    """,
+    (project_id, body)
+)
+result = fetchone_as_dict(cursor)
+return {
+    "id": result["id"],
+    "created_at": result["created_at"],
+}
+
+
+Option 2 (cleaner, global): switch cursor factories:
+
+Postgres: psycopg2.extras.RealDictCursor
+
+SQLite: conn.row_factory = sqlite3.Row
+
+# Postgres connector
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+conn = psycopg2.connect(dsn, cursor_factory=RealDictCursor)
+
+# SQLite connector
+import sqlite3
+conn = sqlite3.connect(path)
+conn.row_factory = sqlite3.Row
+
+
+If you do this, you can keep your existing row["id"] style everywhere. (I’d still keep the small fetchone_as_dict util around for safety in older spots.)
+
+Why not indexes? Using row[0]/row[1] is brittle and breaks when you add/change columns. Dict-like rows are safer.
+
+B) Make the purchase request resilient and explicit
+1) Pydantic model: accept strings for enum and validate early
+# backend/app/api/schemas/purchase.py
+from pydantic import BaseModel, validator
+from typing import List, Optional
+from enum import Enum
+
+class TierType(str, Enum):
+    basic = "basic"
+    research = "research"
+    pro = "pro"
+
+class PurchaseRequest(BaseModel):
+    query: str
+    tier: TierType
+    idempotency_key: str
+    selected_source_ids: Optional[List[str]] = None  # allow empty/None
+
+    @validator("selected_source_ids", pre=True)
+    def default_list(cls, v):
+        return v or []
+
+2) Fallback source resolution (server-side)
+
+If selected_source_ids is empty, try deriving sources from the current project state. If none exist, return a clear 422 before touching any DB write path.
+
+# backend/app/api/routes/purchases.py (inside handler)
+req: PurchaseRequest = PurchaseRequest(**payload)
+
+# Step 1: resolve sources
+source_ids = req.selected_source_ids
+if not source_ids:
+    # Attempt to pull from project cache/state (pseudo-code)
+    source_ids = cache.get_project_sources(project_id) or []
+    # Or: source_ids = repo.sources.for_project(project_id)
+if not source_ids:
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "No sources selected or available for this project."}
+    )
+
+# Step 2: validate the sources actually exist/are available
+available = repo.sources.validate_availability(source_ids)
+if not available:
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Selected sources are not currently available."}
+    )
+
+# Step 3: proceed to create purchase & log (wrapped in a tx)
+with db.transaction() as tx:
+    # create purchase record
+    purchase_id = repo.purchases.create(
+        tx=tx,
+        project_id=project_id,
+        tier=req.tier.value,
+        idempotency_key=req.idempotency_key,
+        query=req.query,
+        sources=source_ids,
+    )
+    # return purchase summary
+    return JSONResponse(
+        status_code=201,
+        content={"purchase_id": purchase_id, "tier": req.tier.value, "sources": source_ids}
+    )
+
+
+Note on idempotency: Ensure a unique index on (project_id, idempotency_key) so retries don’t double-charge.
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_purchases_project_id_idem
+ON purchases(project_id, idempotency_key);
+
+3) Don’t log DB stuff on validation failure
+
+If you’re currently “logging” validation errors into the same messages table (and hitting the tuple bug), separate concerns:
+
+On 422: return the error; optionally log via app logger, not DB.
+
+Only write DB rows inside the success path transaction.
+
+C) Improve error semantics
+
+422 Unprocessable Entity: no/invalid sources, invalid tier, etc. (Pure input/availability issues.)
+
+409 Conflict: idempotency conflict.
+
+500: true unexpected error (should be rare after the tuple fix).
+
+This keeps your client logic simple and reliable.
+
+D) Minimal tests (worth their weight in gold)
+
+Tuple/Dialect test
+
+Postgres connection: confirm row["id"] works after you apply RealDictCursor or fetchone_as_dict.
+
+SQLite connection: confirm row["id"] with row_factory=sqlite3.Row.
+
+Purchase flow tests
+
+selected_source_ids=[] with project cache populated → 201.
+
+selected_source_ids=[] with empty project cache → 422 with “No sources…” message.
+
+Invalid tier value like "RESEARCH" → coerces to research (thanks to enum of type str) or fails gracefully if you prefer strictness.
+
+Idempotency replay → 409.
+
+E) Diff-style summary (Postgres tuple fix + safer purchase)
+
+Add fetchone_as_dict util or switch cursor factories globally.
+
+Replace any cursor.fetchone() usage that immediately indexes with string keys.
+
+Update PurchaseRequest model + handler to:
+
+allow empty selected_source_ids
+
+fallback to project’s current sources
+
+short-circuit with 422 before any DB write if nothing is available
+
+wrap successes in a tx
+
+avoid DB writes for mere validation errors
+
+F) Quick copy-paste snippets
+
+Global Postgres cursor factory (best long-term)
+
+# backend/app/db/postgres.py
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+def get_conn():
+    return psycopg2.connect(dsn, cursor_factory=RealDictCursor)
+
+
+SQLite row factory
+
+# backend/app/db/sqlite.py
+import sqlite3
+def get_conn(path):
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+Local patch where the error occurs (if you want minimal change)
+
+# backend/app/api/routes/projects.py (649–662)
+row = fetchone_as_dict(cursor)  # instead of cursor.fetchone()
+if row is None:
+    raise HTTPException(status_code=500, detail="Insert failed: no row returned")
+return {"id": row["id"], "created_at": row["created_at"]}
+
+Bottom line
+
+Primary fix: stop using tuple rows with string keys. Use RealDictCursor / sqlite3.Row (or the fetchone_as_dict shim).
+
+Secondary fix: make selected_source_ids optional, and reliably source from the project when missing; fail fast with 422 (no DB writes) when nothing’s available.
+
+If you paste the snippets above, you should see the 500s disappear, clean 422s for bad input states, and purchases proceed when sources are actually present.
