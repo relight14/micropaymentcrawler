@@ -1,0 +1,309 @@
+/* ====================================
+   TIER & PACKAGE SELECTION
+   Research tier cards and package selection UI
+   ==================================== */
+
+/* Research Tiers Section */
+.research-tiers-section {
+    background: var(--bg-card);
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.research-tiers-section h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-weight: var(--font-weight-semibold);
+    font-size: 1.1rem;
+}
+
+.research-tiers-section p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+.tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.tier-card {
+    background: var(--bg-card);
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.tier-card:hover {
+    border-color: var(--ledewire-yellow);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.tier-card.selected {
+    border-color: var(--ledewire-yellow);
+    box-shadow: var(--shadow-yellow);
+    background: var(--yellow-light);
+}
+
+.tier-card.selected::after {
+    content: "✓";
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: var(--ledewire-yellow);
+    color: var(--charcoal);
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-weight-bold);
+    font-size: 0.75rem;
+}
+
+.tier-title {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-weight: var(--font-weight-semibold);
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+.tier-price {
+    font-size: 2.2rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--ledewire-yellow);
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.tier-value {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.2;
+    margin-top: 0.25rem;
+}
+
+.tier-description-compelling {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-style: italic;
+    line-height: 1.3;
+    margin-top: 0.5rem;
+    opacity: 0.85;
+}
+
+/* Current Query Summary */
+.current-query-summary {
+    background: var(--pale-grey);
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.current-query-summary h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+/* Modern Research Packages - Matching React ResearchPackets component */
+.research-packages {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+}
+
+.packages-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.packages-header h3 {
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-medium);
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.packages-header p {
+    color: var(--muted-foreground);
+    font-size: 0.95rem;
+}
+
+.packages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    max-width: 1024px;
+    margin: 0 auto;
+}
+
+.package-card {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+.package-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.package-card.highlighted {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md);
+    background: linear-gradient(135deg, rgba(255, 243, 141, 0.05) 0%, rgba(255, 243, 141, 0.1) 100%);
+}
+
+.package-card.highlighted::before {
+    content: "Most Popular";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: var(--accent-foreground);
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+}
+
+.package-header {
+    margin-bottom: 1.5rem;
+}
+
+.package-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem auto;
+    font-size: 1.5rem;
+}
+
+.package-card:not(.highlighted) .package-icon {
+    background: var(--muted);
+    color: var(--muted-foreground);
+}
+
+.package-card.highlighted .package-icon {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.package-title {
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-medium);
+    color: var(--card-foreground);
+    margin-bottom: 0.5rem;
+}
+
+.package-price {
+    font-size: 2rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.package-description {
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    color: var(--foreground);
+    margin-bottom: 1rem;
+}
+
+.package-subtitle {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    line-height: 1.4;
+    margin-bottom: 1.5rem;
+    flex-grow: 1;
+}
+
+.package-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem 0;
+    text-align: left;
+}
+
+.package-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.package-feature::before {
+    content: "✓";
+    color: var(--accent);
+    font-weight: var(--font-weight-bold);
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+}
+
+.package-card.highlighted .package-feature::before {
+    color: var(--accent);
+}
+
+.package-btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: auto;
+}
+
+.package-card:not(.highlighted) .package-btn {
+    background: var(--primary);
+    color: var(--primary-foreground);
+}
+
+.package-card:not(.highlighted) .package-btn:hover {
+    background: var(--muted-foreground);
+}
+
+.package-card.highlighted .package-btn {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.package-card.highlighted .package-btn:hover {
+    background: var(--accent);
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-yellow);
+}
