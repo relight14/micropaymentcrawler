@@ -234,59 +234,6 @@
     font-size: var(--text-xs);
 }
 
-/* Source Selection Checkbox */
-.source-selection {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-}
-
-.source-selection-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-size: var(--text-sm);
-    color: var(--foreground);
-}
-
-.source-selection-checkbox {
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid var(--border);
-    border-radius: calc(var(--radius) - 4px);
-    background: var(--background);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    appearance: none;
-    position: relative;
-}
-
-.source-selection-checkbox:checked {
-    background: var(--accent);
-    border-color: var(--accent);
-}
-
-.source-selection-checkbox:checked::after {
-    content: "✓";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--accent-foreground);
-    font-size: 0.75rem;
-    font-weight: bold;
-}
-
-.source-selection-checkbox:hover {
-    border-color: var(--accent);
-}
-
-.selection-text {
-    flex: 1;
-    font-weight: var(--font-weight-medium);
-}
-
 .selection-cost {
     font-weight: var(--font-weight-semibold);
     color: var(--accent);
@@ -349,13 +296,6 @@
     color: var(--muted-foreground);
     font-size: var(--text-sm);
     line-height: 1.4;
-}
-
-.source-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.5rem;
 }
 
 .source-remove-btn {
