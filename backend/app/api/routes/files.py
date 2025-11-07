@@ -174,8 +174,8 @@ async def upload_file(
                 result = cursor.fetchone()
                 conn.commit()
                 
-                file_id = result[0]
-                created_at = result[1]
+                file_id = result['id']
+                created_at = result['created_at']
         else:
             query = """
                 INSERT INTO uploaded_files (project_id, user_id, filename, file_type, content, file_size, created_at)
