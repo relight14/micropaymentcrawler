@@ -248,6 +248,89 @@ export class OutlineBuilder extends EventTarget {
     }
 
     /**
+     * Handle file upload
+     */
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const allowedExtensions = ['.md', '.doc', '.docx'];
+        const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!allowedExtensions.includes(fileExt)) {
+            this.toastManager.show(`Invalid file type. Allowed: ${allowedExtensions.join(', ')}`, 'error');
+            event.target.value = '';
+            return;
+        }
+
+        // Validate file size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            this.toastManager.show('File too large. Maximum size: 10MB', 'error');
+            event.target.value = '';
+            return;
+        }
+
+        if (!this.currentProjectId) {
+            this.toastManager.show('Please select a project first', 'error');
+            event.target.value = '';
+            return;
+        }
+
+        try {
+            this.updateSaveIndicator('Uploading...');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('project_id', this.currentProjectId);
+
+            const response = await fetch('/api/files/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.authService.getToken()}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    this.authService.handleUnauthorized();
+                    return;
+                }
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+
+            const uploadedFile = await response.json();
+            
+            // Add uploaded file to selected sources pool as a special source type
+            const fileSource = {
+                id: `file_${uploadedFile.id}`,
+                title: uploadedFile.filename,
+                url: null,
+                source_type: 'document',
+                file_id: uploadedFile.id,
+                file_type: uploadedFile.file_type,
+                content_preview: uploadedFile.content_preview,
+                is_uploaded_file: true
+            };
+
+            this.selectedSources.push(fileSource);
+            this.updateSaveIndicator('Uploaded');
+            setTimeout(() => this.updateSaveIndicator(''), 2000);
+            this.toastManager.show(`File "${file.name}" uploaded successfully`, 'success');
+            this.render();
+            
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            this.updateSaveIndicator('');
+            this.toastManager.show(error.message || 'Failed to upload file', 'error');
+        } finally {
+            event.target.value = '';
+        }
+    }
+
+    /**
      * Get outline structure for report generation
      */
     getOutlineStructure() {
@@ -304,8 +387,11 @@ export class OutlineBuilder extends EventTarget {
                 <div class="selected-sources-pool">
                     <div class="pool-header">
                         <span class="pool-title">Selected Sources (${this.selectedSources.length})</span>
-                        ${this.selectedSources.length > 0 ? '<span class="pool-hint">Drag to sections below</span>' : ''}
+                        <button class="upload-file-btn" id="upload-file-btn" title="Upload document (.md, .doc)">
+                            📄 Upload
+                        </button>
                     </div>
+                    <input type="file" id="file-upload-input" accept=".md,.doc,.docx" style="display: none;" />
                     <div class="source-chips">
                         ${this.selectedSources.length === 0 ? `
                             <div class="empty-pool">
@@ -388,7 +474,8 @@ export class OutlineBuilder extends EventTarget {
             'blog': '📝',
             'social': '💬',
             'video': '🎥',
-            'other': '📄'
+            'document': '📄',
+            'other': '🔗'
         };
         return icons[sourceType] || icons['other'];
     }
@@ -409,6 +496,14 @@ export class OutlineBuilder extends EventTarget {
         const addSectionBtn = document.getElementById('add-section-btn');
         if (addSectionBtn) {
             addSectionBtn.addEventListener('click', () => this.addSection());
+        }
+
+        // File upload button
+        const uploadBtn = document.getElementById('upload-file-btn');
+        const fileInput = document.getElementById('file-upload-input');
+        if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
         }
 
         document.querySelectorAll('.section-title-input').forEach(input => {

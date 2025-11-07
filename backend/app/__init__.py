@@ -15,7 +15,7 @@ from config import config
 from utils.rate_limit import limiter
 from utils.static import NoCacheStaticFiles
 from middleware.error_handler import ErrorHandlerMiddleware, BudgetExceededError
-from app.api.routes import auth, research, purchase, chat, sources, health, wallet, projects
+from app.api.routes import auth, research, purchase, chat, sources, health, wallet, projects, files
 
 
 # Configure logging
@@ -138,5 +138,6 @@ def create_app() -> FastAPI:
     app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
     app.include_router(sources.router, prefix="/api/sources", tags=["sources"])
     app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+    app.include_router(files.router, prefix="/api/files", tags=["files"])
     
     return app

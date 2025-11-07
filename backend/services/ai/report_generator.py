@@ -8,8 +8,14 @@ import logging
 from typing import List, Optional, Dict, Tuple
 from anthropic import Anthropic
 from schemas.domain import SourceCard, TierType
+from config import Config
 
 logger = logging.getLogger(__name__)
+
+if Config.USE_POSTGRES:
+    from data.postgres_db import postgres_db as db
+else:
+    from data.db import db
 
 # <important_code_snippet_instructions>
 # The newest Anthropic model is "claude-sonnet-4-20250514", not "claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022" nor "claude-3-sonnet-20240229". 
@@ -417,32 +423,68 @@ class ReportGeneratorService:
         
         return "\n".join(guidance)
     
+    def _get_file_content(self, file_id: int) -> Optional[str]:
+        """Fetch full content of an uploaded file from database."""
+        try:
+            query = """
+                SELECT content FROM uploaded_files WHERE id = ?
+            """ if not Config.USE_POSTGRES else """
+                SELECT content FROM uploaded_files WHERE id = %s
+            """
+            result = db.execute_query(query, (file_id,))
+            
+            # execute_query returns a single row (dict-like) or None
+            if result and 'content' in result:
+                return result['content']
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching file content for file_id={file_id}: {e}")
+            return None
+    
     def _format_sources_for_prompt(self, sources: List[SourceCard]) -> str:
         """Format sources with rich metadata for Claude prompt."""
         formatted = []
         for i, source in enumerate(sources, 1):
+            # Check if this is an uploaded file
+            is_uploaded_file = hasattr(source, 'file_id') and source.file_id
+            
             # Build metadata section
             metadata_parts = []
-            if source.author:
-                metadata_parts.append(f"Author: {source.author}")
-            if source.published_date:
-                metadata_parts.append(f"Published: {source.published_date}")
-            if source.relevance_score:
-                metadata_parts.append(f"Relevance: {source.relevance_score:.2f}")
+            
+            if is_uploaded_file:
+                # For uploaded files, add file type info
+                if hasattr(source, 'file_type'):
+                    metadata_parts.append(f"Type: Uploaded {source.file_type.upper()} document")
+            else:
+                # For web sources, add standard metadata
+                if source.author:
+                    metadata_parts.append(f"Author: {source.author}")
+                if source.published_date:
+                    metadata_parts.append(f"Published: {source.published_date}")
+                if source.relevance_score:
+                    metadata_parts.append(f"Relevance: {source.relevance_score:.2f}")
             
             metadata_str = " | ".join(metadata_parts) if metadata_parts else "No additional metadata"
+            
+            # Get content - fetch full content for uploaded files
+            if is_uploaded_file:
+                content = self._get_file_content(source.file_id)
+                if not content:
+                    content = getattr(source, 'content_preview', 'File content unavailable')
+            else:
+                content = source.excerpt if source.excerpt else 'No content available'
             
             # Format source with expanded content
             formatted.append(f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Source {i}:
 TITLE: {source.title}
-DOMAIN: {source.domain}
-URL: {source.url}
+DOMAIN: {source.domain if not is_uploaded_file else 'User Document'}
+URL: {source.url if source.url else 'N/A (Uploaded File)'}
 METADATA: {metadata_str}
 
 CONTENT:
-{source.excerpt if source.excerpt else 'No content available'}
+{content}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """)
         return "\n".join(formatted)
