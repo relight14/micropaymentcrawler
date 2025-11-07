@@ -42,6 +42,7 @@ The frontend is a responsive, modern Single Page Application (SPA) built with va
 - **Input Field**: Features an auto-expanding multi-line textarea with an inline send button.
 - **Conversation Management**: Implements conversation-scoped source selection to prevent cross-topic pollution and a "Start a New Search" button for clearer conversation resets. Report Builder queries automatically switch to Chat mode for context.
 - **Smart Summary Button**: Dynamic button text changes from "Summarize for $X" to "Review Summary" after purchase, with persistent cache checks to avoid duplicate purchases.
+- **File Upload System**: Users can upload .doc/.docx/.md files to projects for AI processing. Files are parsed on upload (python-docx for Word documents, UTF-8 for markdown), stored in the `uploaded_files` database table with full content and metadata, and displayed in the outline builder alongside web sources. Uploaded files integrate seamlessly with drag-and-drop, can be added to outline sections, and are included when generating research reports. The report generator fetches full file content (not just previews) from the database and includes it in Claude prompts for comprehensive analysis. Maximum file size: 10MB.
 
 ## Feature Specifications
 - **Dynamic Research Services**: Provides query-based research packages with variable pricing ($0.10-$10.00), determined by source count, quality, and licensing complexity.
