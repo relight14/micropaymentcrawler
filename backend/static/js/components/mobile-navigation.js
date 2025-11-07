@@ -34,7 +34,7 @@ export class MobileNavigation {
                 aria-label="Projects"
                 ${this.currentPanel === 'projects' ? 'aria-current="page"' : ''}
             >
-                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                 </svg>
                 <span class="mobile-nav-label">Projects</span>
@@ -46,7 +46,7 @@ export class MobileNavigation {
                 aria-label="Chat"
                 ${this.currentPanel === 'chat' ? 'aria-current="page"' : ''}
             >
-                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
                 </svg>
                 <span class="mobile-nav-label">Chat</span>
@@ -58,9 +58,8 @@ export class MobileNavigation {
                 aria-label="Outline"
                 ${this.currentPanel === 'outline' ? 'aria-current="page"' : ''}
             >
-                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M3 9h18M9 21V9"/>
+                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                 </svg>
                 <span class="mobile-nav-label">Outline</span>
             </button>

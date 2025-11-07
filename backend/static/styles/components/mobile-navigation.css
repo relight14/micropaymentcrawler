@@ -13,7 +13,7 @@
     height: 60px;
     background: var(--card);
     border-top: 1px solid var(--border);
-    z-index: 2000;
+    z-index: 3000;
     flex-direction: row;
     justify-content: space-around;
     align-items: center;
@@ -81,7 +81,11 @@
 .mobile-nav-icon {
     width: 24px;
     height: 24px;
+    stroke: currentColor;
     stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
 }
 
 /* Tab labels */
@@ -120,7 +124,7 @@
     #outline-builder {
         position: fixed;
         top: 0;
-        bottom: 60px; /* Account for bottom nav */
+        bottom: 60px !important; /* Account for bottom nav - !important overrides chat-layout.css */
         z-index: 1000;
         width: 100%;
         max-width: 100%;
