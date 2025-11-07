@@ -343,6 +343,46 @@ export class OutlineBuilder extends EventTarget {
     }
 
     /**
+     * Setup resize handle for outline builder
+     */
+    setupResizeHandle(handle) {
+        const container = document.getElementById('outline-builder');
+        const MIN_WIDTH = 250;
+        const MAX_WIDTH = 600;
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = container.offsetWidth;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            const deltaX = startX - e.clientX;
+            const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + deltaX));
+            
+            container.style.width = `${newWidth}px`;
+            container.style.minWidth = `${newWidth}px`;
+            container.style.maxWidth = `${newWidth}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+    }
+
+    /**
      * Render the outline builder
      */
     render() {
@@ -378,6 +418,7 @@ export class OutlineBuilder extends EventTarget {
         }
 
         container.innerHTML = `
+            <div class="resize-handle" id="outline-resize-handle"></div>
             <div class="outline-builder">
                 <div class="outline-header">
                     <h3>Research Outline</h3>
@@ -504,6 +545,12 @@ export class OutlineBuilder extends EventTarget {
         if (uploadBtn && fileInput) {
             uploadBtn.addEventListener('click', () => fileInput.click());
             fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        }
+
+        // Resize handle
+        const resizeHandle = document.getElementById('outline-resize-handle');
+        if (resizeHandle) {
+            this.setupResizeHandle(resizeHandle);
         }
 
         document.querySelectorAll('.section-title-input').forEach(input => {

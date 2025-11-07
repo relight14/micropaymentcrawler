@@ -52,6 +52,7 @@
     overflow-y: auto;
     flex-shrink: 0;
     transition: transform 0.3s ease;
+    position: relative;
 }
 
 /* Keep .active class for compatibility */
