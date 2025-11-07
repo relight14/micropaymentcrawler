@@ -103,11 +103,9 @@
 }
 
 .upload-file-btn {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
-    font-size: 12px;
+    margin: 16px;
+    padding: 10px 16px;
+    font-size: 14px;
     color: #ffffff !important;
     background: linear-gradient(135deg, #3730a3 0%, #4338ca 100%);
     border: none;
