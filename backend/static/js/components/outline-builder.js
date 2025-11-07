@@ -493,7 +493,7 @@ export class OutlineBuilder extends EventTarget {
 
                 <input type="file" id="file-upload-input" accept=".md,.doc,.docx" style="display: none;" />
                 <button class="upload-file-btn" id="upload-file-btn" title="Upload document (.md, .doc, .docx)">
-                    📄 Upload your own docs
+                    Upload your own docs
                 </button>
 
                 <button class="add-section-btn" id="add-section-btn">
