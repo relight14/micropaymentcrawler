@@ -115,12 +115,12 @@ async def create_project(
                     conn.commit()
                     
                     return Project(
-                        id=result[0],
-                        user_id=result[1],
-                        title=result[2],
-                        created_at=result[3],
-                        updated_at=result[4],
-                        is_active=result[5]
+                        id=result['id'],
+                        user_id=result['user_id'],
+                        title=result['title'],
+                        created_at=result['created_at'],
+                        updated_at=result['updated_at'],
+                        is_active=result['is_active']
                     )
         else:
             query = """
