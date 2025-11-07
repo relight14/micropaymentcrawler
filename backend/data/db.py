@@ -188,10 +188,31 @@ class DatabaseConnection:
                 )
             """)
             
+            # Create uploaded_files table for user documents
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS uploaded_files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    user_id TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    file_type TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                )
+            """)
+            
             # Create index for efficient message queries
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_messages_project_created 
                 ON messages(project_id, created_at)
+            """)
+            
+            # Create index for efficient file queries
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_uploaded_files_project_created 
+                ON uploaded_files(project_id, created_at)
             """)
             
             conn.commit()
