@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from utils.rate_limit import limiter
 from config import Config
+from services.ai.outline_suggester import get_outline_suggester
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -692,3 +693,94 @@ async def create_message(
     except Exception as e:
         logger.error(f"Error creating message: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create message: {str(e)}")
+
+
+class OutlineSuggestionResponse(BaseModel):
+    """AI-generated outline suggestion"""
+    title: str
+    rationale: str
+    order_index: int
+
+
+@router.post("/{project_id}/suggest-outline", response_model=List[OutlineSuggestionResponse])
+@limiter.limit("10/minute")
+async def suggest_outline(
+    request: Request,
+    project_id: int,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """
+    Generate AI-powered outline suggestions for a project based on its research topic.
+    Uses conversation history and project title for context.
+    """
+    try:
+        access_token = extract_bearer_token(authorization)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Get project to verify ownership and get research topic
+        if Config.USE_POSTGRES:
+            query = "SELECT * FROM projects WHERE id = %s AND user_id = %s"
+            with db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query, (project_id, user_id))
+                    project = cursor.fetchone()
+        else:
+            query = "SELECT * FROM projects WHERE id = ? AND user_id = ?"
+            project = db.execute_query(query, (project_id, user_id))
+        
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Get conversation history for context
+        conversation_context = []
+        if Config.USE_POSTGRES:
+            messages_query = """
+                SELECT sender, content FROM messages 
+                WHERE project_id = %s 
+                ORDER BY created_at DESC 
+                LIMIT 6
+            """
+            with db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(messages_query, (project_id,))
+                    messages = cursor.fetchall()
+                    conversation_context = [
+                        {"sender": msg['sender'], "content": msg['content']}
+                        for msg in messages
+                    ]
+        else:
+            messages_query = """
+                SELECT sender, content FROM messages 
+                WHERE project_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 6
+            """
+            messages = db.execute_query(messages_query, (project_id,), fetch_all=True)
+            conversation_context = [
+                {"sender": msg['sender'], "content": msg['content']}
+                for msg in messages
+            ] if messages else []
+        
+        # Reverse to chronological order (oldest first)
+        conversation_context.reverse()
+        
+        # Get AI suggestions
+        suggester = get_outline_suggester()
+        research_topic = project['title'] if isinstance(project, dict) else project.title
+        suggestions = suggester.suggest_outline(research_topic, conversation_context)
+        
+        # Convert to response format
+        return [
+            OutlineSuggestionResponse(
+                title=s.title,
+                rationale=s.rationale,
+                order_index=s.order_index
+            )
+            for s in suggestions
+        ]
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating outline suggestions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate outline suggestions: {str(e)}")

@@ -6,13 +6,14 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import time
 
 from schemas.api import SourceUnlockRequest, SourceUnlockResponse
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from services.ai.conversational import AIResearchService
+from services.ai.outline_suggester import get_outline_suggester
 from utils.rate_limit import get_user_or_ip_key, limiter
 
 logger = logging.getLogger(__name__)
@@ -439,3 +440,57 @@ async def unlock_source(request: Request, unlock_request: SourceUnlockRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error unlocking source: {str(e)}")
+
+
+class CategorizeSourceRequest(BaseModel):
+    """Request to categorize a source into outline sections"""
+    source_title: str
+    source_description: str
+    section_titles: List[str]
+
+
+class CategorizeSourceResponse(BaseModel):
+    """Response with relevant section indices"""
+    relevant_section_indices: List[int]
+    confidence: str
+
+
+@router.post("/categorize", response_model=CategorizeSourceResponse)
+@limiter.limit("30/minute")
+async def categorize_source(
+    request: Request,
+    categorize_request: CategorizeSourceRequest,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """
+    Use AI to determine which outline sections a source is relevant to.
+    This enables automatic placement of sources into multiple appropriate sections.
+    """
+    try:
+        # Validate authentication
+        access_token = extract_bearer_token(authorization)
+        validate_user_token(access_token)
+        
+        # Get AI categorization
+        suggester = get_outline_suggester()
+        categorization = suggester.categorize_source(
+            source_title=categorize_request.source_title,
+            source_description=categorize_request.source_description,
+            section_titles=categorize_request.section_titles
+        )
+        
+        return CategorizeSourceResponse(
+            relevant_section_indices=categorization.relevant_section_indices,
+            confidence=categorization.confidence
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error categorizing source: {str(e)}")
+        # Fallback: return first section
+        return CategorizeSourceResponse(
+            relevant_section_indices=[0] if len(categorize_request.section_titles) > 0 else [],
+            confidence="low"
+        )
+
