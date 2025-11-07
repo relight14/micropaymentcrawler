@@ -22,7 +22,7 @@ export class OutlineBuilder extends EventTarget {
     /**
      * Set the current project
      */
-    setProject(projectId, projectData) {
+    async setProject(projectId, projectData) {
         this.currentProjectId = projectId;
         
         // If no project (logout scenario), clear sections
@@ -32,32 +32,249 @@ export class OutlineBuilder extends EventTarget {
             return;
         }
         
-        // Has project - use its outline or defaults
-        if (projectData && projectData.outline) {
+        // Has project - use its outline or fetch AI suggestions
+        if (projectData && projectData.outline && projectData.outline.length > 0) {
             this.sections = projectData.outline;
+            this.render();
         } else {
-            this.sections = this.getDefaultSections();
+            // New project or empty outline - fetch AI suggestions
+            await this.fetchAndApplyAISuggestions();
         }
-        this.render();
     }
 
     /**
-     * Get default outline sections for new projects
+     * Get default outline sections for new projects (fallback)
      */
     getDefaultSections() {
         return [
-            { id: null, title: 'Introduction', order_index: 0, sources: [] },
+            { id: null, title: 'Background & Context', order_index: 0, sources: [] },
             { id: null, title: 'Key Findings', order_index: 1, sources: [] },
-            { id: null, title: 'Conclusion', order_index: 2, sources: [] }
+            { id: null, title: 'Analysis & Perspectives', order_index: 2, sources: [] },
+            { id: null, title: 'Conclusions', order_index: 3, sources: [] }
         ];
     }
 
     /**
-     * Update selected sources from source manager
+     * Fetch AI-generated outline suggestions from backend
      */
-    setSelectedSources(sources) {
-        this.selectedSources = sources || [];
+    async fetchAISuggestions(projectId) {
+        if (!projectId) {
+            throw new Error('No project ID provided');
+        }
+
+        const token = this.authService.getToken();
+        if (!token) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`/api/projects/${projectId}/suggest-outline`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch suggestions: ${response.statusText}`);
+        }
+
+        const suggestions = await response.json();
+        return suggestions;
+    }
+
+    /**
+     * Fetch and apply AI suggestions to outline
+     * Includes race condition protection for project switching
+     */
+    async fetchAndApplyAISuggestions() {
+        // Capture project ID at invocation time to prevent race conditions
+        const initiatingProjectId = this.currentProjectId;
+        
+        if (!initiatingProjectId) {
+            this.sections = this.getDefaultSections();
+            this.render();
+            return;
+        }
+        
+        try {
+            this.updateSaveIndicator('Generating outline...');
+            
+            // Pass captured ID to API call
+            const suggestions = await this.fetchAISuggestions(initiatingProjectId);
+            
+            // Guard: Bail if project changed while fetching (before mutating state)
+            if (this.currentProjectId !== initiatingProjectId) {
+                console.log('Project changed during AI fetch, discarding stale suggestions');
+                this.updateSaveIndicator('');
+                return;
+            }
+            
+            // Convert AI suggestions to outline sections
+            this.sections = suggestions.map((suggestion, index) => ({
+                id: null,
+                title: suggestion.title,
+                order_index: index,
+                sources: [],
+                aiGenerated: true,
+                aiRationale: suggestion.rationale
+            }));
+
+            this.render();
+            this.debouncedSave();
+            this.updateSaveIndicator('AI outline ready');
+            setTimeout(() => this.updateSaveIndicator(''), 2000);
+
+            analytics.track('ai_outline_generated', {
+                project_id: initiatingProjectId,
+                section_count: this.sections.length
+            });
+
+        } catch (error) {
+            // Guard: Only show error if still on same project
+            if (this.currentProjectId !== initiatingProjectId) {
+                this.updateSaveIndicator('');
+                return;
+            }
+            
+            console.error('Error fetching AI suggestions:', error);
+            this.toastManager.show('Using default outline - AI suggestions unavailable', 'info');
+            this.sections = this.getDefaultSections();
+            this.render();
+            this.updateSaveIndicator('');
+        }
+    }
+
+    /**
+     * Regenerate AI suggestions (user-triggered)
+     * Includes race condition protection for project switching
+     */
+    async regenerateAISuggestions() {
+        if (!confirm('Replace current outline with new AI suggestions? This will keep your sources but reorganize sections.')) {
+            return;
+        }
+
+        // Capture project ID to prevent cross-project contamination
+        const initiatingProjectId = this.currentProjectId;
+
+        // Store current sources to preserve them
+        const allSources = [];
+        this.sections.forEach(section => {
+            allSources.push(...section.sources);
+        });
+
+        await this.fetchAndApplyAISuggestions();
+
+        // Guard: Abort if project changed during regeneration
+        if (this.currentProjectId !== initiatingProjectId) {
+            console.log('Project changed during regeneration, aborting source restoration');
+            return;
+        }
+
+        // Add all sources back to first section (user can reorganize)
+        if (this.sections.length > 0 && allSources.length > 0) {
+            this.sections[0].sources = allSources;
+            this.render();
+            this.debouncedSave();
+        }
+    }
+
+    /**
+     * Update selected sources from source manager
+     * Auto-categorizes and places new sources into relevant sections
+     */
+    async setSelectedSources(sources) {
+        const newSources = sources || [];
+        
+        // Find sources that are newly selected
+        const previousIds = new Set(this.selectedSources.map(s => s.id));
+        const newlySelected = newSources.filter(s => !previousIds.has(s.id));
+        
+        this.selectedSources = newSources;
         this.render();
+        
+        // Auto-place newly selected sources into relevant sections
+        if (newlySelected.length > 0 && this.sections.length > 0 && this.currentProjectId) {
+            await this.autoPlaceNewSources(newlySelected);
+        }
+    }
+
+    /**
+     * Automatically categorize and place new sources into relevant sections using AI
+     * Includes race condition protection for project switching
+     */
+    async autoPlaceNewSources(newSources) {
+        // Capture project ID to prevent placing sources in wrong project
+        const initiatingProjectId = this.currentProjectId;
+        
+        for (const source of newSources) {
+            try {
+                const relevantIndices = await this.categorizeSource(source);
+                
+                // Guard: Bail if project changed during categorization
+                if (this.currentProjectId !== initiatingProjectId) {
+                    console.log('Project changed during source categorization, aborting placement');
+                    return;
+                }
+                
+                // Add source to each relevant section
+                for (const sectionIndex of relevantIndices) {
+                    if (sectionIndex < this.sections.length) {
+                        this.addSourceToSection(sectionIndex, source, true); // true = AI-placed
+                    }
+                }
+                
+            } catch (error) {
+                // Guard: Only handle error if still on same project
+                if (this.currentProjectId !== initiatingProjectId) {
+                    return;
+                }
+                
+                console.error('Error auto-placing source:', error);
+                // Fallback: add to first section
+                if (this.sections.length > 0) {
+                    this.addSourceToSection(0, source, false);
+                }
+            }
+        }
+    }
+
+    /**
+     * Call AI API to categorize a source into sections
+     */
+    async categorizeSource(source) {
+        const token = this.authService.getToken();
+        if (!token || this.sections.length === 0) {
+            return [0]; // Fallback to first section
+        }
+
+        try {
+            const sectionTitles = this.sections.map(s => s.title);
+            
+            const response = await fetch('/api/sources/categorize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    source_title: source.title || '',
+                    source_description: source.description || source.excerpt || '',
+                    section_titles: sectionTitles
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Categorization failed');
+            }
+
+            const result = await response.json();
+            return result.relevant_section_indices || [0];
+            
+        } catch (error) {
+            console.error('Error categorizing source:', error);
+            return [0]; // Fallback to first section
+        }
     }
 
     /**
@@ -138,25 +355,30 @@ export class OutlineBuilder extends EventTarget {
     /**
      * Add source to a section
      */
-    addSourceToSection(sectionIndex, sourceData) {
+    addSourceToSection(sectionIndex, sourceData, isAIPlaced = false) {
         const section = this.sections[sectionIndex];
         
         const existingIndex = section.sources.findIndex(s => s.source_data.id === sourceData.id);
         if (existingIndex >= 0) {
-            this.toastManager.show('Source already in this section', 'info');
+            // Source already in section, don't show toast for AI placement
+            if (!isAIPlaced) {
+                this.toastManager.show('Source already in this section', 'info');
+            }
             return;
         }
 
         section.sources.push({
             source_data: sourceData,
-            order_index: section.sources.length
+            order_index: section.sources.length,
+            aiPlaced: isAIPlaced
         });
         this.render();
         this.debouncedSave();
 
         analytics.track('outline_source_added', {
             project_id: this.currentProjectId,
-            section_index: sectionIndex
+            section_index: sectionIndex,
+            ai_placed: isAIPlaced
         });
     }
 
@@ -178,23 +400,35 @@ export class OutlineBuilder extends EventTarget {
     }
 
     /**
-     * Debounced save to backend
+     * Debounced save to backend with race condition protection
+     * Captures project ID and sections snapshot when scheduled
      */
     debouncedSave() {
         if (this.saveTimeout) {
             clearTimeout(this.saveTimeout);
         }
         
+        // Capture project ID and sections at schedule time
+        const projectIdToSave = this.currentProjectId;
+        const sectionsToSave = JSON.parse(JSON.stringify(this.sections)); // Deep clone
+        
         this.saveTimeout = setTimeout(() => {
-            this.saveToBackend();
+            this.saveToBackend(projectIdToSave, sectionsToSave);
         }, 1000);
     }
 
     /**
-     * Save outline to backend
+     * Save outline to backend with race condition protection
+     * Only saves if still on the same project
      */
-    async saveToBackend() {
-        if (!this.currentProjectId || !this.authService.isAuthenticated()) {
+    async saveToBackend(projectIdToSave, sectionsToSave) {
+        if (!projectIdToSave || !this.authService.isAuthenticated()) {
+            return;
+        }
+
+        // Guard: Abort if project changed since save was scheduled
+        if (this.currentProjectId !== projectIdToSave) {
+            console.log('Project changed since save scheduled, aborting save');
             return;
         }
 
@@ -202,14 +436,14 @@ export class OutlineBuilder extends EventTarget {
         this.updateSaveIndicator('Saving...');
 
         try {
-            const response = await fetch(`/api/projects/${this.currentProjectId}/outline`, {
+            const response = await fetch(`/api/projects/${projectIdToSave}/outline`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.authService.getToken()}`
                 },
                 body: JSON.stringify({
-                    sections: this.sections
+                    sections: sectionsToSave
                 })
             });
 
@@ -421,7 +655,12 @@ export class OutlineBuilder extends EventTarget {
             <div class="resize-handle" id="outline-resize-handle"></div>
             <div class="outline-builder">
                 <div class="outline-header">
-                    <h3>Research Outline</h3>
+                    <div>
+                        <h3>Research Outline</h3>
+                        <button class="regenerate-outline-btn" id="regenerate-outline-btn" title="Get new AI-suggested sections">
+                            ✨ Regenerate
+                        </button>
+                    </div>
                     <span class="save-indicator" id="outline-save-indicator"></span>
                 </div>
 
@@ -538,6 +777,12 @@ export class OutlineBuilder extends EventTarget {
         const addSectionBtn = document.getElementById('add-section-btn');
         if (addSectionBtn) {
             addSectionBtn.addEventListener('click', () => this.addSection());
+        }
+
+        // Regenerate AI outline button
+        const regenerateBtn = document.getElementById('regenerate-outline-btn');
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', () => this.regenerateAISuggestions());
         }
 
         // File upload button
