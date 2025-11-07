@@ -350,7 +350,7 @@ async def update_project_outline(
                             RETURNING id
                         """, (project_id, section.title, section.order_index))
                         
-                        section_id = cursor.fetchone()[0]
+                        section_id = cursor.fetchone()['id']
                         
                         for source in section.sources:
                             cursor.execute("""
