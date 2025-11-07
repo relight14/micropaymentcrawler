@@ -428,11 +428,7 @@ export class OutlineBuilder extends EventTarget {
                 <div class="selected-sources-pool">
                     <div class="pool-header">
                         <span class="pool-title">Selected Sources (${this.selectedSources.length})</span>
-                        <button class="upload-file-btn" id="upload-file-btn" title="Upload document (.md, .doc)">
-                            📄 Upload
-                        </button>
                     </div>
-                    <input type="file" id="file-upload-input" accept=".md,.doc,.docx" style="display: none;" />
                     <div class="source-chips">
                         ${this.selectedSources.length === 0 ? `
                             <div class="empty-pool">
@@ -494,6 +490,11 @@ export class OutlineBuilder extends EventTarget {
                         </div>
                     `).join('')}
                 </div>
+
+                <input type="file" id="file-upload-input" accept=".md,.doc,.docx" style="display: none;" />
+                <button class="upload-file-btn" id="upload-file-btn" title="Upload document (.md, .doc, .docx)">
+                    📄 Upload your own docs
+                </button>
 
                 <button class="add-section-btn" id="add-section-btn">
                     + Add Section
