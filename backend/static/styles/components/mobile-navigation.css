@@ -1,0 +1,172 @@
+/**
+ * Mobile Bottom Navigation Styles
+ * Tab bar for Projects, Chat, and Outline switching on mobile devices
+ */
+
+/* Mobile navigation - hidden by default, shown only on mobile */
+.mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    z-index: 2000;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Show mobile nav only on mobile screens */
+@media (max-width: 768px) {
+    .mobile-nav {
+        display: flex;
+    }
+
+    /* Add padding to main content to account for bottom nav */
+    #main-content {
+        padding-bottom: 60px;
+    }
+}
+
+/* Mobile nav tab buttons */
+.mobile-nav-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    height: 100%;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 8px;
+    gap: 4px;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-tab:hover {
+    background: var(--hover-bg);
+}
+
+.mobile-nav-tab:active {
+    transform: scale(0.95);
+}
+
+/* Active tab styling */
+.mobile-nav-tab.active {
+    color: var(--primary);
+}
+
+.mobile-nav-tab.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 3px;
+    background: linear-gradient(135deg, #3730a3 0%, #4338ca 100%);
+    border-radius: 0 0 3px 3px;
+}
+
+/* Tab icons */
+.mobile-nav-icon {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2;
+}
+
+/* Tab labels */
+.mobile-nav-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+/* Mobile backdrop overlay */
+.mobile-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.mobile-backdrop.visible {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Mobile panel visibility states */
+@media (max-width: 768px) {
+    /* By default, hide sidebars on mobile */
+    #project-sidebar,
+    #outline-builder {
+        position: fixed;
+        top: 0;
+        bottom: 60px; /* Account for bottom nav */
+        z-index: 1000;
+        width: 100%;
+        max-width: 100%;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #outline-builder {
+        transform: translateX(100%);
+    }
+
+    /* Show panels when active */
+    #project-sidebar.mobile-active {
+        transform: translateX(0);
+    }
+
+    #outline-builder.mobile-active {
+        transform: translateX(0);
+    }
+
+    /* Ensure chat is visible by default */
+    #main-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+}
+
+/* Dark mode adjustments */
+body.dark-mode .mobile-nav {
+    background: var(--card);
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .mobile-nav-tab:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .mobile-backdrop {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+/* Handle notched devices (iPhone X and later) */
+@supports (padding: max(0px)) {
+    .mobile-nav {
+        padding-bottom: max(env(safe-area-inset-bottom), 8px);
+        height: calc(60px + env(safe-area-inset-bottom));
+    }
+}

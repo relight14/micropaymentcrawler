@@ -17,6 +17,7 @@ import { TierManager } from './managers/tier-manager.js';
 import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
 import { ProjectManager } from './managers/project-manager.js';
+import { MobileNavigation } from './components/mobile-navigation.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
 import { summaryPopover } from './components/summary-popover.js';
@@ -103,6 +104,9 @@ export class ChatResearchApp {
             authService: this.authService,
             toastManager: this.toastManager
         });
+        
+        // Initialize mobile navigation for responsive mobile experience
+        this.mobileNavigation = new MobileNavigation();
         
         // Setup ReportBuilder event listeners
         this.reportBuilder.addEventListener('reportGenerated', (e) => {
