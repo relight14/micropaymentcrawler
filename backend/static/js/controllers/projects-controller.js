@@ -179,10 +179,11 @@ export class ProjectsController {
      * @param {string} projectTitle - Project title
      */
     async loadProjectMessages(projectId, projectTitle) {
+        console.log('🔍 [LOAD] Step 1: Starting loadProjectMessages', { projectId, projectTitle });
         try {
             const { appState, uiManager, sourceManager, reportBuilder, apiService } = this.dependencies;
             
-            console.log(`📥 Loading messages for project ${projectId}...`);
+            console.log(`🔍 [LOAD] Step 2: Loading messages for project ${projectId}...`);
             
             // Clear current conversation display (skip confirmation)
             appState.clearConversation();
@@ -190,18 +191,22 @@ export class ProjectsController {
             sourceManager.updateSelectionUI();
             reportBuilder.update();
             
+            console.log('🔍 [LOAD] Step 3: Fetching messages from backend');
             // Fetch messages from backend
             const response = await apiService.getProjectMessages(projectId);
+            console.log('🔍 [LOAD] Step 4: Got response from API', response);
             const messages = response.messages || [];
             
-            console.log(`📥 Loaded ${messages.length} messages for project ${projectId}`);
+            console.log(`🔍 [LOAD] Step 5: Loaded ${messages.length} messages for project ${projectId}`);
             
             if (messages.length === 0) {
+                console.log('🔍 [LOAD] Step 6a: No messages, showing welcome');
                 // Show welcome message for empty project (don't save it)
                 this.isRestoringMessages = true;
                 this._addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`);
                 this.isRestoringMessages = false;
             } else {
+                console.log('🔍 [LOAD] Step 6b: Restoring messages to chat interface');
                 // Restore messages to chat interface (without saving them again)
                 this.isRestoringMessages = true;
                 
@@ -209,36 +214,44 @@ export class ProjectsController {
                 let mostRecentResearchData = null;
                 
                 for (const msg of messages) {
+                    console.log('🔍 [LOAD] Processing message', msg);
                     // Add message to state and UI
                     const metadata = msg.message_data?.metadata || null;
                     let content = msg.content;
                     
+                    console.log('🔍 [LOAD] Content type:', typeof content, 'starts with <:', typeof content === 'string' && content.trim().startsWith('<'));
                     // Reconstruct HTML content as DOM element for proper rendering
                     if (typeof content === 'string' && content.trim().startsWith('<')) {
+                        console.log('🔍 [LOAD] Reconstructing HTML content');
                         try {
                             const tempDiv = document.createElement('div');
                             tempDiv.innerHTML = content;
                             
+                            console.log('🔍 [LOAD] tempDiv.children.length:', tempDiv.children.length);
                             // If multiple root elements, return them all in a wrapper
                             if (tempDiv.children.length > 1) {
+                                console.log('🔍 [LOAD] Multiple root elements, wrapping');
                                 const wrapper = document.createElement('div');
                                 while (tempDiv.firstChild) {
                                     wrapper.appendChild(tempDiv.firstChild);
                                 }
                                 content = wrapper;
                             } else if (tempDiv.firstChild) {
+                                console.log('🔍 [LOAD] Single element, using directly');
                                 // Single element, return it directly
                                 content = tempDiv.firstChild;
                             }
                             // If no children, keep content as string
                         } catch (error) {
-                            console.error('Error reconstructing HTML message:', error);
+                            console.error('🔍 [LOAD] Error reconstructing HTML message:', error);
                             // Keep content as original string if parsing fails
                         }
                     }
                     
+                    console.log('🔍 [LOAD] Adding message to appState and UI');
                     const message = appState.addMessage(msg.sender, content, metadata);
                     uiManager.addMessageToChat(message);
+                    console.log('🔍 [LOAD] Message added successfully');
                     
                     // Extract research data from source cards metadata for restoration
                     if (metadata?.type === 'source_cards' && metadata?.sources) {
@@ -250,21 +263,26 @@ export class ProjectsController {
                     }
                 }
                 
+                console.log('🔍 [LOAD] Step 7: Finished processing all messages');
                 // Restore the most recent research data to appState
                 if (mostRecentResearchData) {
+                    console.log('🔍 [LOAD] Step 8: Restoring research data');
                     appState.setCurrentResearchData(mostRecentResearchData);
                     console.log(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
                 }
                 
                 this.isRestoringMessages = false;
-                console.log(`✅ Restored ${messages.length} messages to chat interface`);
+                console.log(`🔍 [LOAD] Step 9: ✅ Restored ${messages.length} messages to chat interface`);
             }
             
+            console.log('🔍 [LOAD] Step 10: Hiding welcome screen');
             // Hide welcome screen
             this._hideWelcomeScreen();
             
+            console.log('🔍 [LOAD] Step 11: ✅ Complete!');
         } catch (error) {
-            console.error('Failed to load project messages:', error);
+            console.error('🔍 [LOAD] ERROR in loadProjectMessages:', error);
+            console.error('🔍 [LOAD] Error stack:', error.stack);
             this._addMessage('system', `Failed to load conversation history for this project. Starting fresh.`);
         }
     }
