@@ -25,10 +25,22 @@ export class MessageCoordinator {
         
         conversationHistory.forEach((message) => {
             const uiMessage = { ...message };
-            if (typeof message.content === 'string' && message.content.startsWith('<')) {
+            // Reconstruct HTML content as DOM element for proper rendering
+            if (typeof message.content === 'string' && message.content.trim().startsWith('<')) {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = message.content;
-                uiMessage.content = tempDiv.firstChild;
+                
+                // If multiple root elements, return them all in a wrapper
+                if (tempDiv.children.length > 1) {
+                    const wrapper = document.createElement('div');
+                    while (tempDiv.firstChild) {
+                        wrapper.appendChild(tempDiv.firstChild);
+                    }
+                    uiMessage.content = wrapper;
+                } else {
+                    // Single element, return it directly
+                    uiMessage.content = tempDiv.firstChild;
+                }
             }
             
             this.uiManager.addMessageToChat(uiMessage);

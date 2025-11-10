@@ -211,7 +211,27 @@ export class ProjectsController {
                 for (const msg of messages) {
                     // Add message to state and UI
                     const metadata = msg.message_data?.metadata || null;
-                    const message = appState.addMessage(msg.sender, msg.content, metadata);
+                    let content = msg.content;
+                    
+                    // Reconstruct HTML content as DOM element for proper rendering
+                    if (typeof content === 'string' && content.trim().startsWith('<')) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = content;
+                        
+                        // If multiple root elements, return them all in a wrapper
+                        if (tempDiv.children.length > 1) {
+                            const wrapper = document.createElement('div');
+                            while (tempDiv.firstChild) {
+                                wrapper.appendChild(tempDiv.firstChild);
+                            }
+                            content = wrapper;
+                        } else {
+                            // Single element, return it directly
+                            content = tempDiv.firstChild;
+                        }
+                    }
+                    
+                    const message = appState.addMessage(msg.sender, content, metadata);
                     uiManager.addMessageToChat(message);
                     
                     // Extract research data from source cards metadata for restoration

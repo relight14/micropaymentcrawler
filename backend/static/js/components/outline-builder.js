@@ -28,6 +28,7 @@ export class OutlineBuilder extends EventTarget {
         // If no project (logout scenario), clear sections
         if (!projectId) {
             this.sections = [];
+            this.selectedSources = [];
             this.render();
             return;
         }
@@ -35,6 +36,26 @@ export class OutlineBuilder extends EventTarget {
         // Has project - use its outline or fetch AI suggestions
         if (projectData && projectData.outline && projectData.outline.length > 0) {
             this.sections = projectData.outline;
+            
+            // Extract all sources from outline sections to populate selected sources pool
+            const allSources = [];
+            const seenIds = new Set();
+            
+            this.sections.forEach(section => {
+                if (section.sources && Array.isArray(section.sources)) {
+                    section.sources.forEach(sourceWrapper => {
+                        const source = sourceWrapper.source_data;
+                        if (source && source.id && !seenIds.has(source.id)) {
+                            allSources.push(source);
+                            seenIds.add(source.id);
+                        }
+                    });
+                }
+            });
+            
+            // Populate selected sources pool with all sources from outline
+            this.selectedSources = allSources;
+            
             this.render();
         } else {
             // New project or empty outline - fetch AI suggestions
