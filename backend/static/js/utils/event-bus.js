@@ -9,6 +9,7 @@ export const EVENT_TYPES = {
     TIER_PURCHASED: 'tierPurchased',
     TIER_PURCHASE_ERROR: 'tierPurchaseError',
     REPORT_REQUESTED: 'reportRequested',
+    REPORT_STATUS_CHANGED: 'reportStatusChanged',
     
     // Project events
     PROJECT_CREATED: 'projectCreated',

@@ -1,5 +1,6 @@
 import { MessageRenderer } from '../components/message-renderer.js';
 import { analytics } from '../utils/analytics.js';
+import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 
 export class MessageCoordinator {
     constructor({ appState, apiService, authService, uiManager, toastManager, sourceManager }) {
@@ -9,6 +10,68 @@ export class MessageCoordinator {
         this.uiManager = uiManager;
         this.toastManager = toastManager;
         this.sourceManager = sourceManager;
+        
+        // Report/Enrichment Status State Machine
+        // States: idle → pricing → generating → complete → error
+        this.reportStatus = 'idle';
+    }
+    
+    /**
+     * Set report/enrichment status with event emission
+     * @param {string} status - 'idle' | 'pricing' | 'generating' | 'complete' | 'error'
+     */
+    setReportStatus(status) {
+        const validStates = ['idle', 'pricing', 'generating', 'complete', 'error'];
+        if (!validStates.includes(status)) {
+            console.warn(`Invalid report status: ${status}`);
+            return;
+        }
+        
+        const oldStatus = this.reportStatus;
+        this.reportStatus = status;
+        
+        // Emit event for subscribers
+        AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.REPORT_STATUS_CHANGED, {
+            detail: {
+                oldStatus,
+                newStatus: status
+            }
+        }));
+        
+        console.log(`📊 Report status: ${oldStatus} → ${status}`);
+    }
+    
+    /**
+     * Get current report status
+     */
+    getReportStatus() {
+        return this.reportStatus;
+    }
+    
+    /**
+     * Check if report/pricing is pending
+     */
+    isReportPending() {
+        return this.reportStatus === 'pricing' || this.reportStatus === 'generating';
+    }
+    
+    /**
+     * Sync status from backend enrichment_status
+     * Maps backend values to frontend state machine
+     */
+    syncStatusFromBackend(backendStatus) {
+        const statusMap = {
+            'idle': 'idle',
+            'processing': 'pricing',  // Backend enrichment = frontend pricing
+            'generating': 'generating',  // Backend report generation
+            'ready': 'complete',
+            'complete': 'complete',
+            'error': 'error',
+            'failed': 'error'
+        };
+        
+        const mappedStatus = statusMap[backendStatus] || 'idle';
+        this.setReportStatus(mappedStatus);
     }
 
     /**
@@ -84,6 +147,9 @@ export class MessageCoordinator {
 
     showProgressiveLoading() {
         const messagesContainer = document.getElementById('messagesContainer');
+        
+        // Transition to 'generating' state when report generation starts
+        this.setReportStatus('generating');
         
         const loadingMessage = MessageRenderer.createMessageElement({
             sender: 'system',

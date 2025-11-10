@@ -245,16 +245,46 @@ export class AppState {
         return this.currentResearchData;
     }
     
-    // Enrichment status tracking
-    setEnrichmentStatus(status) {
+    // Enrichment status tracking - ADAPTER (delegates to MessageCoordinator)
+    // TODO: Remove after all consumers migrated to MessageCoordinator
+    setEnrichmentStatus(status, messageCoordinator = null) {
+        // Legacy support during dual-write period
         this.enrichmentStatus = status;
+        
+        // Delegate to MessageCoordinator if available
+        if (messageCoordinator) {
+            // Map old statuses to new state machine
+            const statusMap = {
+                'idle': 'idle',
+                'processing': 'pricing',
+                'complete': 'complete'
+            };
+            messageCoordinator.setReportStatus(statusMap[status] || status);
+        }
     }
     
-    getEnrichmentStatus() {
+    getEnrichmentStatus(messageCoordinator = null) {
+        // Prefer MessageCoordinator if available
+        if (messageCoordinator) {
+            const status = messageCoordinator.getReportStatus();
+            // Map back to legacy format for compatibility
+            const reverseMap = {
+                'idle': 'idle',
+                'pricing': 'processing',
+                'generating': 'processing',
+                'complete': 'complete',
+                'error': 'complete'
+            };
+            return reverseMap[status] || status;
+        }
         return this.enrichmentStatus;
     }
     
-    isEnrichmentPending() {
+    isEnrichmentPending(messageCoordinator = null) {
+        // Prefer MessageCoordinator if available
+        if (messageCoordinator) {
+            return messageCoordinator.isReportPending();
+        }
         return this.enrichmentStatus === 'processing';
     }
 
