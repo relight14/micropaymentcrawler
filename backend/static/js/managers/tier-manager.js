@@ -173,12 +173,39 @@ export class TierManager extends EventTarget {
             }));
             
             if (button) {
-                const selectedSources = useSelectedSources ? this.appState.getSelectedSources() : [];
-                button.textContent = useSelectedSources ? 
-                    `Build Report with ${selectedSources.length || 0} Selected Sources` : 
-                    `Purchase ${tierId === 'research' ? 'Research' : 'Pro'} Package`;
+                // Get outline snapshot to show source count
+                const outlineStructure = projectStore.getOutlineSnapshot();
+                const outlineSourceCount = this._countOutlineSources(outlineStructure);
+                const sourcePrice = outlineSourceCount * 0.05;
+                
+                button.textContent = outlineSourceCount > 0 ?
+                    `Generate Report (${outlineSourceCount} source${outlineSourceCount !== 1 ? 's' : ''}, $${sourcePrice.toFixed(2)})` :
+                    `Generate Report`;
                 button.disabled = false;
             }
         }
+    }
+    
+    _countOutlineSources(outlineStructure) {
+        /**
+         * Count total unique sources in outline structure
+         */
+        if (!outlineStructure || !outlineStructure.sections) {
+            return 0;
+        }
+        
+        const uniqueIds = new Set();
+        outlineStructure.sections.forEach(section => {
+            if (section.sources && Array.isArray(section.sources)) {
+                section.sources.forEach(sourceWrapper => {
+                    const sourceData = sourceWrapper.source_data || sourceWrapper;
+                    if (sourceData.id) {
+                        uniqueIds.add(sourceData.id);
+                    }
+                });
+            }
+        });
+        
+        return uniqueIds.size;
     }
 }

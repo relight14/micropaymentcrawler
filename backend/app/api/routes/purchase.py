@@ -82,6 +82,37 @@ def extract_user_id_from_token(access_token: str) -> str:
         return f"anon_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
 
 
+def extract_sources_from_outline(outline_structure: Dict[str, Any]) -> list:
+    """
+    Extract all unique sources from outline structure.
+    Outline is the single source of truth for what goes in the report.
+    """
+    from schemas.domain import SourceCard
+    
+    if not outline_structure or 'sections' not in outline_structure:
+        return []
+    
+    seen_ids = set()
+    unique_sources = []
+    
+    for section in outline_structure.get('sections', []):
+        for source_wrapper in section.get('sources', []):
+            source_data = source_wrapper.get('source_data', source_wrapper)
+            source_id = source_data.get('id')
+            
+            if source_id and source_id not in seen_ids:
+                seen_ids.add(source_id)
+                # Convert dict to SourceCard instance
+                try:
+                    unique_sources.append(SourceCard(**source_data))
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Failed to parse source from outline: {e}")
+                    continue
+    
+    return unique_sources
+
+
 @router.post("", response_model=PurchaseResponse)
 @limiter.limit("10/minute")
 async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
@@ -99,18 +130,15 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         validate_user_token(access_token)
         user_id = extract_user_id_from_token(access_token)
         
-        # Calculate pricing
-        tier_base_prices = {
-            TierType.BASIC: 0.00,
-            TierType.RESEARCH: 0.35,  
-            TierType.PRO: 0.65
-        }
-        base_price = tier_base_prices[purchase_request.tier]
+        # Extract sources first to generate idempotency key with source IDs
+        temp_outline = purchase_request.outline_structure or {}
+        temp_sources = extract_sources_from_outline(temp_outline)
+        source_ids_str = ",".join(sorted([s.id for s in temp_sources])) if temp_sources else "no_sources"
         
-        # Generate stable idempotency key if not provided
+        # Generate stable idempotency key including source IDs (allows iterative purchases)
         import hashlib
         if not purchase_request.idempotency_key:
-            request_signature = f"{user_id}:{purchase_request.query}:{purchase_request.tier.value}:{base_price}"
+            request_signature = f"{user_id}:{purchase_request.query}:{purchase_request.tier.value}:{source_ids_str}"
             purchase_request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
         
         # Check idempotency status
@@ -157,41 +185,42 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 headers={"Retry-After": "2"}
             )
         
-        # Tier configurations
+        # Extract sources from outline structure first (needed for pricing calculation)
+        sources = extract_sources_from_outline(purchase_request.outline_structure or {})
+        
+        if not sources:
+            # No sources in outline - will be handled per-tier below
+            pass
+        
+        # Calculate incremental pricing: $0.05 per new source
+        previous_source_ids = ledger.get_previous_purchase_sources(user_id, purchase_request.query)
+        current_source_ids = set([s.id for s in sources]) if sources else set()
+        
+        if previous_source_ids:
+            previous_ids_set = set(previous_source_ids)
+            new_source_ids = current_source_ids - previous_ids_set
+            new_source_count = len(new_source_ids)
+            logger.info(f"💰 [PRICING] Previous: {len(previous_ids_set)} sources, Current: {len(current_source_ids)} sources, New: {new_source_count} sources")
+        else:
+            new_source_count = len(current_source_ids)
+            logger.info(f"💰 [PRICING] First purchase: {new_source_count} sources")
+        
+        # Simple pricing: $0.05 per new source
+        calculated_price = new_source_count * 0.05
+        
+        # Tier configurations - now just for max_sources limits
         tier_configs = {
-            TierType.BASIC: {"price": 0.00, "max_sources": 10},
-            TierType.RESEARCH: {"price": 0.35, "max_sources": 20}, 
-            TierType.PRO: {"price": 0.65, "max_sources": 40}
+            TierType.BASIC: {"max_sources": 10},
+            TierType.RESEARCH: {"max_sources": 20}, 
+            TierType.PRO: {"max_sources": 40}
         }
         
         config = tier_configs[purchase_request.tier]
         
-        # Handle FREE TIER
-        if config["price"] == 0.00:
-            # Use provided sources directly (frontend is source of truth)
-            if purchase_request.selected_sources and len(purchase_request.selected_sources) > 0:
-                # Convert dict objects to SourceCard instances
-                from schemas.domain import SourceCard
-                sources = [SourceCard(**source_dict) for source_dict in purchase_request.selected_sources]
-            elif purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
-                # Legacy fallback: try cache lookup for backward compatibility
-                selected_sources = []
-                for cache_key in crawler._cache:
-                    cached_sources, timestamp = crawler._cache[cache_key]
-                    if crawler._is_cache_valid(timestamp):
-                        for source in cached_sources:
-                            if source.id in purchase_request.selected_source_ids:
-                                selected_sources.append(source)
-                
-                if len(selected_sources) > 0:
-                    sources = selected_sources
-                else:
-                    raise HTTPException(
-                        status_code=422,
-                        detail="Selected sources not available. Please refresh your search and select sources again."
-                    )
-            else:
-                # No selected sources - generate fresh
+        # Handle FREE TIER (no new sources)
+        if calculated_price == 0.00:
+            if not sources:
+                # No sources in outline - generate fresh
                 sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             
             # Log outline structure before report generation
@@ -231,7 +260,9 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 price=0.00,
                 wallet_id=None,
                 transaction_id=free_transaction_id,
-                packet=packet
+                packet=packet,
+                source_ids=[s.id for s in sources],
+                user_id=user_id
             )
             
             response_data = PurchaseResponse(
@@ -245,34 +276,11 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             return response_data
         
         # PAID TIERS: Continue with payment processing
-        budget_limit = config["price"] * 0.60
         max_sources = config["max_sources"]
         
-        # Use provided sources directly (frontend is source of truth)
-        if purchase_request.selected_sources and len(purchase_request.selected_sources) > 0:
-            # Convert dict objects to SourceCard instances
-            from schemas.domain import SourceCard
-            sources = [SourceCard(**source_dict) for source_dict in purchase_request.selected_sources]
-        elif purchase_request.selected_source_ids and len(purchase_request.selected_source_ids) > 0:
-            # Legacy fallback: try cache lookup for backward compatibility
-            selected_sources = []
-            for cache_key in crawler._cache:
-                cached_sources, timestamp = crawler._cache[cache_key]
-                if crawler._is_cache_valid(timestamp):
-                    for source in cached_sources:
-                        if source.id in purchase_request.selected_source_ids:
-                            selected_sources.append(source)
-            
-            if len(selected_sources) > 0:
-                sources = selected_sources
-            else:
-                raise HTTPException(
-                    status_code=422,
-                    detail="Selected sources not available. Please refresh your search and select sources again."
-                )
-        else:
-            # No selected sources - generate fresh
-            sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
+        if not sources:
+            # No sources in outline - generate fresh
+            sources = await crawler.generate_sources(purchase_request.query, max_sources)
         
         # Log outline structure before report generation (PAID TIER)
         if purchase_request.outline_structure:
@@ -317,7 +325,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             payment_result = ledewire.create_purchase(
                 access_token=access_token,
                 content_id=content_id,
-                price_cents=int(config["price"] * 100),
+                price_cents=int(calculated_price * 100),
                 idempotency_key=purchase_request.idempotency_key
             )
             
@@ -335,17 +343,19 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         purchase_id = ledger.record_purchase(
             query=purchase_request.query,
             tier=purchase_request.tier,
-            price=config["price"],
+            price=calculated_price,
             wallet_id=wallet_id,
             transaction_id=transaction_id,
-            packet=packet
+            packet=packet,
+            source_ids=[s.id for s in sources],
+            user_id=user_id
         )
         
         response_data = PurchaseResponse(
             success=True,
-            message=f"Research purchased successfully! Your {purchase_request.tier.value.title()} tier research is ready.",
+            message=f"Research purchased successfully! ${calculated_price:.2f} for {new_source_count} new source(s).",
             packet=packet.model_dump(),
-            wallet_deduction=config["price"]
+            wallet_deduction=calculated_price
         )
         
         # Store for idempotency with completed status

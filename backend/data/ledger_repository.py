@@ -75,6 +75,20 @@ class ResearchLedger:
                 )
             """)
             
+            # Add source_ids_used column to purchases table if it doesn't exist
+            try:
+                cursor.execute("ALTER TABLE purchases ADD COLUMN source_ids_used TEXT")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
+            # Add user_id column for better purchase lookups
+            try:
+                cursor.execute("ALTER TABLE purchases ADD COLUMN user_id TEXT")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
             conn.commit()
     
     def record_purchase(self, 
@@ -83,25 +97,51 @@ class ResearchLedger:
                        price: float, 
                        wallet_id: Optional[str], 
                        transaction_id: str,
-                       packet: ResearchPacket) -> int:
+                       packet: ResearchPacket,
+                       source_ids: Optional[List[str]] = None,
+                       user_id: Optional[str] = None) -> int:
         """Record a successful purchase and research packet delivery."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
+            # Convert source IDs list to JSON string
+            source_ids_json = json.dumps(source_ids) if source_ids else None
+            
             cursor.execute("""
-                INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data, source_ids_used, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 query,
                 tier or "dynamic",
                 price,
                 wallet_id,
                 transaction_id,
-                json.dumps(packet.model_dump())
+                json.dumps(packet.model_dump()),
+                source_ids_json,
+                user_id
             ))
             
             return cursor.lastrowid or 0
     
+    def get_previous_purchase_sources(self, user_id: str, query: str) -> Optional[List[str]]:
+        """
+        Get source IDs from the most recent purchase for this user/query.
+        Used for incremental pricing to determine which sources are new.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT source_ids_used FROM purchases 
+                WHERE user_id = ? AND query = ? 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """, (user_id, query))
+            
+            result = cursor.fetchone()
+            if result and result[0]:
+                return json.loads(result[0])
+            return None
+
     def get_idempotency_status(self, user_id: str, idempotency_key: str, operation_type: str) -> Optional[Dict]:
         """Get current status of an idempotent operation. Returns dict with status and response_data, or None."""
         with sqlite3.connect(self.db_path) as conn:

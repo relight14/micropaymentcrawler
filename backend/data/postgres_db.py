@@ -123,6 +123,32 @@ class PostgreSQLConnection:
                     END $$;
                 """)
                 
+                # Add source_ids_used column to purchases table if it doesn't exist
+                cursor.execute("""
+                    DO $$ 
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='purchases' AND column_name='source_ids_used'
+                        ) THEN
+                            ALTER TABLE purchases ADD COLUMN source_ids_used TEXT;
+                        END IF;
+                    END $$;
+                """)
+                
+                # Add user_id column to purchases table for better lookups
+                cursor.execute("""
+                    DO $$ 
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='purchases' AND column_name='user_id'
+                        ) THEN
+                            ALTER TABLE purchases ADD COLUMN user_id TEXT;
+                        END IF;
+                    END $$;
+                """)
+                
                 # Create outline_sections table
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS outline_sections (
