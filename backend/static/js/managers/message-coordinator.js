@@ -11,6 +11,44 @@ export class MessageCoordinator {
         this.sourceManager = sourceManager;
     }
 
+    /**
+     * Restore a single message from persistence
+     * SINGLE SOURCE OF TRUTH for rendering persisted messages
+     * @param {Object} messageRecord - Message from database/state
+     * @param {Object} options - Restoration options
+     * @param {boolean} options.skipPersist - Skip re-saving to AppState (for project loads)
+     * @returns {Object} - Normalized message object
+     */
+    restoreMessage(messageRecord, options = {}) {
+        const { skipPersist = false } = options;
+        
+        // Normalize message structure
+        const metadata = messageRecord.message_data?.metadata || messageRecord.metadata || null;
+        const content = messageRecord.content;
+        const sender = messageRecord.sender;
+        
+        // Parse HTML content for UI rendering using centralized method
+        const uiContent = MessageRenderer.parseHtml(content);
+        
+        // Create normalized message object
+        const message = {
+            id: messageRecord.id,
+            sender,
+            content: uiContent,  // Parsed DOM for UI
+            metadata,
+            timestamp: messageRecord.timestamp
+        };
+        
+        // Add to UI through proper pipeline: MessageCoordinator → UIManager → MessageRenderer
+        this.uiManager.addMessageToChat(message);
+        
+        return message;
+    }
+
+    /**
+     * Restore all messages from conversation history
+     * Used when switching modes (Chat ↔ Research)
+     */
     restoreMessages() {
         const messagesContainer = document.getElementById('messagesContainer');
         
@@ -24,32 +62,7 @@ export class MessageCoordinator {
         const conversationHistory = this.appState.getConversationHistory();
         
         conversationHistory.forEach((message) => {
-            const uiMessage = { ...message };
-            // Reconstruct HTML content as DOM element for proper rendering
-            if (typeof message.content === 'string' && message.content.trim().startsWith('<')) {
-                try {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = message.content;
-                    
-                    // If multiple root elements, return them all in a wrapper
-                    if (tempDiv.children.length > 1) {
-                        const wrapper = document.createElement('div');
-                        while (tempDiv.firstChild) {
-                            wrapper.appendChild(tempDiv.firstChild);
-                        }
-                        uiMessage.content = wrapper;
-                    } else if (tempDiv.firstChild) {
-                        // Single element, return it directly
-                        uiMessage.content = tempDiv.firstChild;
-                    }
-                    // If no children, keep content as string
-                } catch (error) {
-                    console.error('Error reconstructing HTML message:', error);
-                    // Keep content as original string if parsing fails
-                }
-            }
-            
-            this.uiManager.addMessageToChat(uiMessage);
+            this.restoreMessage(message, { skipPersist: true });
         });
     }
 

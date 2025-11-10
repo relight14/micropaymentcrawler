@@ -5,6 +5,7 @@
 
 import { ProjectManager } from '../managers/project-manager.js';
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
+import { MessageRenderer } from '../components/message-renderer.js';
 
 export class ProjectsController {
     constructor() {
@@ -212,36 +213,20 @@ export class ProjectsController {
                     const content = msg.content;
                     
                     // Add to appState with original string content (needed for .substring() calls)
+                    // This normalizes "ai" → "assistant" and shapes metadata correctly
                     const message = appState.addMessage(msg.sender, content, metadata);
                     
-                    // Reconstruct HTML content as DOM element for UI rendering only
-                    let uiContent = content;
-                    if (typeof content === 'string' && content.trim().startsWith('<')) {
-                        try {
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = content;
-                            
-                            // If multiple root elements, return them all in a wrapper
-                            if (tempDiv.children.length > 1) {
-                                const wrapper = document.createElement('div');
-                                while (tempDiv.firstChild) {
-                                    wrapper.appendChild(tempDiv.firstChild);
-                                }
-                                uiContent = wrapper;
-                            } else if (tempDiv.firstChild) {
-                                // Single element, return it directly
-                                uiContent = tempDiv.firstChild;
-                            }
-                            // If no children, keep uiContent as string
-                        } catch (error) {
-                            console.error('Error reconstructing HTML message:', error);
-                            // Keep uiContent as original string if parsing fails
+                    // Delegate to MessageCoordinator for consistent rendering pipeline
+                    // MessageCoordinator → UIManager → MessageRenderer
+                    // IMPORTANT: Pass normalized message from AppState, not raw backend record
+                    const messageCoordinator = this.dependencies.messageCoordinator || {
+                        restoreMessage: (normalizedMsg) => {
+                            // Fallback if messageCoordinator not available
+                            const uiContent = MessageRenderer.parseHtml(normalizedMsg.content);
+                            uiManager.addMessageToChat({ ...normalizedMsg, content: uiContent });
                         }
-                    }
-                    
-                    // Override the content with DOM element for UI rendering
-                    const uiMessage = { ...message, content: uiContent };
-                    uiManager.addMessageToChat(uiMessage);
+                    };
+                    messageCoordinator.restoreMessage(message, { skipPersist: true });
                     
                     // Extract research data from source cards metadata for restoration
                     if (metadata?.type === 'source_cards' && metadata?.sources) {

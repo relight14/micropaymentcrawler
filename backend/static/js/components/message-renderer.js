@@ -64,6 +64,43 @@ export class MessageRenderer {
     };
     
     /**
+     * Parse HTML string content into DOM elements
+     * SINGLE SOURCE OF TRUTH for HTML reconstruction
+     * @param {string} htmlString - HTML content as string
+     * @returns {HTMLElement|string} - DOM element(s) or original string if not HTML
+     */
+    static parseHtml(htmlString) {
+        // Not a string or doesn't start with HTML, return as-is
+        if (typeof htmlString !== 'string' || !htmlString.trim().startsWith('<')) {
+            return htmlString;
+        }
+        
+        try {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlString;
+            
+            // If multiple root elements, wrap them in a container
+            if (tempDiv.children.length > 1) {
+                const wrapper = document.createElement('div');
+                while (tempDiv.firstChild) {
+                    wrapper.appendChild(tempDiv.firstChild);
+                }
+                return wrapper;
+            } else if (tempDiv.firstChild) {
+                // Single element, return it directly
+                return tempDiv.firstChild;
+            }
+            
+            // If no children, return original string
+            return htmlString;
+        } catch (error) {
+            console.error('Error parsing HTML content:', error);
+            // Keep content as original string if parsing fails
+            return htmlString;
+        }
+    }
+    
+    /**
      * Create a standardized message DOM element
      * @param {Message} message - Message object
      * @returns {HTMLElement} - Message DOM element
