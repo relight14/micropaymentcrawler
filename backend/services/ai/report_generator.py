@@ -326,16 +326,19 @@ class ReportGeneratorService:
         if outline_structure and outline_structure.get('sections'):
             topics = [section.get('title', f'Section {i}') 
                      for i, section in enumerate(outline_structure['sections'], 1)]
+            logger.info(f"✅ [REPORT] Extracted {len(topics)} custom topics from outline: {topics}")
             return topics
         
         # Default topics if no outline provided
-        return [
+        default_topics = [
             "Key Findings",
             "Evidence & Data", 
             "Expert Perspectives",
             "Trends & Patterns",
             "Implementation Insights"
         ]
+        logger.info(f"⚠️ [REPORT] No outline structure - using {len(default_topics)} generic topics")
+        return default_topics
     
     def _generate_claude_report(self, query: str, sources: List[SourceCard], tier: TierType, outline_structure: Optional[Dict] = None) -> Dict:
         """Generate structured report using Claude API with JSON output."""

@@ -194,6 +194,15 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 # No selected sources - generate fresh
                 sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             
+            # Log outline structure before report generation
+            if purchase_request.outline_structure:
+                sections = purchase_request.outline_structure.get('sections', [])
+                logger.info(f"📋 [PURCHASE] Outline structure received: {len(sections)} sections")
+                for i, section in enumerate(sections, 1):
+                    logger.info(f"   Section {i}: '{section.get('title', 'NO TITLE')}' ({len(section.get('sources', []))} sources)")
+            else:
+                logger.info(f"⚠️ [PURCHASE] No outline_structure provided - will use generic topics")
+            
             # Generate AI report
             report_data = report_generator.generate_report(
                 purchase_request.query, 
@@ -264,6 +273,15 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         else:
             # No selected sources - generate fresh
             sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
+        
+        # Log outline structure before report generation (PAID TIER)
+        if purchase_request.outline_structure:
+            sections = purchase_request.outline_structure.get('sections', [])
+            logger.info(f"📋 [PURCHASE PAID] Outline structure received: {len(sections)} sections")
+            for i, section in enumerate(sections, 1):
+                logger.info(f"   Section {i}: '{section.get('title', 'NO TITLE')}' ({len(section.get('sources', []))} sources)")
+        else:
+            logger.info(f"⚠️ [PURCHASE PAID] No outline_structure provided - will use generic topics")
         
         # Generate AI report (with fallback handling built-in)
         report_data = report_generator.generate_report(
