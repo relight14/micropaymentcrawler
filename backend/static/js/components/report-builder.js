@@ -749,7 +749,7 @@ export class ReportBuilder extends EventTarget {
             button.addEventListener('click', async (e) => {
                 const tier = e.target.dataset.tier;
                 const price = parseFloat(e.target.dataset.price);
-                const query = this.appState.getCurrentQuery() || "Research Query";
+                const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
                 
                 const selectedSources = this.appState.getSelectedSources();
                 const useSelectedSources = selectedSources && selectedSources.length > 0;

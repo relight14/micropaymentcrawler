@@ -117,7 +117,12 @@ export class ProjectManager {
     handleProjectCreated(project) {
         // Add to store
         projectStore.addProject(project);
-        projectStore.setActiveProject(project.id, project.title);
+        projectStore.setActiveProject(project.id, project.title, project.research_query);
+        
+        // Sync research query to AppState if available
+        if (project.research_query && window.app?.appState) {
+            window.app.appState.setCurrentQuery(project.research_query);
+        }
         
         // Set up outline builder with new project
         this.outlineBuilder.setProject(project.id, { outline: projectStore.state.currentOutline });
@@ -135,6 +140,7 @@ export class ProjectManager {
         console.log(`📊 [ProjectManager] Handling project switch:`, {
             newProjectId: projectData.id,
             newProjectTitle: projectData.title,
+            researchQuery: projectData.research_query,
             currentAppState: {
                 mode: window.app?.appState?.getMode(),
                 messageCount: window.app?.appState?.state?.messages?.length || 0
@@ -142,8 +148,16 @@ export class ProjectManager {
         });
         
         // Update store
-        projectStore.setActiveProject(projectData.id, projectData.title);
+        projectStore.setActiveProject(projectData.id, projectData.title, projectData.research_query);
         projectStore.setOutline(projectData.outline);
+        
+        // Sync research query to AppState if available
+        if (projectData.research_query && window.app?.appState) {
+            window.app.appState.setCurrentQuery(projectData.research_query);
+            console.log(`✅ [ProjectManager] Restored research query: "${projectData.research_query}"`);
+        } else if (!projectData.research_query) {
+            console.log(`ℹ️  [ProjectManager] Project has no saved research query`);
+        }
         
         // Update outline builder
         this.outlineBuilder.setProject(projectData.id, projectData);

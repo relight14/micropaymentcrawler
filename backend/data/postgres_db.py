@@ -103,10 +103,24 @@ class PostgreSQLConnection:
                         id SERIAL PRIMARY KEY,
                         user_id TEXT NOT NULL,
                         title TEXT NOT NULL,
+                        research_query TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         is_active BOOLEAN DEFAULT TRUE
                     )
+                """)
+                
+                # Add research_query column if it doesn't exist (migration-friendly)
+                cursor.execute("""
+                    DO $$ 
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='projects' AND column_name='research_query'
+                        ) THEN
+                            ALTER TABLE projects ADD COLUMN research_query TEXT;
+                        END IF;
+                    END $$;
                 """)
                 
                 # Create outline_sections table

@@ -43,7 +43,7 @@ export class TierManager extends EventTarget {
                 tier: tierId,
                 price: price,
                 selectedSources: selectedSources,
-                query: query || this.appState.getCurrentQuery() || "Research Query"
+                query: query || this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query"
             };
 
             const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
@@ -75,7 +75,7 @@ export class TierManager extends EventTarget {
                 const purchaseResponse = await this.apiService.purchaseTier(
                     tierId, 
                     price, 
-                    query || this.appState.getCurrentQuery() || "Research Query", 
+                    query || this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query", 
                     useSelectedSources ? selectedSources : null,
                     outlineStructure
                 );

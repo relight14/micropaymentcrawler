@@ -69,15 +69,20 @@ export class ProjectListSidebar extends EventTarget {
     /**
      * Create a new project
      */
-    async createProject(title) {
+    async createProject(title, researchQuery = null) {
         try {
+            const requestBody = { title };
+            if (researchQuery) {
+                requestBody.research_query = researchQuery;
+            }
+            
             const response = await fetch('/api/projects', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.authService.getToken()}`
                 },
-                body: JSON.stringify({ title })
+                body: JSON.stringify(requestBody)
             });
 
             if (response.ok) {
@@ -88,7 +93,8 @@ export class ProjectListSidebar extends EventTarget {
                 
                 analytics.track('project_created', {
                     project_id: newProject.id,
-                    title: newProject.title
+                    title: newProject.title,
+                    has_research_query: !!researchQuery
                 });
 
                 this.dispatchEvent(new CustomEvent('projectCreated', {
@@ -130,6 +136,7 @@ export class ProjectListSidebar extends EventTarget {
                     id: response_data.project.id,
                     user_id: response_data.project.user_id,
                     title: response_data.project.title,
+                    research_query: response_data.project.research_query,
                     created_at: response_data.project.created_at,
                     updated_at: response_data.project.updated_at,
                     is_active: response_data.project.is_active,
@@ -398,7 +405,7 @@ export class ProjectListSidebar extends EventTarget {
      */
     async autoCreateProject(query) {
         const title = this.generateProjectTitle(query);
-        return await this.createProject(title);
+        return await this.createProject(title, query);
     }
 
     /**

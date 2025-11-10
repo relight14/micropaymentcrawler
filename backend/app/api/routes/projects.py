@@ -41,6 +41,7 @@ class Project(BaseModel):
     id: Optional[int] = None
     user_id: str
     title: str = Field(..., min_length=1, max_length=500)
+    research_query: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     is_active: bool = True
@@ -49,6 +50,7 @@ class Project(BaseModel):
 class CreateProjectRequest(BaseModel):
     """Request to create a new project"""
     title: str = Field(..., min_length=1, max_length=500)
+    research_query: Optional[str] = None
 
 
 class UpdateOutlineRequest(BaseModel):
@@ -105,13 +107,13 @@ async def create_project(
         # Insert project into database
         if Config.USE_POSTGRES:
             query = """
-                INSERT INTO projects (user_id, title, created_at, updated_at, is_active)
-                VALUES (%s, %s, NOW(), NOW(), TRUE)
-                RETURNING id, user_id, title, created_at, updated_at, is_active
+                INSERT INTO projects (user_id, title, research_query, created_at, updated_at, is_active)
+                VALUES (%s, %s, %s, NOW(), NOW(), TRUE)
+                RETURNING id, user_id, title, research_query, created_at, updated_at, is_active
             """
             with db.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute(query, (user_id, project_request.title))
+                    cursor.execute(query, (user_id, project_request.title, project_request.research_query))
                     result = cursor.fetchone()
                     conn.commit()
                     
@@ -119,20 +121,21 @@ async def create_project(
                         id=result['id'],
                         user_id=result['user_id'],
                         title=result['title'],
+                        research_query=result.get('research_query'),
                         created_at=result['created_at'],
                         updated_at=result['updated_at'],
                         is_active=result['is_active']
                     )
         else:
             query = """
-                INSERT INTO projects (user_id, title, created_at, updated_at, is_active)
-                VALUES (?, ?, datetime('now'), datetime('now'), 1)
+                INSERT INTO projects (user_id, title, research_query, created_at, updated_at, is_active)
+                VALUES (?, ?, ?, datetime('now'), datetime('now'), 1)
             """
-            project_id = db.execute_write(query, (user_id, project_request.title))
+            project_id = db.execute_write(query, (user_id, project_request.title, project_request.research_query))
             
             # Fetch the created project
             result = db.execute_query(
-                "SELECT id, user_id, title, created_at, updated_at, is_active FROM projects WHERE id = ?",
+                "SELECT id, user_id, title, research_query, created_at, updated_at, is_active FROM projects WHERE id = ?",
                 (project_id,)
             )
             
@@ -140,6 +143,7 @@ async def create_project(
                 id=result['id'],
                 user_id=result['user_id'],
                 title=result['title'],
+                research_query=result.get('research_query'),
                 created_at=result['created_at'],
                 updated_at=result['updated_at'],
                 is_active=bool(result['is_active'])
@@ -164,12 +168,12 @@ async def get_projects(
         user_id = extract_user_id_from_token(access_token)
         
         query = """
-            SELECT id, user_id, title, created_at, updated_at, is_active
+            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
             WHERE user_id = ? AND is_active = 1
             ORDER BY updated_at DESC
         """ if not Config.USE_POSTGRES else """
-            SELECT id, user_id, title, created_at, updated_at, is_active
+            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
             WHERE user_id = %s AND is_active = TRUE
             ORDER BY updated_at DESC
@@ -184,6 +188,7 @@ async def get_projects(
                     id=row['id'],
                     user_id=row['user_id'],
                     title=row['title'],
+                    research_query=row.get('research_query'),
                     created_at=row['created_at'],
                     updated_at=row['updated_at'],
                     is_active=row['is_active']
@@ -193,6 +198,7 @@ async def get_projects(
                     id=row['id'],
                     user_id=row['user_id'],
                     title=row['title'],
+                    research_query=row.get('research_query'),
                     created_at=row['created_at'],
                     updated_at=row['updated_at'],
                     is_active=bool(row['is_active'])
@@ -221,11 +227,11 @@ async def get_project_with_outline(
         
         # Fetch project
         project_query = """
-            SELECT id, user_id, title, created_at, updated_at, is_active
+            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
             WHERE id = ? AND user_id = ?
         """ if not Config.USE_POSTGRES else """
-            SELECT id, user_id, title, created_at, updated_at, is_active
+            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
             WHERE id = %s AND user_id = %s
         """
@@ -288,6 +294,7 @@ async def get_project_with_outline(
                 id=project_result['id'],
                 user_id=project_result['user_id'],
                 title=project_result['title'],
+                research_query=project_result.get('research_query'),
                 created_at=project_result['created_at'],
                 updated_at=project_result['updated_at'],
                 is_active=bool(project_result['is_active']) if not Config.USE_POSTGRES else project_result['is_active']

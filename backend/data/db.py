@@ -43,11 +43,19 @@ class DatabaseConnection:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
                     title TEXT NOT NULL,
+                    research_query TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     is_active BOOLEAN DEFAULT 1
                 )
             """)
+            
+            # Add research_query column if it doesn't exist (migration-friendly)
+            try:
+                conn.execute("ALTER TABLE projects ADD COLUMN research_query TEXT")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
             
             # Create outline_sections table
             conn.execute("""
@@ -144,6 +152,7 @@ class DatabaseConnection:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
                     title TEXT NOT NULL,
+                    research_query TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     is_active BOOLEAN DEFAULT 1

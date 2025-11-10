@@ -8,6 +8,7 @@ export class ProjectStore {
         this.state = {
             activeProjectId: null,
             currentProjectTitle: '',
+            currentResearchQuery: null,
             projects: [],
             currentOutline: this.getDefaultOutline(),
             selectedSources: []
@@ -71,11 +72,31 @@ export class ProjectStore {
     /**
      * Set active project
      */
-    setActiveProject(projectId, projectTitle = '') {
+    setActiveProject(projectId, projectTitle = '', researchQuery = null) {
         this.setState({
             activeProjectId: projectId,
-            currentProjectTitle: projectTitle
+            currentProjectTitle: projectTitle,
+            currentResearchQuery: researchQuery
         });
+    }
+    
+    /**
+     * Get research query for active project
+     */
+    getResearchQuery() {
+        return this.state.currentResearchQuery;
+    }
+    
+    /**
+     * Update research query for active project
+     */
+    setResearchQuery(query) {
+        this.setState({ currentResearchQuery: query });
+        
+        // Also update the project in the projects array
+        if (this.state.activeProjectId) {
+            this.updateProject(this.state.activeProjectId, { research_query: query });
+        }
     }
 
     /**
