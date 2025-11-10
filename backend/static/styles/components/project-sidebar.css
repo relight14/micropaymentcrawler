@@ -1,6 +1,61 @@
 /* Project Sidebar Styles */
 /* Layout positioning handled by chat-style.css three-column layout */
 
+/* Mobile login prompt */
+.mobile-login-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 32px;
+    text-align: center;
+    height: 100%;
+    background: var(--bg);
+}
+
+.login-prompt-icon {
+    margin-bottom: 24px;
+    color: var(--primary);
+    opacity: 0.8;
+}
+
+.mobile-login-prompt h3 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+}
+
+.mobile-login-prompt p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 32px 0;
+    max-width: 280px;
+}
+
+.mobile-login-btn {
+    padding: 14px 32px;
+    background: linear-gradient(135deg, #3730a3 0%, #4338ca 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(67, 56, 202, 0.3);
+}
+
+.mobile-login-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(67, 56, 202, 0.4);
+}
+
+.mobile-login-btn:active {
+    transform: translateY(0);
+}
+
 .project-sidebar {
     height: 100%;
     display: flex;

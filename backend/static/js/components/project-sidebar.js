@@ -230,8 +230,36 @@ export class ProjectListSidebar extends EventTarget {
         if (!container) return;
 
         if (!this.authService.isAuthenticated()) {
-            container.innerHTML = '';
-            container.style.display = 'none';
+            // On mobile, show login prompt instead of hiding
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                container.style.display = 'block';
+                container.innerHTML = `
+                    <div class="mobile-login-prompt">
+                        <div class="login-prompt-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </div>
+                        <h3>Projects</h3>
+                        <p>Save and organize your research across sessions</p>
+                        <button class="mobile-login-btn" id="mobile-login-btn">
+                            Log In to Access Projects
+                        </button>
+                    </div>
+                `;
+                
+                // Attach login button listener
+                const loginBtn = document.getElementById('mobile-login-btn');
+                if (loginBtn) {
+                    loginBtn.addEventListener('click', () => {
+                        this.authService.login();
+                    });
+                }
+            } else {
+                container.innerHTML = '';
+                container.style.display = 'none';
+            }
             return;
         }
 
