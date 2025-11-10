@@ -23,6 +23,9 @@ export class ProjectListSidebar extends EventTarget {
     async init() {
         if (this.authService.isAuthenticated()) {
             await this.loadProjects();
+        } else {
+            // Render for non-authenticated users (shows mobile login prompt on mobile)
+            this.render();
         }
     }
 
