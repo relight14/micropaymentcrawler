@@ -215,19 +215,25 @@ export class ProjectsController {
                     
                     // Reconstruct HTML content as DOM element for proper rendering
                     if (typeof content === 'string' && content.trim().startsWith('<')) {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = content;
-                        
-                        // If multiple root elements, return them all in a wrapper
-                        if (tempDiv.children.length > 1) {
-                            const wrapper = document.createElement('div');
-                            while (tempDiv.firstChild) {
-                                wrapper.appendChild(tempDiv.firstChild);
+                        try {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = content;
+                            
+                            // If multiple root elements, return them all in a wrapper
+                            if (tempDiv.children.length > 1) {
+                                const wrapper = document.createElement('div');
+                                while (tempDiv.firstChild) {
+                                    wrapper.appendChild(tempDiv.firstChild);
+                                }
+                                content = wrapper;
+                            } else if (tempDiv.firstChild) {
+                                // Single element, return it directly
+                                content = tempDiv.firstChild;
                             }
-                            content = wrapper;
-                        } else {
-                            // Single element, return it directly
-                            content = tempDiv.firstChild;
+                            // If no children, keep content as string
+                        } catch (error) {
+                            console.error('Error reconstructing HTML message:', error);
+                            // Keep content as original string if parsing fails
                         }
                     }
                     
