@@ -16,7 +16,7 @@ import { SourceManager } from './managers/source-manager.js';
 import { TierManager } from './managers/tier-manager.js';
 import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
-import { ProjectManager } from './managers/project-manager.js';
+import { ProjectsController } from './controllers/projects-controller.js';
 import { MobileNavigation } from './components/mobile-navigation.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
@@ -29,9 +29,6 @@ export class ChatResearchApp {
     constructor() {
         // Initialize base URL for API calls
         this.baseURL = window.location.origin;
-        
-        // Flag to prevent saving messages during restoration
-        this.isRestoringMessages = false;
         
         // Initialize core services and state (dependency injection)
         this.authService = new AuthService();
@@ -99,11 +96,8 @@ export class ChatResearchApp {
             sourceManager: this.sourceManager
         });
         
-        this.projectManager = new ProjectManager({
-            apiService: this.apiService,
-            authService: this.authService,
-            toastManager: this.toastManager
-        });
+        // Initialize projects controller (handles all project/outline orchestration)
+        this.projectsController = new ProjectsController();
         
         // Initialize mobile navigation for responsive mobile experience
         this.mobileNavigation = new MobileNavigation();
@@ -170,27 +164,8 @@ export class ChatResearchApp {
         });
         
         // Setup centralized AppEvents bus listeners for cross-component coordination
-        AppEvents.addEventListener(EVENT_TYPES.SOURCE_SELECTED, (e) => {
-            console.log('📡 AppEvents: Source selected', e.detail);
-            // Update report builder when sources are selected
-            if (this.appState.getMode() === 'report') {
-                const reportBuilderElement = this.reportBuilder.show();
-                this.addMessage('system', reportBuilderElement);
-            }
-            // Update project store with selected sources
-            this.projectManager.updateSelectedSources(this.appState.getSelectedSources());
-        });
-        
-        AppEvents.addEventListener(EVENT_TYPES.SOURCE_DESELECTED, (e) => {
-            console.log('📡 AppEvents: Source deselected', e.detail);
-            // Update report builder when sources are deselected
-            if (this.appState.getMode() === 'report') {
-                const reportBuilderElement = this.reportBuilder.show();
-                this.addMessage('system', reportBuilderElement);
-            }
-            // Update project store with selected sources
-            this.projectManager.updateSelectedSources(this.appState.getSelectedSources());
-        });
+        // Note: Project-related events (SOURCE_SELECTED, SOURCE_DESELECTED, PROJECT_SWITCHED) 
+        // are now handled by ProjectsController
         
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_UNLOCKED, (e) => {
             console.log('📡 AppEvents: Source unlocked', e.detail);
@@ -203,24 +178,6 @@ export class ChatResearchApp {
         
         AppEvents.addEventListener(EVENT_TYPES.TIER_PURCHASED, (e) => {
             console.log('📡 AppEvents: Tier purchased', e.detail);
-        });
-        
-        // Listen for source selection changes and sync to ProjectStore
-        document.addEventListener('sourceSelectionChanged', (e) => {
-            console.log('📡 Source selection changed:', e.detail);
-            // Sync appState selections to ProjectStore for outline builder
-            this.projectManager.updateSelectedSources(this.appState.getSelectedSources());
-        });
-        
-        // Handle project switching - load conversation history for the project
-        AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, async (e) => {
-            console.log('📡 AppEvents: Project switched', {
-                projectId: e.detail.projectData.id,
-                projectTitle: e.detail.projectData.title
-            });
-            
-            // Load messages for this project
-            await this.loadProjectMessages(e.detail.projectData.id, e.detail.projectData.title);
         });
         
         // Register logout callback to update UI when user is logged out
@@ -288,10 +245,7 @@ export class ChatResearchApp {
                     this.updateAuthButton();
                     console.log('✅ Auth success callback completed');
                     
-                    // Dispatch auth state changed event for project manager
-                    AppEvents.dispatchEvent(new CustomEvent('authStateChanged', {
-                        detail: { isAuthenticated: true }
-                    }));
+                    // Auth state change is handled by ProjectsController via AppEvents
                 } catch (error) {
                     console.error('❌ Error in auth success callback:', error);
                     // Don't throw - just log and update UI anyway
@@ -365,8 +319,18 @@ export class ChatResearchApp {
             const onboarding = new OnboardingModal();
             onboarding.show();
             
-            // Initialize project manager
-            await this.projectManager.init();
+            // Attach projects controller with all dependencies
+            await this.projectsController.attach({
+                apiService: this.apiService,
+                authService: this.authService,
+                toastManager: this.toastManager,
+                appState: this.appState,
+                uiManager: this.uiManager,
+                reportBuilder: this.reportBuilder,
+                sourceManager: this.sourceManager,
+                addMessageCallback: (sender, content, metadata) => this.addMessage(sender, content, metadata),
+                hideWelcomeCallback: () => this.hideWelcomeScreen()
+            });
         } catch (error) {
             console.error('Error initializing app:', error);
             this.addMessage('system', 'Application initialization failed. Please refresh the page.');
@@ -389,7 +353,7 @@ export class ChatResearchApp {
 
         try {
             // Auto-create project from first query if user has no projects
-            await this.projectManager.ensureActiveProject(message);
+            await this.projectsController.ensureActiveProject(message);
             
             // Track search/message
             analytics.trackSearch(message, currentMode);
@@ -529,128 +493,9 @@ export class ChatResearchApp {
         this.hideWelcomeScreen();
         
         // Save message to backend if there's an active project
-        this.saveMessageToProject(sender, stateContent, metadata);
+        this.projectsController.saveMessageToProject(sender, stateContent, metadata);
         
         return message;
-    }
-    
-    async saveMessageToProject(sender, content, metadata) {
-        try {
-            // Skip saving if we're restoring messages from database
-            if (this.isRestoringMessages) {
-                return;
-            }
-            
-            const activeProjectId = this.projectManager.getActiveProjectId();
-            
-            if (!activeProjectId) {
-                // No active project, skip saving
-                return;
-            }
-            
-            // Normalize sender type for consistency
-            // Frontend uses 'assistant' but backend expects 'ai'
-            const normalizedSender = sender === 'assistant' ? 'ai' : sender;
-            
-            // Only save user, ai, and system messages (skip ephemeral UI elements)
-            if (!['user', 'ai', 'system'].includes(normalizedSender)) {
-                return;
-            }
-            
-            // Ensure content is a string (should already be serialized by addMessage)
-            if (typeof content !== 'string') {
-                console.warn(`⚠️ Non-string content passed to saveMessageToProject, skipping:`, typeof content);
-                return;
-            }
-            
-            // Skip report builder UI (tier selection cards) - it's ephemeral and should regenerate fresh
-            // Only filter DOM elements with tier-cards-section as root class, not text content mentioning it
-            // Always preserve research reports (metadata.type === 'research_report')
-            if (metadata?.type !== 'research_report' && content.startsWith('<')) {
-                try {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = content;
-                    const firstChild = tempDiv.firstElementChild;
-                    if (firstChild && firstChild.classList.contains('tier-cards-section')) {
-                        console.log(`⏭️ Skipping report builder UI persistence for project ${activeProjectId}`);
-                        return;
-                    }
-                } catch (e) {
-                    // If parsing fails, allow the content to be saved
-                    console.warn('Failed to parse HTML for filtering, allowing save:', e);
-                }
-            }
-            
-            const messageData = metadata ? { metadata } : null;
-            
-            await this.apiService.saveMessage(activeProjectId, normalizedSender, content, messageData);
-            console.log(`💾 Message saved to project ${activeProjectId}`);
-        } catch (error) {
-            console.error('Failed to save message to project:', error);
-            // Don't throw - message already displayed to user
-        }
-    }
-    
-    async loadProjectMessages(projectId, projectTitle) {
-        try {
-            console.log(`📥 Loading messages for project ${projectId}...`);
-            
-            // Clear current conversation display (skip confirmation)
-            this.appState.clearConversation();
-            this.uiManager.clearConversationDisplay();
-            this.sourceManager.updateSelectionUI();
-            this.reportBuilder.update();
-            
-            // Fetch messages from backend
-            const response = await this.apiService.getProjectMessages(projectId);
-            const messages = response.messages || [];
-            
-            console.log(`📥 Loaded ${messages.length} messages for project ${projectId}`);
-            
-            if (messages.length === 0) {
-                // Show welcome message for empty project (don't save it)
-                this.isRestoringMessages = true;
-                this.addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`);
-                this.isRestoringMessages = false;
-            } else {
-                // Restore messages to chat interface (without saving them again)
-                this.isRestoringMessages = true;
-                
-                // Track the most recent research data while restoring messages
-                let mostRecentResearchData = null;
-                
-                for (const msg of messages) {
-                    // Add message to state and UI
-                    const metadata = msg.message_data?.metadata || null;
-                    const message = this.appState.addMessage(msg.sender, msg.content, metadata);
-                    this.uiManager.addMessageToChat(message);
-                    
-                    // Extract research data from source cards metadata for restoration
-                    if (metadata?.type === 'source_cards' && metadata?.sources) {
-                        mostRecentResearchData = {
-                            sources: metadata.sources,
-                            query: metadata.query || '',
-                            enrichment_status: 'complete'
-                        };
-                    }
-                }
-                
-                // Restore the most recent research data to appState
-                if (mostRecentResearchData) {
-                    this.appState.setCurrentResearchData(mostRecentResearchData);
-                    console.log(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
-                }
-                
-                this.isRestoringMessages = false;
-                console.log(`✅ Restored ${messages.length} messages to chat interface`);
-            }
-            
-            this.hideWelcomeScreen();
-            
-        } catch (error) {
-            console.error('Failed to load project messages:', error);
-            this.addMessage('system', `Failed to load conversation history for this project. Starting fresh.`);
-        }
     }
     
     hideWelcomeScreen() {
