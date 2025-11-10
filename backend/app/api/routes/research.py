@@ -1122,19 +1122,31 @@ async def analyze_research_query(
         # QUERY PERSISTENCE: Save query to project if this is the first search
         if research_request.project_id:
             try:
-                import os
-                if os.getenv('USE_POSTGRES', 'true').lower() == 'true':
-                    from data.postgres_db import postgres_db as db
-                else:
-                    from data.db import db
+                # Check if project exists and has no query yet
+                project_query = """
+                    SELECT id, research_query FROM projects WHERE id = ? AND user_id = ?
+                """ if not Config.USE_POSTGRES else """
+                    SELECT id, research_query FROM projects WHERE id = %s AND user_id = %s
+                """
                 
-                # Get project to check if it already has a query
-                project = db.get_project(research_request.project_id, user_id)
+                from data.db import db as sqlite_db
+                from data.postgres_db import postgres_db
+                db_instance = postgres_db if Config.USE_POSTGRES else sqlite_db
+                
+                project_result = db_instance.execute_query(project_query, (research_request.project_id, user_id))
                 
                 # Only save if project exists and has no query yet (preserve first search)
-                if project and not project.get('research_query'):
-                    db.update_project(research_request.project_id, user_id, {'research_query': sanitized_query})
-                    logger.info(f"💾 Saved first research query to project {research_request.project_id}: '{sanitized_query}'")
+                if project_result and len(project_result) > 0:
+                    project = project_result[0]
+                    if not project.get('research_query'):
+                        # Update query
+                        update_query = """
+                            UPDATE projects SET research_query = ? WHERE id = ?
+                        """ if not Config.USE_POSTGRES else """
+                            UPDATE projects SET research_query = %s WHERE id = %s
+                        """
+                        db_instance.execute_query(update_query, (sanitized_query, research_request.project_id))
+                        logger.info(f"💾 Saved first research query to project {research_request.project_id}: '{sanitized_query}'")
             except Exception as e:
                 # Don't fail the search if query save fails
                 logger.warning(f"⚠️ Failed to save query to project: {e}")
