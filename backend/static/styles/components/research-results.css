@@ -202,3 +202,281 @@ body.dark-mode .citation-badge--cloudflare {
     background: rgba(230, 126, 34, 0.2);
     color: #f39c5a;
 }
+
+/* ====================================
+   RESEARCH FINDINGS TABLE
+   Structured table display for report data
+   ==================================== */
+
+/* Findings section header with export button */
+.findings-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.csv-export-btn {
+    padding: 0.5rem 1rem;
+    background: var(--accent-primary, #6366f1);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.csv-export-btn:hover {
+    background: var(--accent-hover, #4f46e5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.csv-export-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.2);
+}
+
+.findings-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    margin-top: 1rem;
+}
+
+/* Table Header */
+.findings-table thead {
+    background: var(--secondary);
+    border-bottom: 2px solid var(--border);
+}
+
+.findings-table th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--text-sm);
+    color: var(--foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+/* Table Body */
+.findings-table tbody {
+    background: var(--card);
+}
+
+/* Topic Header Rows */
+.topic-header-row {
+    background: var(--accent);
+    border-top: 2px solid var(--border);
+}
+
+.topic-header-cell {
+    padding: 0.75rem 1rem;
+    font-weight: var(--font-weight-bold);
+    font-size: var(--text-base);
+    color: var(--accent-foreground);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* Data Rows */
+.finding-row {
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.15s ease;
+}
+
+.finding-row:hover {
+    background: var(--muted);
+}
+
+/* Alternating row colors for readability */
+.finding-row:nth-child(even) {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.finding-row:nth-child(even):hover {
+    background: var(--muted);
+}
+
+/* Table Cells */
+.findings-table td {
+    padding: 0.875rem 1rem;
+    font-size: var(--text-sm);
+    color: var(--foreground);
+    vertical-align: top;
+    line-height: 1.5;
+}
+
+/* Content/Quote Cell - Widest column */
+.content-cell {
+    max-width: 350px;
+    font-style: italic;
+    color: var(--foreground);
+}
+
+/* Takeaway Cell - Medium width */
+.takeaway-cell {
+    max-width: 250px;
+    font-weight: var(--font-weight-medium);
+}
+
+/* Topic Cell - Hidden on mobile (info in header row) */
+.topic-cell {
+    max-width: 150px;
+    color: var(--muted-foreground);
+    font-size: var(--text-xs);
+}
+
+/* Source Cell - Medium width */
+.source-cell {
+    max-width: 200px;
+    font-weight: var(--font-weight-medium);
+}
+
+/* Link Cell - Narrow */
+.link-cell {
+    width: 60px;
+    text-align: center;
+}
+
+.link-cell a {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    color: var(--foreground);
+    text-decoration: none;
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+}
+
+.link-cell a:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+    transform: scale(1.1);
+}
+
+/* Research Directions List */
+.research-directions-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.research-directions-list li {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--muted);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    color: var(--foreground);
+}
+
+.research-directions-list li:before {
+    content: "🔍";
+    margin-right: 0.5rem;
+}
+
+/* Responsive Design - Mobile */
+@media (max-width: 768px) {
+    .findings-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .findings-table thead,
+    .findings-table tbody,
+    .findings-table tr,
+    .findings-table th,
+    .findings-table td {
+        display: block;
+    }
+    
+    .findings-table thead {
+        display: none;
+    }
+    
+    .topic-header-row {
+        display: block;
+    }
+    
+    .topic-header-cell {
+        display: block;
+        padding: 1rem;
+        font-size: var(--text-lg);
+    }
+    
+    .finding-row {
+        margin-bottom: 1rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem;
+    }
+    
+    .finding-row td {
+        padding: 0.5rem 0;
+        border-bottom: none;
+    }
+    
+    .finding-row td:before {
+        content: attr(class);
+        display: block;
+        font-weight: var(--font-weight-semibold);
+        font-size: var(--text-xs);
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+    }
+    
+    .content-cell:before {
+        content: "Content/Quote";
+    }
+    
+    .takeaway-cell:before {
+        content: "Takeaway";
+    }
+    
+    .topic-cell:before {
+        content: "Topic";
+    }
+    
+    .source-cell:before {
+        content: "Source";
+    }
+    
+    .link-cell:before {
+        content: "Link";
+    }
+    
+    .link-cell {
+        text-align: left;
+    }
+    
+    /* Hide topic cell on mobile since it's redundant with header */
+    .topic-cell {
+        display: none;
+    }
+}
+
+/* Dark mode adjustments for table */
+body.dark-mode .findings-table {
+    box-shadow: var(--shadow-md);
+}
+
+body.dark-mode .finding-row:nth-child(even) {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+body.dark-mode .topic-header-row {
+    border-top-color: rgba(255, 255, 255, 0.1);
+}

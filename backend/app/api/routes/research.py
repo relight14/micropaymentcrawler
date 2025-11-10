@@ -752,23 +752,25 @@ async def generate_research_report(
             
         if report_request.selected_sources or report_request.selected_source_ids:
             # Generate AI report with selected sources
-            ai_report, citation_metadata = report_generator.generate_report(
+            report_data = report_generator.generate_report(
                 sanitized_query, 
                 selected_sources, 
                 report_request.tier,
                 outline_structure=report_request.outline_structure
             )
             
-            # Build packet directly with AI report (no packet_builder needed)
+            # Build packet directly with structured report data
             research_packet = ResearchPacket(
                 query=sanitized_query,
                 tier=report_request.tier,
-                summary=ai_report,  # Full AI report with integrated outline
-                outline=None,  # Integrated into summary
-                insights=None,  # Pro tier insights are part of summary
+                summary=report_data.get('summary', ''),
+                outline=None,  # Table data is now in table_data field
+                insights=report_data.get('research_directions', None),  # Pro tier research directions
                 sources=selected_sources,
                 total_sources=len(selected_sources),
-                citation_metadata=citation_metadata
+                citation_metadata=report_data.get('citation_metadata', {}),
+                table_data=report_data.get('table_data', []),  # New structured table data
+                conflicts=report_data.get('conflicts', None)  # Pro tier conflicts
             )
             
         else:
@@ -787,23 +789,25 @@ async def generate_research_report(
             generated_sources = await crawler.generate_sources(sanitized_query, max_sources)
             
             # Generate AI report
-            ai_report, citation_metadata = report_generator.generate_report(
+            report_data = report_generator.generate_report(
                 sanitized_query,
                 generated_sources,
                 report_request.tier,
                 outline_structure=report_request.outline_structure
             )
             
-            # Build packet directly
+            # Build packet directly with structured report data
             research_packet = ResearchPacket(
                 query=sanitized_query,
                 tier=report_request.tier,
-                summary=ai_report,
+                summary=report_data.get('summary', ''),
                 outline=None,
-                insights=None,
+                insights=report_data.get('research_directions', None),
                 sources=generated_sources,
                 total_sources=len(generated_sources),
-                citation_metadata=citation_metadata
+                citation_metadata=report_data.get('citation_metadata', {}),
+                table_data=report_data.get('table_data', []),
+                conflicts=report_data.get('conflicts', None)
             )
         
         return research_packet

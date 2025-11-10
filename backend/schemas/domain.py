@@ -39,20 +39,28 @@ class SourceCard(BaseModel):
     relevance_score: Optional[float] = None
     source_type: Optional[str] = None  # "academic", "journalism", "business", "government"
     composite_score: Optional[float] = None  # Recency-weighted composite ranking score
+    
+    # Uploaded file fields
+    is_uploaded_file: bool = False  # Flag to indicate if this source is an uploaded file
+    file_id: Optional[int] = None  # Database ID for uploaded files
+    file_type: Optional[str] = None  # File extension/type (e.g., 'docx', 'md')
+    content_preview: Optional[str] = None  # Preview text for uploaded files
 
 
 class ResearchPacket(BaseModel):
     """Research packet model containing sources and analysis"""
     query: str
-    summary: str  # Essential field for research content
+    summary: str  # High-level overview of research
     sources: List[SourceCard]
     total_sources: int  # For UI display
     # Optional fields
     tier: Optional[TierType] = None  # Support for dynamic packages
     outline: Optional[str] = None
-    insights: Optional[str] = None
+    insights: Optional[str] = None  # Research directions for Pro tier
     total_cost: Optional[float] = None
     content_id: Optional[str] = None  # LedeWire content identifier
     licensing_summary: Optional[Dict[str, Any]] = None
     created_at: Optional[str] = None
     citation_metadata: Optional[Dict[int, Dict[str, Any]]] = None  # Maps citation [N] to source metadata for inline purchase badges
+    table_data: Optional[List[Dict[str, Any]]] = None  # Structured table data: [{topic, source, content, takeaway, link}]
+    conflicts: Optional[str] = None  # Agreement/conflict analysis for Pro tier
