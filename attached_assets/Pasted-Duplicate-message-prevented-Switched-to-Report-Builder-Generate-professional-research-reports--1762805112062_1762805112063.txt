@@ -1,0 +1,23 @@
+Duplicate message prevented: 📊 Switched to Report Builder - Generate professional research reports from your selected sources.
+addMessage @ app-state.js:111Understand this warning
+projects-controller.js:157 ⏭️ Skipping report builder UI persistence for project 8
+projects-controller.js:169 💾 Message saved to project 8
+tier-manager.js:45 🔍 [TierManager] Building purchase details: Object
+tier-manager.js:45 🔍 [TierManager] Building purchase details: {explicitQuery: 'Research Query', appStateQuery: '', projectStoreQuery: null, finalQuery: 'Research Query'}
+analytics.js:24 [Analytics] tier_select {tier: 'pro', timestamp: '2025-11-10T20:02:53.208Z'}
+message-coordinator.js:41 📊 Report status: idle → generating
+tier-manager.js:88 🔍 [TierManager] Calling purchaseTier API: {explicitQuery: 'Research Query', appStateQuery: '', projectStoreQuery: null, apiQuery: 'Research Query', tier: 'pro'}
+api.js:365 📋 Using custom outline with 5 sections for purchase
+analytics.js:24 [Analytics] purchase {value: 0.65, currency: 'USD', source_count: 30, timestamp: '2025-11-10T20:02:53.799Z'}
+report-builder.js:136 📊 DISPLAY REPORT: Displaying generated report: {query: 'Research Query', summary: 'The sources reveal that research query systems hav…ls, and large-scale data processing applications.', sources: Array(30), total_sources: 30, tier: 'pro', …}
+report-builder.js:137 🔍 CITATION DEBUG: citation_metadata = {1: {…}, 2: {…}, 3: {…}, 4: {…}, 5: {…}, 6: {…}, 7: {…}, 8: {…}, 9: {…}, 10: {…}, 11: {…}, 12: {…}, 13: {…}}
+app.js:180 📡 AppEvents: Tier purchased {tier: 'pro', reportData: {…}}
+2projects-controller.js:169 💾 Message saved to project 8
+viewport.js:16 📐 [Viewport] Breakpoint changed: {isMobile: true, breakpoint: '(max-width: 768px)'}
+project-sidebar.js:22 🔧 [ProjectListSidebar] Viewport changed, isMobile: true
+project-sidebar.js:254 🔧 [ProjectListSidebar] render() called {isAuthenticated: true, projectCount: 5, activeProjectId: 8, windowWidth: 764}
+project-sidebar.js:269 🔧 [ProjectListSidebar] isMobile: true
+viewport.js:16 📐 [Viewport] Breakpoint changed: {isMobile: false, breakpoint: '(max-width: 768px)'}
+project-sidebar.js:22 🔧 [ProjectListSidebar] Viewport changed, isMobile: false
+project-sidebar.js:254 🔧 [ProjectListSidebar] render() called {isAuthenticated: true, projectCount: 5, activeProjectId: 8, windowWidth: 806}
+project-sidebar.js:269 🔧 [ProjectListSidebar] isMobile: false

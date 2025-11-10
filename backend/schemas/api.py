@@ -50,6 +50,7 @@ class ResearchRequest(BaseModel):
     preferred_source_count: Optional[int] = 15  # Desired number of sources
     conversation_context: Optional[List[Dict[str, str]]] = None  # Chat history for context
     reset_topic: Optional[bool] = False  # Flag to reset conversation topic (from "Start a New Search" button)
+    project_id: Optional[int] = None  # Current project ID for query persistence
 
 
 class DynamicResearchResponse(BaseModel):
