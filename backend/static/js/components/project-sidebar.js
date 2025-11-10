@@ -18,12 +18,12 @@ export class ProjectListSidebar extends EventTarget {
     }
 
     /**
-     * Initialize the sidebar and load projects
+     * Initialize the sidebar
+     * Note: For authenticated users, projects are loaded by ProjectManager.loadInitialData()
+     * This just ensures the sidebar renders for non-authenticated users
      */
     async init() {
-        if (this.authService.isAuthenticated()) {
-            await this.loadProjects();
-        } else {
+        if (!this.authService.isAuthenticated()) {
             // Render for non-authenticated users (shows mobile login prompt on mobile)
             this.render();
         }

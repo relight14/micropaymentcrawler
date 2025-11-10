@@ -36,6 +36,9 @@ export class ProjectManager {
         // Set up store subscription
         this.setupStoreSubscription();
 
+        // Initialize sidebar (renders mobile login prompt if not authenticated)
+        await this.sidebar.init();
+
         // Load initial data if authenticated
         if (this.authService.isAuthenticated()) {
             await this.loadInitialData();
