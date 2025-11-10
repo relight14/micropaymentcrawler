@@ -92,6 +92,12 @@ export class MobileNavigation {
     }
 
     switchPanel(panel) {
+        console.log('📱 [MobileNav] switchPanel() called', {
+            fromPanel: this.currentPanel,
+            toPanel: panel,
+            windowWidth: window.innerWidth
+        });
+        
         this.currentPanel = panel;
         this.updateTabStates();
         this.updatePanelVisibility();
@@ -116,12 +122,25 @@ export class MobileNavigation {
     }
 
     updatePanelVisibility() {
+        console.log('📱 [MobileNav] updatePanelVisibility() called', {
+            currentPanel: this.currentPanel
+        });
+        
         const projectSidebar = document.getElementById('project-sidebar');
         const mainContent = document.getElementById('main-content');
         const outlineBuilder = document.getElementById('outline-builder');
         const backdrop = document.getElementById('mobile-backdrop');
 
+        console.log('📱 [MobileNav] DOM elements check:', {
+            projectSidebar: !!projectSidebar,
+            mainContent: !!mainContent,
+            outlineBuilder: !!outlineBuilder,
+            backdrop: !!backdrop,
+            projectSidebarHTML: projectSidebar ? projectSidebar.innerHTML.substring(0, 100) : 'NULL'
+        });
+
         if (!projectSidebar || !mainContent || !outlineBuilder) {
+            console.error('📱 [MobileNav] ERROR: Missing required DOM elements!');
             return;
         }
 
@@ -132,12 +151,19 @@ export class MobileNavigation {
 
         switch (this.currentPanel) {
             case 'projects':
+                console.log('📱 [MobileNav] Showing Projects panel - adding classes to #project-sidebar');
                 projectSidebar.classList.add('visible', 'mobile-active');
                 backdrop.classList.add('visible');
+                console.log('📱 [MobileNav] Classes added:', {
+                    projectSidebarClasses: projectSidebar.className,
+                    backdropClasses: backdrop.className
+                });
                 break;
             case 'chat':
+                console.log('📱 [MobileNav] Showing Chat panel (default)');
                 break;
             case 'outline':
+                console.log('📱 [MobileNav] Showing Outline panel');
                 outlineBuilder.classList.add('visible', 'mobile-active');
                 backdrop.classList.add('visible');
                 break;

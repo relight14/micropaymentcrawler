@@ -23,9 +23,17 @@ export class ProjectListSidebar extends EventTarget {
      * This just ensures the sidebar renders for non-authenticated users
      */
     async init() {
+        console.log('🔧 [ProjectListSidebar] init() called', {
+            isAuthenticated: this.authService.isAuthenticated(),
+            willRender: !this.authService.isAuthenticated()
+        });
+        
         if (!this.authService.isAuthenticated()) {
+            console.log('🔧 [ProjectListSidebar] User NOT authenticated - calling render()');
             // Render for non-authenticated users (shows mobile login prompt on mobile)
             this.render();
+        } else {
+            console.log('🔧 [ProjectListSidebar] User authenticated - skipping render (will load via loadInitialData)');
         }
     }
 
@@ -229,11 +237,22 @@ export class ProjectListSidebar extends EventTarget {
      * Render the sidebar
      */
     render() {
+        console.log('🔧 [ProjectListSidebar] render() called', {
+            isAuthenticated: this.authService.isAuthenticated(),
+            projectCount: this.projects.length,
+            activeProjectId: this.activeProjectId,
+            windowWidth: window.innerWidth
+        });
+        
         const container = document.getElementById('project-sidebar');
-        if (!container) return;
+        if (!container) {
+            console.error('🔧 [ProjectListSidebar] ERROR: #project-sidebar container not found!');
+            return;
+        }
 
         // Check if mobile viewport
         const isMobile = window.innerWidth <= 768;
+        console.log('🔧 [ProjectListSidebar] isMobile:', isMobile);
         
         if (!this.authService.isAuthenticated()) {
             // On mobile, show login prompt instead of hiding
