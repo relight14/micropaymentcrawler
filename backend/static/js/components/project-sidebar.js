@@ -5,6 +5,7 @@
  */
 
 import { analytics } from '../utils/analytics.js';
+import { viewport } from '../utils/viewport.js';
 
 export class ProjectListSidebar extends EventTarget {
     constructor({ apiService, authService, toastManager }) {
@@ -15,6 +16,12 @@ export class ProjectListSidebar extends EventTarget {
         this.projects = [];
         this.activeProjectId = null;
         this.isCollapsed = false;
+        
+        // Subscribe to viewport changes to re-render when crossing mobile breakpoint
+        this.unsubscribeViewport = viewport.subscribe((isMobile) => {
+            console.log('🔧 [ProjectListSidebar] Viewport changed, isMobile:', isMobile);
+            this.render();
+        });
     }
 
     /**
@@ -250,8 +257,8 @@ export class ProjectListSidebar extends EventTarget {
             return;
         }
 
-        // Check if mobile viewport
-        const isMobile = window.innerWidth <= 768;
+        // Check if mobile viewport using matchMedia (works in Replit iframe)
+        const isMobile = viewport.isMobile();
         console.log('🔧 [ProjectListSidebar] isMobile:', isMobile);
         
         if (!this.authService.isAuthenticated()) {

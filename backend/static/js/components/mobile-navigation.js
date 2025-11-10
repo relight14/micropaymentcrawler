@@ -3,6 +3,8 @@
  * Provides tab-based navigation for Projects, Chat, and Outline on mobile devices
  */
 
+import { viewport } from '../utils/viewport.js';
+
 export class MobileNavigation {
     constructor() {
         this.currentPanel = 'chat'; // Default to chat view
