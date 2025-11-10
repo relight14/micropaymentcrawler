@@ -1,5 +1,6 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
+import { projectStore } from '../state/project-store.js';
 
 export class TierManager extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager, reportBuilder, messageCoordinator }) {
@@ -68,11 +69,15 @@ export class TierManager extends EventTarget {
                     detail: { tier: tierId, price }
                 }));
                 
+                // Get outline structure from ProjectStore
+                const outlineStructure = projectStore.getOutlineSnapshot();
+                
                 const purchaseResponse = await this.apiService.purchaseTier(
                     tierId, 
                     price, 
                     query || this.appState.getCurrentQuery() || "Research Query", 
-                    useSelectedSources ? selectedSources : null
+                    useSelectedSources ? selectedSources : null,
+                    outlineStructure
                 );
                 
                 if (loadingMessageElement) {

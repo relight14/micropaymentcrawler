@@ -76,6 +76,7 @@ class PurchaseRequest(BaseModel):
     selected_source_ids: Optional[List[str]] = None  # DEPRECATED: Use selected_sources instead
     budget_limit_dollars: Optional[float] = None  # Total budget for research
     idempotency_key: Optional[str] = None
+    outline_structure: Optional[Dict[str, Any]] = None  # Custom outline structure from project outline builder
 
 
 class PurchaseResponse(BaseModel):

@@ -333,7 +333,7 @@ export class APIService {
         }, 'Article summarization failed');
     }
 
-    async purchaseTier(tierId, price, query = "Research Query", selectedSources = null) {
+    async purchaseTier(tierId, price, query = "Research Query", selectedSources = null, outlineStructure = null) {
         // Generate stable idempotency key for this purchase attempt
         const userId = this.authService.getUserId();
         const sourceIds = selectedSources ? selectedSources.map(s => s.id).sort().join(',') : '';
@@ -357,6 +357,12 @@ export class APIService {
         // Include full source objects if provided (frontend is source of truth)
         if (selectedSources && selectedSources.length > 0) {
             requestBody.selected_sources = selectedSources;
+        }
+        
+        // Include outline structure if provided
+        if (outlineStructure && outlineStructure.sections && outlineStructure.sections.length > 0) {
+            requestBody.outline_structure = outlineStructure;
+            console.log(`📋 Using custom outline with ${outlineStructure.sections.length} sections for purchase`);
         }
         
         return await this._fetchWithRetry(`${this.baseURL}/api/purchase`, {

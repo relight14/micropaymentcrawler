@@ -190,7 +190,12 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             
             # Generate AI report
-            report_data = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+            report_data = report_generator.generate_report(
+                purchase_request.query, 
+                sources, 
+                purchase_request.tier,
+                outline_structure=purchase_request.outline_structure
+            )
             
             # Build packet directly
             packet = ResearchPacket(
@@ -256,7 +261,12 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         
         # Generate AI report (with fallback handling built-in)
-        report_data = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+        report_data = report_generator.generate_report(
+            purchase_request.query, 
+            sources, 
+            purchase_request.tier,
+            outline_structure=purchase_request.outline_structure
+        )
         
         # Build packet directly with AI-generated report
         packet = ResearchPacket(
