@@ -23,7 +23,7 @@
     transition: transform 0.3s ease;
 }
 
-#project-sidebar.active {
+#project-sidebar.visible {
     display: block;
 }
 
