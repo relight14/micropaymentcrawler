@@ -644,24 +644,26 @@ export class OutlineBuilder extends EventTarget {
         const container = document.getElementById('outline-builder');
         if (!container) return;
 
-        // Not authenticated - show empty state
+        // Not authenticated - hide the panel completely
         if (!this.authService.isAuthenticated()) {
-            container.classList.remove('visible');  // Ensure hidden when logged out
-            container.innerHTML = `
-                <div class="outline-builder">
-                    <div class="outline-header">
-                        <h3>Research Outline</h3>
-                    </div>
-                    <div class="empty-outline-state">
-                        <p>📝</p>
-                        <p>Log in to organize sources with custom outlines</p>
-                    </div>
-                </div>
-            `;
+            container.classList.remove('visible');
+            container.innerHTML = '';  // Clear content completely
             return;
         }
 
-        // Authenticated - show outline with .visible class for CSS
+        // Check if there's any meaningful content to show
+        const hasContent = this.currentProjectId || 
+                          (this.selectedSources && this.selectedSources.length > 0) ||
+                          (this.sections && this.sections.some(s => s.sources && s.sources.length > 0));
+
+        // Hide if no content to show
+        if (!hasContent) {
+            container.classList.remove('visible');
+            container.innerHTML = '';
+            return;
+        }
+
+        // Authenticated and has content - show outline with .visible class for CSS
         container.classList.add('visible');  // CSS uses this to show outline across all breakpoints
 
         // Authenticated but no project - show default template
