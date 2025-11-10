@@ -89,6 +89,11 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
     # Extract user_id at function start for exception handler access
     user_id = None
     try:
+        # Log the incoming query value for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 [PURCHASE] Received research query: '{purchase_request.query}' | Tier: {purchase_request.tier}")
+        
         # Extract and validate Bearer token
         access_token = extract_bearer_token(authorization)
         validate_user_token(access_token)

@@ -39,11 +39,21 @@ export class TierManager extends EventTarget {
                 }
             }
 
+            // Build query with fallback chain
+            const finalQuery = query || this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+            
+            console.log('🔍 [TierManager] Building purchase details:', {
+                explicitQuery: query,
+                appStateQuery: this.appState.getCurrentQuery(),
+                projectStoreQuery: projectStore.getResearchQuery(),
+                finalQuery: finalQuery
+            });
+            
             const purchaseDetails = {
                 tier: tierId,
                 price: price,
                 selectedSources: selectedSources,
-                query: query || this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query"
+                query: finalQuery
             };
 
             const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
@@ -72,10 +82,21 @@ export class TierManager extends EventTarget {
                 // Get outline structure from ProjectStore
                 const outlineStructure = projectStore.getOutlineSnapshot();
                 
+                // Build query with fallback chain
+                const apiQuery = query || this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+                
+                console.log('🔍 [TierManager] Calling purchaseTier API:', {
+                    explicitQuery: query,
+                    appStateQuery: this.appState.getCurrentQuery(),
+                    projectStoreQuery: projectStore.getResearchQuery(),
+                    apiQuery: apiQuery,
+                    tier: tierId
+                });
+                
                 const purchaseResponse = await this.apiService.purchaseTier(
                     tierId, 
                     price, 
-                    query || this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query", 
+                    apiQuery, 
                     useSelectedSources ? selectedSources : null,
                     outlineStructure
                 );
