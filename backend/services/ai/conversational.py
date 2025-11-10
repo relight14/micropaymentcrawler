@@ -296,7 +296,9 @@ Generate an optimized search query (max 120 chars):"""
         common_words = {'october', 'november', 'december', 'january', 'february', 'march', 
                        'april', 'may', 'june', 'july', 'august', 'september', 'monday', 
                        'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-                       'today', 'yesterday', 'tomorrow', 'morning', 'evening', 'night'}
+                       'today', 'yesterday', 'tomorrow', 'morning', 'evening', 'night',
+                       # Geographic abbreviations and common pronouns
+                       'us', 'uk', 'eu', 'usa', 'uae', 'ussr', 'un', 'nato', 'asean'}
         introduced = introduced - common_words
         
         if introduced:
