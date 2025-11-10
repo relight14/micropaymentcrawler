@@ -75,17 +75,46 @@ def validate_user_token(access_token: str):
 
 
 def extract_user_id_from_token(access_token: str) -> str:
-    """Extract user ID from JWT token for session isolation"""
+    """
+    Extract user ID from JWT token by decoding the payload.
+    Uses email or sub claim as the unique user identifier.
+    """
     try:
-        response = ledewire.get_wallet_balance(access_token)
-        if response.get('balance_cents') is not None:
-            wallet_id = response.get('wallet_id', 'mock_wallet')
-            return f"user_{wallet_id}"
-        else:
-            import hashlib
-            return f"user_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
-    except Exception:
+        import json
+        import base64
+        
+        # JWT format: header.payload.signature
+        parts = access_token.split('.')
+        if len(parts) != 3:
+            raise ValueError("Invalid JWT format")
+        
+        # Decode the payload (middle part)
+        payload = parts[1]
+        # Add padding if needed for base64 decoding
+        padding = 4 - (len(payload) % 4)
+        if padding != 4:
+            payload += '=' * padding
+        
+        decoded_bytes = base64.urlsafe_b64decode(payload)
+        decoded_payload = json.loads(decoded_bytes)
+        
+        # Extract user identifier from token claims
+        # Prefer email, fall back to sub (subject), then user_id
+        user_identifier = (
+            decoded_payload.get('email') or 
+            decoded_payload.get('sub') or 
+            decoded_payload.get('user_id')
+        )
+        
+        if not user_identifier:
+            raise ValueError("No user identifier found in JWT")
+        
+        return f"user_{user_identifier}"
+        
+    except Exception as e:
+        # Fallback for chat: use anonymous user
         import hashlib  
+        print(f"⚠️ Failed to decode JWT for chat, using anon fallback: {e}")
         return f"anon_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
 
 
