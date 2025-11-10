@@ -85,6 +85,13 @@ export class APIService {
             preferred_source_count: 15
         };
         
+        // Include active project ID for query persistence
+        const { projectStore } = await import('../state/project-store.js');
+        if (projectStore.state.activeProjectId) {
+            requestBody.project_id = projectStore.state.activeProjectId;
+            console.log(`🔍 [API] Sending project_id ${requestBody.project_id} with search request`);
+        }
+        
         // Include conversation context if available to make research context-aware
         if (conversationContext && conversationContext.length > 0) {
             // Transform conversation objects to simple format expected by backend

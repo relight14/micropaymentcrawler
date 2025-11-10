@@ -1118,6 +1118,20 @@ async def analyze_research_query(
             response.cache_key = result["cache_key"]
         if result.get("timestamp"):
             response.timestamp = result["timestamp"]
+        
+        # QUERY PERSISTENCE: Save query to project if this is the first search
+        if research_request.project_id:
+            try:
+                from data.postgres_db import get_project, update_project
+                project = get_project(research_request.project_id, user_id)
+                
+                # Only save if project exists and has no query yet (preserve first search)
+                if project and not project.get('research_query'):
+                    update_project(research_request.project_id, user_id, {'research_query': sanitized_query})
+                    logger.info(f"💾 Saved first research query to project {research_request.project_id}: '{sanitized_query}'")
+            except Exception as e:
+                # Don't fail the search if query save fails
+                logger.warning(f"⚠️ Failed to save query to project: {e}")
             
         return response
         
