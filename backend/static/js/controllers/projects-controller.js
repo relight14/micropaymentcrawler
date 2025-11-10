@@ -217,12 +217,17 @@ export class ProjectsController {
                     console.log('🔍 [LOAD] Processing message', msg);
                     // Add message to state and UI
                     const metadata = msg.message_data?.metadata || null;
-                    let content = msg.content;
+                    const content = msg.content;
+                    
+                    console.log('🔍 [LOAD] Adding message to appState with original content string');
+                    // Add to appState with original string content (needed for .substring() calls)
+                    const message = appState.addMessage(msg.sender, content, metadata);
                     
                     console.log('🔍 [LOAD] Content type:', typeof content, 'starts with <:', typeof content === 'string' && content.trim().startsWith('<'));
-                    // Reconstruct HTML content as DOM element for proper rendering
+                    // Reconstruct HTML content as DOM element for UI rendering only
+                    let uiContent = content;
                     if (typeof content === 'string' && content.trim().startsWith('<')) {
-                        console.log('🔍 [LOAD] Reconstructing HTML content');
+                        console.log('🔍 [LOAD] Reconstructing HTML content for UI');
                         try {
                             const tempDiv = document.createElement('div');
                             tempDiv.innerHTML = content;
@@ -235,22 +240,23 @@ export class ProjectsController {
                                 while (tempDiv.firstChild) {
                                     wrapper.appendChild(tempDiv.firstChild);
                                 }
-                                content = wrapper;
+                                uiContent = wrapper;
                             } else if (tempDiv.firstChild) {
                                 console.log('🔍 [LOAD] Single element, using directly');
                                 // Single element, return it directly
-                                content = tempDiv.firstChild;
+                                uiContent = tempDiv.firstChild;
                             }
-                            // If no children, keep content as string
+                            // If no children, keep uiContent as string
                         } catch (error) {
                             console.error('🔍 [LOAD] Error reconstructing HTML message:', error);
-                            // Keep content as original string if parsing fails
+                            // Keep uiContent as original string if parsing fails
                         }
                     }
                     
-                    console.log('🔍 [LOAD] Adding message to appState and UI');
-                    const message = appState.addMessage(msg.sender, content, metadata);
-                    uiManager.addMessageToChat(message);
+                    console.log('🔍 [LOAD] Adding message to UI');
+                    // Override the content with DOM element for UI rendering
+                    const uiMessage = { ...message, content: uiContent };
+                    uiManager.addMessageToChat(uiMessage);
                     console.log('🔍 [LOAD] Message added successfully');
                     
                     // Extract research data from source cards metadata for restoration

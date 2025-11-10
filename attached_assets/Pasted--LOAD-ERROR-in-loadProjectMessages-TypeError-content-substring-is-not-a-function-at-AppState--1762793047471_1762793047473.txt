@@ -1,0 +1,20 @@
+[LOAD] ERROR in loadProjectMessages: TypeError: content.substring is not a function
+    at AppState.addMessage (app-state.js:100:62)
+    at ProjectsController.loadProjectMessages (projects-controller.js:252:46)
+    at async EventTarget.<anonymous> (projects-controller.js:97:13)
+loadProjectMessages @ projects-controller.js:284Understand this error
+projects-controller.js:285 🔍 [LOAD] Error stack: TypeError: content.substring is not a function
+    at AppState.addMessage (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/state/app-state.js:100:62)
+    at ProjectsController.loadProjectMessages (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/controllers/projects-controller.js:252:46)
+    at async EventTarget.<anonymous> (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/controllers/projects-controller.js:97:13)
+loadProjectMessages @ projects-controller.js:285Understand this error
+projects-controller.js:284 🔍 [LOAD] ERROR in loadProjectMessages: TypeError: content.substring is not a function
+    at AppState.addMessage (app-state.js:100:62)
+    at ProjectsController.loadProjectMessages (projects-controller.js:252:46)
+    at async EventTarget.<anonymous> (projects-controller.js:97:13)
+loadProjectMessages @ projects-controller.js:284Understand this error
+projects-controller.js:285 🔍 [LOAD] Error stack: TypeError: content.substring is not a function
+    at AppState.addMessage (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/state/app-state.js:100:62)
+    at ProjectsController.loadProjectMessages (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/controllers/projects-controller.js:252:46)
+    at async EventTarget.<anonymous> (https://74525fee-fa41-4f5c-800d-1fe4cf7e0f48-00-3bby6hjzo2wde.worf.replit.dev/static/js/controllers/projects-controller.js:97:13)
+loadProjectMessages @ projects-controller.js:285Understand this error
