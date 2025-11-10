@@ -229,11 +229,13 @@ export class ProjectListSidebar extends EventTarget {
         const container = document.getElementById('project-sidebar');
         if (!container) return;
 
+        // Check if mobile viewport
+        const isMobile = window.innerWidth <= 768;
+        
         if (!this.authService.isAuthenticated()) {
             // On mobile, show login prompt instead of hiding
-            const isMobile = window.innerWidth <= 768;
             if (isMobile) {
-                container.style.display = 'block';
+                container.style.display = '';  // Clear inline style, let CSS handle it
                 container.innerHTML = `
                     <div class="mobile-login-prompt">
                         <div class="login-prompt-icon">
@@ -249,6 +251,9 @@ export class ProjectListSidebar extends EventTarget {
                     </div>
                 `;
                 
+                // Ensure panel is visible on mobile (maintain mobile-active class from MobileNavigation)
+                container.classList.add('visible', 'mobile-active');
+                
                 // Attach login button listener
                 const loginBtn = document.getElementById('mobile-login-btn');
                 if (loginBtn) {
@@ -263,7 +268,7 @@ export class ProjectListSidebar extends EventTarget {
             return;
         }
 
-        container.style.display = 'block';
+        container.style.display = '';
 
         container.innerHTML = `
             <div class="project-sidebar ${this.isCollapsed ? 'collapsed' : ''}">
