@@ -625,6 +625,7 @@ export class OutlineBuilder extends EventTarget {
 
         // Not authenticated - show empty state
         if (!this.authService.isAuthenticated()) {
+            container.classList.remove('visible');  // Ensure hidden when logged out
             container.innerHTML = `
                 <div class="outline-builder">
                     <div class="outline-header">
@@ -638,6 +639,9 @@ export class OutlineBuilder extends EventTarget {
             `;
             return;
         }
+
+        // Authenticated - show outline with .visible class for CSS
+        container.classList.add('visible');  // CSS uses this to show outline across all breakpoints
 
         // Authenticated but no project - show default template
         if (!this.currentProjectId) {

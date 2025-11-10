@@ -293,11 +293,14 @@ export class ProjectListSidebar extends EventTarget {
             } else {
                 container.innerHTML = '';
                 container.style.display = 'none';
+                container.classList.remove('visible');  // Ensure hidden on desktop when logged out
             }
             return;
         }
 
+        // Authenticated - show sidebar with .visible class for CSS
         container.style.display = '';
+        container.classList.add('visible');  // CSS uses this to show sidebar across all breakpoints
 
         container.innerHTML = `
             <div class="project-sidebar ${this.isCollapsed ? 'collapsed' : ''}">
