@@ -5,6 +5,7 @@
  */
 
 import { analytics } from '../utils/analytics.js';
+import { projectStore } from '../state/project-store.js';
 
 export class OutlineBuilder extends EventTarget {
     constructor({ apiService, authService, toastManager }) {
@@ -432,6 +433,12 @@ export class OutlineBuilder extends EventTarget {
         // Capture project ID and sections at schedule time
         const projectIdToSave = this.currentProjectId;
         const sectionsToSave = JSON.parse(JSON.stringify(this.sections)); // Deep clone
+        
+        // CRITICAL: Sync outline to ProjectStore immediately so getOutlineSnapshot() returns current data
+        if (this.authService.isAuthenticated() && projectIdToSave) {
+            projectStore.setOutline(sectionsToSave);
+            console.log(`📋 [OutlineBuilder] Synced ${sectionsToSave.length} sections to ProjectStore`);
+        }
         
         this.saveTimeout = setTimeout(() => {
             this.saveToBackend(projectIdToSave, sectionsToSave);
