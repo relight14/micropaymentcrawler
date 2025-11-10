@@ -328,6 +328,7 @@ export class ChatResearchApp {
                 uiManager: this.uiManager,
                 reportBuilder: this.reportBuilder,
                 sourceManager: this.sourceManager,
+                messageCoordinator: this.messageCoordinator,
                 addMessageCallback: (sender, content, metadata) => this.addMessage(sender, content, metadata),
                 hideWelcomeCallback: () => this.hideWelcomeScreen()
             });

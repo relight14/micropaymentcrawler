@@ -5,7 +5,6 @@
 
 import { ProjectManager } from '../managers/project-manager.js';
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
-import { MessageRenderer } from '../components/message-renderer.js';
 
 export class ProjectsController {
     constructor() {
@@ -219,14 +218,7 @@ export class ProjectsController {
                     // Delegate to MessageCoordinator for consistent rendering pipeline
                     // MessageCoordinator → UIManager → MessageRenderer
                     // IMPORTANT: Pass normalized message from AppState, not raw backend record
-                    const messageCoordinator = this.dependencies.messageCoordinator || {
-                        restoreMessage: (normalizedMsg) => {
-                            // Fallback if messageCoordinator not available
-                            const uiContent = MessageRenderer.parseHtml(normalizedMsg.content);
-                            uiManager.addMessageToChat({ ...normalizedMsg, content: uiContent });
-                        }
-                    };
-                    messageCoordinator.restoreMessage(message, { skipPersist: true });
+                    this.dependencies.messageCoordinator.restoreMessage(message, { skipPersist: true });
                     
                     // Extract research data from source cards metadata for restoration
                     if (metadata?.type === 'source_cards' && metadata?.sources) {
