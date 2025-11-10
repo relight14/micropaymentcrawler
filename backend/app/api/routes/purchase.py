@@ -190,18 +190,19 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
             
             # Generate AI report
-            report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+            report_data = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
             
             # Build packet directly
             packet = ResearchPacket(
                 query=purchase_request.query,
                 tier=purchase_request.tier,
-                summary=report,
+                summary=report_data.get("summary", ""),
                 outline=None,
                 insights=None,
                 sources=sources,
                 total_sources=len(sources),
-                citation_metadata=citation_metadata
+                citation_metadata=report_data.get("citation_metadata"),
+                table_data=report_data.get("table_data")
             )
             
             free_transaction_id = f"free_{uuid.uuid4().hex[:12]}"
@@ -255,18 +256,19 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             sources = await crawler.generate_sources(purchase_request.query, max_sources, budget_limit)
         
         # Generate AI report (with fallback handling built-in)
-        report, citation_metadata = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
+        report_data = report_generator.generate_report(purchase_request.query, sources, purchase_request.tier)
         
         # Build packet directly with AI-generated report
         packet = ResearchPacket(
             query=purchase_request.query,
             tier=purchase_request.tier,
-            summary=report,
+            summary=report_data.get("summary", ""),
             outline=None,
             insights=None,
             sources=sources,
             total_sources=len(sources),
-            citation_metadata=citation_metadata
+            citation_metadata=report_data.get("citation_metadata"),
+            table_data=report_data.get("table_data")
         )
         
         # Selective Mock: Check if payments should be mocked
