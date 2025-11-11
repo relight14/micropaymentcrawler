@@ -10,10 +10,12 @@ import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
 
 export class ProjectManager {
-    constructor({ apiService, authService, toastManager }) {
+    constructor({ apiService, authService, toastManager, messageCoordinator, appState }) {
         this.apiService = apiService;
         this.authService = authService;
         this.toastManager = toastManager;
+        this.messageCoordinator = messageCoordinator;
+        this.appState = appState;
         
         // Create component instances
         this.sidebar = new ProjectListSidebar({ apiService, authService, toastManager });
@@ -93,60 +95,76 @@ export class ProjectManager {
     }
 
     /**
-     * Handle user login - preserve conversation history
+     * Handle user login - preserve conversation history from localStorage
      */
     async handleLogin() {
         try {
-            // Capture conversation history from AppState before loading projects
-            const appState = window.app?.appState;
-            const conversationHistory = appState?.getConversationHistory() || [];
-            
-            // Filter out system messages and keep only user/assistant exchanges
-            const userMessages = conversationHistory.filter(msg => 
-                msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
-            );
-            
-            console.log(`🔐 User logged in - found ${userMessages.length} messages in anonymous session`);
+            console.log(`🔐 User logged in - checking for saved anonymous session...`);
             
             // Load initial project data first
             await this.loadInitialData();
             
-            // If there's conversation history, create a project to preserve it
-            if (userMessages.length > 0) {
-                try {
-                    // Extract research topic from first user message
-                    const firstUserMessage = conversationHistory.find(msg => msg.sender === 'user');
-                    const projectTitle = firstUserMessage?.content?.substring(0, 100).replace(/<[^>]*>/g, '').trim() || 'Untitled Research';
-                    
-                    console.log(`💾 Preserving ${userMessages.length} messages in new project: "${projectTitle}"`);
-                    
-                    // Create new project via sidebar
-                    const project = await this.sidebar.createProject(projectTitle, appState?.state?.currentQuery);
-                    
-                    if (project) {
-                        // Save all messages to the project
-                        for (const msg of userMessages) {
-                            const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
-                            const messageData = msg.metadata ? { metadata: msg.metadata } : null;
-                            await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
-                        }
-                        
-                        console.log(`✅ Conversation history preserved in project ${project.id}`);
-                        this.toastManager.show(`💾 Your conversation has been saved to "${projectTitle}"`, 'success');
-                        
-                        // Don't auto-switch to the project - let user continue their current conversation
-                        // Just add it to the project list
-                        projectStore.addProject(project);
-                        await this.sidebar.loadProjects(); // Refresh sidebar to show new project
-                    }
-                } catch (error) {
-                    console.error('Failed to preserve conversation history:', error);
-                    // Don't show error to user - they can still continue using the app
+            // Check for saved anonymous session in localStorage
+            const savedSessionData = localStorage.getItem('temp_anonymous_conversation');
+            
+            if (!savedSessionData) {
+                console.log(`ℹ️  No anonymous session found in localStorage`);
+                return;
+            }
+            
+            try {
+                const sessionData = JSON.parse(savedSessionData);
+                const messages = sessionData.messages || [];
+                
+                // Validate session (not too old - within 10 minutes)
+                const sessionAge = Date.now() - (sessionData.timestamp || 0);
+                if (sessionAge > 10 * 60 * 1000) {
+                    console.log(`⏰ Anonymous session expired (${Math.round(sessionAge / 1000)}s old), skipping`);
+                    localStorage.removeItem('temp_anonymous_conversation');
+                    return;
                 }
+                
+                if (messages.length === 0) {
+                    console.log(`ℹ️  Anonymous session has no messages`);
+                    localStorage.removeItem('temp_anonymous_conversation');
+                    return;
+                }
+                
+                console.log(`💾 Restoring ${messages.length} messages from anonymous session...`);
+                
+                // Extract project title from first user message
+                const firstUserMessage = messages.find(msg => msg.sender === 'user');
+                const projectTitle = firstUserMessage?.content?.substring(0, 100).replace(/<[^>]*>/g, '').trim() || 'Untitled Research';
+                
+                // Create new project
+                const project = await this.sidebar.createProject(projectTitle, sessionData.currentQuery);
+                
+                if (project) {
+                    // Save all messages to the project
+                    for (const msg of messages) {
+                        const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
+                        const messageData = msg.metadata ? { metadata: msg.metadata } : null;
+                        await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
+                    }
+                    
+                    console.log(`✅ Anonymous conversation restored to project ${project.id}`);
+                    this.toastManager.show(`💾 Your conversation has been saved to "${projectTitle}"`, 'success');
+                    
+                    // Add to project list
+                    projectStore.addProject(project);
+                    await this.sidebar.loadProjects(); // Refresh sidebar
+                    
+                    // Clean up localStorage
+                    localStorage.removeItem('temp_anonymous_conversation');
+                }
+            } catch (parseError) {
+                console.error('Failed to parse or restore anonymous session:', parseError);
+                // Clean up invalid data
+                localStorage.removeItem('temp_anonymous_conversation');
             }
         } catch (error) {
             console.error('Error handling login:', error);
-            // Still try to load initial data even if history preservation fails
+            // Still try to load initial data even if restoration fails
             await this.loadInitialData();
         }
     }
@@ -214,7 +232,7 @@ export class ProjectManager {
     /**
      * Handle project loaded event
      */
-    handleProjectLoaded(projectData) {
+    async handleProjectLoaded(projectData) {
         console.log(`📊 [ProjectManager] Handling project switch:`, {
             newProjectId: projectData.id,
             newProjectTitle: projectData.title,
@@ -243,12 +261,77 @@ export class ProjectManager {
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;
         
-        console.log(`⚠️ [ProjectManager] Chat interface NOT updated - projects don't store messages`);
+        // Load and display project messages
+        await this.loadProjectMessages(projectData.id);
         
         // Emit global event
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_SWITCHED, {
             detail: { projectData }
         }));
+    }
+
+    /**
+     * Load and display messages for a specific project
+     * @param {number} projectId - The ID of the project
+     */
+    async loadProjectMessages(projectId) {
+        try {
+            console.log(`📨 [ProjectManager] Loading messages for project ${projectId}...`);
+            
+            // Clear current chat UI while preserving mode
+            this.clearChatInterface();
+            
+            // Fetch messages from API
+            const response = await this.apiService.getProjectMessages(projectId);
+            const messages = response.messages || [];
+            
+            console.log(`📬 [ProjectManager] Fetched ${messages.length} messages`);
+            
+            if (messages.length === 0) {
+                console.log(`ℹ️  [ProjectManager] No messages found for project ${projectId}`);
+                return;
+            }
+            
+            // Clear AppState conversation history to prevent duplicates
+            this.appState.clearConversation();
+            
+            // Restore each message using MessageCoordinator
+            for (const messageRecord of messages) {
+                // Add to AppState (skipPersist to avoid re-saving)
+                this.appState.addMessage(
+                    messageRecord.sender === 'ai' ? 'assistant' : messageRecord.sender,
+                    messageRecord.content,
+                    messageRecord.message_data?.metadata || null
+                );
+                
+                // Render the message
+                this.messageCoordinator.restoreMessage(messageRecord, { skipPersist: true });
+            }
+            
+            console.log(`✅ [ProjectManager] Loaded and displayed ${messages.length} messages`);
+        } catch (error) {
+            console.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);
+            this.toastManager.show('Failed to load project messages', 'error');
+        }
+    }
+
+    /**
+     * Clear chat interface while preserving mode
+     */
+    clearChatInterface() {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (!messagesContainer) return;
+        
+        // Remove report builder if present
+        const reportBuilder = messagesContainer.querySelector('.report-builder-interface');
+        if (reportBuilder) {
+            reportBuilder.remove();
+        }
+        
+        // Clear all messages
+        messagesContainer.innerHTML = '';
+        
+        console.log(`🧹 [ProjectManager] Chat interface cleared`);
     }
 
     /**

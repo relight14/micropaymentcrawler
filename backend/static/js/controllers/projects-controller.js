@@ -38,7 +38,9 @@ export class ProjectsController {
         this.projectManager = new ProjectManager({
             apiService: deps.apiService,
             authService: deps.authService,
-            toastManager: deps.toastManager
+            toastManager: deps.toastManager,
+            messageCoordinator: deps.messageCoordinator,
+            appState: deps.appState
         });
         
         // Set up all event listeners

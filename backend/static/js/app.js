@@ -519,6 +519,48 @@ export class ChatResearchApp {
         this.modalController.showAuthModal();
     }
 
+    /**
+     * Capture anonymous session before login to preserve conversation
+     */
+    captureAnonymousSession() {
+        try {
+            // Only capture if user is NOT authenticated (anonymous session)
+            if (this.authService.isAuthenticated()) {
+                return;
+            }
+            
+            const conversationHistory = this.appState.getConversationHistory();
+            
+            // Only save if there's actual conversation
+            if (conversationHistory.length === 0) {
+                return;
+            }
+            
+            // Filter to user/assistant messages only
+            const messagesToSave = conversationHistory.filter(msg => 
+                msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
+            );
+            
+            if (messagesToSave.length === 0) {
+                return;
+            }
+            
+            // Store in localStorage (survives page reload)
+            const sessionData = {
+                messages: messagesToSave,
+                currentQuery: this.appState.state.currentQuery,
+                mode: this.appState.getMode(),
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('temp_anonymous_conversation', JSON.stringify(sessionData));
+            console.log(`💾 [App] Captured ${messagesToSave.length} messages from anonymous session`);
+        } catch (error) {
+            console.error('Failed to capture anonymous session:', error);
+            // Don't throw - login should proceed even if capture fails
+        }
+    }
+
     updateAuthButton() {
         try {
             const loginButton = document.getElementById('loginButton');
