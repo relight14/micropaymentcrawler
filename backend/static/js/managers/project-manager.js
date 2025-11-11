@@ -24,6 +24,8 @@ export class ProjectManager {
         // Track initialization state
         this.isInitialized = false;
         this.hasAutoCreatedProject = false;
+        this.isLoadingProjects = false; // Guard flag to prevent duplicate loadProjects() calls
+        this.pendingReload = false; // Flag to queue a retry if load is requested during active load
     }
 
     /**
@@ -95,15 +97,47 @@ export class ProjectManager {
     }
 
     /**
-     * Handle user login - load user's projects without clearing UI
+     * Load projects with guard to prevent duplicate concurrent calls
+     * Uses queued retry pattern to ensure loads after project creation are not skipped
+     * Single entry point for all project loading to avoid race conditions
+     */
+    async loadProjectsWithGuard() {
+        // If already loading, queue a retry instead of skipping
+        if (this.isLoadingProjects) {
+            console.log(`📋 [ProjectManager] Already loading projects, queuing retry...`);
+            this.pendingReload = true;
+            return;
+        }
+        
+        // Loop to handle queued retries
+        do {
+            this.isLoadingProjects = true;
+            this.pendingReload = false;
+            
+            try {
+                console.log(`📋 [ProjectManager] Loading projects...`);
+                await this.sidebar.loadProjects();
+                console.log(`✅ [ProjectManager] Projects loaded successfully`);
+            } catch (error) {
+                console.error('[ProjectManager] Error loading projects:', error);
+                throw error;
+            } finally {
+                this.isLoadingProjects = false;
+            }
+            
+            // If another call came in during load, retry once more
+            if (this.pendingReload) {
+                console.log(`📋 [ProjectManager] Executing queued reload...`);
+            }
+        } while (this.pendingReload);
+    }
+
+    /**
+     * Handle user login - triggered by authStateChanged event
      */
     async handleLogin() {
-        try {
-            console.log(`🔐 [ProjectManager] Auth state changed to authenticated - loading projects...`);
-            await this.sidebar.loadProjects();
-        } catch (error) {
-            console.error('[ProjectManager] Error handling login:', error);
-        }
+        console.log(`🔐 [ProjectManager] Auth state changed to authenticated`);
+        await this.loadProjectsWithGuard();
     }
 
     /**
@@ -155,10 +189,7 @@ export class ProjectManager {
             
             console.log(`✅ Conversation saved to project ${project.id}`);
             
-            // Add to project list and set as active
-            projectStore.addProject(project);
-            await this.sidebar.loadProjects(); // Refresh sidebar
-            
+            // Return the created project (caller will handle loading projects)
             return project;
         } catch (error) {
             console.error('Error creating project from conversation:', error);

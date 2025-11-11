@@ -240,8 +240,8 @@ export class ChatResearchApp {
                         this.toastManager.show(`💾 Your conversation has been saved to "${project.title}"`, 'success');
                     }
                     
-                    // Load user's projects into sidebar (without clearing UI)
-                    await this.projectsController.projectManager.sidebar.loadProjects();
+                    // Load user's projects into sidebar (using guarded helper to prevent race)
+                    await this.projectsController.projectManager.loadProjectsWithGuard();
                     
                     // Auto-trigger funding modal if balance is $0
                     if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
