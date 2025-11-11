@@ -234,14 +234,9 @@ export class ChatResearchApp {
                     console.log('🎨 Updating auth button UI...');
                     this.updateAuthButton();
                     
-                    // Create project from current conversation first (before loading projects)
-                    const project = await this.projectsController.projectManager.createProjectFromConversation();
-                    if (project) {
-                        this.toastManager.show(`💾 Your conversation has been saved to "${project.title}"`, 'success');
-                    }
-                    
-                    // Load user's projects into sidebar (using guarded helper to prevent race)
-                    await this.projectsController.projectManager.loadProjectsWithGuard();
+                    // NOTE: Project creation and loading moved to ProjectManager.handleLogin()
+                    // to prevent race conditions and duplicate migrations. The authStateChanged
+                    // event will trigger handleLogin() which preserves chat and creates project.
                     
                     // Auto-trigger funding modal if balance is $0
                     if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {

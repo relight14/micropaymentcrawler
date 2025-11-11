@@ -27,6 +27,7 @@ export class ProjectManager {
         this.hasAutoCreatedProject = false;
         this.isLoadingProjects = false; // Guard flag to prevent duplicate loadProjects() calls
         this.pendingReload = false; // Flag to queue a retry if load is requested during active load
+        this.hasMigratedLoginChat = false; // One-shot flag to prevent duplicate login migration
     }
 
     /**
@@ -138,27 +139,60 @@ export class ProjectManager {
 
     /**
      * Handle user login - triggered by authStateChanged event
+     * Preserves pre-login chat and migrates it to a new project
+     * Uses one-shot guard to prevent duplicate migration if event fires multiple times
      */
     async handleLogin() {
         logger.info(`🔐 [ProjectManager] Auth state changed to authenticated`);
+        
+        // CRITICAL: Preserve pre-login chat BEFORE any async operations that might clear it
+        const preLoginChat = this.appState.getConversationHistory();
+        const hasPreLoginChat = preLoginChat && preLoginChat.length > 0;
+        
+        // Show UX spinner for perceived performance
+        if (hasPreLoginChat && !this.hasMigratedLoginChat) {
+            this.toastManager.show('💾 Syncing your research...', 'info');
+        }
+        
+        // Load projects first
         await this.loadProjectsWithGuard();
+        
+        // Migrate pre-login conversation to a new project (one-shot guard)
+        if (hasPreLoginChat && !this.hasMigratedLoginChat) {
+            this.hasMigratedLoginChat = true; // Set guard immediately to prevent duplicate runs
+            
+            try {
+                const project = await this.createProjectFromConversation(preLoginChat);
+                if (project) {
+                    // Auto-load the newly created project to show saved conversation
+                    await this.sidebar.loadProject(project.id);
+                    this.toastManager.show(`💾 Your conversation has been saved to "${project.title}"`, 'success');
+                }
+            } catch (error) {
+                logger.error('Failed to migrate login chat:', error);
+                // Reset flag on failure to allow retry
+                this.hasMigratedLoginChat = false;
+            }
+        }
     }
 
     /**
-     * Create project from current conversation (used after login)
+     * Create project from conversation (used after login)
+     * @param {Array} conversationHistory - Optional pre-captured conversation to avoid race conditions
      * @returns {Promise<Object|null>} Created project or null if failed
      */
-    async createProjectFromConversation() {
+    async createProjectFromConversation(conversationHistory = null) {
         try {
-            const conversationHistory = this.appState.getConversationHistory();
+            // Use passed conversation or fetch from appState (fallback for legacy calls)
+            const conversation = conversationHistory || this.appState.getConversationHistory();
             
-            if (!conversationHistory || conversationHistory.length === 0) {
+            if (!conversation || conversation.length === 0) {
                 logger.info(`ℹ️  No conversation to save`);
                 return null;
             }
             
             // Filter to user/assistant messages only
-            const messagesToSave = conversationHistory.filter(msg => 
+            const messagesToSave = conversation.filter(msg => 
                 msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
             );
             
@@ -455,6 +489,7 @@ export class ProjectManager {
         this.sidebar.render();
         this.outlineBuilder.setProject(null, null);
         this.hasAutoCreatedProject = false;
+        this.hasMigratedLoginChat = false; // Reset migration flag for next login
     }
 
     /**
