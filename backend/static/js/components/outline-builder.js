@@ -6,6 +6,7 @@
 
 import { analytics } from '../utils/analytics.js';
 import { projectStore } from '../state/project-store.js';
+import { AppEvents } from '../utils/event-bus.js';
 
 export class OutlineBuilder extends EventTarget {
     constructor({ apiService, authService, toastManager }) {
@@ -199,6 +200,34 @@ export class OutlineBuilder extends EventTarget {
             this.render();
             this.debouncedSave();
         }
+    }
+
+    /**
+     * Handle Build Research Packet button click
+     * Dispatches event for app.js to trigger tier purchase flow
+     */
+    handleBuildResearchPacket() {
+        // Get research query from projectStore
+        const query = projectStore.getResearchQuery();
+        
+        if (!query) {
+            this.toastManager.show('No research query found. Please start a new search.', 'error');
+            return;
+        }
+        
+        if (this.selectedSources.length === 0) {
+            this.toastManager.show('Please select sources to build your research packet', 'error');
+            return;
+        }
+        
+        // Dispatch event for app.js to handle tier purchase
+        AppEvents.dispatchEvent(new CustomEvent('buildResearchPacket', {
+            detail: {
+                query: query,
+                selectedSources: this.selectedSources,
+                outlineStructure: this.sections
+            }
+        }));
     }
 
     /**
@@ -691,8 +720,9 @@ export class OutlineBuilder extends EventTarget {
                 <div class="outline-header">
                     <div>
                         <h3>Research Outline</h3>
-                        <button class="regenerate-outline-btn" id="regenerate-outline-btn" title="Get new AI-suggested sections">
-                            ✨ Regenerate
+                        <p class="outline-prompt">Build a research packet based on this outline</p>
+                        <button class="build-packet-btn" id="build-packet-btn" title="Generate a comprehensive research report">
+                            📊 Build Research Packet
                         </button>
                     </div>
                     <span class="save-indicator" id="outline-save-indicator"></span>
@@ -813,10 +843,10 @@ export class OutlineBuilder extends EventTarget {
             addSectionBtn.addEventListener('click', () => this.addSection());
         }
 
-        // Regenerate AI outline button
-        const regenerateBtn = document.getElementById('regenerate-outline-btn');
-        if (regenerateBtn) {
-            regenerateBtn.addEventListener('click', () => this.regenerateAISuggestions());
+        // Build Research Packet button
+        const buildPacketBtn = document.getElementById('build-packet-btn');
+        if (buildPacketBtn) {
+            buildPacketBtn.addEventListener('click', () => this.handleBuildResearchPacket());
         }
 
         // File upload button

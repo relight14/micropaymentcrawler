@@ -189,6 +189,18 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Tier purchased', e.detail);
         });
         
+        // Listen for Build Research Packet event from OutlineBuilder
+        AppEvents.addEventListener('buildResearchPacket', async (e) => {
+            console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
+            const { query, selectedSources } = e.detail;
+            
+            // Show tier selection modal for user to choose research or pro tier
+            const tierSelected = await this.uiManager.showTierSelection(query, selectedSources);
+            if (!tierSelected) {
+                console.log('User cancelled tier selection');
+            }
+        });
+        
         // Guard to prevent duplicate search triggers during login flow
         this.pendingSearchFromLogin = false;
         
