@@ -184,7 +184,7 @@ export class ProjectsController {
             
             // Clear current conversation display (skip confirmation)
             appState.clearConversation();
-            uiManager.clearConversationDisplay();
+            uiManager.clearConversationDisplay(true); // Show loading state
             sourceManager.updateSelectionUI();
             reportBuilder.update();
             

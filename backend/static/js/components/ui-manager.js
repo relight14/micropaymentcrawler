@@ -480,17 +480,28 @@ export class UIManager {
     }
 
     // Clear conversation UI
-    clearConversationDisplay() {
+    clearConversationDisplay(isLoadingProject = false) {
         if (!this.messagesContainer) return;
         
-        this.messagesContainer.innerHTML = `
-            <div class="welcome-message">
-                <div class="welcome-content">
-                    <h2>Fresh start! 🚀</h2>
-                    <p>Your conversation has been cleared. What would you like to research today?</p>
+        if (isLoadingProject) {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <div class="welcome-content">
+                        <h2>Loading project history... ⏳</h2>
+                        <p>Please wait while we retrieve your conversation.</p>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <div class="welcome-content">
+                        <h2>Fresh start! 🚀</h2>
+                        <p>Your conversation has been cleared. What would you like to research today?</p>
+                    </div>
+                </div>
+            `;
+        }
     }
 
     // Utility methods with helper for scroll behavior
