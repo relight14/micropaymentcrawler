@@ -161,6 +161,12 @@ export class ProjectsController {
                 return;
             }
             
+            // Skip saving if user is not authenticated
+            if (!this.dependencies.authService.isAuthenticated()) {
+                console.log('👤 User not authenticated - message displayed but not persisted');
+                return;
+            }
+            
             const activeProjectId = this.projectManager.getActiveProjectId();
             
             if (!activeProjectId) {

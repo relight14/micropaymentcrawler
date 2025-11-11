@@ -70,9 +70,10 @@ export class ProjectManager {
         });
 
         // Listen to auth state changes
-        AppEvents.addEventListener('authStateChanged', (e) => {
+        AppEvents.addEventListener('authStateChanged', async (e) => {
             if (e.detail.isAuthenticated) {
-                this.loadInitialData();
+                // Capture conversation history before loading projects
+                await this.handleLogin();
             } else {
                 this.handleLogout();
             }
@@ -89,6 +90,65 @@ export class ProjectManager {
                 this.outlineBuilder.setSelectedSources(newState.selectedSources);
             }
         });
+    }
+
+    /**
+     * Handle user login - preserve conversation history
+     */
+    async handleLogin() {
+        try {
+            // Capture conversation history from AppState before loading projects
+            const appState = window.app?.appState;
+            const conversationHistory = appState?.getConversationHistory() || [];
+            
+            // Filter out system messages and keep only user/assistant exchanges
+            const userMessages = conversationHistory.filter(msg => 
+                msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
+            );
+            
+            console.log(`🔐 User logged in - found ${userMessages.length} messages in anonymous session`);
+            
+            // Load initial project data first
+            await this.loadInitialData();
+            
+            // If there's conversation history, create a project to preserve it
+            if (userMessages.length > 0) {
+                try {
+                    // Extract research topic from first user message
+                    const firstUserMessage = conversationHistory.find(msg => msg.sender === 'user');
+                    const projectTitle = firstUserMessage?.content?.substring(0, 100).replace(/<[^>]*>/g, '').trim() || 'Untitled Research';
+                    
+                    console.log(`💾 Preserving ${userMessages.length} messages in new project: "${projectTitle}"`);
+                    
+                    // Create new project via sidebar
+                    const project = await this.sidebar.createProject(projectTitle, appState?.state?.currentQuery);
+                    
+                    if (project) {
+                        // Save all messages to the project
+                        for (const msg of userMessages) {
+                            const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
+                            const messageData = msg.metadata ? { metadata: msg.metadata } : null;
+                            await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
+                        }
+                        
+                        console.log(`✅ Conversation history preserved in project ${project.id}`);
+                        this.toastManager.show(`💾 Your conversation has been saved to "${projectTitle}"`, 'success');
+                        
+                        // Don't auto-switch to the project - let user continue their current conversation
+                        // Just add it to the project list
+                        projectStore.addProject(project);
+                        await this.sidebar.loadProjects(); // Refresh sidebar to show new project
+                    }
+                } catch (error) {
+                    console.error('Failed to preserve conversation history:', error);
+                    // Don't show error to user - they can still continue using the app
+                }
+            }
+        } catch (error) {
+            console.error('Error handling login:', error);
+            // Still try to load initial data even if history preservation fails
+            await this.loadInitialData();
+        }
     }
 
     /**
