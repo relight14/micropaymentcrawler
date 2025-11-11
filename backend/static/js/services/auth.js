@@ -104,6 +104,13 @@ export class AuthService {
         localStorage.removeItem('ledewire_token');
         localStorage.removeItem('ledewire_refresh_token');
         
+        // Dispatch auth state changed event
+        import('./event-bus.js').then(({ AppEvents, EVENT_TYPES }) => {
+            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.AUTH_STATE_CHANGED, {
+                detail: { isAuthenticated: false }
+            }));
+        });
+        
         // Trigger all logout callbacks to update UI
         this.logoutCallbacks.forEach(callback => {
             try {
