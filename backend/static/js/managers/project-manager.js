@@ -287,28 +287,53 @@ export class ProjectManager {
             
             console.log(`📬 [ProjectManager] Fetched ${messages.length} messages`);
             
-            if (messages.length === 0) {
-                console.log(`ℹ️  [ProjectManager] No messages found for project ${projectId}`);
-                return;
-            }
-            
             // Clear AppState conversation history to prevent duplicates
             this.appState.clearConversation();
             
-            // Restore each message using MessageCoordinator
-            for (const messageRecord of messages) {
-                // Add to AppState (skipPersist to avoid re-saving)
-                this.appState.addMessage(
-                    messageRecord.sender === 'ai' ? 'assistant' : messageRecord.sender,
-                    messageRecord.content,
-                    messageRecord.message_data?.metadata || null
-                );
+            if (messages.length === 0) {
+                // Show welcome message for empty project
+                const projectTitle = projectStore.state.activeProjectTitle || 'this project';
+                this.messageCoordinator.addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`, null, { skipPersist: true });
+                console.log(`ℹ️  [ProjectManager] No messages found, showing welcome message`);
+            } else {
+                // Track the most recent research data while restoring messages
+                let mostRecentResearchData = null;
                 
-                // Render the message
-                this.messageCoordinator.restoreMessage(messageRecord, { skipPersist: true });
+                // Restore each message using MessageCoordinator
+                for (const messageRecord of messages) {
+                    // Add to AppState
+                    this.appState.addMessage(
+                        messageRecord.sender === 'ai' ? 'assistant' : messageRecord.sender,
+                        messageRecord.content,
+                        messageRecord.message_data?.metadata || null
+                    );
+                    
+                    // Render the message
+                    this.messageCoordinator.restoreMessage(messageRecord, { skipPersist: true });
+                    
+                    // Extract research data from source cards metadata for restoration
+                    const metadata = messageRecord.message_data?.metadata;
+                    if (metadata?.type === 'source_cards' && metadata?.sources) {
+                        mostRecentResearchData = {
+                            sources: metadata.sources,
+                            query: metadata.query || '',
+                            enrichment_status: 'complete'
+                        };
+                    }
+                }
+                
+                // Restore the most recent research data to appState
+                if (mostRecentResearchData) {
+                    this.appState.setCurrentResearchData(mostRecentResearchData);
+                    console.log(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
+                }
+                
+                console.log(`✅ [ProjectManager] Loaded and displayed ${messages.length} messages`);
             }
             
-            console.log(`✅ [ProjectManager] Loaded and displayed ${messages.length} messages`);
+            // Hide welcome screen
+            this.hideWelcomeScreen();
+            
         } catch (error) {
             console.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);
             this.toastManager.show('Failed to load project messages', 'error');
@@ -332,6 +357,16 @@ export class ProjectManager {
         messagesContainer.innerHTML = '';
         
         console.log(`🧹 [ProjectManager] Chat interface cleared`);
+    }
+
+    /**
+     * Hide the welcome screen
+     */
+    hideWelcomeScreen() {
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen && !welcomeScreen.classList.contains('hidden')) {
+            welcomeScreen.classList.add('hidden');
+        }
     }
 
     /**

@@ -126,16 +126,8 @@ export class ProjectsController {
             reportBuilder.update();
         });
 
-        // PROJECT_SWITCHED: Load conversation history for the project
-        AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, async (e) => {
-            console.log('📡 AppEvents: Project switched', {
-                projectId: e.detail.projectData.id,
-                projectTitle: e.detail.projectData.title
-            });
-            
-            // Load messages for this project
-            await this.loadProjectMessages(e.detail.projectData.id, e.detail.projectData.title);
-        });
+        // PROJECT_SWITCHED: Message loading is now handled by ProjectManager
+        // No additional action needed here - ProjectManager loads messages before emitting this event
 
         // AUTH_STATE_CHANGED: Already handled by ProjectManager internally via AppEvents
         // No need to duplicate here
@@ -219,76 +211,6 @@ export class ProjectsController {
         }
     }
 
-    /**
-     * Load messages for a specific project
-     * @param {string} projectId - Project ID
-     * @param {string} projectTitle - Project title
-     */
-    async loadProjectMessages(projectId, projectTitle) {
-        try {
-            const { apiService } = this.dependencies;
-            
-            // UI already cleared by PROJECT_LOADING_STARTED event
-            // Just fetch messages from backend
-            const response = await apiService.getProjectMessages(projectId);
-            const messages = response.messages || [];
-            
-            console.log(`📥 Loaded ${messages.length} messages for project ${projectId}`);
-            
-            if (messages.length === 0) {
-                // Show welcome message for empty project (don't save it)
-                this.isRestoringMessages = true;
-                this._addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`);
-                this.isRestoringMessages = false;
-            } else {
-                // Restore messages to chat interface (without saving them again)
-                this.isRestoringMessages = true;
-                
-                // Track the most recent research data while restoring messages
-                let mostRecentResearchData = null;
-                
-                for (const msg of messages) {
-                    // Add message to state and UI
-                    const metadata = msg.message_data?.metadata || null;
-                    const content = msg.content;
-                    
-                    // Add to appState with original string content (needed for .substring() calls)
-                    // This normalizes "ai" → "assistant" and shapes metadata correctly
-                    const message = appState.addMessage(msg.sender, content, metadata);
-                    
-                    // Delegate to MessageCoordinator for consistent rendering pipeline
-                    // MessageCoordinator → UIManager → MessageRenderer
-                    // IMPORTANT: Pass normalized message from AppState, not raw backend record
-                    this.dependencies.messageCoordinator.restoreMessage(message, { skipPersist: true });
-                    
-                    // Extract research data from source cards metadata for restoration
-                    if (metadata?.type === 'source_cards' && metadata?.sources) {
-                        mostRecentResearchData = {
-                            sources: metadata.sources,
-                            query: metadata.query || '',
-                            enrichment_status: 'complete'
-                        };
-                    }
-                }
-                
-                // Restore the most recent research data to appState
-                if (mostRecentResearchData) {
-                    appState.setCurrentResearchData(mostRecentResearchData);
-                    console.log(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
-                }
-                
-                this.isRestoringMessages = false;
-                console.log(`✅ Restored ${messages.length} messages to chat interface`);
-            }
-            
-            // Hide welcome screen
-            this._hideWelcomeScreen();
-            
-        } catch (error) {
-            console.error('Failed to load project messages:', error);
-            this._addMessage('system', `Failed to load conversation history for this project. Starting fresh.`);
-        }
-    }
 
     /**
      * Get the active project ID
