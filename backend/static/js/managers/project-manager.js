@@ -180,6 +180,15 @@ export class ProjectManager {
         // 4) Auto-load the newly created project (triggers existing handleProjectLoaded flow)
         if (newProjectId) {
             await this.sidebar.loadProject(newProjectId);
+            
+            // FIX C: Dispatch SOURCE_SEARCH_TRIGGER after project loads to fire search
+            const query = this.appState.getCurrentQuery();
+            if (query && query.trim()) {
+                logger.info('🔍 Dispatching SOURCE_SEARCH_TRIGGER after login with query:', query);
+                AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+                    detail: { query }
+                }));
+            }
         }
     }
 

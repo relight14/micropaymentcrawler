@@ -189,6 +189,32 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Tier purchased', e.detail);
         });
         
+        // Guard to prevent duplicate search triggers during login flow
+        this.pendingSearchFromLogin = false;
+        
+        // FIX B: Global listener for SOURCE_SEARCH_TRIGGER - fires search from any entry point
+        AppEvents.addEventListener(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, (e) => {
+            console.log('📡 AppEvents: SOURCE_SEARCH_TRIGGER received', e.detail);
+            const query = e.detail?.query || this.appState.getCurrentQuery();
+            if (query && query.trim()) {
+                // Guard: Skip if search was already fired from setMode during login flow
+                if (this.pendingSearchFromLogin) {
+                    console.log('⏭️ SOURCE_SEARCH_TRIGGER: Skipping - search already fired from setMode');
+                    this.pendingSearchFromLogin = false; // reset flag
+                    return;
+                }
+                
+                // Populate input with query and trigger send
+                const chatInput = document.getElementById('newChatInput');
+                if (chatInput) {
+                    chatInput.value = query;
+                    this.sendMessage();
+                }
+            } else {
+                console.log('⚠️ SOURCE_SEARCH_TRIGGER: No query available to search');
+            }
+        });
+        
         // Register logout callback to update UI when user is logged out
         this.authService.onLogout(() => {
             console.log('🔐 Logout callback triggered - updating UI');
@@ -251,6 +277,10 @@ export class ChatResearchApp {
                         console.log('🔄 Executing pending tab action after login:', pendingTabAction);
                         
                         if (pendingTabAction.type === 'mode_switch') {
+                            // Set guard flag to prevent duplicate search from SOURCE_SEARCH_TRIGGER
+                            if (pendingTabAction.mode === 'research') {
+                                this.pendingSearchFromLogin = true;
+                            }
                             this.setMode(pendingTabAction.mode);
                         }
                         
@@ -468,12 +498,31 @@ export class ChatResearchApp {
             this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
             const reportBuilderElement = this.reportBuilder.show();
             this.addMessage('system', reportBuilderElement);
+        } else if (mode === 'research') {
+            // FIX A: Auto-fire search when entering research mode
+            const query = this.appState.getCurrentQuery();
+            if (query && query.trim()) {
+                // Populate input with query and trigger send
+                console.log('🔍 Research mode entered with query - auto-firing search:', query);
+                const chatInput = document.getElementById('newChatInput');
+                if (chatInput) {
+                    chatInput.value = query;
+                    this.sendMessage();
+                }
+                // Note: pendingSearchFromLogin flag is set BEFORE setMode is called (see auth callback)
+                // and checked in SOURCE_SEARCH_TRIGGER listener to prevent duplicates
+            } else {
+                // FIX D: UX nudge when no query available
+                if (this.appState.getConversationHistory().length > 0) {
+                    this.addMessage('system', "📚 Switched to Sources mode - I'll find and license authoritative sources.");
+                }
+                console.log('📚 Research mode entered but no query available');
+            }
         } else {
             // Add mode change message if there's history
             if (this.appState.getConversationHistory().length > 0) {
                 const modeMessages = {
-                    'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation.",
-                    'research': "📚 Switched to Sources mode - I'll find and license authoritative sources."
+                    'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation."
                 };
                 if (modeMessages[mode]) {
                     this.addMessage('system', modeMessages[mode]);
