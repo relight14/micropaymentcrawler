@@ -25,17 +25,54 @@ export class InteractionHandler {
         this.sourceManager.unlockSource(null, sourceId, price);
     }
 
-    handleResearchSuggestion(topicHint, setModeCallback) {
+    handleResearchSuggestion(topicHint, setModeCallback, autoExecute = false, sendMessageCallback = null) {
+        // Switch to research mode
         setModeCallback('research');
         
-        if (topicHint) {
-            const chatInput = document.getElementById('newChatInput');
-            if (chatInput) {
-                chatInput.value = topicHint;
-                chatInput.focus();
-                this.uiManager.updateCharacterCount();
+        const chatInput = document.getElementById('newChatInput');
+        if (!chatInput) return;
+        
+        // Use topicHint if available, otherwise use current query from appState
+        let queryText = topicHint || this.appState.getCurrentQuery() || '';
+        
+        // If still no query, try to extract from last user message
+        if (!queryText) {
+            const messages = this.appState.getConversationHistory();
+            const lastUserMessage = messages.filter(m => m.sender === 'user').pop();
+            if (lastUserMessage?.content) {
+                // Safely extract text - handle both string and HTML content
+                const content = lastUserMessage.content;
+                if (typeof content === 'string') {
+                    queryText = content.substring(0, 100);
+                } else if (content instanceof HTMLElement) {
+                    queryText = content.textContent?.substring(0, 100) || '';
+                }
             }
         }
+        
+        // Set the query in the input
+        chatInput.value = queryText;
+        this.uiManager.updateCharacterCount();
+        
+        // Auto-execute search if requested
+        if (autoExecute && sendMessageCallback && queryText) {
+            // Small delay to ensure mode switch completes
+            setTimeout(async () => {
+                try {
+                    // Execute the search
+                    await sendMessageCallback();
+                    
+                    // Only mark as used if search executed successfully
+                    sessionStorage.setItem('hasUsedResearch', 'true');
+                } catch (error) {
+                    console.error('Failed to auto-execute search:', error);
+                    // Don't set hasUsedResearch flag on failure - allow retry
+                }
+            }, 100);
+        } else {
+            chatInput.focus();
+        }
+
     }
 
     async clearConversation(addMessageCallback, reportBuilderUpdateCallback, skipConfirmation = false) {

@@ -233,9 +233,13 @@ export class MessageRenderer {
             }
         }
         
-        // Add research mode suggestion if applicable
-        if (message.metadata?.suggest_research) {
-            const suggestionElement = this._createResearchSuggestion(message.metadata.topic_hint);
+        // Add research mode suggestion after every assistant message in chat mode
+        // (unless user has already switched to research mode)
+        const currentMode = window.app?.appState?.getMode();
+        const hasUsedResearch = sessionStorage.getItem('hasUsedResearch') === 'true';
+        
+        if (message.sender === 'assistant' && currentMode === 'chat' && !hasUsedResearch) {
+            const suggestionElement = this._createResearchSuggestion(message.metadata?.topic_hint);
             bodyDiv.appendChild(suggestionElement);
         }
         
@@ -347,30 +351,32 @@ export class MessageRenderer {
         const suggestionDiv = document.createElement('div');
         suggestionDiv.className = 'research-suggestion';
         
-        // Create preview text
-        const previewText = document.createElement('span');
-        previewText.className = 'suggestion-text';
-        const preview = topicHint 
-            ? `I think I've got it - ready to find credible sources on this?`
-            : `Ready to search for authoritative sources?`;
-        previewText.textContent = preview;
+        // Create emoji and text
+        const textSpan = document.createElement('span');
+        textSpan.className = 'suggestion-text';
+        textSpan.textContent = '💡 Want sources for this topic?';
         
         // Create button
         const button = document.createElement('button');
         button.className = 'switch-mode-btn';
-        button.textContent = 'Find Sources';
+        button.innerHTML = '🔍 Find Sources';
         button.setAttribute('data-topic-hint', topicHint || '');
         
-        // Add click handler (will be wired up by app.js)
+        // Add click handler - auto-execute search
         button.onclick = () => {
+            // Don't mark hasUsedResearch here - let handler do it after successful execution
+            
             // Dispatch custom event that app.js will listen for
             const event = new CustomEvent('switchToResearch', {
-                detail: { topicHint: topicHint || '' }
+                detail: { 
+                    topicHint: topicHint || '',
+                    autoExecute: true // Signal to auto-run the search
+                }
             });
             document.dispatchEvent(event);
         };
         
-        suggestionDiv.appendChild(previewText);
+        suggestionDiv.appendChild(textSpan);
         suggestionDiv.appendChild(button);
         
         return suggestionDiv;

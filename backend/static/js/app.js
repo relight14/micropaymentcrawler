@@ -282,9 +282,11 @@ export class ChatResearchApp {
                 onCitationBadgeClick: (sourceId, price) => this.interactionHandler.handleCitationClick(sourceId, price),
                 onFeedbackSubmit: (query, sourceIds, rating, mode, feedbackSection) => 
                     this.messageCoordinator.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
-                onResearchSuggestion: (topicHint) => this.interactionHandler.handleResearchSuggestion(
+                onResearchSuggestion: (topicHint, autoExecute) => this.interactionHandler.handleResearchSuggestion(
                     topicHint,
-                    (mode) => this.setMode(mode)
+                    (mode) => this.setMode(mode),
+                    autoExecute,
+                    () => this.sendMessage() // Pass sendMessage callback for auto-execution
                 ),
                 onChatInput: (e) => {
                     this.uiManager.updateCharacterCount();

@@ -206,10 +206,11 @@ export class EventRouter {
         // Research mode suggestion handler (custom event)
         document.addEventListener('switchToResearch', (e) => {
             const topicHint = e.detail?.topicHint || '';
-            console.log('💡 Switching to research mode with topic:', topicHint);
+            const autoExecute = e.detail?.autoExecute || false;
+            console.log('💡 Switching to research mode with topic:', topicHint, 'autoExecute:', autoExecute);
             
             if (this.handlers.onResearchSuggestion) {
-                this.handlers.onResearchSuggestion(topicHint);
+                this.handlers.onResearchSuggestion(topicHint, autoExecute);
             }
         });
     }
