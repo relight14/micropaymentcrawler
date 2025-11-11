@@ -98,6 +98,11 @@ def extract_user_id_from_token(access_token: str) -> str:
         decoded_bytes = base64.urlsafe_b64decode(payload)
         decoded_payload = json.loads(decoded_bytes)
         
+        # DEBUG: Log what's in the JWT
+        logger.info(f"🔍 JWT payload keys: {list(decoded_payload.keys())}")
+        logger.info(f"🔍 JWT email: {decoded_payload.get('email')}")
+        logger.info(f"🔍 JWT sub: {decoded_payload.get('sub')}")
+        
         # Extract user identifier from token claims
         # Prefer email, fall back to sub (subject), then user_id
         user_identifier = (
@@ -109,7 +114,9 @@ def extract_user_id_from_token(access_token: str) -> str:
         if not user_identifier:
             raise ValueError("No user identifier found in JWT")
         
-        return f"user_{user_identifier}"
+        final_id = f"user_{user_identifier}"
+        logger.info(f"🔍 Extracted user_id: {final_id}")
+        return final_id
         
     except Exception as e:
         # Fallback: use token hash for projects
