@@ -25,23 +25,24 @@
 
 .tiers-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 0.75rem;
     margin-bottom: 1rem;
-    max-width: 600px;
+    max-width: 500px;
+    margin: 0 auto;
 }
 
 .tier-card {
     background: var(--bg-card);
     border: 2px solid var(--border-light);
     border-radius: var(--radius-lg);
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
     position: relative;
     overflow: hidden;
-    min-height: 100px;
+    min-height: 120px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -79,26 +80,26 @@
 
 .tier-title {
     color: var(--text-primary);
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.3rem;
     font-weight: var(--font-weight-semibold);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     opacity: 0.8;
 }
 
 .tier-price {
-    font-size: 1.6rem;
+    font-size: 1.4rem;
     font-weight: var(--font-weight-bold);
     color: var(--ledewire-yellow);
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.3rem;
     line-height: 1;
 }
 
 .tier-value {
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: var(--font-weight-medium);
     line-height: 1.2;
-    margin-top: 0.15rem;
+    margin-top: 0.1rem;
 }
 
 .tier-description-compelling {
