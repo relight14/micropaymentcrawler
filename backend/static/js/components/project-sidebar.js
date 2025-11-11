@@ -121,6 +121,24 @@ export class ProjectListSidebar extends EventTarget {
     async loadProject(projectId) {
         try {
             console.log(`🔄 [ProjectSidebar] Loading project ${projectId}...`);
+            
+            // Update UI immediately for instant feedback
+            this.activeProjectId = projectId;
+            this.render(); // Highlight the tab immediately
+            
+            // Get project title from cached list for immediate display
+            const cachedProject = this.projects.find(p => p.id === projectId);
+            const projectTitle = cachedProject?.title || 'Project';
+            
+            // Emit early event to trigger loading UI immediately
+            this.dispatchEvent(new CustomEvent('projectLoadingStarted', {
+                detail: { 
+                    projectId,
+                    projectTitle 
+                }
+            }));
+            
+            // Fetch full project data in background
             const response = await fetch(`/api/projects/${projectId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.authService.getToken()}`
@@ -148,9 +166,6 @@ export class ProjectListSidebar extends EventTarget {
                     title: projectData.title,
                     outlineSections: projectData.outline?.length || 0
                 });
-                
-                this.activeProjectId = projectId;
-                this.render();
                 
                 analytics.track('project_loaded', {
                     project_id: projectId

@@ -13,6 +13,7 @@ export const EVENT_TYPES = {
     
     // Project events
     PROJECT_CREATED: 'projectCreated',
+    PROJECT_LOADING_STARTED: 'projectLoadingStarted',
     PROJECT_LOADED: 'projectLoaded',
     PROJECT_SWITCHED: 'projectSwitched',
     PROJECT_DELETED: 'projectDeleted',

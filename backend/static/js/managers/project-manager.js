@@ -56,6 +56,11 @@ export class ProjectManager {
             this.handleProjectCreated(e.detail.project);
         });
 
+        // Immediate UI update when project loading starts
+        this.sidebar.addEventListener('projectLoadingStarted', (e) => {
+            this.handleProjectLoadingStarted(e.detail.projectId, e.detail.projectTitle);
+        });
+
         this.sidebar.addEventListener('projectLoaded', (e) => {
             this.handleProjectLoaded(e.detail.projectData);
         });
@@ -125,6 +130,21 @@ export class ProjectManager {
         // Emit global event
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_CREATED, {
             detail: { project }
+        }));
+    }
+
+    /**
+     * Handle project loading started (immediate UI update)
+     */
+    handleProjectLoadingStarted(projectId, projectTitle) {
+        console.log(`⚡ [ProjectManager] Project loading started immediately:`, {
+            projectId,
+            projectTitle
+        });
+        
+        // Show loading UI immediately
+        AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_LOADING_STARTED, {
+            detail: { projectId, projectTitle }
         }));
     }
 

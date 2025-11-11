@@ -86,6 +86,21 @@ export class ProjectsController {
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
 
+        // PROJECT_LOADING_STARTED: Show loading UI immediately
+        AppEvents.addEventListener(EVENT_TYPES.PROJECT_LOADING_STARTED, (e) => {
+            console.log('⚡ AppEvents: Project loading started', {
+                projectId: e.detail.projectId,
+                projectTitle: e.detail.projectTitle
+            });
+            
+            // Immediately clear and show loading state
+            const { appState, uiManager, sourceManager, reportBuilder } = this.dependencies;
+            appState.clearConversation();
+            uiManager.clearConversationDisplay(true); // Show loading state
+            sourceManager.updateSelectionUI();
+            reportBuilder.update();
+        });
+
         // PROJECT_SWITCHED: Load conversation history for the project
         AppEvents.addEventListener(EVENT_TYPES.PROJECT_SWITCHED, async (e) => {
             console.log('📡 AppEvents: Project switched', {
@@ -180,15 +195,10 @@ export class ProjectsController {
      */
     async loadProjectMessages(projectId, projectTitle) {
         try {
-            const { appState, uiManager, sourceManager, reportBuilder, apiService } = this.dependencies;
+            const { apiService } = this.dependencies;
             
-            // Clear current conversation display (skip confirmation)
-            appState.clearConversation();
-            uiManager.clearConversationDisplay(true); // Show loading state
-            sourceManager.updateSelectionUI();
-            reportBuilder.update();
-            
-            // Fetch messages from backend
+            // UI already cleared by PROJECT_LOADING_STARTED event
+            // Just fetch messages from backend
             const response = await apiService.getProjectMessages(projectId);
             const messages = response.messages || [];
             
