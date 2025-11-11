@@ -204,6 +204,9 @@ export class ChatResearchApp {
                     return;
                 }
                 
+                // Show loading indicator for post-login search
+                this.uiManager.showTypingIndicator('Running your search query...');
+                
                 // Populate input with query and trigger send
                 const chatInput = document.getElementById('newChatInput');
                 if (chatInput) {

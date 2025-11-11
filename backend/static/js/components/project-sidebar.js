@@ -16,6 +16,8 @@ export class ProjectListSidebar extends EventTarget {
         this.projects = [];
         this.activeProjectId = null;
         this.isCollapsed = false;
+        this.isLoadingProjects = false;
+        this.loadingDebounceTimer = null;
         
         // Subscribe to viewport changes to re-render when crossing mobile breakpoint
         this.unsubscribeViewport = viewport.subscribe((isMobile) => {
@@ -48,6 +50,12 @@ export class ProjectListSidebar extends EventTarget {
      * Load all projects for the current user
      */
     async loadProjects() {
+        // Debounce: Only show spinner if loading takes > 150ms to prevent flicker
+        this.loadingDebounceTimer = setTimeout(() => {
+            this.isLoadingProjects = true;
+            this.render();
+        }, 150);
+        
         try {
             const response = await fetch('/api/projects', {
                 headers: {
@@ -63,6 +71,11 @@ export class ProjectListSidebar extends EventTarget {
             }
         } catch (error) {
             console.error('Error loading projects:', error);
+        } finally {
+            // Clear loading state
+            clearTimeout(this.loadingDebounceTimer);
+            this.isLoadingProjects = false;
+            this.render();
         }
     }
 
@@ -323,6 +336,37 @@ export class ProjectListSidebar extends EventTarget {
         // Authenticated - show sidebar with .visible class for CSS
         container.style.display = '';
         container.classList.add('visible');  // CSS uses this to show sidebar across all breakpoints
+
+        // Show loading spinner if projects are being loaded
+        if (this.isLoadingProjects) {
+            container.innerHTML = `
+                <div class="project-sidebar ${this.isCollapsed ? 'collapsed' : ''}">
+                    <div class="sidebar-header">
+                        <button class="toggle-btn" id="sidebar-toggle" disabled>
+                            ${this.isCollapsed ? '▶' : '◀'}
+                        </button>
+                        ${!this.isCollapsed ? '<h3>Projects</h3>' : ''}
+                    </div>
+                    
+                    ${!this.isCollapsed ? `
+                        <button class="new-project-btn" id="new-project-btn" disabled>
+                            + New Project
+                        </button>
+                        
+                        <div class="projects-list">
+                            <div class="sidebar-loading" role="status" aria-live="polite">
+                                <div class="sidebar-spinner"></div>
+                                <span class="sidebar-loading-text">Loading projects...</span>
+                                <span class="sr-only">Loading your research projects</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            this.attachEventListeners();
+            return;
+        }
 
         container.innerHTML = `
             <div class="project-sidebar ${this.isCollapsed ? 'collapsed' : ''}">
