@@ -520,7 +520,7 @@ class SourceCard {
         
         const text = document.createElement('span');
         text.className = 'selection-text';
-        text.textContent = 'Add to Report';
+        text.textContent = 'Add to Outline';
         
         label.appendChild(checkbox);
         label.appendChild(text);
