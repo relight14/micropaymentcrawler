@@ -108,6 +108,8 @@ export class ChatResearchApp {
             const message = this.reportBuilder.displayReport(reportData);
             if (message) {
                 this.addMessage(message.sender, message.content, message.metadata);
+                // Auto-scroll to top of the newly generated report
+                this._scrollToLastMessage();
             }
             this.toastManager.show(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${sourceCount} selected sources!`, 'success');
         });
@@ -156,7 +158,14 @@ export class ChatResearchApp {
             if (message) {
                 this.addMessage(message.sender, message.content, message.metadata);
             }
+            
+            // Add success message BEFORE scrolling so it doesn't become the scroll target
             this.addMessage('system', '✅ AI research report generated successfully!');
+            
+            // Auto-scroll to the report (second-to-last message now)
+            if (message) {
+                this._scrollToSecondLastMessage();
+            }
         });
         
         this.tierManager.addEventListener('purchaseError', (e) => {
@@ -670,6 +679,56 @@ export class ChatResearchApp {
             console.error('Error executing pending action:', error);
             this.addMessage('system', 'Failed to complete the action. Please try again.');
         }
+    }
+
+    /**
+     * Scrolls to the top of the last message in the chat
+     * Used for report generation to show the report header
+     * @private
+     */
+    _scrollToLastMessage() {
+        // Small delay to ensure DOM has updated
+        setTimeout(() => {
+            const messagesContainer = document.getElementById('messagesContainer');
+            if (!messagesContainer) return;
+            
+            const messages = messagesContainer.querySelectorAll('.message');
+            if (messages.length === 0) return;
+            
+            const lastMessage = messages[messages.length - 1];
+            
+            // Scroll to top of the message (not bottom) so user sees the report header first
+            lastMessage.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest'
+            });
+        }, 100);
+    }
+
+    /**
+     * Scrolls to the second-to-last message in the chat
+     * Used when a success message is added after the report
+     * @private
+     */
+    _scrollToSecondLastMessage() {
+        // Small delay to ensure DOM has updated
+        setTimeout(() => {
+            const messagesContainer = document.getElementById('messagesContainer');
+            if (!messagesContainer) return;
+            
+            const messages = messagesContainer.querySelectorAll('.message');
+            if (messages.length < 2) return;
+            
+            const reportMessage = messages[messages.length - 2];
+            
+            // Scroll to top of the report message so user sees the report header first
+            reportMessage.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest'
+            });
+        }, 100);
     }
 
 }

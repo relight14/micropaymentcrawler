@@ -168,11 +168,7 @@ export class ReportBuilder extends EventTarget {
         const summarySection = this._createSection('Summary', reportData.summary);
         container.appendChild(summarySection);
         
-        // Build research findings table
-        const findingsSection = this._createFindingsSection(reportData.table_data);
-        container.appendChild(findingsSection);
-        
-        // Add Pro tier sections if available
+        // Add Pro tier sections BEFORE table (for context/insights before data)
         if (reportData.conflicts) {
             const conflictsSection = this._createSection('Areas of Agreement & Conflict', reportData.conflicts);
             container.appendChild(conflictsSection);
@@ -182,6 +178,10 @@ export class ReportBuilder extends EventTarget {
             const directionsSection = this._createResearchDirectionsSection(reportData.research_directions);
             container.appendChild(directionsSection);
         }
+        
+        // Build research findings table (after context sections)
+        const findingsSection = this._createFindingsSection(reportData.table_data);
+        container.appendChild(findingsSection);
         
         // Add footer
         const sourceCount = reportData.total_sources || reportData.table_data.length || 0;
