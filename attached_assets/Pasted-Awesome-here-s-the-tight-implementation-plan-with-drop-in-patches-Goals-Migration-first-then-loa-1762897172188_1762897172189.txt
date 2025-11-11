@@ -1,0 +1,83 @@
+Awesome—here’s the tight implementation plan with drop-in patches.
+
+Goals
+
+Migration first, then load+sync projects.
+
+Optimistic UI: show cached projects instantly.
+
+Auto-load new project (your existing flow will fire source search).
+
+Patches
+1) Optimistic UI before any async
+
+Call this when the user clicks Sources (before login flow kicks in), or at the top of handleLogin():
+
+// Optimistic render of cached list
+if (projectStore.state.projects?.length) {
+  this.sidebar.projects = projectStore.state.projects;
+  this.sidebar.render(); // non-blocking UI refresh
+}
+
+2) Fix handleLogin() ordering
+
+Create project from preserved chat first, then load+sync projects, then auto-load the new project.
+
+async handleLogin() {
+  logger.info('🔐 [ProjectManager] Auth state changed to authenticated');
+
+  // Preserve chat BEFORE anything else
+  const preLoginChat = this.appState.getConversationHistory();
+  const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
+  let newProjectId = null;
+
+  // Optimistic UI (cached projects) to avoid blank flash
+  if (projectStore.state.projects?.length) {
+    this.sidebar.projects = projectStore.state.projects;
+    this.sidebar.render();
+  }
+
+  // 1) Migrate first (one-shot)
+  if (hasPreLoginChat && !this.hasMigratedLoginChat) {
+    this.hasMigratedLoginChat = true;
+    this.toastManager.show('💾 Syncing your research...', 'info');
+    try {
+      const project = await this.createProjectFromConversation(preLoginChat);
+      if (project) {
+        newProjectId = project.id;
+        this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
+      }
+    } catch (err) {
+      logger.error('Failed to migrate login chat:', err);
+      this.hasMigratedLoginChat = false; // allow retry on next login
+    }
+  }
+
+  // 2) Load projects (guarded) and 3) sync store immediately after
+  await this.loadProjectsWithGuard();
+  projectStore.setProjects(this.sidebar.projects); // <-- sync store NOW
+
+  // 4) Auto-load the newly created project (which will trigger your existing flow)
+  if (newProjectId) {
+    await this.sidebar.loadProject(newProjectId);
+    // If your source search is triggered on project load, nothing else to do.
+    // If not, dispatch an explicit trigger here:
+    // AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+    //   detail: { query: this.appState.getCurrentQuery() }
+    // }));
+  }
+}
+
+3) Make createProjectFromConversation pure & fast
+
+You already accept a pre-captured chat—good. Keep it pure (no clears, no loads). No change needed unless you had side effects.
+
+Sanity checks
+
+No call anywhere clears conversation before migration.
+
+projectStore.setProjects(this.sidebar.projects) runs immediately after guarded load.
+
+Sidebar renders cached list instantly; API refresh updates it quietly.
+
+Loading the new project calls your existing handleProjectLoaded → loadProjectMessages → fires source search (or the explicit event above).

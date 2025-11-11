@@ -141,38 +141,45 @@ export class ProjectManager {
      * Handle user login - triggered by authStateChanged event
      * Preserves pre-login chat and migrates it to a new project
      * Uses one-shot guard to prevent duplicate migration if event fires multiple times
+     * ORDER: Migrate first → Load projects → Sync store → Auto-load new project
      */
     async handleLogin() {
         logger.info(`🔐 [ProjectManager] Auth state changed to authenticated`);
         
-        // CRITICAL: Preserve pre-login chat BEFORE any async operations that might clear it
+        // Preserve chat BEFORE anything else
         const preLoginChat = this.appState.getConversationHistory();
-        const hasPreLoginChat = preLoginChat && preLoginChat.length > 0;
+        const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
+        let newProjectId = null;
         
-        // Show UX spinner for perceived performance
-        if (hasPreLoginChat && !this.hasMigratedLoginChat) {
-            this.toastManager.show('💾 Syncing your research...', 'info');
+        // Optimistic UI (cached projects) to avoid blank flash
+        if (projectStore.state.projects?.length) {
+            this.sidebar.projects = projectStore.state.projects;
+            this.sidebar.render();
         }
         
-        // Load projects first
-        await this.loadProjectsWithGuard();
-        
-        // Migrate pre-login conversation to a new project (one-shot guard)
+        // 1) Migrate first (one-shot guard)
         if (hasPreLoginChat && !this.hasMigratedLoginChat) {
-            this.hasMigratedLoginChat = true; // Set guard immediately to prevent duplicate runs
-            
+            this.hasMigratedLoginChat = true;
+            this.toastManager.show('💾 Syncing your research...', 'info');
             try {
                 const project = await this.createProjectFromConversation(preLoginChat);
                 if (project) {
-                    // Auto-load the newly created project to show saved conversation
-                    await this.sidebar.loadProject(project.id);
-                    this.toastManager.show(`💾 Your conversation has been saved to "${project.title}"`, 'success');
+                    newProjectId = project.id;
+                    this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
                 }
-            } catch (error) {
-                logger.error('Failed to migrate login chat:', error);
-                // Reset flag on failure to allow retry
-                this.hasMigratedLoginChat = false;
+            } catch (err) {
+                logger.error('Failed to migrate login chat:', err);
+                this.hasMigratedLoginChat = false; // allow retry on next login
             }
+        }
+        
+        // 2) Load projects (guarded) and 3) sync store immediately after
+        await this.loadProjectsWithGuard();
+        projectStore.setProjects(this.sidebar.projects); // sync store NOW
+        
+        // 4) Auto-load the newly created project (triggers existing handleProjectLoaded flow)
+        if (newProjectId) {
+            await this.sidebar.loadProject(newProjectId);
         }
     }
 
