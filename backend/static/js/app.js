@@ -194,10 +194,22 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
             const { query, selectedSources } = e.detail;
             
+            console.log('🔄 About to call tierManager.purchaseTier with:', {
+                tier: 'research',
+                price: 100,
+                query: query,
+                useSelectedSources: true
+            });
+            
             // Trigger tier purchase with research tier (default)
             // Pass null for button, 'research' tier, appropriate price, query, and useSelectedSources=true
             const price = 100; // Research tier price in cents
-            await this.tierManager.purchaseTier(null, 'research', price, query, true);
+            try {
+                await this.tierManager.purchaseTier(null, 'research', price, query, true);
+                console.log('✅ tierManager.purchaseTier completed');
+            } catch (error) {
+                console.error('❌ Error calling tierManager.purchaseTier:', error);
+            }
         });
         
         // Guard to prevent duplicate search triggers during login flow
