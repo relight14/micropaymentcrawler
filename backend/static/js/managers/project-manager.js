@@ -95,14 +95,14 @@ export class ProjectManager {
     }
 
     /**
-     * Handle user login - load project data
+     * Handle user login - load user's projects without clearing UI
      */
     async handleLogin() {
         try {
-            console.log(`🔐 User logged in - loading project data...`);
-            await this.loadInitialData();
+            console.log(`🔐 [ProjectManager] Auth state changed to authenticated - loading projects...`);
+            await this.sidebar.loadProjects();
         } catch (error) {
-            console.error('Error handling login:', error);
+            console.error('[ProjectManager] Error handling login:', error);
         }
     }
 

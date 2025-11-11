@@ -234,14 +234,14 @@ export class ChatResearchApp {
                     console.log('🎨 Updating auth button UI...');
                     this.updateAuthButton();
                     
-                    // Load initial project data
-                    await this.projectsController.projectManager.loadInitialData();
-                    
-                    // Create project from current conversation if any
+                    // Create project from current conversation first (before loading projects)
                     const project = await this.projectsController.projectManager.createProjectFromConversation();
                     if (project) {
                         this.toastManager.show(`💾 Your conversation has been saved to "${project.title}"`, 'success');
                     }
+                    
+                    // Load user's projects into sidebar (without clearing UI)
+                    await this.projectsController.projectManager.sidebar.loadProjects();
                     
                     // Auto-trigger funding modal if balance is $0
                     if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
