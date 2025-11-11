@@ -234,11 +234,9 @@ export class MessageRenderer {
         }
         
         // Add research mode suggestion after every assistant message in chat mode
-        // (unless user has already switched to research mode)
         const currentMode = window.app?.appState?.getMode();
-        const hasUsedResearch = sessionStorage.getItem('hasUsedResearch') === 'true';
         
-        if (message.sender === 'assistant' && currentMode === 'chat' && !hasUsedResearch) {
+        if (message.sender === 'assistant' && currentMode === 'chat') {
             const suggestionElement = this._createResearchSuggestion(message.metadata?.topic_hint);
             bodyDiv.appendChild(suggestionElement);
         }
@@ -364,8 +362,6 @@ export class MessageRenderer {
         
         // Add click handler - auto-execute search
         button.onclick = () => {
-            // Don't mark hasUsedResearch here - let handler do it after successful execution
-            
             // Dispatch custom event that app.js will listen for
             const event = new CustomEvent('switchToResearch', {
                 detail: { 

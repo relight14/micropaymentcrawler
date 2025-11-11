@@ -61,12 +61,8 @@ export class InteractionHandler {
                 try {
                     // Execute the search
                     await sendMessageCallback();
-                    
-                    // Only mark as used if search executed successfully
-                    sessionStorage.setItem('hasUsedResearch', 'true');
                 } catch (error) {
                     console.error('Failed to auto-execute search:', error);
-                    // Don't set hasUsedResearch flag on failure - allow retry
                 }
             }, 100);
         } else {
