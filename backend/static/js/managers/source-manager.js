@@ -207,11 +207,6 @@ export class SourceManager extends EventTarget {
         }
     }
 
-    async unlockFromChat(sourceId, price, title) {
-        console.warn('unlockFromChat is deprecated - use unlockSource directly');
-        return this.unlockSource(null, sourceId, price);
-    }
-
     async summarizeSource(source, price, buttonElement) {
         console.log('✨ SUMMARIZE: summarizeSource() called!', { source, price });
         

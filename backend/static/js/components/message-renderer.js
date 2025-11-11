@@ -383,18 +383,6 @@ export class MessageRenderer {
     }
     
     /**
-     * Create download button for research reports
-     * @private
-     * @deprecated - CSV export is now handled within report-builder.js table rendering
-     */
-    static _createDownloadButton(reportContent, metadata) {
-        // This method is deprecated - CSV export button is now rendered
-        // within the findings table in report-builder.js
-        // Keeping this stub for backwards compatibility
-        return document.createDocumentFragment();
-    }
-    
-    /**
      * Create loading indicator content
      * @private
      */
