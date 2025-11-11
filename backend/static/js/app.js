@@ -190,26 +190,11 @@ export class ChatResearchApp {
         });
         
         // Listen for Build Research Packet event from OutlineBuilder
-        AppEvents.addEventListener('buildResearchPacket', async (e) => {
+        AppEvents.addEventListener('buildResearchPacket', (e) => {
             console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
-            const { query, selectedSources } = e.detail;
             
-            console.log('🔄 About to call tierManager.purchaseTier with:', {
-                tier: 'research',
-                price: 100,
-                query: query,
-                useSelectedSources: true
-            });
-            
-            // Trigger tier purchase with research tier (default)
-            // Pass null for button, 'research' tier, appropriate price, query, and useSelectedSources=true
-            const price = 100; // Research tier price in cents
-            try {
-                await this.tierManager.purchaseTier(null, 'research', price, query, true);
-                console.log('✅ tierManager.purchaseTier completed');
-            } catch (error) {
-                console.error('❌ Error calling tierManager.purchaseTier:', error);
-            }
+            // Switch to report builder mode - tier selection cards will render automatically
+            this.setMode('report');
         });
         
         // Guard to prevent duplicate search triggers during login flow
