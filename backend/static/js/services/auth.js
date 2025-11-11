@@ -104,21 +104,8 @@ export class AuthService {
         localStorage.removeItem('ledewire_token');
         localStorage.removeItem('ledewire_refresh_token');
         
-        // Dispatch auth state changed event
-        import('../utils/event-bus.js').then(({ AppEvents, EVENT_TYPES }) => {
-            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.AUTH_STATE_CHANGED, {
-                detail: { isAuthenticated: false }
-            }));
-        });
-        
-        // Trigger all logout callbacks to update UI
-        this.logoutCallbacks.forEach(callback => {
-            try {
-                callback();
-            } catch (error) {
-                console.error('Error in logout callback:', error);
-            }
-        });
+        // Refresh page to clear all state
+        window.location.reload();
     }
 
     async login(email, password) {
@@ -164,11 +151,11 @@ export class AuthService {
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
         
-        // Get wallet balance after login
-        await this.updateWalletBalance();
-        
         // Track successful login
         analytics.trackLogin('ledewire');
+        
+        // Refresh page to load user-specific data
+        window.location.reload();
         
         return data;
     }
