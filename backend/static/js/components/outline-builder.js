@@ -207,8 +207,15 @@ export class OutlineBuilder extends EventTarget {
      * Dispatches event for app.js to trigger tier purchase flow
      */
     handleBuildResearchPacket() {
+        console.log('🚀 handleBuildResearchPacket called', {
+            selectedSourcesCount: this.selectedSources.length,
+            sectionsCount: this.sections.length
+        });
+        
         // Get research query from projectStore
         const query = projectStore.getResearchQuery();
+        
+        console.log('📋 Research query from store:', query);
         
         if (!query) {
             this.toastManager.show('No research query found. Please start a new search.', 'error');
@@ -219,6 +226,8 @@ export class OutlineBuilder extends EventTarget {
             this.toastManager.show('Please select sources to build your research packet', 'error');
             return;
         }
+        
+        console.log('✅ Dispatching buildResearchPacket event');
         
         // Dispatch event for app.js to handle tier purchase
         AppEvents.dispatchEvent(new CustomEvent('buildResearchPacket', {
@@ -845,8 +854,12 @@ export class OutlineBuilder extends EventTarget {
 
         // Build Research Packet button
         const buildPacketBtn = document.getElementById('build-packet-btn');
+        console.log('🔘 Build Packet button found:', !!buildPacketBtn);
         if (buildPacketBtn) {
-            buildPacketBtn.addEventListener('click', () => this.handleBuildResearchPacket());
+            buildPacketBtn.addEventListener('click', () => {
+                console.log('🔘 Build Packet button clicked!');
+                this.handleBuildResearchPacket();
+            });
         }
 
         // File upload button
