@@ -127,6 +127,9 @@ export class ProjectManager {
         // Set up outline builder with new project
         this.outlineBuilder.setProject(project.id, { outline: projectStore.state.currentOutline });
         
+        // Reset auto-creation flag so user can auto-create another project later
+        this.hasAutoCreatedProject = false;
+        
         // Emit global event
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_CREATED, {
             detail: { project }
@@ -177,6 +180,9 @@ export class ProjectManager {
         // Update outline builder
         this.outlineBuilder.setProject(projectData.id, projectData);
         
+        // Reset auto-creation flag so user can auto-create another project later
+        this.hasAutoCreatedProject = false;
+        
         console.log(`⚠️ [ProjectManager] Chat interface NOT updated - projects don't store messages`);
         
         // Emit global event
@@ -226,25 +232,40 @@ export class ProjectManager {
      * @param {string} query - The user's first query
      */
     async ensureActiveProject(query) {
-        // Don't auto-create if user already has projects
-        if (projectStore.hasProjects() || this.hasAutoCreatedProject) {
+        // If there's already an active project, use it
+        if (projectStore.state.activeProjectId) {
             return projectStore.state.activeProjectId;
+        }
+
+        // If we've already auto-created in this session, don't create another
+        if (this.hasAutoCreatedProject) {
+            return null;
         }
 
         // Auto-create project from query (works for both authenticated and anonymous users)
         this.hasAutoCreatedProject = true;
-        const project = await this.sidebar.autoCreateProject(query);
         
-        if (project) {
-            analytics.track('project_auto_created', {
-                project_id: project.id,
-                from_query: true,
-                is_authenticated: this.authService.isAuthenticated()
-            });
-            return project.id;
+        try {
+            const project = await this.sidebar.autoCreateProject(query);
+            
+            if (project) {
+                analytics.track('project_auto_created', {
+                    project_id: project.id,
+                    from_query: true,
+                    is_authenticated: this.authService.isAuthenticated()
+                });
+                return project.id;
+            }
+            
+            // Creation returned null - reset flag to allow retry
+            this.hasAutoCreatedProject = false;
+            return null;
+        } catch (error) {
+            console.error('Failed to auto-create project:', error);
+            // Reset flag on failure to allow retry
+            this.hasAutoCreatedProject = false;
+            return null;
         }
-
-        return null;
     }
 
     /**
