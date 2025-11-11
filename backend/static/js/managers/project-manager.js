@@ -97,15 +97,10 @@ export class ProjectManager {
             // Update store with loaded projects
             projectStore.setProjects(this.sidebar.projects);
             
-            // Load the first project if available
-            if (this.sidebar.projects.length > 0) {
-                const firstProject = this.sidebar.projects[0];
-                await this.sidebar.loadProject(firstProject.id);
-            } else {
-                // No projects - clear the outline builder
-                this.outlineBuilder.setProject(null, null);
-                projectStore.setActiveProject(null);
-            }
+            // Don't auto-load any project - start with fresh chat
+            // User can manually select a project or start a new one
+            this.outlineBuilder.setProject(null, null);
+            projectStore.setActiveProject(null);
         } catch (error) {
             console.error('Error loading initial data:', error);
         }
