@@ -1,0 +1,65 @@
+What’s wrong (tight)
+
+setMode('research') doesn’t kick off a search.
+You switch UI mode but never call SourceManager to run a query.
+
+No listener wired to a “start search” event.
+You referenced EVENT_TYPES.SOURCE_SEARCH_TRIGGER earlier, but this file doesn’t listen for it.
+
+After login migration, nothing tells SourceManager to search.
+ProjectsController may load the new project, but this controller doesn’t react to “project ready → run search.”
+
+Empty current query.
+If appState.getCurrentQuery() is null, switching to Sources does nothing (no query to run).
+
+Minimal fixes (drop-in)
+A) Fire a search on entering Sources mode
+setMode(mode) {
+  // ...existing auth checks...
+
+  const modeChanged = this.appState.setMode(mode);
+  if (!modeChanged) return;
+
+  analytics.trackModeSwitch(mode);
+  this.uiManager.updateModeDisplay();
+
+  if (mode === 'research') {
+    // Run a source search immediately using the latest query (if any)
+    const q = this.appState.getCurrentQuery();
+    if (q && q.trim()) {
+      this.sourceManager.search(q, { autoExecute: true }); // implement .search if name differs
+    } else {
+      this.addMessage('system', '📚 Enter a query and I’ll pull matching sources.');
+    }
+  } else if (mode === 'report') {
+    // ...existing report UI...
+  } else {
+    // ...existing chat message...
+  }
+}
+
+B) Listen for a central trigger (optional but clean)
+
+Add this in the constructor near other AppEvents:
+
+AppEvents.addEventListener(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, (e) => {
+  const q = e.detail?.query || this.appState.getCurrentQuery();
+  if (q && q.trim()) this.sourceManager.search(q, { autoExecute: true });
+});
+
+C) After login migration → trigger search
+
+Where you auto-load the newly created project (in your ProjectManager flow), dispatch:
+
+AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+  detail: { query: this.appState.getCurrentQuery() }
+}));
+
+
+(or call sourceManager.search(...) directly if you prefer no event).
+
+D) Guard for no query (UX)
+
+When mode is research and no query exists, post a small system nudge (already in A).
+
+Summary: wire mode switch → search, add an event listener for a global trigger, and dispatch that trigger after login/migration. That’s it.
