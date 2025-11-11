@@ -8,6 +8,7 @@ import { OutlineBuilder } from '../components/outline-builder.js';
 import { projectStore } from '../state/project-store.js';
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
+import { logger } from '../utils/logger.js';
 
 export class ProjectManager {
     constructor({ apiService, authService, toastManager, messageCoordinator, appState }) {
@@ -100,43 +101,46 @@ export class ProjectManager {
      * Load projects with guard to prevent duplicate concurrent calls
      * Uses queued retry pattern to ensure loads after project creation are not skipped
      * Single entry point for all project loading to avoid race conditions
+     * Caps at 1 retry to prevent infinite loops
      */
     async loadProjectsWithGuard() {
         // If already loading, queue a retry instead of skipping
         if (this.isLoadingProjects) {
-            console.log(`📋 [ProjectManager] Already loading projects, queuing retry...`);
+            logger.info(`📋 [ProjectManager] Already loading projects, queuing retry...`);
             this.pendingReload = true;
             return;
         }
         
-        // Loop to handle queued retries
+        // Loop to handle queued retries (max 1 retry to prevent infinite loops)
+        let reloadCount = 0;
         do {
             this.isLoadingProjects = true;
             this.pendingReload = false;
             
             try {
-                console.log(`📋 [ProjectManager] Loading projects...`);
+                logger.info(`📋 [ProjectManager] Loading projects...`);
                 await this.sidebar.loadProjects();
-                console.log(`✅ [ProjectManager] Projects loaded successfully`);
+                logger.info(`✅ [ProjectManager] Projects loaded successfully`);
             } catch (error) {
-                console.error('[ProjectManager] Error loading projects:', error);
+                logger.error('[ProjectManager] Error loading projects:', error);
                 throw error;
             } finally {
                 this.isLoadingProjects = false;
             }
             
-            // If another call came in during load, retry once more
-            if (this.pendingReload) {
-                console.log(`📋 [ProjectManager] Executing queued reload...`);
+            // If another call came in during load, retry once more (up to 1 retry)
+            if (this.pendingReload && reloadCount < 1) {
+                logger.info(`📋 [ProjectManager] Executing queued reload...`);
+                reloadCount++;
             }
-        } while (this.pendingReload);
+        } while (this.pendingReload && reloadCount < 1);
     }
 
     /**
      * Handle user login - triggered by authStateChanged event
      */
     async handleLogin() {
-        console.log(`🔐 [ProjectManager] Auth state changed to authenticated`);
+        logger.info(`🔐 [ProjectManager] Auth state changed to authenticated`);
         await this.loadProjectsWithGuard();
     }
 
@@ -149,7 +153,7 @@ export class ProjectManager {
             const conversationHistory = this.appState.getConversationHistory();
             
             if (!conversationHistory || conversationHistory.length === 0) {
-                console.log(`ℹ️  No conversation to save`);
+                logger.info(`ℹ️  No conversation to save`);
                 return null;
             }
             
@@ -159,11 +163,11 @@ export class ProjectManager {
             );
             
             if (messagesToSave.length === 0) {
-                console.log(`ℹ️  No user/assistant messages to save`);
+                logger.info(`ℹ️  No user/assistant messages to save`);
                 return null;
             }
             
-            console.log(`💾 Creating project from ${messagesToSave.length} messages...`);
+            logger.info(`💾 Creating project from ${messagesToSave.length} messages...`);
             
             // Extract project title from first user message
             const firstUserMessage = messagesToSave.find(msg => msg.sender === 'user');
@@ -176,7 +180,7 @@ export class ProjectManager {
             const project = await this.sidebar.createProject(projectTitle, researchQuery);
             
             if (!project) {
-                console.error('Failed to create project');
+                logger.error('Failed to create project');
                 return null;
             }
             
@@ -187,12 +191,12 @@ export class ProjectManager {
                 await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
             }
             
-            console.log(`✅ Conversation saved to project ${project.id}`);
+            logger.info(`✅ Conversation saved to project ${project.id}`);
             
             // Return the created project (caller will handle loading projects)
             return project;
         } catch (error) {
-            console.error('Error creating project from conversation:', error);
+            logger.error('Error creating project from conversation:', error);
             return null;
         }
     }
@@ -222,8 +226,8 @@ export class ProjectManager {
      */
     async loadInitialData() {
         try {
-            // Load projects via sidebar
-            await this.sidebar.loadProjects();
+            // Load projects via guarded loader to ensure concurrency safety
+            await this.loadProjectsWithGuard();
             
             // Update store with loaded projects
             projectStore.setProjects(this.sidebar.projects);
@@ -233,7 +237,7 @@ export class ProjectManager {
             this.outlineBuilder.setProject(null, null);
             projectStore.setActiveProject(null);
         } catch (error) {
-            console.error('Error loading initial data:', error);
+            logger.error('Error loading initial data:', error);
         }
     }
 
@@ -246,8 +250,8 @@ export class ProjectManager {
         projectStore.setActiveProject(project.id, project.title, project.research_query);
         
         // Sync research query to AppState if available
-        if (project.research_query && window.app?.appState) {
-            window.app.appState.setCurrentQuery(project.research_query);
+        if (project.research_query && this.appState) {
+            this.appState.setCurrentQuery(project.research_query);
         }
         
         // Set up outline builder with new project
@@ -266,7 +270,7 @@ export class ProjectManager {
      * Handle project loading started (immediate UI update)
      */
     handleProjectLoadingStarted(projectId, projectTitle) {
-        console.log(`⚡ [ProjectManager] Project loading started immediately:`, {
+        logger.info(`⚡ [ProjectManager] Project loading started immediately:`, {
             projectId,
             projectTitle
         });
@@ -281,14 +285,14 @@ export class ProjectManager {
      * Handle project loaded event
      */
     async handleProjectLoaded(projectData) {
-        console.log(`📊 [ProjectManager] Handling project switch:`, {
+        logger.info(`📊 [ProjectManager] Handling project switch:`, {
             newProjectId: projectData.id,
             newProjectTitle: projectData.title,
             researchQuery: projectData.research_query,
-            currentAppState: {
-                mode: window.app?.appState?.getMode(),
-                messageCount: window.app?.appState?.state?.messages?.length || 0
-            }
+            currentAppState: this.appState ? {
+                mode: this.appState.getMode(),
+                messageCount: this.appState.state?.messages?.length || 0
+            } : 'AppState not available'
         });
         
         // Update store
@@ -296,11 +300,11 @@ export class ProjectManager {
         projectStore.setOutline(projectData.outline);
         
         // Sync research query to AppState if available
-        if (projectData.research_query && window.app?.appState) {
-            window.app.appState.setCurrentQuery(projectData.research_query);
-            console.log(`✅ [ProjectManager] Restored research query: "${projectData.research_query}"`);
+        if (projectData.research_query && this.appState) {
+            this.appState.setCurrentQuery(projectData.research_query);
+            logger.info(`✅ [ProjectManager] Restored research query: "${projectData.research_query}"`);
         } else if (!projectData.research_query) {
-            console.log(`ℹ️  [ProjectManager] Project has no saved research query`);
+            logger.info(`ℹ️  [ProjectManager] Project has no saved research query`);
         }
         
         // Update outline builder
@@ -324,7 +328,7 @@ export class ProjectManager {
      */
     async loadProjectMessages(projectId) {
         try {
-            console.log(`📨 [ProjectManager] Loading messages for project ${projectId}...`);
+            logger.info(`📨 [ProjectManager] Loading messages for project ${projectId}...`);
             
             // Clear current chat UI while preserving mode
             this.clearChatInterface();
@@ -333,7 +337,7 @@ export class ProjectManager {
             const response = await this.apiService.getProjectMessages(projectId);
             const messages = response.messages || [];
             
-            console.log(`📬 [ProjectManager] Fetched ${messages.length} messages`);
+            logger.info(`📬 [ProjectManager] Fetched ${messages.length} messages`);
             
             // Clear AppState conversation history to prevent duplicates
             this.appState.clearConversation();
@@ -342,7 +346,7 @@ export class ProjectManager {
                 // Show welcome message for empty project
                 const projectTitle = projectStore.state.activeProjectTitle || 'this project';
                 this.messageCoordinator.addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`, null, { skipPersist: true });
-                console.log(`ℹ️  [ProjectManager] No messages found, showing welcome message`);
+                logger.info(`ℹ️  [ProjectManager] No messages found, showing welcome message`);
             } else {
                 // Track the most recent research data while restoring messages
                 let mostRecentResearchData = null;
@@ -373,17 +377,17 @@ export class ProjectManager {
                 // Restore the most recent research data to appState
                 if (mostRecentResearchData) {
                     this.appState.setCurrentResearchData(mostRecentResearchData);
-                    console.log(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
+                    logger.info(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
                 }
                 
-                console.log(`✅ [ProjectManager] Loaded and displayed ${messages.length} messages`);
+                logger.info(`✅ [ProjectManager] Loaded and displayed ${messages.length} messages`);
             }
             
             // Hide welcome screen
             this.hideWelcomeScreen();
             
         } catch (error) {
-            console.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);
+            logger.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);
             this.toastManager.show('Failed to load project messages', 'error');
         }
     }
@@ -404,7 +408,7 @@ export class ProjectManager {
         // Clear all messages
         messagesContainer.innerHTML = '';
         
-        console.log(`🧹 [ProjectManager] Chat interface cleared`);
+        logger.info(`🧹 [ProjectManager] Chat interface cleared`);
     }
 
     /**
@@ -487,7 +491,7 @@ export class ProjectManager {
             this.hasAutoCreatedProject = false;
             return null;
         } catch (error) {
-            console.error('Failed to auto-create project:', error);
+            logger.error('Failed to auto-create project:', error);
             // Reset flag on failure to allow retry
             this.hasAutoCreatedProject = false;
             return null;
