@@ -194,11 +194,10 @@ export class ChatResearchApp {
             console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
             const { query, selectedSources } = e.detail;
             
-            // Show tier selection modal for user to choose research or pro tier
-            const tierSelected = await this.uiManager.showTierSelection(query, selectedSources);
-            if (!tierSelected) {
-                console.log('User cancelled tier selection');
-            }
+            // Trigger tier purchase with research tier (default)
+            // Pass null for button, 'research' tier, appropriate price, query, and useSelectedSources=true
+            const price = 100; // Research tier price in cents
+            await this.tierManager.purchaseTier(null, 'research', price, query, true);
         });
         
         // Guard to prevent duplicate search triggers during login flow
