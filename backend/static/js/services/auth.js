@@ -154,10 +154,7 @@ export class AuthService {
         // Track successful login
         analytics.trackLogin('ledewire');
         
-        // Refresh page to load user-specific data
-        window.location.reload();
-        
-        return data;
+        return { success: true, ...data };
     }
 
     async signup(email, password, firstName, lastName) {
@@ -183,10 +180,7 @@ export class AuthService {
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
         
-        // Get wallet balance after login
-        await this.updateWalletBalance();
-        
-        return data;
+        return { success: true, ...data };
     }
 
     async refreshAccessToken() {

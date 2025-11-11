@@ -95,78 +95,95 @@ export class ProjectManager {
     }
 
     /**
-     * Handle user login - preserve conversation history from localStorage
+     * Handle user login - load project data
      */
     async handleLogin() {
         try {
-            console.log(`🔐 User logged in - checking for saved anonymous session...`);
-            
-            // Load initial project data first
+            console.log(`🔐 User logged in - loading project data...`);
             await this.loadInitialData();
-            
-            // Check for saved anonymous session in localStorage
-            const savedSessionData = localStorage.getItem('temp_anonymous_conversation');
-            
-            if (!savedSessionData) {
-                console.log(`ℹ️  No anonymous session found in localStorage`);
-                return;
-            }
-            
-            try {
-                const sessionData = JSON.parse(savedSessionData);
-                const messages = sessionData.messages || [];
-                
-                // Validate session (not too old - within 10 minutes)
-                const sessionAge = Date.now() - (sessionData.timestamp || 0);
-                if (sessionAge > 10 * 60 * 1000) {
-                    console.log(`⏰ Anonymous session expired (${Math.round(sessionAge / 1000)}s old), skipping`);
-                    localStorage.removeItem('temp_anonymous_conversation');
-                    return;
-                }
-                
-                if (messages.length === 0) {
-                    console.log(`ℹ️  Anonymous session has no messages`);
-                    localStorage.removeItem('temp_anonymous_conversation');
-                    return;
-                }
-                
-                console.log(`💾 Restoring ${messages.length} messages from anonymous session...`);
-                
-                // Extract project title from first user message
-                const firstUserMessage = messages.find(msg => msg.sender === 'user');
-                const projectTitle = firstUserMessage?.content?.substring(0, 100).replace(/<[^>]*>/g, '').trim() || 'Untitled Research';
-                
-                // Create new project
-                const project = await this.sidebar.createProject(projectTitle, sessionData.currentQuery);
-                
-                if (project) {
-                    // Save all messages to the project
-                    for (const msg of messages) {
-                        const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
-                        const messageData = msg.metadata ? { metadata: msg.metadata } : null;
-                        await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
-                    }
-                    
-                    console.log(`✅ Anonymous conversation restored to project ${project.id}`);
-                    this.toastManager.show(`💾 Your conversation has been saved to "${projectTitle}"`, 'success');
-                    
-                    // Add to project list
-                    projectStore.addProject(project);
-                    await this.sidebar.loadProjects(); // Refresh sidebar
-                    
-                    // Clean up localStorage
-                    localStorage.removeItem('temp_anonymous_conversation');
-                }
-            } catch (parseError) {
-                console.error('Failed to parse or restore anonymous session:', parseError);
-                // Clean up invalid data
-                localStorage.removeItem('temp_anonymous_conversation');
-            }
         } catch (error) {
             console.error('Error handling login:', error);
-            // Still try to load initial data even if restoration fails
-            await this.loadInitialData();
         }
+    }
+
+    /**
+     * Create project from current conversation (used after login)
+     * @returns {Promise<Object|null>} Created project or null if failed
+     */
+    async createProjectFromConversation() {
+        try {
+            const conversationHistory = this.appState.getConversationHistory();
+            
+            if (!conversationHistory || conversationHistory.length === 0) {
+                console.log(`ℹ️  No conversation to save`);
+                return null;
+            }
+            
+            // Filter to user/assistant messages only
+            const messagesToSave = conversationHistory.filter(msg => 
+                msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
+            );
+            
+            if (messagesToSave.length === 0) {
+                console.log(`ℹ️  No user/assistant messages to save`);
+                return null;
+            }
+            
+            console.log(`💾 Creating project from ${messagesToSave.length} messages...`);
+            
+            // Extract project title from first user message
+            const firstUserMessage = messagesToSave.find(msg => msg.sender === 'user');
+            const projectTitle = this._extractProjectTitle(firstUserMessage?.content);
+            
+            // Get research query from AppState
+            const researchQuery = this.appState.getCurrentQuery() || null;
+            
+            // Create new project
+            const project = await this.sidebar.createProject(projectTitle, researchQuery);
+            
+            if (!project) {
+                console.error('Failed to create project');
+                return null;
+            }
+            
+            // Save all messages to the project
+            for (const msg of messagesToSave) {
+                const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
+                const messageData = msg.metadata ? { metadata: msg.metadata } : null;
+                await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
+            }
+            
+            console.log(`✅ Conversation saved to project ${project.id}`);
+            
+            // Add to project list and set as active
+            projectStore.addProject(project);
+            await this.sidebar.loadProjects(); // Refresh sidebar
+            
+            return project;
+        } catch (error) {
+            console.error('Error creating project from conversation:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Extract project title from message content
+     * @private
+     */
+    _extractProjectTitle(content) {
+        if (!content) return 'Untitled Research';
+        
+        // Handle HTML content
+        if (typeof content !== 'string') {
+            if (content instanceof HTMLElement) {
+                content = content.textContent || '';
+            } else {
+                content = String(content);
+            }
+        }
+        
+        // Strip HTML tags and truncate
+        return content.replace(/<[^>]*>/g, '').trim().substring(0, 100) || 'Untitled Research';
     }
 
     /**

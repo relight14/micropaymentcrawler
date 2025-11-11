@@ -192,11 +192,6 @@ export class ModalController {
         }
 
         try {
-            // Capture anonymous conversation before login (survives page reload)
-            if (window.app?.captureAnonymousSession) {
-                window.app.captureAnonymousSession();
-            }
-            
             let result;
             if (type === 'login') {
                 result = await this.authService.login(email, password);

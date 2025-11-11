@@ -230,6 +230,19 @@ export class ChatResearchApp {
                     await this.authService.updateWalletBalance();
                     console.log('💰 Wallet balance updated:', this.authService.getWalletBalance());
                     
+                    // Update UI with wallet balance
+                    console.log('🎨 Updating auth button UI...');
+                    this.updateAuthButton();
+                    
+                    // Load initial project data
+                    await this.projectsController.projectManager.loadInitialData();
+                    
+                    // Create project from current conversation if any
+                    const project = await this.projectsController.projectManager.createProjectFromConversation();
+                    if (project) {
+                        this.toastManager.show(`💾 Your conversation has been saved to "${project.title}"`, 'success');
+                    }
+                    
                     // Auto-trigger funding modal if balance is $0
                     if (this.authService.isAuthenticated() && this.authService.getWalletBalance() === 0) {
                         setTimeout(() => {
@@ -249,12 +262,7 @@ export class ChatResearchApp {
                         this.appState.clearPendingAction();
                     }
                     
-                    // Update UI with wallet balance
-                    console.log('🎨 Updating auth button UI...');
-                    this.updateAuthButton();
                     console.log('✅ Auth success callback completed');
-                    
-                    // Auth state change is handled by ProjectsController via AppEvents
                 } catch (error) {
                     console.error('❌ Error in auth success callback:', error);
                     // Don't throw - just log and update UI anyway
@@ -517,48 +525,6 @@ export class ChatResearchApp {
     // Authentication methods
     async handleAuthButtonClick() {
         this.modalController.showAuthModal();
-    }
-
-    /**
-     * Capture anonymous session before login to preserve conversation
-     */
-    captureAnonymousSession() {
-        try {
-            // Only capture if user is NOT authenticated (anonymous session)
-            if (this.authService.isAuthenticated()) {
-                return;
-            }
-            
-            const conversationHistory = this.appState.getConversationHistory();
-            
-            // Only save if there's actual conversation
-            if (conversationHistory.length === 0) {
-                return;
-            }
-            
-            // Filter to user/assistant messages only
-            const messagesToSave = conversationHistory.filter(msg => 
-                msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
-            );
-            
-            if (messagesToSave.length === 0) {
-                return;
-            }
-            
-            // Store in localStorage (survives page reload)
-            const sessionData = {
-                messages: messagesToSave,
-                currentQuery: this.appState.state.currentQuery,
-                mode: this.appState.getMode(),
-                timestamp: Date.now()
-            };
-            
-            localStorage.setItem('temp_anonymous_conversation', JSON.stringify(sessionData));
-            console.log(`💾 [App] Captured ${messagesToSave.length} messages from anonymous session`);
-        } catch (error) {
-            console.error('Failed to capture anonymous session:', error);
-            // Don't throw - login should proceed even if capture fails
-        }
     }
 
     updateAuthButton() {
