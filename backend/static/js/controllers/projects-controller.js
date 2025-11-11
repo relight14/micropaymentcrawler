@@ -86,6 +86,29 @@ export class ProjectsController {
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
 
+        // PROJECT_CREATED: Clear chat and show welcome message for new project
+        AppEvents.addEventListener(EVENT_TYPES.PROJECT_CREATED, (e) => {
+            console.log('📡 AppEvents: New project created', {
+                projectId: e.detail.project.id,
+                projectTitle: e.detail.project.title
+            });
+            
+            // Clear old messages and show welcome for new project
+            const { appState, uiManager, sourceManager, reportBuilder } = this.dependencies;
+            appState.clearConversation();
+            uiManager.clearConversationDisplay();
+            sourceManager.updateSelectionUI();
+            reportBuilder.update();
+            
+            // Show welcome message for new project (don't save it)
+            this.isRestoringMessages = true;
+            this._addMessage('system', `🎯 Welcome to "${e.detail.project.title}". Start your research here.`);
+            this.isRestoringMessages = false;
+            
+            // Hide welcome screen
+            this._hideWelcomeScreen();
+        });
+
         // PROJECT_LOADING_STARTED: Show loading UI immediately
         AppEvents.addEventListener(EVENT_TYPES.PROJECT_LOADING_STARTED, (e) => {
             console.log('⚡ AppEvents: Project loading started', {
