@@ -4,6 +4,7 @@
  */
 
 import { analytics } from '../utils/analytics.js';
+import { AppEvents } from '../utils/event-bus.js';
 
 export class AuthService {
     constructor() {
@@ -97,6 +98,14 @@ export class AuthService {
         // Track logout
         analytics.trackLogout();
         
+        // Dispatch authStateChanged event BEFORE clearing state
+        AppEvents.dispatchEvent(new CustomEvent('authStateChanged', {
+            detail: { 
+                isAuthenticated: false,
+                user: null
+            }
+        }));
+        
         this.token = null;
         this.refreshToken = null;
         this.userInfo = null;
@@ -154,6 +163,14 @@ export class AuthService {
         // Track successful login
         analytics.trackLogin('ledewire');
         
+        // Dispatch authStateChanged event to trigger ProjectManager.handleLogin()
+        AppEvents.dispatchEvent(new CustomEvent('authStateChanged', {
+            detail: { 
+                isAuthenticated: true,
+                user: this.userInfo
+            }
+        }));
+        
         return { success: true, ...data };
     }
 
@@ -179,6 +196,14 @@ export class AuthService {
         
         // Decode JWT to extract user info
         this.userInfo = this.decodeJWT(data.access_token);
+        
+        // Dispatch authStateChanged event to trigger ProjectManager.handleLogin()
+        AppEvents.dispatchEvent(new CustomEvent('authStateChanged', {
+            detail: { 
+                isAuthenticated: true,
+                user: this.userInfo
+            }
+        }));
         
         return { success: true, ...data };
     }
