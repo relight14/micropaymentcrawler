@@ -10,32 +10,50 @@ import { projectStore } from '../state/project-store.js';
 // Tier configuration constant
 const TIERS = [
     {
-        id: 'research',
-        icon: '🔬',
-        title: 'Research Package',
-        price: 0.35,
-        description: 'Professional summary and analysis with source compilation',
-        features: [
-            '✓ Professional summary and analysis',
-            '✓ Source compilation and citations',
-            '✓ Ready for download'
-        ],
-        buttonText: 'Purchase Research Package',
-        highlighted: true
-    },
-    {
         id: 'pro',
         icon: '⭐',
         title: 'Pro Package',
-        price: 0.65,
+        price: 3.00,
+        priceLabel: '$3',
+        subtitle: 'Executive Analysis',
         description: 'Everything in Research plus strategic insights and executive formatting',
         features: [
-            '✓ Everything in Research Package',
-            '✓ Strategic insights and recommendations',
-            '✓ Executive summary format',
-            '✓ Enhanced formatting and presentation'
+            'Source compilation & citations',
+            'Strategic insights & recommendations',
+            'Executive formatting'
         ],
-        buttonText: 'Purchase Pro Package',
+        expandedFeatures: [
+            'Professional summary and analysis',
+            'Source compilation with citations',
+            'Strategic insights and recommendations',
+            'Executive summary format',
+            'Enhanced formatting and presentation',
+            'Ready for download'
+        ],
+        buttonText: 'Generate Pro Report — $3',
+        microcopy: 'Trusted by analysts • Ready in ~3 min',
+        highlighted: true,
+        badge: 'Most Popular'
+    },
+    {
+        id: 'research',
+        icon: '🔬',
+        title: 'Research Package',
+        price: 1.00,
+        priceLabel: 'Only $1',
+        subtitle: 'Quick Brief',
+        description: 'Professional summary and analysis with source compilation',
+        features: [
+            'Source compilation & citations',
+            'Basic analysis',
+            'Download ready'
+        ],
+        expandedFeatures: [
+            'Professional summary and analysis',
+            'Source compilation with citations',
+            'Ready for download'
+        ],
+        buttonText: 'Basic Report — $1',
         highlighted: false
     }
 ];
@@ -545,22 +563,39 @@ export class ReportBuilder extends EventTarget {
         const sourceCount = selectedSources.length;
         const totalCost = this.appState.getSelectedSourcesTotal();
         
+        // Create modal-style takeover container
         const container = document.createElement('div');
-        container.className = 'tier-cards-section';
+        container.className = 'tier-selection-takeover';
+        
+        // Progress narrative header
+        const progressHeader = document.createElement('div');
+        progressHeader.className = 'tier-progress-header';
+        progressHeader.innerHTML = `
+            <div class="progress-checkmark">✅</div>
+            <div class="progress-content">
+                <div class="progress-title">${sourceCount} Vetted Sources Ready</div>
+                <div class="progress-subtitle">Choose Your Research Package → Report Generation Begins</div>
+            </div>
+        `;
+        container.appendChild(progressHeader);
+        
+        // Main content area
+        const contentArea = document.createElement('div');
+        contentArea.className = 'tier-selection-content';
         
         // Header
-        container.appendChild(this._createHeader());
+        contentArea.appendChild(this._createHeader());
         
-        // Selected sources section (if any)
-        if (sourceCount > 0) {
-            container.appendChild(this._createSelectedSourcesSection(selectedSources, sourceCount, totalCost));
-        }
+        // Tier cards with asymmetric layout
+        contentArea.appendChild(this._createTierCardsContainer());
         
-        // Tier cards
-        container.appendChild(this._createTierCardsContainer());
+        // Expandable comparison (What's inside?)
+        contentArea.appendChild(this._createComparisonAccordion());
         
-        // Note
-        container.appendChild(this._createNote());
+        // Security footer
+        contentArea.appendChild(this._createSecurityFooter());
+        
+        container.appendChild(contentArea);
         
         return container;
     }
@@ -576,11 +611,7 @@ export class ReportBuilder extends EventTarget {
         const headerTitle = document.createElement('h3');
         headerTitle.textContent = 'Choose Your Research Package';
         
-        const headerDesc = document.createElement('p');
-        headerDesc.textContent = 'Select the perfect research tier for your needs. Report generation begins after purchase confirmation.';
-        
         headerDiv.appendChild(headerTitle);
-        headerDiv.appendChild(headerDesc);
         
         return headerDiv;
     }
@@ -688,14 +719,14 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
-     * Creates tier cards container using template literals
+     * Creates tier cards container with asymmetric layout
      * @private
      */
     _createTierCardsContainer() {
         const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'tier-cards-container';
+        cardsContainer.className = 'tier-cards-asymmetric';
         
-        // Create tier cards from config
+        // Create tier cards from config (Pro first, then Research)
         TIERS.forEach(tier => {
             cardsContainer.appendChild(this._createTierCard(tier));
         });
@@ -704,32 +735,113 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
-     * Creates individual tier card
+     * Creates individual tier card with new asymmetric design
      * @private
      */
     _createTierCard(tier) {
         const cardDiv = document.createElement('div');
-        cardDiv.className = tier.highlighted ? 'tier-card highlighted' : 'tier-card';
+        cardDiv.className = tier.highlighted ? 'tier-card tier-card-pro' : 'tier-card tier-card-research';
         cardDiv.dataset.tier = tier.id;
         
+        const badgeHTML = tier.badge ? `<div class="tier-badge">${tier.badge}</div>` : '';
+        const microcopyHTML = tier.microcopy ? `<div class="tier-microcopy">${tier.microcopy}</div>` : '';
+        const buttonClass = tier.highlighted ? 'tier-purchase-btn tier-btn-primary' : 'tier-purchase-btn tier-btn-ghost';
+        
         cardDiv.innerHTML = `
+            ${badgeHTML}
             <div class="tier-icon">${tier.icon}</div>
-            <h4>${tier.title}</h4>
-            <div class="tier-price">$${tier.price.toFixed(2)}</div>
-            <p class="tier-description">${tier.description}</p>
-            <ul class="tier-features">
-                ${tier.features.map(feature => `<li>${feature}</li>`).join('')}
+            <h4 class="tier-title-new">${tier.title}</h4>
+            <div class="tier-price-new">${tier.priceLabel}</div>
+            <div class="tier-subtitle">${tier.subtitle}</div>
+            <ul class="tier-features-compact">
+                ${tier.features.map(feature => `<li>✓ ${feature}</li>`).join('')}
             </ul>
-            <button class="tier-purchase-btn" data-tier="${tier.id}" data-price="${tier.price}">
+            <button class="${buttonClass}" data-tier="${tier.id}" data-price="${tier.price}">
                 ${tier.buttonText}
             </button>
+            ${microcopyHTML}
         `;
         
         return cardDiv;
     }
 
     /**
-     * Creates note section
+     * Creates expandable comparison accordion
+     * @private
+     */
+    _createComparisonAccordion() {
+        const accordionDiv = document.createElement('details');
+        accordionDiv.className = 'tier-comparison-accordion';
+        
+        const summary = document.createElement('summary');
+        summary.className = 'accordion-summary';
+        summary.textContent = "What's inside? ▼";
+        
+        const content = document.createElement('div');
+        content.className = 'accordion-content';
+        
+        // Build comparison table
+        content.innerHTML = `
+            <table class="tier-comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Research</th>
+                        <th>Pro</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Professional summary & analysis</td>
+                        <td>✓</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td>Source compilation & citations</td>
+                        <td>✓</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td>Strategic insights & recommendations</td>
+                        <td>—</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td>Executive summary format</td>
+                        <td>—</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td>Enhanced formatting & presentation</td>
+                        <td>—</td>
+                        <td>✓</td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+        
+        accordionDiv.appendChild(summary);
+        accordionDiv.appendChild(content);
+        
+        return accordionDiv;
+    }
+
+    /**
+     * Creates security footer
+     * @private
+     */
+    _createSecurityFooter() {
+        const footer = document.createElement('div');
+        footer.className = 'tier-security-footer';
+        footer.innerHTML = `
+            <span class="security-icon">🔒</span>
+            <span class="security-text">Secure checkout</span>
+        `;
+        return footer;
+    }
+
+    /**
+     * Creates note section (legacy, no longer used)
      * @private
      */
     _createNote() {
