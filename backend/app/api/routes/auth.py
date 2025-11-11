@@ -44,6 +44,10 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
             error_msg = ledewire.handle_api_error(result)
             raise HTTPException(status_code=401, detail=f"Login failed: {error_msg}")
         
+        # DEBUG: Log what LedeWire actually returns (mask token)
+        debug_result = {k: (v[:20] + "..." if k == "access_token" and v else v) for k, v in result.items()}
+        logger.info(f"🔍 LedeWire login response for {request.email}: {debug_result}")
+        
         # Handle conversation migration from anonymous to authenticated user
         logger.debug(f"Migration check: x_previous_user_id={x_previous_user_id}, has_access_token={bool(result.get('access_token'))}")
         
