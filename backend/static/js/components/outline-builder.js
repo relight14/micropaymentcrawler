@@ -19,6 +19,19 @@ export class OutlineBuilder extends EventTarget {
         this.sections = [];
         this.isSaving = false;
         this.saveTimeout = null;
+        this.isCollapsed = false;
+    }
+
+    /**
+     * Toggle outline builder collapsed state
+     */
+    toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed;
+        const container = document.getElementById('outline-builder');
+        if (container) {
+            container.classList.toggle('collapsed', this.isCollapsed);
+        }
+        this.render();
     }
 
     /**
@@ -736,90 +749,97 @@ export class OutlineBuilder extends EventTarget {
             <div class="resize-handle" id="outline-resize-handle"></div>
             <div class="outline-builder">
                 <div class="outline-header">
-                    <div>
-                        <h3>Research Outline</h3>
-                        <p class="outline-prompt">Build a research packet based on this outline</p>
-                        <button class="build-packet-btn" id="build-packet-btn" title="Generate a comprehensive research report">
-                            📊 Build Research Packet
-                        </button>
-                    </div>
-                    <span class="save-indicator" id="outline-save-indicator"></span>
+                    ${!this.isCollapsed ? `
+                        <div>
+                            <h3>Research Outline</h3>
+                            <p class="outline-prompt">Build a research packet based on this outline</p>
+                            <button class="build-packet-btn" id="build-packet-btn" title="Generate a comprehensive research report">
+                                📊 Build Research Packet
+                            </button>
+                        </div>
+                        <span class="save-indicator" id="outline-save-indicator"></span>
+                    ` : ''}
+                    <button class="outline-toggle-btn" id="outline-toggle-btn">
+                        ${this.isCollapsed ? '◀' : '▶'}
+                    </button>
                 </div>
 
-                <div class="selected-sources-pool">
-                    <div class="pool-header">
-                        <span class="pool-title">Selected Sources (${this.selectedSources.length})</span>
-                    </div>
-                    <div class="source-chips">
-                        ${this.selectedSources.length === 0 ? `
-                            <div class="empty-pool">
-                                <p>No sources selected</p>
-                                <p class="hint">Select sources from the search results to organize them</p>
-                            </div>
-                        ` : this.selectedSources.map(source => `
-                            <div class="source-chip" 
-                                 draggable="true" 
-                                 data-source-id="${source.id}"
-                                 data-source-json='${JSON.stringify(source).replace(/'/g, "&apos;")}'>
-                                <span class="source-chip-icon">${this.getSourceIcon(source.source_type)}</span>
-                                <span class="source-chip-title">${this.escapeHtml(source.title || source.url)}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-
-                <div class="outline-sections">
-                    ${this.sections.map((section, index) => `
-                        <div class="outline-section" data-section-index="${index}">
-                            <div class="section-header">
-                                <input 
-                                    type="text" 
-                                    class="section-title-input" 
-                                    value="${this.escapeHtml(section.title)}"
-                                    data-section-index="${index}"
-                                    placeholder="Section title"
-                                />
-                                <div class="section-controls">
-                                    ${this.sections.length > 1 && index > 0 ? `
-                                        <button class="section-move-btn" data-index="${index}" data-direction="up" title="Move up">
-                                            ▲
-                                        </button>
-                                    ` : ''}
-                                    ${this.sections.length > 1 && index < this.sections.length - 1 ? `
-                                        <button class="section-move-btn" data-index="${index}" data-direction="down" title="Move down">
-                                            ▼
-                                        </button>
-                                    ` : ''}
-                                    <button class="section-delete-btn" data-index="${index}" title="Delete section">
-                                        ✕
-                                    </button>
+                ${!this.isCollapsed ? `
+                    <div class="selected-sources-pool">
+                        <div class="pool-header">
+                            <span class="pool-title">Selected Sources (${this.selectedSources.length})</span>
+                        </div>
+                        <div class="source-chips">
+                            ${this.selectedSources.length === 0 ? `
+                                <div class="empty-pool">
+                                    <p>No sources selected</p>
+                                    <p class="hint">Select sources from the search results to organize them</p>
                                 </div>
-                            </div>
-                            <div class="section-drop-zone" data-section-index="${index}">
-                                ${section.sources.length === 0 ? `
-                                    <div class="drop-placeholder">Drop sources here</div>
-                                ` : section.sources.map((source, sourceIndex) => `
-                                    <div class="section-source">
-                                        <span class="source-icon">${this.getSourceIcon(source.source_data.source_type)}</span>
-                                        <span class="source-title">${this.escapeHtml(source.source_data.title || source.source_data.url)}</span>
-                                        <button class="remove-source-btn" data-section-index="${index}" data-source-index="${sourceIndex}">
+                            ` : this.selectedSources.map(source => `
+                                <div class="source-chip" 
+                                     draggable="true" 
+                                     data-source-id="${source.id}"
+                                     data-source-json='${JSON.stringify(source).replace(/'/g, "&apos;")}'>
+                                    <span class="source-chip-icon">${this.getSourceIcon(source.source_type)}</span>
+                                    <span class="source-chip-title">${this.escapeHtml(source.title || source.url)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="outline-sections">
+                        ${this.sections.map((section, index) => `
+                            <div class="outline-section" data-section-index="${index}">
+                                <div class="section-header">
+                                    <input 
+                                        type="text" 
+                                        class="section-title-input" 
+                                        value="${this.escapeHtml(section.title)}"
+                                        data-section-index="${index}"
+                                        placeholder="Section title"
+                                    />
+                                    <div class="section-controls">
+                                        ${this.sections.length > 1 && index > 0 ? `
+                                            <button class="section-move-btn" data-index="${index}" data-direction="up" title="Move up">
+                                                ▲
+                                            </button>
+                                        ` : ''}
+                                        ${this.sections.length > 1 && index < this.sections.length - 1 ? `
+                                            <button class="section-move-btn" data-index="${index}" data-direction="down" title="Move down">
+                                                ▼
+                                            </button>
+                                        ` : ''}
+                                        <button class="section-delete-btn" data-index="${index}" title="Delete section">
                                             ✕
                                         </button>
                                     </div>
-                                `).join('')}
+                                </div>
+                                <div class="section-drop-zone" data-section-index="${index}">
+                                    ${section.sources.length === 0 ? `
+                                        <div class="drop-placeholder">Drop sources here</div>
+                                    ` : section.sources.map((source, sourceIndex) => `
+                                        <div class="section-source">
+                                            <span class="source-icon">${this.getSourceIcon(source.source_data.source_type)}</span>
+                                            <span class="source-title">${this.escapeHtml(source.source_data.title || source.source_data.url)}</span>
+                                            <button class="remove-source-btn" data-section-index="${index}" data-source-index="${sourceIndex}">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
-                </div>
+                        `).join('')}
+                    </div>
 
-                <input type="file" id="file-upload-input" accept=".md,.doc,.docx" style="display: none;" />
-                <button class="upload-file-btn" id="upload-file-btn" title="Upload document (.md, .doc, .docx)">
-                    Upload your own docs
-                </button>
+                    <input type="file" id="file-upload-input" accept=".md,.doc,.docx" style="display: none;" />
+                    <button class="upload-file-btn" id="upload-file-btn" title="Upload document (.md, .doc, .docx)">
+                        Upload your own docs
+                    </button>
 
-                <button class="add-section-btn" id="add-section-btn">
-                    + Add Section
-                </button>
+                    <button class="add-section-btn" id="add-section-btn">
+                        + Add Section
+                    </button>
+                ` : ''}
             </div>
         `;
 
@@ -856,6 +876,12 @@ export class OutlineBuilder extends EventTarget {
      * Attach event listeners
      */
     attachEventListeners() {
+        // Outline toggle button
+        const outlineToggleBtn = document.getElementById('outline-toggle-btn');
+        if (outlineToggleBtn) {
+            outlineToggleBtn.addEventListener('click', () => this.toggleCollapse());
+        }
+
         const addSectionBtn = document.getElementById('add-section-btn');
         if (addSectionBtn) {
             addSectionBtn.addEventListener('click', () => this.addSection());

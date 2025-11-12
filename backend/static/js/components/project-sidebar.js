@@ -269,6 +269,10 @@ export class ProjectListSidebar extends EventTarget {
      */
     toggleCollapse() {
         this.isCollapsed = !this.isCollapsed;
+        const container = document.getElementById('project-sidebar');
+        if (container) {
+            container.classList.toggle('collapsed', this.isCollapsed);
+        }
         this.render();
     }
 

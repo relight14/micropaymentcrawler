@@ -30,6 +30,14 @@
 #project-sidebar.collapsed {
     width: 50px;
     min-width: 50px;
+    overflow-x: hidden;
+}
+
+#outline-builder.collapsed {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    overflow-x: hidden;
 }
 
 /* Main content area - center */

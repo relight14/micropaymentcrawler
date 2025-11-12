@@ -93,6 +93,16 @@
     background-color: var(--hover-bg, rgba(255, 255, 255, 0.1));
 }
 
+/* Collapsed state - center toggle button */
+#project-sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    padding: 16px 8px;
+}
+
+#project-sidebar.collapsed .toggle-btn {
+    margin: 0 auto;
+}
+
 .new-project-btn {
     margin: 16px;
     padding: 10px 16px;
