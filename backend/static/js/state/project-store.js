@@ -103,14 +103,23 @@ export class ProjectStore {
      * Set projects list
      */
     setProjects(projects) {
-        this.setState({ projects });
+        const byId = new Map();
+        for (const p of projects || []) {
+            const prev = byId.get(p.id);
+            if (!prev || new Date(p.updated_at) > new Date(prev.updated_at)) byId.set(p.id, p);
+        }
+        const unique = Array.from(byId.values()).sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+        this.setState({ projects: unique });
     }
 
     /**
      * Add a new project
      */
     addProject(project) {
-        const projects = [project, ...this.state.projects];
+        const exists = this.state.projects.some(p => p.id === project.id);
+        const projects = exists
+            ? this.state.projects.map(p => p.id === project.id ? { ...p, ...project } : p)
+            : [project, ...this.state.projects];
         this.setState({ projects });
     }
 

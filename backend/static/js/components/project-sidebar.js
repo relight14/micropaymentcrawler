@@ -56,7 +56,27 @@ export class ProjectListSidebar extends EventTarget {
             });
 
             if (response.ok) {
-                this.projects = await response.json();
+                const raw = await response.json();
+
+                const byId = new Map();
+                const byKey = new Map();
+                const norm = s => (s || '').toLowerCase().trim();
+
+                for (const p of raw) {
+                    const prev = byId.get(p.id);
+                    if (!prev || new Date(p.updated_at) > new Date(prev.updated_at)) byId.set(p.id, p);
+                }
+
+                for (const p of byId.values()) {
+                    const k = `${p.user_id}:${norm(p.title)}`;
+                    const prevKey = byKey.get(k);
+                    if (!prevKey || new Date(p.updated_at) > new Date(prevKey.updated_at)) byKey.set(k, p);
+                }
+
+                const collapsed = Array.from(byKey.values());
+                collapsed.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+                this.projects = collapsed;
                 this.render();
             } else if (response.status === 401) {
                 this.authService.handleUnauthorized();
@@ -71,6 +91,18 @@ export class ProjectListSidebar extends EventTarget {
      */
     async createProject(title, researchQuery = null) {
         try {
+            const norm = s => (s || '').toLowerCase().trim();
+            const k = `${this.authService.getUserId?.()}:${norm(title)}`;
+            const existing = this.projects.find(p => `${p.user_id}:${norm(p.title)}` === k);
+
+            if (existing) {
+                this.activeProjectId = existing.id;
+                this.render();
+                this.dispatchEvent(new CustomEvent('projectCreated', { detail: { project: existing } }));
+                this.toastManager.show('Project already exists — opening it', 'info');
+                return existing;
+            }
+
             const requestBody = { title };
             if (researchQuery) {
                 requestBody.research_query = researchQuery;
@@ -87,7 +119,8 @@ export class ProjectListSidebar extends EventTarget {
 
             if (response.ok) {
                 const newProject = await response.json();
-                this.projects.unshift(newProject);
+
+                await this.loadProjects();
                 this.activeProjectId = newProject.id;
                 this.render();
                 
@@ -344,18 +377,23 @@ export class ProjectListSidebar extends EventTarget {
                                 <p>No projects yet</p>
                                 <p class="hint">Create your first project to get started</p>
                             </div>
-                        ` : this.projects.map(project => `
-                            <div class="project-item ${project.id === this.activeProjectId ? 'active' : ''}" 
+                        ` : this.projects.map(project => {
+                            const isActive = project.id === this.activeProjectId;
+                            return `
+                            <div class="project-item ${isActive ? 'active' : ''}" 
                                  data-project-id="${project.id}">
                                 <div class="project-info">
-                                    <div class="project-title">${this.escapeHtml(project.title)}</div>
+                                    <div class="project-title">
+                                        ${this.escapeHtml(project.title)}
+                                        ${isActive ? '<span class="loading-indicator"> •••</span>' : ''}
+                                    </div>
                                     <div class="project-timestamp">${this.formatTimestamp(project.updated_at)}</div>
                                 </div>
                                 <button class="delete-project-btn" data-project-id="${project.id}" title="Delete project">
                                     ✕
                                 </button>
                             </div>
-                        `).join('')}
+                        `;}).join('')}
                     </div>
                 ` : ''}
             </div>

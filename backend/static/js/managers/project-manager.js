@@ -28,6 +28,7 @@ export class ProjectManager {
         this.isLoadingProjects = false; // Guard flag to prevent duplicate loadProjects() calls
         this.pendingReload = false; // Flag to queue a retry if load is requested during active load
         this.hasMigratedLoginChat = false; // One-shot flag to prevent duplicate login migration
+        this._autoCreateLock = false; // Mutex guard to prevent concurrent auto-create calls
     }
 
     /**
@@ -138,10 +139,20 @@ export class ProjectManager {
     }
 
     /**
+     * Find existing project by normalized title
+     */
+    _findExistingProjectByTitle(title) {
+        const norm = s => (s || '').toLowerCase().trim();
+        const k = norm(title);
+        const list = this.sidebar?.projects || projectStore.state.projects || [];
+        return list.find(p => norm(p.title) === k) || null;
+    }
+
+    /**
      * Handle user login - triggered by authStateChanged event
      * Preserves pre-login chat and migrates it to a new project
      * Uses one-shot guard to prevent duplicate migration if event fires multiple times
-     * ORDER: Migrate first → Load projects → Sync store → Auto-load new project
+     * ORDER: Load projects first → Migrate if needed → Sync store → Auto-load new project
      */
     async handleLogin() {
         logger.info(`🔐 [ProjectManager] Auth state changed to authenticated`);
@@ -157,15 +168,31 @@ export class ProjectManager {
             this.sidebar.render();
         }
         
-        // 1) Migrate first (one-shot guard)
+        // 1) Load projects first so we can dedupe against them
+        await this.loadProjectsWithGuard();
+        projectStore.setProjects(this.sidebar.projects); // sync store NOW
+        
+        // 2) One-shot guarded migration
         if (hasPreLoginChat && !this.hasMigratedLoginChat) {
             this.hasMigratedLoginChat = true;
             this.toastManager.show('💾 Syncing your research...', 'info');
+            
             try {
-                const project = await this.createProjectFromConversation(preLoginChat);
-                if (project) {
-                    newProjectId = project.id;
-                    this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
+                // derive candidate title
+                const firstUserMessage = preLoginChat.find(m => m.sender === 'user');
+                const candidateTitle = this._extractProjectTitle(firstUserMessage?.content);
+                
+                // If a project with the same title exists, reuse it
+                const existing = this._findExistingProjectByTitle(candidateTitle);
+                if (existing) {
+                    newProjectId = existing.id;
+                    this.toastManager.show(`🔁 Opening existing project "${existing.title}"`, 'info');
+                } else {
+                    const project = await this.createProjectFromConversation(preLoginChat);
+                    if (project) {
+                        newProjectId = project.id;
+                        this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
+                    }
                 }
             } catch (err) {
                 logger.error('Failed to migrate login chat:', err);
@@ -173,15 +200,10 @@ export class ProjectManager {
             }
         }
         
-        // 2) Load projects (guarded) and 3) sync store immediately after
-        await this.loadProjectsWithGuard();
-        projectStore.setProjects(this.sidebar.projects); // sync store NOW
-        
-        // 4) Auto-load the newly created project (triggers existing handleProjectLoaded flow)
+        // 3) If we created or found one, load it
         if (newProjectId) {
             await this.sidebar.loadProject(newProjectId);
             
-            // FIX C: Dispatch SOURCE_SEARCH_TRIGGER after project loads to fire search
             const query = this.appState.getCurrentQuery();
             if (query && query.trim()) {
                 logger.info('🔍 Dispatching SOURCE_SEARCH_TRIGGER after login with query:', query);
@@ -523,7 +545,12 @@ export class ProjectManager {
             return null;
         }
 
-        // Auto-create project from query (works for both authenticated and anonymous users)
+        // Mutex guard to prevent concurrent auto-create calls
+        if (this._autoCreateLock) {
+            return null;
+        }
+
+        this._autoCreateLock = true;
         this.hasAutoCreatedProject = true;
         
         try {
@@ -546,6 +573,8 @@ export class ProjectManager {
             // Reset flag on failure to allow retry
             this.hasAutoCreatedProject = false;
             return null;
+        } finally {
+            this._autoCreateLock = false;
         }
     }
 
