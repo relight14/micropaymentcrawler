@@ -217,16 +217,8 @@ export class ProjectManager {
         if (newProjectId) {
             await this.sidebar.loadProject(newProjectId);
             
-            // Only dispatch SOURCE_SEARCH_TRIGGER after restore completes
-            const query = this.appState.getCurrentQuery();
-            if (query && query.trim() && !this._isRestoring) {
-                logger.info('🔍 Dispatching SOURCE_SEARCH_TRIGGER after login with query:', query);
-                AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
-                    detail: { query }
-                }));
-            } else if (this._isRestoring) {
-                logger.warn('⚠️ Skipping SOURCE_SEARCH_TRIGGER - project still restoring');
-            }
+            // No automatic search after login - user must manually trigger search via "Run Source Search" button
+            logger.info('✅ Project loaded after login. User can now manually trigger source search.');
         }
     }
 
