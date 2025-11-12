@@ -6,57 +6,7 @@
 
 import { analytics } from '../utils/analytics.js';
 import { projectStore } from '../state/project-store.js';
-
-// Tier configuration constant
-const TIERS = [
-    {
-        id: 'pro',
-        icon: '⭐',
-        title: 'Pro Package',
-        price: 3.00,
-        priceLabel: '$3',
-        subtitle: 'Executive Analysis',
-        description: 'Everything in Research plus strategic insights and executive formatting',
-        features: [
-            'Source compilation & citations',
-            'Strategic insights & recommendations',
-            'Executive formatting'
-        ],
-        expandedFeatures: [
-            'Professional summary and analysis',
-            'Source compilation with citations',
-            'Strategic insights and recommendations',
-            'Executive summary format',
-            'Enhanced formatting and presentation',
-            'Ready for download'
-        ],
-        buttonText: 'Generate Pro Report — $3',
-        microcopy: 'Trusted by analysts • Ready in ~3 min',
-        highlighted: true,
-        badge: 'Most Popular'
-    },
-    {
-        id: 'research',
-        icon: '🔬',
-        title: 'Research Package',
-        price: 1.00,
-        priceLabel: 'Only $1',
-        subtitle: 'Quick Brief',
-        description: 'Professional summary and analysis with source compilation',
-        features: [
-            'Source compilation & citations',
-            'Basic analysis',
-            'Download ready'
-        ],
-        expandedFeatures: [
-            'Professional summary and analysis',
-            'Source compilation with citations',
-            'Ready for download'
-        ],
-        buttonText: 'Basic Report — $1',
-        highlighted: false
-    }
-];
+import { TIERS } from '../config/tier-catalog.js';
 
 export class ReportBuilder extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager }) {
