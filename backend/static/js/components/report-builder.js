@@ -154,6 +154,12 @@ export class ReportBuilder extends EventTarget {
      * @private
      */
     _updateTierCardPricing(tierId, quote) {
+        // Null-guard: return early if quote is missing
+        if (!quote) {
+            console.warn(`⚠️ No quote provided for tier: ${tierId}`);
+            return;
+        }
+        
         const tierCard = document.querySelector(`[data-tier-id="${tierId}"]`);
         if (!tierCard) return;
         
