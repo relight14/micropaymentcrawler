@@ -31,7 +31,6 @@ class Config:
     
     # LedeWire Configuration
     LEDEWIRE_API_URL = os.getenv("LEDEWIRE_API_URL", "https://api-staging.ledewire.com")
-    LEDEWIRE_USE_MOCK = os.getenv("LEDEWIRE_USE_MOCK", "false").lower() == "true"
     
     # Rate Limiting
     RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
@@ -64,11 +63,11 @@ class Config:
         if cls.USE_POSTGRES and not cls.DATABASE_URL:
             errors.append("DATABASE_URL must be set when USE_POSTGRES=true")
         
-        if not cls.TAVILY_API_KEY and not cls.LEDEWIRE_USE_MOCK:
-            errors.append("TAVILY_API_KEY is required in production mode")
+        if not cls.TAVILY_API_KEY:
+            errors.append("TAVILY_API_KEY is required")
         
-        if not cls.ANTHROPIC_API_KEY and not cls.LEDEWIRE_USE_MOCK:
-            errors.append("ANTHROPIC_API_KEY is required in production mode")
+        if not cls.ANTHROPIC_API_KEY:
+            errors.append("ANTHROPIC_API_KEY is required")
         
         return errors
     
