@@ -1,0 +1,110 @@
+Yes—if you remove the destructive clears and batch the swap.
+You don’t need a new UIManager or big refactor. Do the minimal, surgical changes below and the flicker will disappear.
+
+Minimal fix (drop-in)
+
+1) Kill the destructive clears
+In loadProjectMessages():
+
+Remove this.clearChatInterface()
+
+Defer this.appState.clearConversation() until you’re ready to replace.
+
+2) Add a lightweight “restoring” overlay (no DOM wipe)
+
+// at top of loadProjectMessages
+if (this._isRestoring) return;
+this._isRestoring = true;
+
+const messagesContainer = document.getElementById('messagesContainer');
+messagesContainer?.classList.add('restoring'); // CSS dims; keep content visible
+
+
+3) Fetch → build off-DOM → single swap → single state replace
+
+try {
+  const { messages = [] } = await this.apiService.getProjectMessages(projectId);
+
+  // Build offscreen
+  const frag = document.createDocumentFragment();
+  const newConversation = [];
+
+  if (messages.length === 0) {
+    const div = document.createElement('div');
+    div.className = 'system-msg';
+    const title = projectStore.state.activeProjectTitle || 'this project';
+    div.textContent = `🎯 Welcome to "${title}". Start your research here.`;
+    frag.appendChild(div);
+  } else {
+    this.messageCoordinator?.beginBatch?.();
+    for (const m of messages) {
+      newConversation.push({
+        sender: m.sender === 'ai' ? 'assistant' : m.sender,
+        content: m.content,
+        metadata: m.message_data?.metadata || null
+      });
+
+      const el = this.messageCoordinator.renderMessageToElement
+        ? this.messageCoordinator.renderMessageToElement(m, { skipPersist: true })
+        : null;
+
+      if (el) {
+        frag.appendChild(el);
+      } else {
+        const tmp = document.createElement('div');
+        this.messageCoordinator.restoreMessage(m, { skipPersist: true, mount: tmp });
+        frag.append(...tmp.childNodes);
+      }
+    }
+    this.messageCoordinator?.endBatch?.();
+  }
+
+  // Single DOM swap
+  messagesContainer.innerHTML = '';
+  messagesContainer.appendChild(frag);
+
+  // Single state replace
+  if (this.appState.replaceConversation) {
+    this.appState.replaceConversation(newConversation);
+  } else {
+    this.appState.clearConversation();
+    for (const msg of newConversation) {
+      this.appState.addMessage(msg.sender, msg.content, msg.metadata);
+    }
+  }
+
+  this.hideWelcomeScreen();
+} catch (e) {
+  logger.error(`loadProjectMessages failed for ${projectId}`, e);
+  this.toastManager.show('Failed to load project messages', 'error');
+} finally {
+  messagesContainer?.classList.remove('restoring');
+  this._isRestoring = false;
+}
+
+
+4) Gate mid-restore events
+
+If you fire SOURCE_SEARCH_TRIGGER or others during login, dispatch only after _isRestoring === false.
+
+5) Tiny CSS
+
+#messagesContainer.restoring { opacity: .6; pointer-events: none; }
+
+Does it fix the flicker?
+
+✅ No mid-restore blank state (no innerHTML='' until you have the full fragment)
+
+✅ No multi-paint message loops (single swap)
+
+✅ No double-clears of AppState
+
+✅ Events run after the final render
+
+Quick acceptance test
+
+Log out → type a few messages → log in → verify no blank flashes; chat dims then swaps once.
+
+Switch projects back and forth rapidly → still a single swap per load.
+
+Enable a debug counter on renders; you should see 1 DOM replace, not N.
