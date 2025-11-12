@@ -1,0 +1,296 @@
+1) Stop the duplicate creation at the source (Sidebar)
+A. Deduplicate the fetched list and prefer newest by updated_at
+
+ProjectListSidebar.loadProjects() — replace the body after if (response.ok) { … }:
+
+if (response.ok) {
+    const raw = await response.json();
+
+    // 🔒 Dedup by id (always) and collapse same-title rows by newest updated_at
+    const byId = new Map();
+    const byKey = new Map(); // key = normalized(title)
+    const norm = s => (s || '').toLowerCase().trim();
+
+    for (const p of raw) {
+        // prefer newest by id
+        const prev = byId.get(p.id);
+        if (!prev || new Date(p.updated_at) > new Date(prev.updated_at)) byId.set(p.id, p);
+
+        const k = `${p.user_id}:${norm(p.title)}`;
+        const prevKey = byKey.get(k);
+        if (!prevKey || new Date(p.updated_at) > new Date(prevKey.updated_at)) byKey.set(k, p);
+    }
+
+    // If the API already had dupes, collapse to title-based winners (keeps UI stable)
+    // Otherwise this just returns the id-based unique list.
+    const collapsed = Array.from(byKey.values());
+
+    // Sort newest first for better UX
+    collapsed.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+    this.projects = collapsed;
+    this.render();
+} else if (response.status === 401) {
+    this.authService.handleUnauthorized();
+}
+
+B. Prevent local unshift races; refresh from server instead
+
+ProjectListSidebar.createProject() — before calling fetch, short-circuit if a project with the same normalized title already exists; and after a server create, do not unshift — reload the list.
+
+async createProject(title, researchQuery = null) {
+    try {
+        const norm = s => (s || '').toLowerCase().trim();
+        const k = `${this.authService.getUserId?.()}:${norm(title)}`;
+        const existing = this.projects.find(p => `${p.user_id}:${norm(p.title)}` === k);
+
+        if (existing) {
+            // ✅ Treat as success; select the existing one and emit
+            this.activeProjectId = existing.id;
+            this.render();
+            this.dispatchEvent(new CustomEvent('projectCreated', { detail: { project: existing } }));
+            this.toastManager.show('Project already exists — opening it', 'info');
+            return existing;
+        }
+
+        const requestBody = { title };
+        if (researchQuery) requestBody.research_query = researchQuery;
+
+        const response = await fetch('/api/projects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.authService.getToken()}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (response.ok) {
+            const newProject = await response.json();
+
+            // 🚫 no local unshift (causes UI dupes)
+            // ✅ reload full list (which dedupes) and then activate
+            await this.loadProjects();
+            this.activeProjectId = newProject.id;
+            this.render();
+
+            analytics.track('project_created', {
+                project_id: newProject.id,
+                title: newProject.title,
+                has_research_query: !!researchQuery
+            });
+
+            this.dispatchEvent(new CustomEvent('projectCreated', {
+                detail: { project: newProject }
+            }));
+
+            this.toastManager.show('New project created successfully', 'success');
+            return newProject;
+        } else if (response.status === 401) {
+            this.authService.handleUnauthorized();
+        } else {
+            this.toastManager.show('Failed to create project', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating project:', error);
+        this.toastManager.show('Failed to create project', 'error');
+    }
+    return null;
+}
+
+2) Make the store immune to duplicates
+
+You’re using a simple array store, so harden the mutators to id-dedupe. This alone fixes half your UI pain.
+
+ProjectStore.setProjects() — replace implementation:
+
+setProjects(projects) {
+    // unique by id; keep newest updated_at
+    const byId = new Map();
+    for (const p of projects || []) {
+        const prev = byId.get(p.id);
+        if (!prev || new Date(p.updated_at) > new Date(prev.updated_at)) byId.set(p.id, p);
+    }
+    const unique = Array.from(byId.values()).sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+    this.setState({ projects: unique });
+}
+
+
+ProjectStore.addProject(project) — guard:
+
+addProject(project) {
+    const exists = this.state.projects.some(p => p.id === project.id);
+    const projects = exists
+        ? this.state.projects.map(p => p.id === project.id ? { ...p, ...project } : p)
+        : [project, ...this.state.projects];
+    this.setState({ projects });
+}
+
+
+ProjectStore.updateProject() — (unchanged logic is fine), but this makes duplicates much less likely to survive a roundtrip.
+
+3) Make login restore deterministic and fast
+
+Two changes: load first, then (maybe) migrate, and only create if it doesn’t already exist. This kills the “create during login” races and the 10s confusion.
+
+A. Add a quick helper inside ProjectManager to check existence
+_findExistingProjectByTitle(title) {
+    const norm = s => (s || '').toLowerCase().trim();
+    const k = norm(title);
+    const list = this.sidebar?.projects || projectStore.state.projects || [];
+    return list.find(p => norm(p.title) === k) || null;
+}
+
+B. Change the order in handleLogin():
+
+Capture chat (keep this), then load projects with guard and sync the store so you have a list to compare against.
+
+Only then, if chat exists and we haven’t migrated, create-or-use.
+
+ProjectManager.handleLogin() — replace the middle of the function:
+
+// Preserve chat BEFORE anything else (keep your current code)
+const preLoginChat = this.appState.getConversationHistory();
+const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
+let newProjectId = null;
+
+// Optimistic UI: render cached if any (keep your current code)
+
+// 👉 Load projects first so we can dedupe against them
+await this.loadProjectsWithGuard();
+projectStore.setProjects(this.sidebar.projects); // sync store
+
+// One-shot guarded migration
+if (hasPreLoginChat && !this.hasMigratedLoginChat) {
+    this.hasMigratedLoginChat = true;
+    this.toastManager.show('💾 Syncing your research...', 'info');
+
+    try {
+        // derive candidate title
+        const firstUserMessage = preLoginChat.find(m => m.sender === 'user');
+        const candidateTitle = this._extractProjectTitle(firstUserMessage?.content);
+
+        // 🔎 If a project with the same title exists, reuse it
+        const existing = this._findExistingProjectByTitle(candidateTitle);
+        if (existing) {
+            newProjectId = existing.id;
+            this.toastManager.show(`🔁 Opening existing project "${existing.title}"`, 'info');
+        } else {
+            const project = await this.createProjectFromConversation(preLoginChat);
+            if (project) {
+                newProjectId = project.id;
+                this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
+            }
+        }
+    } catch (err) {
+        logger.error('Failed to migrate login chat:', err);
+        this.hasMigratedLoginChat = false; // allow retry on next login
+    }
+}
+
+// If we created or found one, load it
+if (newProjectId) {
+    await this.sidebar.loadProject(newProjectId);
+
+    const query = this.appState.getCurrentQuery();
+    if (query && query.trim()) {
+        logger.info('🔍 Dispatching SOURCE_SEARCH_TRIGGER after login with query:', query);
+        AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+            detail: { query }
+        }));
+    }
+}
+
+
+Note: createProjectFromConversation() already uses this.sidebar.createProject(...), which now has the “reuse if exists” guard — so you’re protected from both sides.
+
+4) Keep “auto-create” from firing multiples
+
+You’ve got hasAutoCreatedProject, which helps. The remaining risk is parallel calls into ensureActiveProject(). Add a tiny mutex.
+
+ProjectManager constructor:
+
+this._autoCreateLock = false;
+
+
+ensureActiveProject(query) — wrap with a lock:
+
+async ensureActiveProject(query) {
+    if (projectStore.state.activeProjectId) return projectStore.state.activeProjectId;
+    if (this.hasAutoCreatedProject) return null;
+    if (this._autoCreateLock) return null;         // 🔒 new
+
+    this._autoCreateLock = true;                   // 🔒
+    this.hasAutoCreatedProject = true;
+
+    try {
+        const project = await this.sidebar.autoCreateProject(query);
+        if (project) {
+            analytics.track('project_auto_created', {
+                project_id: project.id,
+                from_query: true,
+                is_authenticated: this.authService.isAuthenticated()
+            });
+            return project.id;
+        }
+        this.hasAutoCreatedProject = false;
+        return null;
+    } catch (e) {
+        logger.error('Failed to auto-create project:', e);
+        this.hasAutoCreatedProject = false;
+        return null;
+    } finally {
+        this._autoCreateLock = false;              // 🔓
+    }
+}
+
+5) Make the 10-second “is it broken?” feeling go away
+
+You already emit projectLoadingStarted. Use it to show a visible skeleton immediately. This is mostly CSS/markup, but here’s the minimal Sidebar.render() tweak to show a skeleton when this.activeProjectId is set and a project is loading:
+
+Inside the projects list HTML, replace the project item when it’s the active one and you’re mid-load:
+
+<div class="projects-list">
+  ${this.projects.length === 0 ? `
+      <div class="empty-state">
+          <p>No projects yet</p>
+          <p class="hint">Create your first project to get started</p>
+      </div>
+  ` : this.projects.map(project => {
+      const isActive = project.id === this.activeProjectId;
+      return `
+      <div class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
+        <div class="project-info">
+          <div class="project-title">
+            ${this.escapeHtml(project.title)}
+            ${isActive ? '<span class="loading-dot">• • •</span>' : ''}
+          </div>
+          <div class="project-timestamp">${this.formatTimestamp(project.updated_at)}</div>
+        </div>
+        <button class="delete-project-btn" data-project-id="${project.id}" title="Delete project">✕</button>
+      </div>`;
+  }).join('')}
+</div>
+
+
+Add a tiny CSS pulse to .loading-dot (three dots) and users will see that the project is loading instantly.
+
+6) (Optional but nice) Send a correlation id on all fetches
+
+If you want traceability without big changes, add a header on Sidebar/PM/APIService calls:
+
+const cid = crypto?.randomUUID?.() || String(Date.now());
+headers['X-Correlation-Id'] = cid;
+
+
+Not required for correctness, but invaluable when verifying that dupes stopped.
+
+What this fixes, concretely
+
+Duplicate rows in UI: Deduped in Sidebar.loadProjects() and in ProjectStore.setProjects(); no more unshift races.
+
+Duplicate creation during login/outline/new: Pre-create lookup by normalized title on the client; order changed in handleLogin(); lock added to ensureActiveProject().
+
+Perceived 10s freeze: Immediate visual feedback via projectLoadingStarted + inline skeleton indicator; list renders instantly.
+
+State consistency: Store hardening (unique by id) means even if the API returns dupes, UI stays clean.

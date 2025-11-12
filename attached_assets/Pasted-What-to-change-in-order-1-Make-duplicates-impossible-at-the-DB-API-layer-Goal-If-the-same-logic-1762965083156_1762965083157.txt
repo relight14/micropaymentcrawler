@@ -1,0 +1,194 @@
+What to change (in order)
+1) Make duplicates impossible at the DB/API layer
+
+Goal: If the same logical project “key” shows up twice during races, only one row wins.
+
+Pick a uniqueness key for MVP:
+
+If a project is anchored to the first user query: (user_id, normalized_first_query) UNIQUE.
+
+If it’s anchored to a conversation id: (user_id, conversation_id) UNIQUE (preferred if you have it).
+
+DB migration (Postgres example):
+
+-- choose one of these based on your anchor
+ALTER TABLE projects ADD COLUMN conversation_id TEXT;
+CREATE UNIQUE INDEX CONCURRENTLY ux_projects_user_convo
+  ON projects (user_id, conversation_id)
+  WHERE conversation_id IS NOT NULL;
+
+-- if you must anchor by first query/title (normalize to lower/trim)
+ALTER TABLE projects ADD COLUMN normalized_key TEXT;
+UPDATE projects SET normalized_key = LOWER(TRIM(first_query));
+CREATE UNIQUE INDEX CONCURRENTLY ux_projects_user_key
+  ON projects (user_id, normalized_key)
+  WHERE normalized_key IS NOT NULL;
+
+
+API contract: make POST /projects idempotent.
+
+Accept idempotency_key (uuid v4) and the uniqueness anchor (conversation_id or normalized_key).
+
+Server logic: “find-or-create” within a transaction. If unique-violation occurs, re-select and return the winning row with 200/201.
+
+Store/process idempotency_key in a short-lived table if you need exactly-once semantics across retries.
+
+2) One ingestion path in the frontend
+
+Goal: The only way projects enter app state is via ProjectManager.
+
+Ban direct list mutations (e.g., projects.unshift() in the sidebar).
+
+ProjectManager exposes:
+
+createOrGetProject(anchor, meta, correlationId)
+
+loadAllProjects(correlationId)
+
+selectProject(projectId)
+
+Sidebar becomes pure view: it subscribes to ProjectStore only.
+
+3) Normalize state to kill UI duplicates
+
+Goal: Even if the API returns dupes, UI shows one.
+
+ProjectStore shape:
+
+type ProjectMap = Record<string, Project>;
+interface ProjectState {
+  byId: ProjectMap;
+  allIds: string[];       // derived, unique
+  selectedId?: string;
+  isLoading: boolean;
+}
+
+
+Reducer rules:
+
+On UPSERT_PROJECTS:
+
+Insert/merge into byId by server ID only.
+
+Recompute allIds = unique([...existing, ...incomingIds]).
+
+Never allow arrays of Project as source of truth.
+
+4) Remove race conditions around login/auto-create
+
+Goal: Only one “create from conversation” runs.
+
+Gate with a mutex/flag in ProjectManager:
+
+if (this.isCreatingFromConversation) return;
+this.isCreatingFromConversation = true;
+try { await createOrGetProject(...); } finally { this.isCreatingFromConversation = false; }
+
+
+Debounce or coalesce auth events:
+
+AuthService should emit a single authStateChanged per login.
+
+ProjectManager subscribes once and routes through a single restoreFlow().
+
+5) Deterministic restore flow (fast & obvious to user)
+
+Goal: No 10-second “is it broken?” lull.
+
+On app start or auth success:
+
+ProjectStore.isLoading = true
+
+Kick one loadAllProjects() request.
+
+Immediately render a skeleton list + “Restoring your last project…” message.
+
+When response arrives, select lastActiveProjectId (persisted) or newest.
+
+Do not create a project during restore unless zero exist.
+
+6) Correlation IDs + logs (to prove it’s fixed)
+
+Goal: Trace one user action across layers.
+
+Generate a correlationId per user action (login, “New Project”, outline).
+
+Include it in:
+
+Request headers: X-Correlation-Id
+
+Server logs for create/find/load
+
+Client logs around state transitions
+
+Add a guardlog:
+
+“Suppressed duplicate create: same anchor within 2s, correlationId=…”.
+
+7) One “New Project” story
+
+Goal: All buttons funnel to the same call.
+
+Any path that “creates a project” must call ProjectManager.createOrGetProject(anchor, …).
+
+Outline generation must require an active project; if none, call the same method with the same anchor (conversation_id).
+
+8) Data cleanup script (once)
+
+Goal: Remove the current mess so your new constraints don’t explode.
+
+Strategy:
+
+For each (user_id, anchor) group: keep the latest (or the one with the most child items), remap child rows (messages/outline) to survivor, delete others.
+
+Produce a CSV of merges for audit.
+
+Minimal code you’ll likely need to touch
+
+Backend
+
+db/migrations/* – add unique index + new cols as needed
+
+models/project.* – add conversation_id / normalized_key
+
+routes/projects.(py|ts|go) – make Create idempotent (find-or-create)
+
+middleware/correlation_id.(ts|py|go) – inject/propagate X-Correlation-Id
+
+Frontend
+
+services/ProjectManager.ts – single ingestion path + mutex + restore flow
+
+stores/ProjectStore.(ts|js) – normalized state, upsert reducer
+
+components/Sidebar/ProjectListSidebar.(tsx|vue) – remove local mutations
+
+services/AuthService.(ts|js) – ensure one auth event; (you already found the missing dispatch—good)
+
+Any place calling createProjectFromConversation or creating during outline generation—route through ProjectManager.createOrGetProject
+
+Hotfix (you can ship today)
+
+Front: Stop sidebar from mutating project arrays. Only dispatch UPSERT_PROJECTS.
+
+Front: Add an in-memory dedupe on fetch:
+
+const unique = Object.values(
+  fetched.reduce((m,p) => (m[p.id]=p, m), {} as Record<string,Project>)
+);
+dispatch(upsertProjects(unique));
+
+
+Back: Wrap create in “check-then-insert catch unique violation → select” logic (even before the migration lands).
+
+UX: Show a skeleton + “Restoring…” message during restore; do not auto-create on login if any projects exist.
+
+Acceptance criteria (MVP-level)
+
+Creating from login + clicking “New Project” within 1s yields one project in DB and in UI.
+
+Reload after login shows projects in <1.5s perceived (skeleton immediately; data by first network roundtrip).
+
+No duplicates in ProjectStore.byId; allIds unique.
+
+Server logs show one successful create or a create that resolves to existing via unique index—never two rows.
