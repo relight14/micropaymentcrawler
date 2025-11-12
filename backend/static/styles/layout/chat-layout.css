@@ -51,7 +51,7 @@
 
 /* Outline builder - right sidebar */
 #outline-builder {
-    display: block;
+    display: none; /* Hidden by default until .visible class is added */
     width: 320px;
     min-width: 320px;
     max-width: 320px;
@@ -61,6 +61,11 @@
     flex-shrink: 0;
     transition: transform 0.3s ease;
     position: relative;
+}
+
+/* Show outline when visible class is added (authenticated + has content) */
+#outline-builder.visible {
+    display: block;
 }
 
 /* Keep .active class for compatibility */
