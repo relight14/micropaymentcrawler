@@ -330,7 +330,8 @@ export class UIManager {
                 selectedSources = [], 
                 query = "",
                 titleOverride = null,
-                customDescription = null
+                customDescription = null,
+                quoteUnavailable = false
             } = purchaseDetails;
             
             const sourceCount = selectedSources.length;
@@ -383,9 +384,17 @@ export class UIManager {
                                     ` : ''}
                                 `}
                                 <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;">
+                                ${quoteUnavailable ? `
+                                    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 4px; padding: 0.75rem; margin-bottom: 1rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; color: #92400e; font-size: 0.875rem;">
+                                            <span>⚠️</span>
+                                            <span><strong>Price estimate unavailable.</strong> Final price will be calculated based on selected sources at checkout.</span>
+                                        </div>
+                                    </div>
+                                ` : ''}
                                 <div class="purchase-item total">
                                     <span class="purchase-label"><strong>Total</strong></span>
-                                    <span class="purchase-value"><strong>${price === 0 ? 'FREE' : `$${Number(price || 0).toFixed(2)}`}</strong></span>
+                                    <span class="purchase-value"><strong>${price === 0 ? 'FREE' : (quoteUnavailable ? `~$${Number(price || 0).toFixed(2)}` : `$${Number(price || 0).toFixed(2)}`)}</strong></span>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 1rem; margin-top: 2rem;">

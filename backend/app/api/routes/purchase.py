@@ -141,6 +141,99 @@ def extract_sources_from_outline(outline_structure: Dict[str, Any]) -> list:
     return unique_sources
 
 
+def calculate_incremental_pricing(user_id: str, query: str, sources: list, logger) -> dict:
+    """
+    Calculate incremental pricing for a purchase.
+    Returns dict with calculated_price, new_source_count, previous_source_count, total_source_count.
+    
+    previous_source_count = sources in current outline that user already owns (intersection)
+    new_source_count = sources in current outline that are new (set difference)
+    total_source_count = all sources in current outline
+    """
+    previous_source_ids = ledger.get_previous_purchase_sources(user_id, query)
+    current_source_ids = set([s.id for s in sources]) if sources else set()
+    
+    if previous_source_ids:
+        previous_ids_set = set(previous_source_ids)
+        
+        # Intersection: sources in current outline that were previously purchased
+        owned_source_ids = current_source_ids & previous_ids_set
+        previous_count = len(owned_source_ids)
+        
+        # Set difference: sources in current outline that are new
+        new_source_ids = current_source_ids - previous_ids_set
+        new_source_count = len(new_source_ids)
+        
+        logger.info(f"💰 [PRICING] Current outline: {len(current_source_ids)} sources | Already owned: {previous_count} | New: {new_source_count}")
+    else:
+        new_source_count = len(current_source_ids)
+        previous_count = 0
+        logger.info(f"💰 [PRICING] First purchase: {new_source_count} sources")
+    
+    # Simple pricing: $0.05 per new source
+    calculated_price = new_source_count * 0.05
+    
+    return {
+        "calculated_price": calculated_price,
+        "new_source_count": new_source_count,
+        "previous_source_count": previous_count,
+        "total_source_count": len(current_source_ids)
+    }
+
+
+@router.get("/quote")
+@limiter.limit("30/minute")
+async def get_pricing_quote(
+    request: Request,
+    tier: str,
+    query: str,
+    outline_structure: str | None = None,  # JSON string
+    authorization: str = Header(None, alias="Authorization")
+):
+    """
+    Get a pricing quote for a research purchase without committing to it.
+    Returns incremental pricing based on outline sources vs previous purchases.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Extract and validate Bearer token
+        access_token = extract_bearer_token(authorization)
+        validate_user_token(access_token)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Parse outline structure from JSON string
+        outline = {}
+        if outline_structure:
+            try:
+                outline = json.loads(outline_structure)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid outline_structure JSON")
+        
+        # Extract sources from outline
+        sources = extract_sources_from_outline(outline)
+        
+        # Calculate incremental pricing
+        pricing_info = calculate_incremental_pricing(user_id, query, sources, logger)
+        
+        logger.info(f"💵 [QUOTE] User {user_id[:8]}... | Query: '{query}' | Tier: {tier}")
+        logger.info(f"💵 [QUOTE] Price: ${pricing_info['calculated_price']:.2f} ({pricing_info['new_source_count']} new sources)")
+        
+        return {
+            "success": True,
+            "tier": tier,
+            "query": query,
+            **pricing_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating pricing quote: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to calculate pricing quote: {str(e)}")
+
+
 @router.post("", response_model=PurchaseResponse)
 @limiter.limit("10/minute")
 async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
@@ -220,21 +313,10 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             # No sources in outline - will be handled per-tier below
             pass
         
-        # Calculate incremental pricing: $0.05 per new source
-        previous_source_ids = ledger.get_previous_purchase_sources(user_id, purchase_request.query)
-        current_source_ids = set([s.id for s in sources]) if sources else set()
-        
-        if previous_source_ids:
-            previous_ids_set = set(previous_source_ids)
-            new_source_ids = current_source_ids - previous_ids_set
-            new_source_count = len(new_source_ids)
-            logger.info(f"💰 [PRICING] Previous: {len(previous_ids_set)} sources, Current: {len(current_source_ids)} sources, New: {new_source_count} sources")
-        else:
-            new_source_count = len(current_source_ids)
-            logger.info(f"💰 [PRICING] First purchase: {new_source_count} sources")
-        
-        # Simple pricing: $0.05 per new source
-        calculated_price = new_source_count * 0.05
+        # Calculate incremental pricing using shared function
+        pricing_info = calculate_incremental_pricing(user_id, purchase_request.query, sources, logger)
+        calculated_price = pricing_info["calculated_price"]
+        new_source_count = pricing_info["new_source_count"]
         
         # Tier configurations - now just for max_sources limits
         tier_configs = {

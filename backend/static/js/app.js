@@ -136,8 +136,8 @@ export class ChatResearchApp {
         });
         
         this.reportBuilder.addEventListener('tierPurchase', (e) => {
-            const { tier, price, query, button, useSelectedSources } = e.detail;
-            this.tierManager.purchaseTier(button, tier, price, query, useSelectedSources);
+            const { tier, price, query, button, useSelectedSources, quoteUnavailable } = e.detail;
+            this.tierManager.purchaseTier(button, tier, price, query, useSelectedSources, quoteUnavailable);
         });
         
         // Setup TierManager event listeners

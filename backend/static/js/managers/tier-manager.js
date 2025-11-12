@@ -14,7 +14,7 @@ export class TierManager extends EventTarget {
         this.messageCoordinator = messageCoordinator;
     }
 
-    async purchaseTier(button, tierId, price, query = "Research Query", useSelectedSources = false) {
+    async purchaseTier(button, tierId, price, query = "Research Query", useSelectedSources = false, quoteUnavailable = false) {
         if (!this.authService.isAuthenticated()) {
             this.appState.setPendingAction({ 
                 type: 'tier_purchase', 
@@ -53,7 +53,8 @@ export class TierManager extends EventTarget {
                 tier: tierId,
                 price: price,
                 selectedSources: selectedSources,
-                query: finalQuery
+                query: finalQuery,
+                quoteUnavailable: quoteUnavailable
             };
 
             const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);

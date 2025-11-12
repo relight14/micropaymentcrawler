@@ -23,12 +23,115 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement} The report builder DOM element
      */
     show() {
+        // Render DOM with static pricing first (optimistic render)
         const container = this._generateReportBuilderDOM();
         
         // Attach event listeners after DOM is created
         setTimeout(() => this._attachTierPurchaseListeners(), 0);
         
+        // Fetch dynamic pricing asynchronously and patch DOM when ready
+        this._fetchAndUpdatePricing();
+        
         return container;
+    }
+    
+    /**
+     * Fetch pricing quotes and update DOM when ready
+     * @private
+     */
+    async _fetchAndUpdatePricing() {
+        if (!this.authService.isAuthenticated()) {
+            // User not logged in - keep default pricing
+            return;
+        }
+        
+        const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+        const outlineStructure = projectStore.getOutlineSnapshot();
+        
+        try {
+            // Fetch quotes for both tiers in parallel
+            const [researchQuote, proQuote] = await Promise.all([
+                this.apiService.getPricingQuote('research', query, outlineStructure),
+                this.apiService.getPricingQuote('pro', query, outlineStructure)
+            ]);
+            
+            this.pricingQuotes = {
+                research: researchQuote,
+                pro: proQuote
+            };
+            
+            console.log('💵 Pricing quotes fetched:', this.pricingQuotes);
+            
+            // Update tier cards with dynamic pricing
+            this._updateTierCardPricing('research', researchQuote);
+            this._updateTierCardPricing('pro', proQuote);
+            
+        } catch (error) {
+            console.error('Failed to fetch pricing quotes:', error);
+            this.pricingQuotes = {};
+        }
+    }
+    
+    /**
+     * Update tier card with dynamic pricing
+     * @param {string} tierId - Tier ID (research/pro)
+     * @param {Object} quote - Pricing quote object
+     * @private
+     */
+    _updateTierCardPricing(tierId, quote) {
+        const tierCard = document.querySelector(`[data-tier-id="${tierId}"]`);
+        if (!tierCard) return;
+        
+        const priceElement = tierCard.querySelector('.tier-price');
+        const detailsElement = tierCard.querySelector('.tier-pricing-details');
+        
+        if (!priceElement) return;
+        
+        // Check if quote is unavailable (error fallback)
+        if (quote.quote_unavailable) {
+            const price = quote.calculated_price || 0;
+            priceElement.textContent = `$${price.toFixed(2)}`;
+            
+            if (detailsElement) {
+                detailsElement.textContent = 'Quote unavailable — showing list price';
+                detailsElement.style.display = 'block';
+                detailsElement.style.color = '#999';
+            }
+            
+            // Mark tier card with quote unavailable flag
+            tierCard.dataset.quoteUnavailable = 'true';
+            tierCard.dataset.actualPrice = price.toFixed(2);
+            return;
+        }
+        
+        const price = quote.calculated_price || 0;
+        const newSourceCount = quote.new_source_count || 0;
+        const previousSourceCount = quote.previous_source_count || 0;
+        
+        // Update price display
+        priceElement.textContent = `$${price.toFixed(2)}`;
+        
+        // Update pricing details with full transparency
+        if (detailsElement) {
+            detailsElement.style.color = '#666'; // Reset color for successful quotes
+            
+            if (previousSourceCount > 0) {
+                // Incremental purchase - show previous + new sources
+                detailsElement.textContent = `${previousSourceCount} already owned, ${newSourceCount} new at $0.05 each`;
+                detailsElement.style.display = 'block';
+            } else if (newSourceCount > 0) {
+                // First purchase
+                detailsElement.textContent = `${newSourceCount} source${newSourceCount !== 1 ? 's' : ''} at $0.05 each`;
+                detailsElement.style.display = 'block';
+            } else {
+                // No sources (edge case)
+                detailsElement.textContent = 'No new sources to purchase';
+                detailsElement.style.display = 'block';
+            }
+        }
+        
+        // Update data attribute for purchase flow
+        tierCard.dataset.actualPrice = price.toFixed(2);
     }
 
     /**
@@ -692,6 +795,7 @@ export class ReportBuilder extends EventTarget {
         const cardDiv = document.createElement('div');
         cardDiv.className = tier.highlighted ? 'tier-card tier-card-pro' : 'tier-card tier-card-research';
         cardDiv.dataset.tier = tier.id;
+        cardDiv.dataset.tierId = tier.id; // For DOM querying in price updates
         
         const badgeHTML = tier.badge ? `<div class="tier-badge">${tier.badge}</div>` : '';
         const microcopyHTML = tier.microcopy ? `<div class="tier-microcopy">${tier.microcopy}</div>` : '';
@@ -701,7 +805,8 @@ export class ReportBuilder extends EventTarget {
             ${badgeHTML}
             <div class="tier-icon">${tier.icon}</div>
             <h4 class="tier-title-new">${tier.title}</h4>
-            <div class="tier-price-new">${tier.priceLabel}</div>
+            <div class="tier-price tier-price-new">${tier.priceLabel}</div>
+            <div class="tier-pricing-details" style="display: none; font-size: 0.8rem; color: #666; margin-top: 4px;"></div>
             <div class="tier-subtitle">${tier.subtitle}</div>
             <ul class="tier-features-compact">
                 ${tier.features.map(feature => `<li>✓ ${feature}</li>`).join('')}
@@ -810,8 +915,15 @@ export class ReportBuilder extends EventTarget {
         purchaseButtons.forEach(button => {
             button.addEventListener('click', async (e) => {
                 const tier = e.target.dataset.tier;
-                const price = parseFloat(e.target.dataset.price);
                 const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+                
+                // Read actual price from tier card (dynamic pricing) or fall back to static
+                const tierCard = e.target.closest('[data-tier-id]');
+                const actualPrice = tierCard?.dataset.actualPrice;
+                const quoteUnavailable = tierCard?.dataset.quoteUnavailable === 'true';
+                const price = actualPrice ? parseFloat(actualPrice) : parseFloat(e.target.dataset.price);
+                
+                console.log(`💰 Purchase initiated - Tier: ${tier}, Price: $${price.toFixed(2)} ${actualPrice ? '(dynamic)' : '(static fallback)'}, Quote unavailable: ${quoteUnavailable}`);
                 
                 const selectedSources = this.appState.getSelectedSources();
                 const useSelectedSources = selectedSources && selectedSources.length > 0;
@@ -822,7 +934,8 @@ export class ReportBuilder extends EventTarget {
                         price, 
                         query,
                         button: e.target,
-                        useSelectedSources
+                        useSelectedSources,
+                        quoteUnavailable
                     }
                 }));
             });

@@ -340,6 +340,41 @@ export class APIService {
         }, 'Article summarization failed');
     }
 
+    async getPricingQuote(tierId, query, outlineStructure = null) {
+        const params = new URLSearchParams({
+            tier: tierId,
+            query: query
+        });
+        
+        if (outlineStructure) {
+            params.append('outline_structure', JSON.stringify(outlineStructure));
+        }
+        
+        try {
+            const response = await this._fetchWithRetry(
+                `${this.baseURL}/api/purchase/quote?${params.toString()}`,
+                {
+                    method: 'GET',
+                    headers: this.getAuthHeaders()
+                },
+                'Failed to get pricing quote'
+            );
+            
+            return response;
+        } catch (error) {
+            console.error('Error fetching pricing quote:', error);
+            // Return fallback indicating quote is unavailable
+            return {
+                success: false,
+                quote_unavailable: true,
+                calculated_price: tierId === 'research' ? 0.35 : 0.65,
+                new_source_count: null,
+                previous_source_count: null,
+                total_source_count: null
+            };
+        }
+    }
+
     async purchaseTier(tierId, price, query = "Research Query", selectedSources = null, outlineStructure = null) {
         // Generate stable idempotency key for this purchase attempt
         const userId = this.authService.getUserId();
