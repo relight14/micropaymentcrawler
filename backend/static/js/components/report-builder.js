@@ -64,6 +64,27 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
+     * Get merged selected sources from both AppState and ProjectStore
+     * Deduplicates by source ID to handle dual-state scenarios
+     * @returns {Array} Merged and deduplicated sources array
+     * @private
+     */
+    _getMergedSelectedSources() {
+        const projectStoreSources = projectStore?.getState?.().selectedSources || [];
+        const appStateSources = this.appState.getSelectedSources() || [];
+        
+        // Merge and deduplicate by ID
+        const sourceMap = new Map();
+        [...projectStoreSources, ...appStateSources].forEach(source => {
+            if (source && source.id) {
+                sourceMap.set(source.id, source);
+            }
+        });
+        
+        return Array.from(sourceMap.values());
+    }
+
+    /**
      * Shows the report builder interface
      * @returns {HTMLElement} The report builder DOM element
      */
