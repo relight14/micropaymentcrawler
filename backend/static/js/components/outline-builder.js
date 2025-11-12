@@ -31,6 +31,8 @@ export class OutlineBuilder extends EventTarget {
         if (!projectId) {
             this.sections = [];
             this.selectedSources = [];
+            projectStore.setSelectedSources([]);
+            console.log(`[Sync] Cleared selected sources from ProjectStore (logout)`);
             this.render();
             return;
         }
@@ -58,9 +60,16 @@ export class OutlineBuilder extends EventTarget {
             // Populate selected sources pool with all sources from outline
             this.selectedSources = allSources;
             
+            // Sync to ProjectStore (canonical source of truth)
+            projectStore.setSelectedSources(allSources);
+            console.log(`[Sync] Loaded ${allSources.length} sources from outline to ProjectStore`);
+            
             this.render();
         } else {
-            // New project or empty outline - fetch AI suggestions
+            // New project or empty outline - clear sources and fetch AI suggestions
+            this.selectedSources = [];
+            projectStore.setSelectedSources([]);
+            console.log(`[Sync] Cleared selected sources from ProjectStore (new project)`);
             await this.fetchAndApplyAISuggestions();
         }
     }

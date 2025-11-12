@@ -1,6 +1,7 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
 import { getBudgetThresholds } from '../config/tier-catalog.js';
+import { projectStore } from '../state/project-store.js';
 
 export class SourceManager extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager, modalController }) {
@@ -326,6 +327,12 @@ export class SourceManager extends EventTarget {
 
     toggleSelection(sourceId, sourceData) {
         const isSelected = this.appState.toggleSourceSelection(sourceId, sourceData);
+        
+        // Sync to ProjectStore (canonical source of truth for UI/reports)
+        const selectedSources = this.appState.getSelectedSources();
+        projectStore.setSelectedSources(selectedSources);
+        console.log(`[Sync] selectedSources count: ${selectedSources.length}`);
+        
         this.updateSelectionUI();
         
         AppEvents.dispatchEvent(new CustomEvent(

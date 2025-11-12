@@ -149,6 +149,16 @@ export class ProjectManager {
     }
 
     /**
+     * Sync selected sources from AppState (sessionStorage) to ProjectStore (runtime)
+     * Called during login to restore pre-login source selections
+     */
+    syncSelectedSourcesFromAppState() {
+        const selectedSources = this.appState.getSelectedSources();
+        projectStore.setSelectedSources(selectedSources);
+        logger.info(`[Sync] Restored ${selectedSources.length} selected sources from session to ProjectStore`);
+    }
+
+    /**
      * Handle user login - triggered by authStateChanged event
      * Preserves pre-login chat and migrates it to a new project
      * Uses one-shot guard to prevent duplicate migration if event fires multiple times
@@ -171,6 +181,9 @@ export class ProjectManager {
         // 1) Load projects first so we can dedupe against them
         await this.loadProjectsWithGuard();
         projectStore.setProjects(this.sidebar.projects); // sync store NOW
+        
+        // 1.5) Sync selected sources from session storage to ProjectStore
+        this.syncSelectedSourcesFromAppState();
         
         // 2) One-shot guarded migration
         if (hasPreLoginChat && !this.hasMigratedLoginChat) {
