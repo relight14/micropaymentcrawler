@@ -75,6 +75,35 @@ export class MessageCoordinator {
     }
 
     /**
+     * Build a message DOM element without appending to DOM
+     * Used for off-DOM rendering (DocumentFragment batching)
+     * @param {Object} messageRecord - Message from database/state
+     * @param {Object} options - Build options
+     * @returns {HTMLElement} - Message DOM element ready to append
+     */
+    buildMessageElement(messageRecord, options = {}) {
+        // Normalize message structure
+        const metadata = messageRecord.message_data?.metadata || messageRecord.metadata || null;
+        const content = messageRecord.content;
+        const sender = messageRecord.sender;
+        
+        // Parse HTML content for UI rendering
+        const uiContent = MessageRenderer.parseHtml(content);
+        
+        // Create normalized message object for renderer
+        const message = {
+            id: messageRecord.id,
+            sender,
+            content: uiContent,
+            metadata,
+            timestamp: messageRecord.timestamp || new Date()
+        };
+        
+        // Create and return DOM element without appending
+        return MessageRenderer.createMessageElement(message);
+    }
+
+    /**
      * Restore a single message from persistence
      * SINGLE SOURCE OF TRUTH for rendering persisted messages
      * @param {Object} messageRecord - Message from database/state
