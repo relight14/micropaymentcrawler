@@ -16,6 +16,51 @@ export class ReportBuilder extends EventTarget {
         this.authService = authService;
         this.toastManager = toastManager;
         this.uiManager = uiManager;
+        this.pricingRefreshDebounceTimer = null;
+        this.sourceSelectionHandler = null;
+        this.isActive = false;
+    }
+    
+    /**
+     * Setup listener for source selection changes to refresh pricing
+     * @private
+     */
+    _setupSourceSelectionListener() {
+        // Remove existing listener if any
+        if (this.sourceSelectionHandler) {
+            document.removeEventListener('sourceSelectionChanged', this.sourceSelectionHandler);
+        }
+        
+        // Create bound handler for cleanup
+        this.sourceSelectionHandler = () => {
+            if (!this.isActive) return; // Only refresh if builder is active
+            
+            if (this.pricingRefreshDebounceTimer) {
+                clearTimeout(this.pricingRefreshDebounceTimer);
+            }
+            
+            this.pricingRefreshDebounceTimer = setTimeout(() => {
+                console.log('📊 Source selection changed - refreshing pricing');
+                this._fetchAndUpdatePricing();
+            }, 500);
+        };
+        
+        document.addEventListener('sourceSelectionChanged', this.sourceSelectionHandler);
+    }
+    
+    /**
+     * Cleanup listeners when builder is no longer needed
+     */
+    destroy() {
+        this.isActive = false;
+        if (this.sourceSelectionHandler) {
+            document.removeEventListener('sourceSelectionChanged', this.sourceSelectionHandler);
+            this.sourceSelectionHandler = null;
+        }
+        if (this.pricingRefreshDebounceTimer) {
+            clearTimeout(this.pricingRefreshDebounceTimer);
+            this.pricingRefreshDebounceTimer = null;
+        }
     }
 
     /**
@@ -23,6 +68,15 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement} The report builder DOM element
      */
     show() {
+        // Clean up any previous state first (singleton pattern protection)
+        if (this.isActive) {
+            this.destroy();
+        }
+        
+        // Mark as active and setup listener
+        this.isActive = true;
+        this._setupSourceSelectionListener();
+        
         // Render DOM with static pricing first (optimistic render)
         const container = this._generateReportBuilderDOM();
         
@@ -40,8 +94,8 @@ export class ReportBuilder extends EventTarget {
      * @private
      */
     async _fetchAndUpdatePricing() {
-        if (!this.authService.isAuthenticated()) {
-            // User not logged in - keep default pricing
+        // Defensive guard - don't refresh if builder is inactive
+        if (!this.isActive || !this.authService.isAuthenticated()) {
             return;
         }
         
@@ -164,38 +218,104 @@ export class ReportBuilder extends EventTarget {
             const reportPacket = await this.apiService.generateReport(query, tier, selectedSources, outlineStructure);
             
             if (reportPacket) {
-                // Track report generation
-                analytics.trackReportGenerate(selectedSources.length, tier);
-                
-                // Update button state
-                if (button) {
-                    button.textContent = 'Report Generated';
-                    button.disabled = true;
-                }
-                
-                // Dispatch success event with report data
-                this.dispatchEvent(new CustomEvent('reportGenerated', {
-                    detail: {
-                        reportData: reportPacket,
-                        tier,
-                        sourceCount: selectedSources.length
-                    }
-                }));
+                this._handleReportSuccess(button, tier, selectedSources, reportPacket);
             }
         } catch (error) {
-            console.error('Error generating report:', error);
-            
-            // Dispatch error event
-            this.dispatchEvent(new CustomEvent('reportError', {
-                detail: { error, tier }
-            }));
-            
-            // Reset button state
-            if (button) {
-                button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
-                button.disabled = false;
-            }
+            this._handleReportError(button, tier, error);
         }
+    }
+    
+    /**
+     * Handle successful report generation
+     * @private
+     */
+    _handleReportSuccess(button, tier, selectedSources, reportPacket) {
+        // Track report generation
+        analytics.trackReportGenerate(selectedSources.length, tier);
+        
+        // Update button state
+        if (button) {
+            button.textContent = 'Report Generated';
+            button.disabled = true;
+        }
+        
+        // Show success toast
+        if (this.toastManager) {
+            this.toastManager.show(`${tier === 'research' ? 'Research' : 'Pro'} report generated successfully`, 'success');
+        }
+        
+        // Dispatch success event with report data
+        this.dispatchEvent(new CustomEvent('reportGenerated', {
+            detail: {
+                reportData: reportPacket,
+                tier,
+                sourceCount: selectedSources.length
+            }
+        }));
+    }
+    
+    /**
+     * Handle report generation errors
+     * @private
+     */
+    _handleReportError(button, tier, error) {
+        console.error('Error generating report:', error);
+        
+        // Parse error message for user-friendly display
+        const errorMessage = this._parseErrorMessage(error);
+        
+        // Show error toast with retry guidance
+        if (this.toastManager) {
+            this.toastManager.show(errorMessage, 'error');
+        }
+        
+        // Dispatch error event
+        this.dispatchEvent(new CustomEvent('reportError', {
+            detail: { error, tier, userMessage: errorMessage }
+        }));
+        
+        // Reset button state
+        if (button) {
+            button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
+            button.disabled = false;
+        }
+    }
+    
+    /**
+     * Parse error into user-friendly message with retry guidance
+     * @private
+     */
+    _parseErrorMessage(error) {
+        // Check if we have structured error from backend
+        if (error.retryGuidance) {
+            return `${error.message}. ${error.retryGuidance}`;
+        }
+        
+        const errorStr = error?.message || String(error);
+        
+        // Handle specific error types
+        if (errorStr.includes('insufficient funds') || errorStr.includes('balance')) {
+            return 'Insufficient wallet balance. Please add funds and try again.';
+        }
+        
+        if (errorStr.includes('401') || errorStr.includes('unauthorized') || errorStr.includes('session')) {
+            return 'Your session expired. Please log in again.';
+        }
+        
+        if (errorStr.includes('429') || errorStr.includes('rate limit')) {
+            return 'Too many requests. Please wait a moment and try again.';
+        }
+        
+        if (errorStr.includes('timeout') || errorStr.includes('timed out')) {
+            return 'Request timed out. Please check your connection and try again.';
+        }
+        
+        if (errorStr.includes('network') || errorStr.includes('fetch')) {
+            return 'Network error. Please check your connection and try again.';
+        }
+        
+        // Generic fallback with retry guidance
+        return 'Report generation failed. Please try again or contact support if the issue persists.';
     }
 
     /**

@@ -154,6 +154,7 @@ export class AppState {
             this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
             this._saveToStorage('selectedSources', this.selectedSources);
             this._syncSelectedSourcesToProjectStore();
+            this._dispatchSourceSelectionEvent();
             return false; // Deselected
         } else {
             // Immutable addition with conversation scoping
@@ -166,6 +167,7 @@ export class AppState {
             this.selectedSources = [...this.selectedSources, newSource];
             this._saveToStorage('selectedSources', this.selectedSources);
             this._syncSelectedSourcesToProjectStore();
+            this._dispatchSourceSelectionEvent();
             return true; // Selected
         }
     }
@@ -194,6 +196,7 @@ export class AppState {
         this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
         this._saveToStorage('selectedSources', this.selectedSources);
         this._syncSelectedSourcesToProjectStore();
+        this._dispatchSourceSelectionEvent();
     }
 
     canAddMoreSources(tierType) {
@@ -377,5 +380,19 @@ export class AppState {
         } catch (error) {
             console.error('Failed to sync selected sources to ProjectStore:', error);
         }
+    }
+    
+    /**
+     * Dispatch source selection changed event for reactive updates
+     * @private
+     */
+    _dispatchSourceSelectionEvent() {
+        const event = new CustomEvent('sourceSelectionChanged', {
+            detail: { 
+                count: this.selectedSources.length,
+                total: this.getSelectedSourcesTotal()
+            }
+        });
+        document.dispatchEvent(event);
     }
 }

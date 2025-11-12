@@ -3,7 +3,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import time
 import json
 import base64
@@ -16,6 +16,27 @@ from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 
 router = APIRouter()
+
+
+class StructuredHTTPException(HTTPException):
+    """HTTPException with structured error metadata for frontend"""
+    
+    def __init__(
+        self,
+        status_code: int,
+        error_type: str,
+        message: str,
+        retry_guidance: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        # Store structured data in detail as JSON-serializable dict
+        detail = {
+            "type": error_type,
+            "message": message,
+            "retry_guidance": retry_guidance or "Please try again later.",
+            "details": details or {}
+        }
+        super().__init__(status_code=status_code, detail=detail)
 
 # Import shared crawler instance after router to avoid circular imports
 import sys
@@ -442,9 +463,21 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             if "error" in payment_result:
                 error_msg = ledewire.handle_api_error(payment_result)
                 if "insufficient" in error_msg.lower():
-                    raise HTTPException(status_code=402, detail=f"Insufficient funds: {error_msg}")
+                    raise StructuredHTTPException(
+                        status_code=402,
+                        error_type="insufficient_funds",
+                        message="Insufficient wallet balance",
+                        retry_guidance="Please add funds to your wallet and try again.",
+                        details={"error_detail": error_msg}
+                    )
                 else:
-                    raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
+                    raise StructuredHTTPException(
+                        status_code=402,
+                        error_type="payment_failed",
+                        message="Payment processing failed",
+                        retry_guidance="Please check your wallet status and try again, or contact support.",
+                        details={"error_detail": error_msg}
+                    )
             
             transaction_id = payment_result.get("transaction_id") or f"fallback_txn_{uuid.uuid4().hex[:12]}"
             wallet_id = payment_result.get("wallet_id")
@@ -488,4 +521,11 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", {"error": str(e)}, "failed")
         except:
             pass
-        raise HTTPException(status_code=500, detail="Purchase processing failed")
+        
+        raise StructuredHTTPException(
+            status_code=500,
+            error_type="server_error",
+            message="Report generation failed",
+            retry_guidance="Please try again in a moment. If the issue persists, contact support.",
+            details={"error_detail": str(e)}
+        )

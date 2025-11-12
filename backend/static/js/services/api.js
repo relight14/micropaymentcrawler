@@ -501,6 +501,31 @@ export class APIService {
             
             if (!response.ok) {
                 this._handle401(response);
+                
+                // Try to parse error response
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (jsonParseError) {
+                    // If JSON parsing fails, throw generic error
+                    throw new Error(`Report generation failed: ${response.statusText}`);
+                }
+                
+                // Check for structured error in detail (StructuredHTTPException format)
+                if (errorData.detail && typeof errorData.detail === 'object' && errorData.detail.type) {
+                    const structuredError = new Error(errorData.detail.message);
+                    structuredError.type = errorData.detail.type;
+                    structuredError.retryGuidance = errorData.detail.retry_guidance;
+                    structuredError.details = errorData.detail.details;
+                    throw structuredError;
+                }
+                
+                // Fallback to plain detail string
+                if (errorData.detail) {
+                    throw new Error(errorData.detail);
+                }
+                
+                // Final fallback
                 throw new Error(`Report generation failed: ${response.statusText}`);
             }
             
