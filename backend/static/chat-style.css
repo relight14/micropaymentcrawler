@@ -648,6 +648,13 @@ body {
     background: var(--primary);
 }
 
+/* Restoring Overlay - Flicker-free project loading */
+#messagesContainer.restoring {
+    opacity: 0.6;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
 /* Welcome Screen */
 .welcome-screen {
     display: flex;
