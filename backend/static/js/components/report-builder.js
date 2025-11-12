@@ -75,13 +75,22 @@ export class ReportBuilder extends EventTarget {
         
         // Merge and deduplicate by ID
         const sourceMap = new Map();
-        [...projectStoreSources, ...appStateSources].forEach(source => {
-            if (source && source.id) {
+        const sourcesWithoutId = [];
+        
+        [...projectStoreSources, ...appStateSources].forEach((source, index) => {
+            if (!source) return; // Skip null/undefined
+            
+            if (source.id) {
                 sourceMap.set(source.id, source);
+            } else {
+                // Preserve sources without ID using index as fallback key
+                console.warn('⚠️ Source without ID detected, preserving with index key:', source);
+                sourcesWithoutId.push(source);
             }
         });
         
-        return Array.from(sourceMap.values());
+        // Return merged sources (ID-based + non-ID sources)
+        return [...Array.from(sourceMap.values()), ...sourcesWithoutId];
     }
 
     /**
@@ -154,14 +163,17 @@ export class ReportBuilder extends EventTarget {
      * @private
      */
     _updateTierCardPricing(tierId, quote) {
-        // Null-guard: return early if quote is missing
+        const tierCard = document.querySelector(`[data-tier-id="${tierId}"]`);
+        if (!tierCard) {
+            console.warn(`⚠️ Tier card not found for: ${tierId}`);
+            return;
+        }
+        
+        // Null-guard: return early if quote is missing (after DOM check)
         if (!quote) {
             console.warn(`⚠️ No quote provided for tier: ${tierId}`);
             return;
         }
-        
-        const tierCard = document.querySelector(`[data-tier-id="${tierId}"]`);
-        if (!tierCard) return;
         
         const priceElement = tierCard.querySelector('.tier-price');
         const detailsElement = tierCard.querySelector('.tier-pricing-details');
@@ -737,13 +749,21 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
-     * Escapes CSV field values (handles quotes, commas, newlines)
+     * Escapes CSV field values (handles quotes, commas, newlines, formula injection)
      * @private
      */
     _escapeCSV(field) {
         if (field == null) return '';
         
-        const stringField = String(field);
+        let stringField = String(field);
+        
+        // Security: Prevent CSV formula injection by escaping dangerous prefixes
+        // Excel/Google Sheets interpret =, +, -, @, tab, CR as formula starters
+        // Also check for Unicode variants and leading whitespace
+        const trimmed = stringField.trimStart();
+        if (/^[=+\-@\t\r]/.test(trimmed) || /^[\u003D\u002B\u002D\u0040]/.test(trimmed)) {
+            stringField = "'" + stringField;
+        }
         
         // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
         if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
