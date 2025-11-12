@@ -507,24 +507,25 @@ export class ChatResearchApp {
             const reportBuilderElement = this.reportBuilder.show();
             this.addMessage('system', reportBuilderElement);
         } else if (mode === 'research') {
-            // FIX A: Auto-fire search when entering research mode
+            // Populate input with existing query if available, but don't auto-run search
             const query = this.appState.getCurrentQuery();
-            if (query && query.trim()) {
-                // Populate input with query and trigger send
-                console.log('🔍 Research mode entered with query - auto-firing search:', query);
-                const chatInput = document.getElementById('newChatInput');
-                if (chatInput) {
-                    chatInput.value = query;
-                    this.sendMessage();
-                }
-                // Note: pendingSearchFromLogin flag is set BEFORE setMode is called (see auth callback)
-                // and checked in SOURCE_SEARCH_TRIGGER listener to prevent duplicates
-            } else {
-                // FIX D: UX nudge when no query available
-                if (this.appState.getConversationHistory().length > 0) {
-                    this.addMessage('system', "📚 Switched to Sources mode - I'll find and license authoritative sources.");
-                }
-                console.log('📚 Research mode entered but no query available');
+            const chatInput = document.getElementById('newChatInput');
+            
+            if (query && query.trim() && chatInput) {
+                chatInput.value = query;
+                this.uiManager.updateCharacterCount();
+            }
+            
+            // Show helpful prompt for user to run search manually
+            if (this.appState.getConversationHistory().length > 0) {
+                this.addMessage('system', "📚 Switched to Sources mode. Enter your research query and click Send to search premium sources.");
+            }
+            
+            console.log('📚 Sources mode entered. User can now run source search manually.');
+            
+            // Focus the input field
+            if (chatInput) {
+                chatInput.focus();
             }
         } else {
             // Add mode change message if there's history
