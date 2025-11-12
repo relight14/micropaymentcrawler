@@ -138,8 +138,8 @@
 }
 
 .project-item.active {
-    background: linear-gradient(135deg, #3730a3 0%, #4338ca 100%);
-    border-color: #4338ca;
+    background: #216aa4;
+    border-color: #216aa4;
 }
 
 .project-info {
