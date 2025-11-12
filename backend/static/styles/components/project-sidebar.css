@@ -36,7 +36,7 @@
 
 .mobile-login-btn {
     padding: 14px 32px;
-    background: linear-gradient(135deg, #3730a3 0%, #4338ca 100%);
+    background: #216aa4;
     color: white;
     border: none;
     border-radius: 8px;
@@ -44,12 +44,13 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(67, 56, 202, 0.3);
+    box-shadow: 0 2px 8px rgba(33, 106, 164, 0.25);
 }
 
 .mobile-login-btn:hover {
+    background: #1a5683;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(67, 56, 202, 0.4);
+    box-shadow: 0 4px 12px rgba(33, 106, 164, 0.35);
 }
 
 .mobile-login-btn:active {
@@ -95,7 +96,7 @@
 .new-project-btn {
     margin: 16px;
     padding: 10px 16px;
-    background: linear-gradient(135deg, #3730a3 0%, #4338ca 100%);
+    background: #216aa4;
     color: white;
     border: none;
     border-radius: 6px;
@@ -103,13 +104,13 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(55, 48, 163, 0.3);
+    box-shadow: 0 2px 8px rgba(33, 106, 164, 0.25);
 }
 
 .new-project-btn:hover {
-    background: linear-gradient(135deg, #312e81 0%, #3730a3 100%);
+    background: #1a5683;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(55, 48, 163, 0.4);
+    box-shadow: 0 4px 12px rgba(33, 106, 164, 0.35);
 }
 
 .projects-list {

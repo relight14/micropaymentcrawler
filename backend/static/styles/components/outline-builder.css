@@ -85,7 +85,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: linear-gradient(135deg, #6B9FF5 0%, #7AA7FF 100%);
+    background: #216aa4;
     color: white;
     border: none;
     border-radius: 6px;
@@ -94,13 +94,13 @@
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(107, 159, 245, 0.25);
+    box-shadow: 0 2px 8px rgba(33, 106, 164, 0.25);
 }
 
 .build-packet-btn:hover {
-    background: linear-gradient(135deg, #5A8EE4 0%, #6B9FF5 100%);
+    background: #1a5683;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(107, 159, 245, 0.35);
+    box-shadow: 0 4px 12px rgba(33, 106, 164, 0.35);
 }
 
 .save-indicator {
@@ -144,19 +144,19 @@
     padding: 10px 16px;
     font-size: 14px;
     color: #ffffff !important;
-    background: linear-gradient(135deg, #6B9FF5 0%, #7AA7FF 100%);
+    background: #216aa4;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 500;
-    box-shadow: 0 2px 8px rgba(107, 159, 245, 0.25);
+    box-shadow: 0 2px 8px rgba(33, 106, 164, 0.25);
 }
 
 .upload-file-btn:hover {
-    background: linear-gradient(135deg, #5A8EE4 0%, #6B9FF5 100%);
+    background: #1a5683;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(107, 159, 245, 0.35);
+    box-shadow: 0 4px 12px rgba(33, 106, 164, 0.35);
 }
 
 .upload-file-btn:active {
@@ -361,7 +361,7 @@
 .add-section-btn {
     margin: 16px;
     padding: 10px 16px;
-    background: linear-gradient(135deg, #6B9FF5 0%, #7AA7FF 100%);
+    background: #216aa4;
     color: white;
     border: none;
     border-radius: 6px;
@@ -369,13 +369,13 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(107, 159, 245, 0.25);
+    box-shadow: 0 2px 8px rgba(33, 106, 164, 0.25);
 }
 
 .add-section-btn:hover {
-    background: linear-gradient(135deg, #5A8EE4 0%, #6B9FF5 100%);
+    background: #1a5683;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(107, 159, 245, 0.35);
+    box-shadow: 0 4px 12px rgba(33, 106, 164, 0.35);
 }
 
 /* Mobile responsive - layout positioning handled by layout/chat-layout.css */
