@@ -478,7 +478,7 @@ export class ChatResearchApp {
                 type: 'mode_switch', 
                 mode: 'research' 
             });
-            this.modalController.showAuthModal();
+            this.modalController.showAuthModal('Sign in to search premium sources');
             return;
         }
         
