@@ -1,0 +1,41 @@
+1) Does this component control all research reports?
+
+It controls the UI flow for report purchase/generation and the rendering of reports.
+
+It does not “own” reports end-to-end: pricing and generation are delegated to the backend via apiService and the rest of the app (e.g., the tier purchase event is emitted for someone else to handle). If another module calls apiService.generateReport(...) directly, it can bypass this UI.
+
+2) Will any Pro/Research elements not fire right now? Yes. Concretely:
+
+Dynamic pricing won’t update: ReportBuilder calls apiService.getPricingQuote(...), but that method doesn’t exist in your APIService. Result: cards keep static pricing; data-actualPrice/quoteUnavailable are never set.
+
+Selected sources list UI never renders: _createSelectedSourcesSection(...) is never appended in _generateReportBuilderDOM(). The remove buttons and cost summary won’t appear.
+
+Source set may be empty: generateReport() reads sources from appState.getSelectedSources(). If you moved the canonical state to ProjectStore (as recommended), and didn’t mirror to AppState, Pro/Research reports will generate without sources.
+
+Pro-only sections depend on backend fields:
+
+conflicts and research_directions only render if the backend returns them in reportData. If your Pro pipeline doesn’t populate these, those sections won’t show.
+
+CSV export only appears for table format (table_data). If the backend returns markdown-only, the table and export button won’t render.
+
+Auth gating: if not logged in, _fetchAndUpdatePricing() is skipped and generateReport() emits authRequired—no report generation.
+
+Tight fixes to make everything fire:
+
+Implement APIService.getPricingQuote(tier, query, outline) returning { calculated_price, new_source_count, previous_source_count, quote_unavailable? }.
+
+Append the selected sources section in _generateReportBuilderDOM():
+
+const selected = this.appState.getSelectedSources();
+contentArea.appendChild(
+  this._createSelectedSourcesSection(selected, selected.length, this.appState.getSelectedSourcesTotal())
+);
+
+
+Unify selection source: read from projectStore.state.selectedSources (or mirror AppState → ProjectStore before opening the builder).
+
+Ensure the Pro pipeline returns conflicts, research_directions, and table_data for Pro; for Research, return at least summary (and optionally table).
+
+Keep displayReport() tolerant: it already falls back to markdown if table_data is missing—good.
+
+If you do those, both tiers’ features will render as intended, and pricing/report flows won’t silently degrade.
