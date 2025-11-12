@@ -1,0 +1,38 @@
+Setting up profile dropdown: Object
+projects-controller.js:30 📦 ProjectsController: Attaching with dependencies...
+projects-controller.js:48 📦 ProjectsController: Event listeners set up
+project-sidebar.js:33 🔧 [ProjectListSidebar] init() called Object
+project-sidebar.js:43 🔧 [ProjectListSidebar] User authenticated - skipping render (will load via loadInitialData)
+logger.js:2 📋 [ProjectManager] Loading projects...
+project-sidebar.js:306 🔧 [ProjectListSidebar] render() called Object
+project-sidebar.js:321 🔧 [ProjectListSidebar] isMobile: false
+logger.js:2 ✅ [ProjectManager] Projects loaded successfully
+outline-builder.js:48 [Sync] Cleared selected sources from ProjectStore (logout)
+projects-controller.js:52 📦 ProjectsController: ProjectManager initialized
+project-sidebar.js:156 🔄 [ProjectSidebar] Loading project 56...
+project-sidebar.js:306 🔧 [ProjectListSidebar] render() called Object
+project-sidebar.js:321 🔧 [ProjectListSidebar] isMobile: false
+logger.js:2 ⚡ [ProjectManager] Project loading started immediately: Object
+projects-controller.js:116 ⚡ AppEvents: Project loading started Object
+source-manager.js:368 Sources selected: 0
+report-builder.js:1121 Report builder display updated
+project-sidebar.js:197 ✅ [ProjectSidebar] Project data loaded: Object
+analytics.js:24 [Analytics] project_loaded Object
+logger.js:2 📊 [ProjectManager] Handling project switch: Object
+logger.js:2 ✅ [ProjectManager] Restored research query: "i'm interested in the historical context of the conflict and current perspectives on what's happening"
+outline-builder.js:892 🔘 Build Packet button found: true
+outline-builder.js:78 [Sync] Loaded 0 sources from outline to ProjectStore
+outline-builder.js:892 🔘 Build Packet button found: true
+logger.js:2 📨 [ProjectManager] Loading messages for project 56...
+logger.js:2 📬 [ProjectManager] Fetched 8 messages
+app-state.js:111 Duplicate message prevented: i'm interested in the historical context of the conflict and current perspectives on what's happenin
+addMessage @ app-state.js:111Understand this warning
+app-state.js:111 Duplicate message prevented: Okay, great, let's dive into the historical context and current perspectives on the conflict in Myan
+addMessage @ app-state.js:111Understand this warning
+logger.js:2 ✅ Restored research data with 15 sources
+logger.js:2 ✅ [ProjectManager] Loaded and displayed 8 messages
+outline-builder.js:892 🔘 Build Packet button found: true
+viewport.js:16 📐 [Viewport] Breakpoint changed: {isMobile: true, breakpoint: '(max-width: 768px)'}
+project-sidebar.js:22 🔧 [ProjectListSidebar] Viewport changed, isMobile: true
+project-sidebar.js:306 🔧 [ProjectListSidebar] render() called {isAuthenticated: true, projectCount: 14, activeProjectId: 56, windowWidth: 704}
+project-sidebar.js:321 🔧 [ProjectListSidebar] isMobile: true
