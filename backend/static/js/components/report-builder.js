@@ -639,6 +639,11 @@ export class ReportBuilder extends EventTarget {
         // Header
         contentArea.appendChild(this._createHeader());
         
+        // Selected sources section (if any sources selected)
+        if (sourceCount > 0) {
+            contentArea.appendChild(this._createSelectedSourcesSection(selectedSources, sourceCount, totalCost));
+        }
+        
         // Tier cards with asymmetric layout
         contentArea.appendChild(this._createTierCardsContainer());
         

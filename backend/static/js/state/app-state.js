@@ -138,6 +138,7 @@ export class AppState {
         this._saveToStorage('conversationHistory', []);
         this._saveToStorage('selectedSources', []);
         this._saveToStorage('conversationId', this.conversationId);
+        this._syncSelectedSourcesToProjectStore();
     }
 
     getConversationHistory() {
@@ -152,6 +153,7 @@ export class AppState {
             // Immutable removal
             this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
             this._saveToStorage('selectedSources', this.selectedSources);
+            this._syncSelectedSourcesToProjectStore();
             return false; // Deselected
         } else {
             // Immutable addition with conversation scoping
@@ -163,6 +165,7 @@ export class AppState {
             };
             this.selectedSources = [...this.selectedSources, newSource];
             this._saveToStorage('selectedSources', this.selectedSources);
+            this._syncSelectedSourcesToProjectStore();
             return true; // Selected
         }
     }
@@ -190,6 +193,7 @@ export class AppState {
     removeSelectedSource(sourceId) {
         this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
         this._saveToStorage('selectedSources', this.selectedSources);
+        this._syncSelectedSourcesToProjectStore();
     }
 
     canAddMoreSources(tierType) {
@@ -360,5 +364,18 @@ export class AppState {
     clearCachedSummaries() {
         this.purchasedSummaries = {};
         this._saveToStorage('purchasedSummaries', {});
+    }
+
+    /**
+     * Sync selected sources to ProjectStore to maintain state consistency
+     * @private
+     */
+    async _syncSelectedSourcesToProjectStore() {
+        try {
+            const { projectStore } = await import('./project-store.js');
+            projectStore.setState({ selectedSources: [...this.selectedSources] });
+        } catch (error) {
+            console.error('Failed to sync selected sources to ProjectStore:', error);
+        }
     }
 }
