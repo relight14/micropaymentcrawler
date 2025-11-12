@@ -409,14 +409,32 @@ export class ProjectManager {
 
     /**
      * Load and display messages for a specific project
+     * Uses overlay + DocumentFragment for flicker-free restoration
      * @param {number} projectId - The ID of the project
      */
     async loadProjectMessages(projectId) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        
         try {
+            // Guard against concurrent restores
+            if (this._isRestoring) {
+                logger.warn(`⚠️  [ProjectManager] Already restoring messages, skipping...`);
+                return;
+            }
+            
             logger.info(`📨 [ProjectManager] Loading messages for project ${projectId}...`);
             
-            // Clear current chat UI while preserving mode
-            this.clearChatInterface();
+            // Set restoring flag and add overlay CSS (dims without clearing)
+            this._isRestoring = true;
+            if (messagesContainer) {
+                messagesContainer.classList.add('restoring');
+            }
+            
+            // Remove report builder if present (can't restore across mode boundaries)
+            const reportBuilder = messagesContainer?.querySelector('.report-builder-interface');
+            if (reportBuilder) {
+                reportBuilder.remove();
+            }
             
             // Fetch messages from API
             const response = await this.apiService.getProjectMessages(projectId);
@@ -424,31 +442,27 @@ export class ProjectManager {
             
             logger.info(`📬 [ProjectManager] Fetched ${messages.length} messages`);
             
-            // Clear AppState conversation history to prevent duplicates
-            this.appState.clearConversation();
-            
             if (messages.length === 0) {
-                // Show welcome message for empty project
+                // Clear and show welcome message for empty project
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                }
+                this.appState.clearConversation();
+                
                 const projectTitle = projectStore.state.activeProjectTitle || 'this project';
                 this.messageCoordinator.addMessage('system', `🎯 Welcome to "${projectTitle}". Start your research here.`, null, { skipPersist: true });
                 logger.info(`ℹ️  [ProjectManager] No messages found, showing welcome message`);
             } else {
-                // Track the most recent research data while restoring messages
+                // Build all messages off-DOM in DocumentFragment
+                const fragment = document.createDocumentFragment();
                 let mostRecentResearchData = null;
                 
-                // Restore each message using MessageCoordinator
+                // Build messages into fragment
                 for (const messageRecord of messages) {
-                    // Add to AppState
-                    this.appState.addMessage(
-                        messageRecord.sender === 'ai' ? 'assistant' : messageRecord.sender,
-                        messageRecord.content,
-                        messageRecord.message_data?.metadata || null
-                    );
+                    const messageElement = this.messageCoordinator.buildMessageElement(messageRecord);
+                    fragment.appendChild(messageElement);
                     
-                    // Render the message
-                    this.messageCoordinator.restoreMessage(messageRecord, { skipPersist: true });
-                    
-                    // Extract research data from source cards metadata for restoration
+                    // Extract research data from source cards metadata
                     const metadata = messageRecord.message_data?.metadata;
                     if (metadata?.type === 'source_cards' && metadata?.sources) {
                         mostRecentResearchData = {
@@ -459,7 +473,23 @@ export class ProjectManager {
                     }
                 }
                 
-                // Restore the most recent research data to appState
+                // Single atomic swap: clear + append fragment
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                    messagesContainer.appendChild(fragment);
+                }
+                
+                // Update AppState in single batch after DOM is ready
+                this.appState.clearConversation();
+                for (const messageRecord of messages) {
+                    this.appState.addMessage(
+                        messageRecord.sender === 'ai' ? 'assistant' : messageRecord.sender,
+                        messageRecord.content,
+                        messageRecord.message_data?.metadata || null
+                    );
+                }
+                
+                // Restore research data to appState
                 if (mostRecentResearchData) {
                     this.appState.setCurrentResearchData(mostRecentResearchData);
                     logger.info(`✅ Restored research data with ${mostRecentResearchData.sources.length} sources`);
@@ -474,6 +504,12 @@ export class ProjectManager {
         } catch (error) {
             logger.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);
             this.toastManager.show('Failed to load project messages', 'error');
+        } finally {
+            // Always cleanup restore state, even on errors
+            this._isRestoring = false;
+            if (messagesContainer) {
+                messagesContainer.classList.remove('restoring');
+            }
         }
     }
 
