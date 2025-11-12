@@ -1,5 +1,6 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
+import { getBudgetThresholds } from '../config/tier-catalog.js';
 
 export class SourceManager extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager, modalController }) {
@@ -454,9 +455,7 @@ export class SourceManager extends EventTarget {
     }
 
     checkBudget(totalCost) {
-        const researchBudget = 0.35;
-        const proBudget = 0.65;
-        const warningThreshold = 0.8;
+        const { research: researchBudget, pro: proBudget, warningThreshold } = getBudgetThresholds();
         
         if (totalCost >= proBudget) {
             const warning = `⚠️ Selected sources exceed Pro budget ($${Number(proBudget || 0).toFixed(2)})`;
