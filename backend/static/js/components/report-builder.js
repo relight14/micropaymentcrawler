@@ -753,7 +753,7 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement}
      */
     _generateReportBuilderDOM() {
-        const selectedSources = this.appState.getSelectedSources();
+        const selectedSources = this._getMergedSelectedSources();
         const sourceCount = selectedSources.length;
         const totalCost = this.appState.getSelectedSourcesTotal();
         
@@ -1071,7 +1071,7 @@ export class ReportBuilder extends EventTarget {
                 
                 console.log(`💰 Purchase initiated - Tier: ${tier}, Price: $${price.toFixed(2)} ${actualPrice ? '(dynamic)' : '(static fallback)'}, Quote unavailable: ${quoteUnavailable}`);
                 
-                const selectedSources = this.appState.getSelectedSources();
+                const selectedSources = this._getMergedSelectedSources();
                 const useSelectedSources = selectedSources && selectedSources.length > 0;
                 
                 this.dispatchEvent(new CustomEvent('tierPurchase', {
