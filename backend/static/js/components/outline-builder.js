@@ -149,11 +149,13 @@ export class OutlineBuilder extends EventTarget {
             
             this.render();
         } else {
-            // New project or empty outline - clear sources and fetch AI suggestions
+            // New project or empty outline - clear sections, render immediately, THEN fetch AI
             this.selectedSources = [];
+            this.sections = [];  // Clear sections array immediately
             projectStore.setSelectedSources([]);
             console.log(`[Sync] Cleared selected sources from ProjectStore (new project)`);
-            await this.fetchAndApplyAISuggestions();
+            this.render();  // Force immediate UI update with empty outline
+            await this.fetchAndApplyAISuggestions();  // Then load AI suggestions asynchronously
         }
     }
 

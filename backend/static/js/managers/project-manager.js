@@ -63,20 +63,19 @@ export class ProjectManager {
     setupComponentListeners() {
         // Project sidebar events
         this.sidebar.addEventListener('projectCreated', (e) => {
-            this.handleProjectCreated(e.detail.project);
+            const { project, preserveConversation = false } = e.detail;
+            this.handleProjectCreated(project, { preserveConversation });
         });
 
         // Immediate UI update when project loading starts
         this.sidebar.addEventListener('projectLoadingStarted', (e) => {
-            this.handleProjectLoadingStarted(
-                e.detail.projectId, 
-                e.detail.projectTitle,
-                e.detail.preserveConversation
-            );
+            const { projectId, projectTitle, preserveConversation = false } = e.detail;
+            this.handleProjectLoadingStarted(projectId, projectTitle, preserveConversation);
         });
 
         this.sidebar.addEventListener('projectLoaded', (e) => {
-            this.handleProjectLoaded(e.detail.projectData, e.detail.preserveConversation);
+            const { projectData, preserveConversation = false } = e.detail;
+            this.handleProjectLoaded(projectData, preserveConversation);
         });
 
         this.sidebar.addEventListener('projectDeleted', (e) => {
@@ -207,6 +206,7 @@ export class ProjectManager {
                 if (existing) {
                     newProjectId = existing.id;
                     this.toastManager.show(`🔁 Opening existing project "${existing.title}"`, 'info');
+                    // Will be loaded later in the common loadProject() call
                 } else {
                     const project = await this.createProjectFromConversation(preLoginChat);
                     if (project) {
@@ -286,8 +286,8 @@ export class ProjectManager {
             // Get research query from AppState
             const researchQuery = this.appState.getCurrentQuery() || null;
             
-            // Create new project
-            const project = await this.sidebar.createProject(projectTitle, researchQuery);
+            // Create new project with preserveConversation flag for login migration
+            const project = await this.sidebar.createProject(projectTitle, researchQuery, { preserveConversation: true });
             
             if (!project) {
                 logger.error('Failed to create project');
@@ -356,8 +356,13 @@ export class ProjectManager {
 
     /**
      * Handle project created event
+     * @param {Object} project - The created project
+     * @param {Object} options - Creation options
+     * @param {boolean} options.preserveConversation - If true, preserve chat history (for login migration)
      */
-    handleProjectCreated(project) {
+    handleProjectCreated(project, options = {}) {
+        const { preserveConversation = false } = options;
+        
         // Add to store
         projectStore.addProject(project);
         projectStore.setActiveProject(project.id, project.title, project.research_query);
@@ -367,15 +372,18 @@ export class ProjectManager {
             this.appState.setCurrentQuery(project.research_query);
         }
         
-        // Clear the chat interface for the new project
-        this.clearChatInterface();
-        this.appState.clearConversation();
-        
-        // Reset ProjectStore outline to default (not the previous project's outline)
-        projectStore.setOutline(projectStore.getDefaultOutline());
-        
-        // Set up outline builder with new empty project - passing empty outline triggers AI suggestions
-        this.outlineBuilder.setProject(project.id, { outline: [] });
+        // Only clear chat and outline if NOT preserving conversation (user-initiated new project)
+        if (!preserveConversation) {
+            logger.info(`🧹 [ProjectManager] Clearing chat and outline for new project (preserveConversation: false)`);
+            this.clearChatInterface();
+            this.appState.clearConversation();
+            projectStore.setOutline(projectStore.getDefaultOutline());
+            this.outlineBuilder.setProject(project.id, { outline: [] });
+        } else {
+            logger.info(`💾 [ProjectManager] Preserving conversation for login migration (preserveConversation: true)`);
+            // For login migration, skip outline setup - loadProject() will fetch full data
+            // This prevents destroying the outline of reused projects
+        }
         
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;

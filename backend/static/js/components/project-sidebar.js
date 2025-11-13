@@ -88,8 +88,14 @@ export class ProjectListSidebar extends EventTarget {
 
     /**
      * Create a new project
+     * @param {string} title - Project title
+     * @param {string|null} researchQuery - Optional research query
+     * @param {Object} options - Creation options
+     * @param {boolean} options.preserveConversation - If true, preserve chat history (for login migration)
      */
-    async createProject(title, researchQuery = null) {
+    async createProject(title, researchQuery = null, options = {}) {
+        const { preserveConversation = false } = options;
+        
         try {
             const norm = s => (s || '').toLowerCase().trim();
             const k = `${this.authService.getUserId?.()}:${norm(title)}`;
@@ -98,7 +104,9 @@ export class ProjectListSidebar extends EventTarget {
             if (existing) {
                 this.activeProjectId = existing.id;
                 this.render();
-                this.dispatchEvent(new CustomEvent('projectCreated', { detail: { project: existing } }));
+                this.dispatchEvent(new CustomEvent('projectCreated', { 
+                    detail: { project: existing, preserveConversation } 
+                }));
                 this.toastManager.show('Project already exists — opening it', 'info');
                 return existing;
             }
@@ -127,11 +135,12 @@ export class ProjectListSidebar extends EventTarget {
                 analytics.track('project_created', {
                     project_id: newProject.id,
                     title: newProject.title,
-                    has_research_query: !!researchQuery
+                    has_research_query: !!researchQuery,
+                    preserve_conversation: preserveConversation
                 });
 
                 this.dispatchEvent(new CustomEvent('projectCreated', {
-                    detail: { project: newProject }
+                    detail: { project: newProject, preserveConversation }
                 }));
                 
                 this.toastManager.show('New project created successfully', 'success');
