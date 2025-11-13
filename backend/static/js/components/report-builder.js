@@ -26,10 +26,13 @@ export class ReportBuilder extends EventTarget {
     _getOutlineSourcesFromStore() {
         const outlineSnapshot = projectStore.getOutlineSnapshot();
         
+        console.log('📊 [Report Builder] Getting outline sources:', outlineSnapshot);
+        
         // Flatten all sources from all sections
         const sources = [];
         if (outlineSnapshot && outlineSnapshot.sections) {
             outlineSnapshot.sections.forEach(section => {
+                console.log(`📊 [Report Builder] Section "${section.title}": ${section.sources?.length || 0} sources`);
                 if (section.sources && Array.isArray(section.sources)) {
                     sources.push(...section.sources);
                 }
@@ -38,6 +41,8 @@ export class ReportBuilder extends EventTarget {
         
         const count = sources.length;
         const totalPrice = calculateProPrice(count);
+        
+        console.log(`📊 [Report Builder] Total flattened sources: ${count}, Price: $${totalPrice.toFixed(2)}`);
         
         return { sources, count, totalPrice };
     }
