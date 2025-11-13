@@ -15,7 +15,11 @@ export class TierManager extends EventTarget {
     }
 
     async purchaseTier(button, tierId, price, query = "Research Query", useSelectedSources = false, quoteUnavailable = false) {
+        console.log('🎯 [TierManager] purchaseTier called with:', { button, tierId, price, query, useSelectedSources, quoteUnavailable });
+        console.log('🎯 [TierManager] Is authenticated?', this.authService.isAuthenticated());
+        
         if (!this.authService.isAuthenticated()) {
+            console.log('🔒 [TierManager] User not authenticated - dispatching authRequired event');
             this.appState.setPendingAction({ 
                 type: 'tier_purchase', 
                 button, 
@@ -29,6 +33,7 @@ export class TierManager extends EventTarget {
             return;
         }
 
+        console.log('✅ [TierManager] User authenticated - proceeding with purchase');
         try {
             let selectedSources = [];
             if (useSelectedSources) {
