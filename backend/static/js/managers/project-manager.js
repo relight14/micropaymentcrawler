@@ -290,6 +290,135 @@ export class ProjectManager {
     }
     
     /**
+     * Handle authenticated source query - NEW FLOW for unauthenticated users running source search
+     * CRITICAL: This flow preserves the existing DOM completely (no clear/rebuild)
+     * Used when: User has conversation → clicks "Find Sources" → logs in → source search fires
+     * @param {string} query - The research query to search for sources
+     */
+    async handleAuthenticatedSourceQuery(query) {
+        logger.info(`🔍 [ProjectManager] handleAuthenticatedSourceQuery called with query: "${query}"`);
+        
+        // Preserve chat BEFORE anything else
+        const preLoginChat = this.appState.getConversationHistory();
+        const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
+        
+        // Optimistic UI (cached projects) to avoid blank flash
+        if (projectStore.state.projects?.length) {
+            this.sidebar.projects = projectStore.state.projects;
+            this.sidebar.render();
+        }
+        
+        // 1) Load projects first so we can dedupe against them
+        await this.loadProjectsWithGuard();
+        projectStore.setProjects(this.sidebar.projects); // sync store NOW
+        
+        // 2) Sync selected sources from session storage to ProjectStore
+        this.syncSelectedSourcesFromAppState();
+        
+        // 3) Create or find project from conversation
+        let projectId = null;
+        if (hasPreLoginChat) {
+            this.toastManager.show('💾 Syncing your research...', 'info');
+            
+            try {
+                const firstUserMessage = preLoginChat.find(m => m.sender === 'user');
+                const candidateTitle = this._extractProjectTitle(firstUserMessage?.content);
+                
+                // Check if project with same title exists
+                const existing = this._findExistingProjectByTitle(candidateTitle);
+                if (existing) {
+                    projectId = existing.id;
+                    logger.info(`🔁 Reusing existing project: ${existing.title} (${projectId})`);
+                    this.toastManager.show(`🔁 Using project "${existing.title}"`, 'info');
+                } else {
+                    // Create new project (just metadata, no messages yet)
+                    const project = await this.sidebar.createProject(candidateTitle, query);
+                    if (project) {
+                        projectId = project.id;
+                        logger.info(`✅ Created new project: ${project.title} (${projectId})`);
+                        this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
+                        
+                        // Persist messages to DB in background (non-blocking)
+                        this._persistConversationToProject(projectId, preLoginChat)
+                            .then(() => logger.info(`✅ Background save complete for project ${projectId}`))
+                            .catch(err => logger.error('Background save failed:', err));
+                    }
+                }
+            } catch (err) {
+                logger.error('Failed to create/find project:', err);
+                this.toastManager.show('⚠️ Failed to save conversation', 'error');
+            }
+        }
+        
+        // 4) Set active project metadata WITHOUT rebuilding DOM
+        if (projectId) {
+            const projectData = this.sidebar.projects.find(p => p.id === projectId);
+            if (projectData) {
+                // Update stores only (no DOM manipulation)
+                projectStore.setActiveProject(projectId, projectData.title, query);
+                this.appState.setCurrentQuery(query);
+                
+                // Update outline builder metadata
+                this.outlineBuilder.setProject(projectId, { outline: projectStore.state.currentOutline });
+                
+                // Update sidebar visual state
+                this.sidebar.activeProjectId = projectId;
+                this.sidebar.render();
+                
+                logger.info(`📋 Set active project: ${projectData.title} (${projectId}) - DOM preserved`);
+            }
+        }
+        
+        // 5) Fire source search - this will append results to existing chat
+        if (query && query.trim()) {
+            logger.info(`🔍 Dispatching SOURCE_SEARCH_TRIGGER with query: "${query}"`);
+            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+                detail: { query }
+            }));
+        }
+    }
+
+    /**
+     * Persist conversation messages to project database (background helper)
+     * Does NOT touch DOM - only saves to database
+     * @param {number} projectId - Project ID to save messages to
+     * @param {Array} conversationHistory - Messages to save
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _persistConversationToProject(projectId, conversationHistory) {
+        if (!projectId || !conversationHistory || conversationHistory.length === 0) {
+            return;
+        }
+        
+        try {
+            // Filter to user/assistant messages only
+            const messagesToSave = conversationHistory.filter(msg => 
+                msg.sender === 'user' || msg.sender === 'assistant' || msg.sender === 'ai'
+            );
+            
+            if (messagesToSave.length === 0) {
+                logger.info(`ℹ️ No user/assistant messages to save for project ${projectId}`);
+                return;
+            }
+            
+            logger.info(`💾 Persisting ${messagesToSave.length} messages to project ${projectId}...`);
+            
+            // Save all messages to the project
+            for (const msg of messagesToSave) {
+                const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
+                const messageData = msg.metadata ? { metadata: msg.metadata } : null;
+                await this.apiService.saveMessage(projectId, normalizedSender, msg.content, messageData);
+            }
+            
+            logger.info(`✅ ${messagesToSave.length} messages persisted to project ${projectId}`);
+        } catch (error) {
+            logger.error(`❌ Error persisting messages to project ${projectId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
      * Extract project title from message content
      * @private
      */
