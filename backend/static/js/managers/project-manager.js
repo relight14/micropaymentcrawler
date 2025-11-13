@@ -172,13 +172,15 @@ export class ProjectManager {
     }
 
     /**
-     * Handle user login - triggered by authStateChanged event
+     * Handle user login - FLOW B for traditional login without pending source query
+     * Triggered by authStateChanged event when no source query is pending
      * Preserves pre-login chat and migrates it to a new project
      * Uses one-shot guard to prevent duplicate migration if event fires multiple times
+     * Note: This flow may rebuild DOM when loading existing project
      * ORDER: Load projects first → Migrate if needed → Sync store → Auto-load new project
      */
     async handleLogin() {
-        logger.info(`🔐 [ProjectManager] Auth state changed to authenticated`);
+        logger.info(`🔐 [ProjectManager] FLOW B: handleLogin (traditional)`);
         
         // Preserve chat BEFORE anything else
         const preLoginChat = this.appState.getConversationHistory();
@@ -303,13 +305,13 @@ export class ProjectManager {
     }
     
     /**
-     * Handle authenticated source query - NEW FLOW for unauthenticated users running source search
+     * Handle authenticated source query - FLOW A for unauthenticated users running source search
      * CRITICAL: This flow preserves the existing DOM completely (no clear/rebuild)
      * Used when: User has conversation → clicks "Find Sources" → logs in → source search fires
      * @param {string} query - The research query to search for sources
      */
     async handleAuthenticatedSourceQuery(query) {
-        logger.info(`🔍 [ProjectManager] handleAuthenticatedSourceQuery called with query: "${query}"`);
+        logger.info(`🔍 [ProjectManager] FLOW A: handleAuthenticatedSourceQuery with query: "${query}"`);
         
         // Preserve chat BEFORE anything else
         const preLoginChat = this.appState.getConversationHistory();
@@ -328,9 +330,10 @@ export class ProjectManager {
         // 2) Sync selected sources from session storage to ProjectStore
         this.syncSelectedSourcesFromAppState();
         
-        // 3) Create or find project from conversation
+        // 3) One-shot guarded migration (prevent duplicate if event fires multiple times)
         let projectId = null;
-        if (hasPreLoginChat) {
+        if (hasPreLoginChat && !this.hasMigratedLoginChat) {
+            this.hasMigratedLoginChat = true;
             this.toastManager.show('💾 Syncing your research...', 'info');
             
             try {
@@ -359,6 +362,7 @@ export class ProjectManager {
                 }
             } catch (err) {
                 logger.error('Failed to create/find project:', err);
+                this.hasMigratedLoginChat = false; // allow retry on next login
                 this.toastManager.show('⚠️ Failed to save conversation', 'error');
             }
         }
