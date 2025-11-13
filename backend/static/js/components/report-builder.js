@@ -656,7 +656,7 @@ export class ReportBuilder extends EventTarget {
         progressHeader.innerHTML = `
             <div class="progress-checkmark">✅</div>
             <div class="progress-content">
-                <div class="progress-title">${sourceCount} Vetted Sources Ready</div>
+                <div class="progress-title">${sourceCount} Sources Ready</div>
                 <div class="progress-subtitle">Your Research Package → Report Generation Begins</div>
             </div>
         `;
@@ -694,108 +694,6 @@ export class ReportBuilder extends EventTarget {
         headerDiv.appendChild(headerTitle);
         
         return headerDiv;
-    }
-
-    /**
-     * Creates selected sources section
-     * @private
-     */
-    _createSelectedSourcesSection(selectedSources, sourceCount, totalCost) {
-        const sourcesSection = document.createElement('div');
-        sourcesSection.className = 'selected-sources-section';
-        
-        // Section header
-        const sourcesHeader = document.createElement('h4');
-        sourcesHeader.textContent = `Selected Sources (${sourceCount})`;
-        sourcesSection.appendChild(sourcesHeader);
-        
-        // Sources list
-        const sourcesList = document.createElement('div');
-        sourcesList.className = 'selected-sources-list';
-        
-        selectedSources.forEach(source => {
-            sourcesList.appendChild(this._createSourceItem(source, sourcesHeader, sourcesSection));
-        });
-        
-        sourcesSection.appendChild(sourcesList);
-        
-        // Total cost summary
-        const costSummary = document.createElement('div');
-        costSummary.className = 'sources-cost-summary';
-        costSummary.textContent = `Total licensing cost: $${Number(totalCost || 0).toFixed(2)}`;
-        sourcesSection.appendChild(costSummary);
-        
-        return sourcesSection;
-    }
-
-    /**
-     * Creates individual source item
-     * @private
-     */
-    _createSourceItem(source, sourcesHeader, sourcesSection) {
-        const sourceItem = document.createElement('div');
-        sourceItem.className = 'selected-source-item';
-        
-        // Title (clickable if URL available)
-        const titleDiv = document.createElement('div');
-        titleDiv.className = 'source-title';
-        if (source.url) {
-            const titleLink = document.createElement('a');
-            titleLink.href = source.url;
-            titleLink.target = '_blank';
-            titleLink.textContent = source.title || 'Untitled Source';
-            titleDiv.appendChild(titleLink);
-        } else {
-            titleDiv.textContent = source.title || 'Untitled Source';
-        }
-        
-        // Author and domain
-        const metaDiv = document.createElement('div');
-        metaDiv.className = 'source-meta';
-        const authorText = source.author ? `${source.author} • ` : '';
-        const domainText = source.domain || 'Unknown Domain';
-        metaDiv.textContent = `${authorText}${domainText}`;
-        
-        // Excerpt
-        const excerptDiv = document.createElement('div');
-        excerptDiv.className = 'source-excerpt';
-        excerptDiv.textContent = source.excerpt || 'No preview available.';
-        
-        // Licensing and remove button
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'source-actions';
-        
-        // Licensing protocol badge
-        if (source.licensing_protocol) {
-            const licenseSpan = document.createElement('span');
-            licenseSpan.className = `license-badge ${source.licensing_protocol.toLowerCase()}`;
-            licenseSpan.textContent = source.licensing_protocol;
-            actionsDiv.appendChild(licenseSpan);
-        }
-        
-        // Remove button
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'source-remove-btn';
-        removeBtn.textContent = '🗑️';
-        removeBtn.title = 'Remove from selection';
-        removeBtn.onclick = () => {
-            this.appState.toggleSourceSelection(source.id, source);
-            sourceItem.remove();
-            // Update header count
-            const remaining = this.appState.getSelectedSourcesCount();
-            sourcesHeader.textContent = `Selected Sources (${remaining})`;
-            if (remaining === 0) {
-                sourcesSection.remove();
-            }
-        };
-        actionsDiv.appendChild(removeBtn);
-        
-        sourceItem.appendChild(titleDiv);
-        sourceItem.appendChild(metaDiv);
-        sourceItem.appendChild(excerptDiv);
-        sourceItem.appendChild(actionsDiv);
-        
-        return sourceItem;
     }
 
     /**

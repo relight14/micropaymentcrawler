@@ -15,8 +15,8 @@
 
 /* Progress Narrative Header */
 .tier-progress-header {
-    background: linear-gradient(135deg, #f0fdf4 0%, #ecfccb 100%);
-    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+    padding: 0.75rem 1.5rem;
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -46,13 +46,13 @@
 
 /* Main Content Area */
 .tier-selection-content {
-    padding: 1.5rem 1.5rem;
+    padding: 1rem 1.5rem;
 }
 
 /* Header Styling */
 .tier-cards-header {
     text-align: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .tier-cards-header h3 {
@@ -64,10 +64,10 @@
 
 /* Asymmetric Tier Cards Layout */
 .tier-cards-asymmetric {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
+    display: flex;
+    justify-content: center;
     gap: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 /* Base Tier Card Styles */
@@ -75,12 +75,14 @@
     background: var(--bg-card);
     border: 2px solid var(--border-light);
     border-radius: var(--radius-lg);
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
     position: relative;
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
     min-height: auto;
+    width: 100%;
+    max-width: 450px;
 }
 
 /* Pro Card - Larger with Glow */
@@ -118,7 +120,7 @@
 /* Icon Styling */
 .tier-icon {
     font-size: 1.75rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.3rem;
     text-align: center;
 }
 
@@ -127,7 +129,7 @@
     font-size: 1.1rem;
     font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
-    margin: 0 0 0.35rem 0;
+    margin: 0 0 0.25rem 0;
     text-align: center;
 }
 
@@ -135,7 +137,7 @@
     font-size: 1.75rem;
     font-weight: var(--font-weight-bold);
     color: var(--ledewire-yellow);
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.15rem;
     line-height: 1;
     text-align: center;
 }
@@ -143,7 +145,7 @@
 .tier-subtitle {
     font-size: 0.85rem;
     color: var(--text-secondary);
-    margin-bottom: 0.85rem;
+    margin-bottom: 0.5rem;
     text-align: center;
 }
 
@@ -151,14 +153,14 @@
 .tier-features-compact {
     list-style: none;
     padding: 0;
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.65rem 0;
     flex: 1;
 }
 
 .tier-features-compact li {
     font-size: 0.85rem;
     color: var(--text-primary);
-    padding: 0.3rem 0;
+    padding: 0.2rem 0;
     line-height: 1.3;
 }
 
