@@ -26,23 +26,24 @@ export class ReportBuilder extends EventTarget {
     _getOutlineSourcesFromStore() {
         const outlineSnapshot = projectStore.getOutlineSnapshot();
         
-        console.log('📊 [Report Builder] Getting outline sources:', outlineSnapshot);
-        
-        // Flatten all sources from all sections
-        const sources = [];
+        // Flatten all sources from all sections and DEDUPLICATE by ID
+        const sourceMap = new Map();
         if (outlineSnapshot && outlineSnapshot.sections) {
             outlineSnapshot.sections.forEach(section => {
-                console.log(`📊 [Report Builder] Section "${section.title}": ${section.sources?.length || 0} sources`);
                 if (section.sources && Array.isArray(section.sources)) {
-                    sources.push(...section.sources);
+                    section.sources.forEach(source => {
+                        // Only add if it has an ID and we haven't seen it before
+                        if (source && source.id && !sourceMap.has(source.id)) {
+                            sourceMap.set(source.id, source);
+                        }
+                    });
                 }
             });
         }
         
+        const sources = Array.from(sourceMap.values());
         const count = sources.length;
         const totalPrice = calculateProPrice(count);
-        
-        console.log(`📊 [Report Builder] Total flattened sources: ${count}, Price: $${totalPrice.toFixed(2)}`);
         
         return { sources, count, totalPrice };
     }
@@ -137,6 +138,7 @@ export class ReportBuilder extends EventTarget {
         const price = quote.calculated_price || 0;
         const newSourceCount = quote.new_source_count || 0;
         const previousSourceCount = quote.previous_source_count || 0;
+        const totalSourceCount = newSourceCount + previousSourceCount;
         
         // Update price display
         priceElement.textContent = `$${price.toFixed(2)}`;
@@ -145,6 +147,12 @@ export class ReportBuilder extends EventTarget {
         if (buttonElement) {
             buttonElement.textContent = `Generate Pro Report — $${price.toFixed(2)}`;
             buttonElement.dataset.price = price.toFixed(2);
+        }
+        
+        // Update header source count with backend's authoritative count
+        const progressTitle = document.querySelector('.progress-title');
+        if (progressTitle && totalSourceCount > 0) {
+            progressTitle.textContent = `${totalSourceCount} Sources Ready`;
         }
         
         // Update pricing details with full transparency
