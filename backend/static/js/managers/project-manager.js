@@ -354,6 +354,10 @@ export class ProjectManager {
                         logger.info(`✅ Created new project: ${project.title} (${projectId})`);
                         this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
                         
+                        // CRITICAL: Add new project to sidebar list immediately so it can be found below
+                        await this.sidebar.loadProjects();
+                        projectStore.setProjects(this.sidebar.projects);
+                        
                         // Persist messages to DB in background (non-blocking)
                         this._persistConversationToProject(projectId, preLoginChat)
                             .then(() => logger.info(`✅ Background save complete for project ${projectId}`))
@@ -365,10 +369,28 @@ export class ProjectManager {
                 this.hasMigratedLoginChat = false; // allow retry on next login
                 this.toastManager.show('⚠️ Failed to save conversation', 'error');
             }
+        } else if (!hasPreLoginChat) {
+            // Edge case: No conversation but query exists (user typed query without sending messages)
+            // Create minimal project with just the query
+            logger.info('⚠️ No pre-login chat but query exists - creating minimal project');
+            try {
+                const project = await this.sidebar.createProject('Research Query', query);
+                if (project) {
+                    projectId = project.id;
+                    logger.info(`✅ Created minimal project for query: ${project.title} (${projectId})`);
+                    
+                    // Reload projects to ensure new project is in sidebar list
+                    await this.sidebar.loadProjects();
+                    projectStore.setProjects(this.sidebar.projects);
+                }
+            } catch (err) {
+                logger.error('Failed to create minimal project:', err);
+            }
         }
         
         // 4) Set active project metadata WITHOUT rebuilding DOM
         if (projectId) {
+            // Reload projects to ensure we have the latest list (in case creation just happened)
             const projectData = this.sidebar.projects.find(p => p.id === projectId);
             if (projectData) {
                 // Update stores only (no DOM manipulation)
@@ -383,15 +405,25 @@ export class ProjectManager {
                 this.sidebar.render();
                 
                 logger.info(`📋 Set active project: ${projectData.title} (${projectId}) - DOM preserved`);
+            } else {
+                logger.error(`❌ Project ${projectId} not found in sidebar list after creation - cannot set active`);
+                projectId = null; // CRITICAL: Clear projectId to prevent source search without active project
+                this.hasMigratedLoginChat = false; // Reset flag to allow retry
             }
+        } else {
+            logger.warn('⚠️ No project established - resetting migration flag');
+            this.hasMigratedLoginChat = false; // Reset flag to allow retry
         }
         
-        // 5) Fire source search - this will append results to existing chat
-        if (query && query.trim()) {
+        // 5) Fire source search ONLY if we have an active project
+        if (projectId && query && query.trim()) {
             logger.info(`🔍 Dispatching SOURCE_SEARCH_TRIGGER with query: "${query}"`);
             AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
                 detail: { query }
             }));
+        } else if (!projectId && query) {
+            logger.error('❌ Cannot fire source search - no active project established');
+            this.toastManager.show('⚠️ Please create or select a project first', 'warning');
         }
     }
 
