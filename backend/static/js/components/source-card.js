@@ -69,6 +69,7 @@ class SourceCard {
         const sourceCard = document.createElement('div');
         sourceCard.className = className;
         sourceCard.setAttribute('data-source-id', source.id);
+        sourceCard.setAttribute('data-source-type', source.source_type || 'journalism');
         
         // Add basic inline styles as fallback
         sourceCard.style.cssText = `

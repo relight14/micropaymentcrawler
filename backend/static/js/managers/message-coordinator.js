@@ -14,6 +14,23 @@ export class MessageCoordinator {
         // Report/Enrichment Status State Machine
         // States: idle → pricing → generating → complete → error
         this.reportStatus = 'idle';
+        
+        // Shared SourceCard instance for building interactive source cards
+        // Singleton pattern prevents accumulating global enrichmentComplete listeners
+        this._sourceCardFactory = null;
+    }
+    
+    /**
+     * Get or create the shared SourceCard factory
+     * Lazy initialization prevents issues when SourceCard isn't loaded yet
+     * @private
+     * @returns {SourceCard} Shared SourceCard instance
+     */
+    _getSourceCardFactory() {
+        if (!this._sourceCardFactory && window.SourceCard) {
+            this._sourceCardFactory = new window.SourceCard(this.appState);
+        }
+        return this._sourceCardFactory;
     }
     
     /**
@@ -87,6 +104,21 @@ export class MessageCoordinator {
         const content = messageRecord.content;
         const sender = messageRecord.sender;
         
+        // Special handling for source cards: recreate with live event listeners
+        if (metadata?.type === 'source_cards' && metadata?.sources?.length > 0) {
+            const interactiveContent = this._buildInteractiveSourceCards(metadata.sources);
+            
+            const message = {
+                id: messageRecord.id,
+                sender,
+                content: interactiveContent,
+                metadata,
+                timestamp: messageRecord.timestamp || new Date()
+            };
+            
+            return MessageRenderer.createMessageElement(message);
+        }
+        
         // Parse HTML content for UI rendering
         const uiContent = MessageRenderer.parseHtml(content);
         
@@ -101,6 +133,158 @@ export class MessageCoordinator {
         
         // Create and return DOM element without appending
         return MessageRenderer.createMessageElement(message);
+    }
+    
+    /**
+     * Build interactive source cards with live event listeners
+     * @private
+     * @param {Array} sources - Array of source objects
+     * @returns {HTMLElement} - Container with interactive source cards
+     */
+    _buildInteractiveSourceCards(sources) {
+        // Get shared SourceCard factory (prevents duplicate global listeners)
+        const sourceCardFactory = this._getSourceCardFactory();
+        
+        if (!sourceCardFactory) {
+            console.error('❌ SourceCard component not available');
+            const errorDiv = document.createElement('div');
+            errorDiv.textContent = 'Error: Unable to load source cards';
+            return errorDiv;
+        }
+        
+        // Create the DOM structure that CSS expects
+        const container = document.createElement('div');
+        container.className = 'sources-preview-section';
+        
+        // Create header section
+        const header = document.createElement('div');
+        header.className = 'preview-header';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Sources Found';
+        
+        const subtitle = document.createElement('p');
+        subtitle.textContent = `Found ${sources.length} sources for your research`;
+        
+        header.appendChild(title);
+        header.appendChild(subtitle);
+        container.appendChild(header);
+        
+        // Add filter chips for source types
+        const filterSection = this._createSourceTypeFilters(sources);
+        container.appendChild(filterSection);
+        
+        // Create individual source cards with live event listeners
+        sources.forEach((source) => {
+            const sourceCard = sourceCardFactory.create(source, {
+                showCheckbox: true,
+                showActions: true
+            });
+            container.appendChild(sourceCard);
+        });
+        
+        // Clear the eventListeners Map to release DOM node references
+        // Event listeners are already attached to DOM nodes and will continue to work
+        // This prevents memory leaks when cards are removed during project/mode switches
+        sourceCardFactory.eventListeners.clear();
+        
+        // Return the live container with event listeners intact
+        // MessageRenderer._createBody() checks instanceof HTMLElement and appends directly
+        return container;
+    }
+    
+    /**
+     * Create source type filter chips
+     * @private
+     * @param {Array} sources - Array of source objects
+     * @returns {HTMLElement} - Filter section element
+     */
+    _createSourceTypeFilters(sources) {
+        const filterSection = document.createElement('div');
+        filterSection.className = 'source-type-filters';
+        
+        // Count sources by type
+        const typeCounts = {
+            'academic': 0,
+            'journalism': 0,
+            'business': 0,
+            'government': 0
+        };
+        
+        sources.forEach(source => {
+            const type = source.source_type || 'journalism';
+            if (typeCounts.hasOwnProperty(type)) {
+                typeCounts[type]++;
+            }
+        });
+        
+        // Filter label
+        const label = document.createElement('span');
+        label.className = 'filter-label';
+        label.textContent = 'Filter:';
+        filterSection.appendChild(label);
+        
+        // Create filter chips with emojis and counts
+        const filterTypes = [
+            { type: 'academic', emoji: '🎓', label: 'Academic' },
+            { type: 'journalism', emoji: '📰', label: 'Journalism' },
+            { type: 'business', emoji: '💼', label: 'Business' },
+            { type: 'government', emoji: '🏛️', label: 'Government' }
+        ];
+        
+        filterTypes.forEach(({ type, emoji, label }) => {
+            const count = typeCounts[type];
+            if (count === 0) return; // Skip if no sources of this type
+            
+            const chip = document.createElement('button');
+            chip.className = 'filter-chip';
+            chip.setAttribute('data-filter-type', type);
+            chip.innerHTML = `${emoji} ${label} <span class="count">${count}</span>`;
+            
+            // Add click handler for filtering
+            chip.addEventListener('click', () => {
+                this._filterSourcesByType(type, chip);
+            });
+            
+            filterSection.appendChild(chip);
+        });
+        
+        return filterSection;
+    }
+    
+    /**
+     * Filter source cards by type
+     * @private
+     * @param {string} filterType - The source type to filter by
+     * @param {HTMLElement} clickedChip - The filter chip that was clicked
+     */
+    _filterSourcesByType(filterType, clickedChip) {
+        const container = clickedChip.closest('.sources-preview-section');
+        if (!container) return;
+        
+        const sourceCards = container.querySelectorAll('.source-card');
+        const filterChips = container.querySelectorAll('.filter-chip');
+        
+        // Toggle active state
+        const isActive = clickedChip.classList.contains('active');
+        
+        if (isActive) {
+            // Deactivate filter - show all cards
+            clickedChip.classList.remove('active');
+            sourceCards.forEach(card => card.style.display = '');
+        } else {
+            // Deactivate all other chips
+            filterChips.forEach(chip => chip.classList.remove('active'));
+            
+            // Activate clicked chip
+            clickedChip.classList.add('active');
+            
+            // Show only matching cards
+            sourceCards.forEach(card => {
+                const cardType = card.getAttribute('data-source-type');
+                card.style.display = cardType === filterType ? '' : 'none';
+            });
+        }
     }
 
     /**
@@ -119,14 +303,20 @@ export class MessageCoordinator {
         const content = messageRecord.content;
         const sender = messageRecord.sender;
         
-        // Parse HTML content for UI rendering using centralized method
-        const uiContent = MessageRenderer.parseHtml(content);
+        // Special handling for source cards: recreate with live event listeners
+        let uiContent;
+        if (metadata?.type === 'source_cards' && metadata?.sources?.length > 0) {
+            uiContent = this._buildInteractiveSourceCards(metadata.sources);
+        } else {
+            // Parse HTML content for UI rendering using centralized method
+            uiContent = MessageRenderer.parseHtml(content);
+        }
         
         // Create normalized message object
         const message = {
             id: messageRecord.id,
             sender,
-            content: uiContent,  // Parsed DOM for UI
+            content: uiContent,  // Interactive DOM for source cards, parsed DOM for others
             metadata,
             timestamp: messageRecord.timestamp
         };
