@@ -96,8 +96,6 @@ export class ProjectListSidebar extends EventTarget {
     async createProject(title, researchQuery = null, options = {}) {
         const { preserveConversation = false } = options;
         
-        console.log('🔧 [ProjectSidebar] createProject called:', { title, researchQuery, preserveConversation });
-        
         try {
             const norm = s => (s || '').toLowerCase().trim();
             const k = `${this.authService.getUserId?.()}:${norm(title)}`;
@@ -141,7 +139,6 @@ export class ProjectListSidebar extends EventTarget {
                     preserve_conversation: preserveConversation
                 });
 
-                console.log('📤 [ProjectSidebar] Dispatching projectCreated event:', { projectId: newProject.id, preserveConversation });
                 this.dispatchEvent(new CustomEvent('projectCreated', {
                     detail: { project: newProject, preserveConversation }
                 }));

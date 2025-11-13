@@ -69,7 +69,6 @@ export class ProjectManager {
         // Project sidebar events
         this.sidebar.addEventListener('projectCreated', (e) => {
             const { project, preserveConversation = false } = e.detail;
-            logger.info('📥 [ProjectManager] Received projectCreated event:', { projectId: project.id, preserveConversation });
             this.handleProjectCreated(project, { preserveConversation });
         });
 
