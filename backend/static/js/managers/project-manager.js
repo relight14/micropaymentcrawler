@@ -496,6 +496,11 @@ export class ProjectManager {
             // Hide welcome screen
             this.hideWelcomeScreen();
             
+            // Scroll to bottom to show latest messages and Find Sources button
+            if (this.uiManager && typeof this.uiManager.scrollToBottom === 'function') {
+                this.uiManager.scrollToBottom();
+            }
+            
         } catch (error) {
             logger.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);
             this.toastManager.show('Failed to load project messages', 'error');
