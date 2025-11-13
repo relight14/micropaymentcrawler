@@ -360,8 +360,19 @@ export class MessageRenderer {
         button.innerHTML = '🔍 Find Sources';
         button.setAttribute('data-topic-hint', topicHint || '');
         
-        // No inline onclick - event delegation handles this via EventRouter
-        // Button click is caught by document-level listener in EventRouter
+        // Direct onclick handler - triggers the same "find sources" flow
+        button.onclick = () => {
+            // Simulate typing "find sources: [topic]" in the input
+            const chatInput = document.getElementById('newChatInput');
+            if (chatInput) {
+                chatInput.value = `find sources: ${topicHint || ''}`.trim();
+                // Trigger the send button click to activate the flow
+                const sendButton = document.getElementById('newSendButton');
+                if (sendButton) {
+                    sendButton.click();
+                }
+            }
+        }
         
         suggestionDiv.appendChild(textSpan);
         suggestionDiv.appendChild(button);
