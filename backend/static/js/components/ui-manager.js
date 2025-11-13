@@ -317,10 +317,12 @@ export class UIManager {
      * Show purchase confirmation modal
      */
     showPurchaseConfirmationModal(purchaseDetails) {
+        console.log('🎯 [UIManager] showPurchaseConfirmationModal called with:', purchaseDetails);
         return new Promise((resolve, reject) => {
             // Remove any existing modal
             const existingModal = document.getElementById('purchaseModal');
             if (existingModal) {
+                console.log('🗑️ [UIManager] Removing existing modal');
                 existingModal.remove();
             }
 
@@ -414,7 +416,9 @@ export class UIManager {
             `;
 
             // Add modal to page
+            console.log('📝 [UIManager] Inserting modal HTML into DOM');
             document.body.insertAdjacentHTML('beforeend', modalHTML);
+            console.log('✅ [UIManager] Modal added to DOM');
 
             // Set up event listeners
             const modal = document.getElementById('purchaseModal');
