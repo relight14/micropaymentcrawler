@@ -1,0 +1,82 @@
+Short answer — because nothing in the code path is reliably producing those values before the response is returned. Concretely, one (or more) of the following is happening in your pipeline:
+
+The report-generation logic never constructs or assigns values for the "conflicts" and "research_directions" fields (they're simply omitted when the ResearchPacket is built).
+The LLM step that composes the human-readable executive summary and table is not being asked (or not being parsed) to return those two fields, so the output doesn't include them.
+The pydantic response model (ResearchPacket) allows those fields but the code that populates the model leaves them unset (optional), so they are absent in the JSON response.
+The conflict analysis and follow-up-question generation are more than a one-step extract and the implementation never calls the helper functions that produce them (or those helper functions are disabled / returning empty values).
+A post-processing validation or sanitization step strips or drops fields not present in expected keys (e.g., code assumes a fixed set and overwrites the packet without these fields).
+Why this is plausible given your repo
+
+generate_research_report is the endpoint that builds the ResearchPacket; we saw many helper functions that extract a brief and build a query, but nothing in the snippets you shared shows conflict-analysis or follow-up-question generation being performed or added to the output.
+You use an LLM (Anthropic) and a number of intermediate steps to build query/brief/source selection — if the prompt to the LLM doesn’t explicitly require structured fields for conflicts and research_directions, the model may only return the summary/table and nothing else.
+The tests and logs you shared indicate some response bodies are being validated and many endpoints are guarded, which can make the code path omit optional fields if not present.
+How to fix it (concrete, prioritized changes)
+
+Confirm model/schema includes the fields
+Ensure the pydantic model that’s used as response_model for generate_research_report (ResearchPacket) includes:
+conflicts: Optional[str] (or a structured object)
+research_directions: Optional[List[str]]
+If these are missing from the model, they will never appear even if you compute them.
+Add explicit conflict analysis and question-generation steps
+Add two helper functions:
+_analyze_conflicts(sources) -> str (returns human-readable analysis of agreement/disagreement)
+_generate_research_directions(brief, sources) -> List[str] (returns 5 follow-up questions)
+Call them in generate_research_report after you have the selected sources and the research brief, then set packet.conflicts and packet.research_directions.
+If you use an LLM to craft the executive results, include explicit instructions in the prompt to return structured JSON with those fields
+For example, instruct the LLM to produce: { "exec_summary": "...", "conflicts": "...", "research_directions": ["q1","q2","q3","q4","q5"], "table": [...] }
+Validate and parse the LLM output carefully. If parsing fails, use local heuristics fallback.
+Add logging and tests
+Log computed conflicts and research directions before packing the response.
+Add an automated test that calls POST /api/research/generate-report and asserts conflicts is a non-empty string and research_directions is an array of length 5.
+Defensive fallback
+If an LLM or helper cannot produce the fields, generate simple fallbacks:
+conflicts: “No major disagreements detected across top sources” or summarize contradictory claims by comparing claims extracted from each source.
+research_directions: generate questions by taking top 5 entities and casting them as follow-ups: e.g., ["What are the primary funding channels for X?", ...].
+Concrete code examples / patches (drop-in) Below are minimal, focused code snippets you can add to backend/app/api/routes/research.py to ensure these fields are computed and included. Adjust helper names to match your codebase.
+
+
+backend/app/api/routes/research.py
+v1
+# Add these helper functions near the other helpers in this file
+
+def _analyze_conflicts(sources: List[SourceCard]) -> str:
+    """
+    Produce a short analysis of agreement/disagreement across sources.
+    Simple heuristic:
+Now integrate these into generate_research_report before returning the ResearchPacket:
+
+
+backend/app/api/routes/research.py
+v2
+# In generate_research_report, after you've built `brief`, `classification`, and `sources`:
+# Example insertion (pseudocode within the function):
+
+    # ... existing flow that gathers sources, crafts summary/table ...
+    brief = _build_research_brief(conversation_context, report_request.query)
+    classification = _classify_intent_and_temporal(brief)
+Ensure ResearchPacket model contains the fields If ResearchPacket is declared in the same file or an imported models module, make sure it includes:
+
+
+backend/app/api/routes/research.py
+v3
+from pydantic import BaseModel
+from typing import List, Optional, Any
+
+class ResearchPacket(BaseModel):
+    topic: str
+    exec_summary: str
+Prompt template for LLM (if using LLM to compose the final packet) If you use a single LLM call to produce the final report, expand the prompt to explicitly require these fields in JSON:
+
+Example top-level instruction: "Return a JSON object with these keys: exec_summary (string), conflicts (string: analysis of agreement/disagreement), research_directions (array of 5 follow-up questions), and sources_table (array). Do not include other fields."
+Add parsing & validation:
+
+After receiving LLM output parse JSON; if conflicts or research_directions missing, call the local heuristic helpers above as a fallback.
+Tests to add
+
+Unit test asserting generate_research_report returns conflicts as non-empty string and research_directions with length 5 when sources are present.
+Integration test where an unauthenticated conversation is used, then produce report and inspect schema.
+Why you might have been seeing empty/missing fields right now
+
+The LLM response or local builder omitted them (not requested in prompt).
+The code created the ResearchPacket but didn't fill the keys (forgot to set packet["conflicts"] / packet["research_directions"]).
+The response model filters optional fields when None, so the client JSON response lacked those keys.
