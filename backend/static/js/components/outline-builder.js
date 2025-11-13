@@ -296,39 +296,19 @@ export class OutlineBuilder extends EventTarget {
 
     /**
      * Handle Build Research Packet button click
-     * Dispatches event for app.js to trigger tier purchase flow
+     * Switches user to Report Builder tab where they can see purchase options
      */
     handleBuildResearchPacket() {
-        console.log('🚀 handleBuildResearchPacket called', {
-            selectedSourcesCount: this.selectedSources.length,
-            sectionsCount: this.sections.length
-        });
+        console.log('🚀 handleBuildResearchPacket - Switching to Report Builder tab');
         
-        // Get research query from projectStore
-        const query = projectStore.getResearchQuery();
-        
-        console.log('📋 Research query from store:', query);
-        
-        if (!query) {
-            this.toastManager.show('No research query found. Please start a new search.', 'error');
-            return;
+        // Switch to Report Builder tab by clicking the header button
+        const reportModeBtn = document.getElementById('reportModeBtn');
+        if (reportModeBtn) {
+            reportModeBtn.click();
+        } else {
+            console.error('❌ Report Builder button not found in header');
+            this.toastManager.show('Unable to switch to Report Builder', 'error');
         }
-        
-        if (this.selectedSources.length === 0) {
-            this.toastManager.show('Please select sources to build your research packet', 'error');
-            return;
-        }
-        
-        console.log('✅ Dispatching buildResearchPacket event');
-        
-        // Dispatch event for app.js to handle tier purchase
-        AppEvents.dispatchEvent(new CustomEvent('buildResearchPacket', {
-            detail: {
-                query: query,
-                selectedSources: this.selectedSources,
-                outlineStructure: this.sections
-            }
-        }));
     }
 
     /**
