@@ -11,12 +11,13 @@ import { analytics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
 
 export class ProjectManager {
-    constructor({ apiService, authService, toastManager, messageCoordinator, appState }) {
+    constructor({ apiService, authService, toastManager, messageCoordinator, appState, sourceManager }) {
         this.apiService = apiService;
         this.authService = authService;
         this.toastManager = toastManager;
         this.messageCoordinator = messageCoordinator;
         this.appState = appState;
+        this.sourceManager = sourceManager;
         
         // Create component instances
         this.sidebar = new ProjectListSidebar({ apiService, authService, toastManager });
@@ -738,6 +739,15 @@ export class ProjectManager {
                 }
                 
                 logger.info(`✅ [ProjectManager] Loaded and displayed ${messages.length} messages`);
+            }
+            
+            // Rehydrate source card click handlers after DOM rebuild
+            if (this.sourceManager && this.sourceManager.sourceCardComponent) {
+                console.log('🔄 REHYDRATE: Calling rehydrateCards after DOM rebuild...');
+                const rehydratedCount = this.sourceManager.sourceCardComponent.rehydrateCards();
+                console.log(`✅ REHYDRATE: Rehydrated ${rehydratedCount} source card handlers`);
+            } else {
+                console.warn('⚠️ REHYDRATE: SourceManager or sourceCardComponent not available');
             }
             
             // Hide welcome screen

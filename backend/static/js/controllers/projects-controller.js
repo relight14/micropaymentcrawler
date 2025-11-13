@@ -40,7 +40,8 @@ export class ProjectsController {
             authService: deps.authService,
             toastManager: deps.toastManager,
             messageCoordinator: deps.messageCoordinator,
-            appState: deps.appState
+            appState: deps.appState,
+            sourceManager: deps.sourceManager
         });
         
         // Set up all event listeners
