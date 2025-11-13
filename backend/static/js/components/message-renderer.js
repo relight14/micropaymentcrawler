@@ -360,17 +360,8 @@ export class MessageRenderer {
         button.innerHTML = '🔍 Find Sources';
         button.setAttribute('data-topic-hint', topicHint || '');
         
-        // Add click handler - auto-execute search
-        button.onclick = () => {
-            // Dispatch custom event that app.js will listen for
-            const event = new CustomEvent('switchToResearch', {
-                detail: { 
-                    topicHint: topicHint || '',
-                    autoExecute: true // Signal to auto-run the search
-                }
-            });
-            document.dispatchEvent(event);
-        };
+        // No inline onclick - event delegation handles this via EventRouter
+        // Button click is caught by document-level listener in EventRouter
         
         suggestionDiv.appendChild(textSpan);
         suggestionDiv.appendChild(button);

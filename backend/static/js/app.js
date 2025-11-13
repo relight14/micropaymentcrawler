@@ -343,7 +343,8 @@ export class ChatResearchApp {
                     this.uiManager.updateCharacterCount();
                     this.uiManager.autoResizeTextarea(e.target);
                 },
-                getDarkModeState: () => this.appState.isDarkModeEnabled()
+                getDarkModeState: () => this.appState.isDarkModeEnabled(),
+                getCurrentQuery: () => this.appState.getCurrentQuery()
             });
 
             // Initialize event listeners
