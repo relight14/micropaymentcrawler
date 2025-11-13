@@ -420,6 +420,21 @@ class ReportGeneratorService:
         
         # PRO TIER: Validate and generate missing advanced sections
         if tier == TierType.PRO:
+            # Debug logging - show what Claude actually returned
+            logger.info("🔍 [PRO VALIDATION] Checking Claude's response for advanced fields:")
+            logger.info(f"   📋 Keys in response: {list(report_dict.keys())}")
+            
+            conflicts_value = report_dict.get('conflicts')
+            logger.info(f"   🔎 'conflicts' field: exists={conflicts_value is not None}, type={type(conflicts_value).__name__ if conflicts_value else 'None'}, length={len(str(conflicts_value)) if conflicts_value else 0}")
+            if conflicts_value:
+                preview = str(conflicts_value)[:100]
+                logger.info(f"   📄 conflicts preview: {preview}...")
+            
+            research_dirs = report_dict.get('research_directions')
+            logger.info(f"   🔎 'research_directions' field: exists={research_dirs is not None}, type={type(research_dirs).__name__ if research_dirs else 'None'}, count={len(research_dirs) if isinstance(research_dirs, list) else 'N/A'}")
+            if research_dirs and isinstance(research_dirs, list):
+                logger.info(f"   📝 research_directions items: {research_dirs}")
+            
             table_data = report_dict.get('table_data', [])
             
             # Check for conflicts field
