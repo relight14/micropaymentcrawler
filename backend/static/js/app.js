@@ -93,7 +93,8 @@ export class ChatResearchApp {
             modalController: this.modalController,
             uiManager: this.uiManager,
             toastManager: this.toastManager,
-            sourceManager: this.sourceManager
+            sourceManager: this.sourceManager,
+            authService: this.authService
         });
         
         // Initialize projects controller (handles all project/outline orchestration)
@@ -507,25 +508,22 @@ export class ChatResearchApp {
             const reportBuilderElement = this.reportBuilder.show();
             this.addMessage('system', reportBuilderElement);
         } else if (mode === 'research') {
-            // Populate input with existing query if available, but don't auto-run search
+            // Auto-fire search when entering research mode
             const query = this.appState.getCurrentQuery();
-            const chatInput = document.getElementById('newChatInput');
-            
-            if (query && query.trim() && chatInput) {
-                chatInput.value = query;
-                this.uiManager.updateCharacterCount();
-            }
-            
-            // Show helpful prompt for user to run search manually
-            if (this.appState.getConversationHistory().length > 0) {
-                this.addMessage('system', "📚 Switched to Sources mode. Enter your research query and click Send to search premium sources.");
-            }
-            
-            console.log('📚 Sources mode entered. User can now run source search manually.');
-            
-            // Focus the input field
-            if (chatInput) {
-                chatInput.focus();
+            if (query && query.trim()) {
+                // Populate input with query and trigger send
+                console.log('🔍 Research mode entered with query - auto-firing search:', query);
+                const chatInput = document.getElementById('newChatInput');
+                if (chatInput) {
+                    chatInput.value = query;
+                    this.sendMessage();
+                }
+            } else {
+                // Show mode switch message when no query available
+                if (this.appState.getConversationHistory().length > 0) {
+                    this.addMessage('system', "📚 Switched to Sources mode - I'll find and license authoritative sources.");
+                }
+                console.log('📚 Research mode entered but no query available');
             }
         } else {
             // Add mode change message if there's history
@@ -735,6 +733,14 @@ export class ChatResearchApp {
             } else if (action.type === 'mode_switch') {
                 // Switch to the pending mode after login
                 this.setMode(action.mode);
+            } else if (action.type === 'research_suggestion') {
+                // User clicked Find Sources before login - now execute the suggestion
+                this.interactionHandler.handleResearchSuggestion(
+                    action.topicHint,
+                    (mode) => this.setMode(mode),
+                    action.autoExecute,
+                    () => this.sendMessage()
+                );
             }
         } catch (error) {
             console.error('Error executing pending action:', error);
