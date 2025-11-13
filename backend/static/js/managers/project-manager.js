@@ -11,12 +11,13 @@ import { analytics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
 
 export class ProjectManager {
-    constructor({ apiService, authService, toastManager, messageCoordinator, appState }) {
+    constructor({ apiService, authService, toastManager, messageCoordinator, appState, injectFindSourcesButtonCallback }) {
         this.apiService = apiService;
         this.authService = authService;
         this.toastManager = toastManager;
         this.messageCoordinator = messageCoordinator;
         this.appState = appState;
+        this.injectFindSourcesButtonCallback = injectFindSourcesButtonCallback;
         
         // Create component instances
         this.sidebar = new ProjectListSidebar({ apiService, authService, toastManager });
@@ -219,6 +220,13 @@ export class ProjectManager {
             
             // No automatic search after login - user must manually trigger search via "Run Source Search" button
             logger.info('✅ Project loaded after login. User can now manually trigger source search.');
+        }
+        
+        // 4) Check for pending "find sources" action and inject button if needed
+        const pendingAction = this.appState.getPendingAction();
+        if (pendingAction?.type === 'find_sources' && this.injectFindSourcesButtonCallback) {
+            logger.info('💡 Pending find sources action detected, injecting button');
+            this.injectFindSourcesButtonCallback(pendingAction.query);
         }
     }
 

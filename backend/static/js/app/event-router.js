@@ -189,43 +189,6 @@ export class EventRouter {
         };
         this._addListener(document, 'click', citationHandler);
         
-        // Find Sources button handler (event delegation)
-        // Scoped to .research-suggestion container to avoid capturing other mode switchers
-        const findSourcesHandler = (e) => {
-            // Only process if click is within a research suggestion
-            const researchSuggestion = e.target.closest('.research-suggestion');
-            if (!researchSuggestion) return;
-            
-            const switchModeBtn = e.target.closest('.switch-mode-btn');
-            if (!switchModeBtn) return;
-            
-            e.preventDefault();
-            
-            // Read context from button's data attribute or fall back to current query
-            let topicHint = switchModeBtn.getAttribute('data-topic-hint') || '';
-            
-            // If no topic hint on button, try to get current query from handler
-            if (!topicHint && this.handlers.getCurrentQuery) {
-                topicHint = this.handlers.getCurrentQuery() || '';
-            }
-            
-            // Guard: only dispatch if we have a query to work with
-            if (!topicHint) {
-                console.warn('Find Sources button clicked but no query available');
-                return;
-            }
-            
-            // Dispatch custom event with autoExecute=true
-            const event = new CustomEvent('switchToResearch', {
-                detail: { 
-                    topicHint: topicHint,
-                    autoExecute: true
-                }
-            });
-            document.dispatchEvent(event);
-        };
-        this._addListener(document, 'click', findSourcesHandler);
-        
         // Feedback button handler
         const feedbackHandler = (e) => {
             const feedbackBtn = e.target.closest('.feedback-btn');
@@ -252,18 +215,6 @@ export class EventRouter {
             }
         };
         this._addListener(document, 'click', feedbackHandler);
-        
-        // Research mode suggestion handler (custom event)
-        const researchSuggestionHandler = (e) => {
-            const topicHint = e.detail?.topicHint || '';
-            const autoExecute = e.detail?.autoExecute || false;
-            console.log('💡 Switching to research mode with topic:', topicHint, 'autoExecute:', autoExecute);
-            
-            if (this.handlers.onResearchSuggestion) {
-                this.handlers.onResearchSuggestion(topicHint, autoExecute);
-            }
-        };
-        this._addListener(document, 'switchToResearch', researchSuggestionHandler);
     }
 
     /**

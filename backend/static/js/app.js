@@ -333,18 +333,11 @@ export class ChatResearchApp {
                 onCitationBadgeClick: (sourceId, price) => this.interactionHandler.handleCitationClick(sourceId, price),
                 onFeedbackSubmit: (query, sourceIds, rating, mode, feedbackSection) => 
                     this.messageCoordinator.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
-                onResearchSuggestion: (topicHint, autoExecute) => this.interactionHandler.handleResearchSuggestion(
-                    topicHint,
-                    (mode) => this.setMode(mode),
-                    autoExecute,
-                    () => this.sendMessage() // Pass sendMessage callback for auto-execution
-                ),
                 onChatInput: (e) => {
                     this.uiManager.updateCharacterCount();
                     this.uiManager.autoResizeTextarea(e.target);
                 },
-                getDarkModeState: () => this.appState.isDarkModeEnabled(),
-                getCurrentQuery: () => this.appState.getCurrentQuery()
+                getDarkModeState: () => this.appState.isDarkModeEnabled()
             });
 
             // Initialize event listeners
@@ -384,7 +377,8 @@ export class ChatResearchApp {
                 sourceManager: this.sourceManager,
                 messageCoordinator: this.messageCoordinator,
                 addMessageCallback: (sender, content, metadata) => this.addMessage(sender, content, metadata),
-                hideWelcomeCallback: () => this.hideWelcomeScreen()
+                hideWelcomeCallback: () => this.hideWelcomeScreen(),
+                injectFindSourcesButtonCallback: (query) => this.injectFindSourcesButton(query)
             });
         } catch (error) {
             console.error('Error initializing app:', error);
@@ -397,6 +391,48 @@ export class ChatResearchApp {
         const message = chatInput?.value?.trim();
         
         if (!message) return;
+        
+        // Detect "find sources" command
+        const findSourcesMatch = message.match(/find sources:?\s*(.*)/i);
+        if (findSourcesMatch || message.toLowerCase() === 'find sources') {
+            chatInput.value = '';
+            this.uiManager.updateCharacterCount();
+            
+            // Add user message to chat
+            this.addMessage('user', message);
+            
+            // Extract the actual research query (text after "find sources")
+            // If user just said "find sources", use last user query from conversation
+            let researchQuery = findSourcesMatch ? findSourcesMatch[1].trim() : '';
+            if (!researchQuery) {
+                researchQuery = this.appState.getCurrentQuery() || '';
+            }
+            
+            // Guard: require a valid query to proceed
+            if (!researchQuery || !researchQuery.trim()) {
+                this.addMessage('system', '⚠️ Please provide a research topic. Try "find sources: [your topic]" or chat first to establish context.');
+                return;
+            }
+            
+            // Set as current query for research flow
+            this.appState.setCurrentQuery(researchQuery);
+            
+            // Set pending action with the query context
+            this.appState.setPendingAction({
+                type: 'find_sources',
+                query: researchQuery
+            });
+            
+            // If not authenticated, show login modal
+            if (!this.authService.isAuthenticated()) {
+                this.modalController.showAuthModal('Sign in to search premium sources');
+                return;
+            }
+            
+            // If authenticated, inject the button directly and stop (don't continue to normal send flow)
+            this.injectFindSourcesButton(researchQuery);
+            return;
+        }
         
         const currentMode = this.appState.getMode();
         
@@ -470,6 +506,50 @@ export class ChatResearchApp {
             this.uiManager.hideTypingIndicator();
             this.addMessage('system', `Sorry, I encountered an error: ${error.message}. Please try again.`);
         }
+    }
+
+    injectFindSourcesButton(query) {
+        console.log('💡 Injecting Find Sources button for query:', query);
+        
+        // Create button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'find-sources-cta';
+        buttonContainer.style.cssText = 'margin: 20px 0; text-align: center;';
+        
+        // Create the button
+        const button = document.createElement('button');
+        button.className = 'primary-button';
+        button.textContent = '🔍 Find Sources';
+        button.style.cssText = 'padding: 12px 24px; font-size: 16px; cursor: pointer;';
+        
+        // Button click handler - one-shot execution
+        button.onclick = () => {
+            console.log('🎯 Find Sources button clicked');
+            
+            // Pre-fill input with query
+            const chatInput = document.getElementById('newChatInput');
+            if (chatInput && query) {
+                chatInput.value = query;
+                this.uiManager.updateCharacterCount();
+            }
+            
+            // Switch to research mode (this auto-fires sendMessage with the query)
+            this.setMode('research');
+            
+            // Remove button after click
+            buttonContainer.remove();
+            
+            // Clear pending action
+            this.appState.clearPendingAction();
+        };
+        
+        buttonContainer.appendChild(button);
+        
+        // Add as system message
+        this.addMessage('system', buttonContainer);
+        
+        // Scroll to bottom
+        this.uiManager.scrollToBottom();
     }
 
     setMode(mode) {
