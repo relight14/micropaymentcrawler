@@ -37,32 +37,27 @@ export class TierManager extends EventTarget {
         try {
             let selectedSources = [];
             if (useSelectedSources) {
-                // Get sources from AppState first, fall back to outline if empty
-                selectedSources = this.appState.getSelectedSources();
-                
-                // If AppState has no sources, get from outline (Report Builder uses outline)
-                if (selectedSources.length === 0) {
-                    const outlineSnapshot = projectStore.getOutlineSnapshot();
-                    if (outlineSnapshot && outlineSnapshot.sections) {
-                        // Flatten and deduplicate sources from outline
-                        const sourceMap = new Map();
-                        outlineSnapshot.sections.forEach(section => {
-                            if (section.sources && Array.isArray(section.sources)) {
-                                section.sources.forEach(source => {
-                                    if (source && source.id && !sourceMap.has(source.id)) {
-                                        sourceMap.set(source.id, source);
-                                    }
-                                });
-                            }
-                        });
-                        selectedSources = Array.from(sourceMap.values());
-                    }
+                // SINGLE SOURCE OF TRUTH: Always get sources from outline (ProjectStore)
+                const outlineSnapshot = projectStore.getOutlineSnapshot();
+                if (outlineSnapshot && outlineSnapshot.sections) {
+                    // Flatten and deduplicate sources from outline (same logic as Report Builder)
+                    const sourceMap = new Map();
+                    outlineSnapshot.sections.forEach(section => {
+                        if (section.sources && Array.isArray(section.sources)) {
+                            section.sources.forEach(source => {
+                                if (source && source.id && !sourceMap.has(source.id)) {
+                                    sourceMap.set(source.id, source);
+                                }
+                            });
+                        }
+                    });
+                    selectedSources = Array.from(sourceMap.values());
                 }
                 
-                console.log('📋 [TierManager] Selected sources count:', selectedSources.length);
+                console.log('📋 [TierManager] Sources from outline:', selectedSources.length);
                 
                 if (selectedSources.length === 0) {
-                    this.toastManager.show('Please select sources first', 'error');
+                    this.toastManager.show('No sources in outline to generate report', 'error');
                     return;
                 }
             }
