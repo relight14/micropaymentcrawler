@@ -346,6 +346,9 @@ export class ProjectManager {
             // User can manually select a project or start a new one
             this.outlineBuilder.setProject(null, null);
             projectStore.setActiveProject(null);
+            
+            // Clear any stale conversation history from sessionStorage
+            this.appState.clearConversation();
         } catch (error) {
             logger.error('Error loading initial data:', error);
         }
@@ -364,8 +367,15 @@ export class ProjectManager {
             this.appState.setCurrentQuery(project.research_query);
         }
         
-        // Set up outline builder with new project
-        this.outlineBuilder.setProject(project.id, { outline: projectStore.state.currentOutline });
+        // Clear the chat interface for the new project
+        this.clearChatInterface();
+        this.appState.clearConversation();
+        
+        // Reset ProjectStore outline to default (not the previous project's outline)
+        projectStore.setOutline(projectStore.getDefaultOutline());
+        
+        // Set up outline builder with new empty project - passing empty outline triggers AI suggestions
+        this.outlineBuilder.setProject(project.id, { outline: [] });
         
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;
@@ -427,7 +437,9 @@ export class ProjectManager {
         
         // SURGICAL FIX: Skip loading messages if preserveConversation is true (login flow)
         // Messages are already in the UI from pre-login chat - no need to reload from DB
+        // If not preserving conversation, clear it before loading new project messages
         if (!preserveConversation) {
+            this.appState.clearConversation();
             await this.loadProjectMessages(projectData.id);
         } else {
             logger.info(`🎯 [ProjectManager] Skipping message reload - conversation preserved from login`);
@@ -587,8 +599,11 @@ export class ProjectManager {
             if (projects.length > 0) {
                 this.sidebar.loadProject(projects[0].id);
             } else {
+                // No projects left - clear everything
                 projectStore.setActiveProject(null);
                 this.outlineBuilder.setProject(null, null);
+                this.appState.clearConversation();
+                this.clearChatInterface();
             }
         }
         
@@ -609,6 +624,10 @@ export class ProjectManager {
         this.outlineBuilder.setProject(null, null);
         this.hasAutoCreatedProject = false;
         this.hasMigratedLoginChat = false; // Reset migration flag for next login
+        
+        // Clear conversation history to prevent old chats from appearing
+        this.appState.clearConversation();
+        this.clearChatInterface();
     }
 
     /**
