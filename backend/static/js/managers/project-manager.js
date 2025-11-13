@@ -185,34 +185,24 @@ export class ProjectManager {
             this.sidebar.render();
         }
         
-        // 1) Load projects first so we can dedupe against them
+        // 1) Load projects first to populate sidebar
         await this.loadProjectsWithGuard();
         projectStore.setProjects(this.sidebar.projects); // sync store NOW
         
         // 1.5) Sync selected sources from session storage to ProjectStore
         this.syncSelectedSourcesFromAppState();
         
-        // 2) One-shot guarded migration
+        // 2) One-shot guarded migration - always create fresh project
         if (hasPreLoginChat && !this.hasMigratedLoginChat) {
             this.hasMigratedLoginChat = true;
             this.toastManager.show('💾 Syncing your research...', 'info');
             
             try {
-                // derive candidate title
-                const firstUserMessage = preLoginChat.find(m => m.sender === 'user');
-                const candidateTitle = this._extractProjectTitle(firstUserMessage?.content);
-                
-                // If a project with the same title exists, reuse it
-                const existing = this._findExistingProjectByTitle(candidateTitle);
-                if (existing) {
-                    newProjectId = existing.id;
-                    this.toastManager.show(`🔁 Opening existing project "${existing.title}"`, 'info');
-                } else {
-                    const project = await this.createProjectFromConversation(preLoginChat);
-                    if (project) {
-                        newProjectId = project.id;
-                        this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
-                    }
+                // Create fresh project from anonymous chat (no deduplication)
+                const project = await this.createProjectFromConversation(preLoginChat);
+                if (project) {
+                    newProjectId = project.id;
+                    this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
                 }
             } catch (err) {
                 logger.error('Failed to migrate login chat:', err);
