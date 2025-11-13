@@ -76,7 +76,7 @@ export class ProjectManager {
         });
 
         this.sidebar.addEventListener('projectLoaded', (e) => {
-            this.handleProjectLoaded(e.detail.projectData);
+            this.handleProjectLoaded(e.detail.projectData, e.detail.preserveConversation);
         });
 
         this.sidebar.addEventListener('projectDeleted', (e) => {
@@ -395,11 +395,12 @@ export class ProjectManager {
     /**
      * Handle project loaded event
      */
-    async handleProjectLoaded(projectData) {
+    async handleProjectLoaded(projectData, preserveConversation = false) {
         logger.info(`📊 [ProjectManager] Handling project switch:`, {
             newProjectId: projectData.id,
             newProjectTitle: projectData.title,
             researchQuery: projectData.research_query,
+            preserveConversation,
             currentAppState: this.appState ? {
                 mode: this.appState.getMode(),
                 messageCount: this.appState.state?.messages?.length || 0
@@ -424,8 +425,13 @@ export class ProjectManager {
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;
         
-        // Load and display project messages
-        await this.loadProjectMessages(projectData.id);
+        // SURGICAL FIX: Skip loading messages if preserveConversation is true (login flow)
+        // Messages are already in the UI from pre-login chat - no need to reload from DB
+        if (!preserveConversation) {
+            await this.loadProjectMessages(projectData.id);
+        } else {
+            logger.info(`🎯 [ProjectManager] Skipping message reload - conversation preserved from login`);
+        }
         
         // Emit global event
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_SWITCHED, {
