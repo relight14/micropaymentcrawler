@@ -78,23 +78,39 @@ export class ProjectManager {
 
         // Listen to auth state changes
         AppEvents.addEventListener('authStateChanged', async (e) => {
+            console.log('🚨🚨🚨 AUTH STATE CHANGED EVENT FIRED', { 
+                isAuthenticated: e.detail.isAuthenticated,
+                timestamp: new Date().toISOString()
+            });
+            
             if (e.detail.isAuthenticated) {
-                // Route to appropriate login handler based on context
+                // Get current query and message count for routing decision
                 const query = this.appState.getCurrentQuery();
+                const messageCount = this.appState.getConversationHistory()?.length || 0;
                 const hasQuery = query && query.trim();
+                
+                console.log('🚨 AUTH ROUTING DECISION:', {
+                    query: query,
+                    hasQuery: hasQuery,
+                    messageCount: messageCount,
+                    decision: hasQuery ? 'FLOW A (preserve DOM)' : 'FLOW B (traditional)'
+                });
                 
                 if (hasQuery) {
                     // Flow A: Unauthenticated user with pending source query
                     // Preserve existing DOM and fire source search
+                    console.log('🔍🔍🔍 ROUTING TO FLOW A - handleAuthenticatedSourceQuery');
                     logger.info('🔍 Routing to handleAuthenticatedSourceQuery (Flow A: preserve DOM)');
                     await this.handleAuthenticatedSourceQuery(query);
                 } else {
                     // Flow B: Regular login without pending source query
                     // Use traditional flow (may rebuild DOM if loading existing project)
+                    console.log('🔐🔐🔐 ROUTING TO FLOW B - handleLogin');
                     logger.info('🔐 Routing to handleLogin (Flow B: traditional)');
                     await this.handleLogin();
                 }
             } else {
+                console.log('🚨 LOGOUT EVENT');
                 this.handleLogout();
             }
         });
@@ -180,10 +196,17 @@ export class ProjectManager {
      * ORDER: Load projects first → Migrate if needed → Sync store → Auto-load new project
      */
     async handleLogin() {
+        const preLoginChat = this.appState.getConversationHistory();
+        const messageCount = preLoginChat?.length || 0;
+        
+        console.log('🔐🔐🔐 FLOW B STARTED - handleLogin', {
+            messageCount: messageCount,
+            hasMigratedLoginChat: this.hasMigratedLoginChat,
+            timestamp: new Date().toISOString()
+        });
         logger.info(`🔐 [ProjectManager] FLOW B: handleLogin (traditional)`);
         
         // Preserve chat BEFORE anything else
-        const preLoginChat = this.appState.getConversationHistory();
         const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
         let newProjectId = null;
         
@@ -311,10 +334,21 @@ export class ProjectManager {
      * @param {string} query - The research query to search for sources
      */
     async handleAuthenticatedSourceQuery(query) {
+        const preLoginChat = this.appState.getConversationHistory();
+        const messageCount = preLoginChat?.length || 0;
+        const messagesContainer = document.getElementById('messagesContainer');
+        const domMessageCount = messagesContainer?.children.length || 0;
+        
+        console.log('🔍🔍🔍 FLOW A STARTED - handleAuthenticatedSourceQuery', {
+            query: query,
+            messageCount: messageCount,
+            domMessageCount: domMessageCount,
+            hasMigratedLoginChat: this.hasMigratedLoginChat,
+            timestamp: new Date().toISOString()
+        });
         logger.info(`🔍 [ProjectManager] FLOW A: handleAuthenticatedSourceQuery with query: "${query}"`);
         
         // Preserve chat BEFORE anything else
-        const preLoginChat = this.appState.getConversationHistory();
         const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
         
         // Optimistic UI (cached projects) to avoid blank flash
@@ -551,6 +585,18 @@ export class ProjectManager {
      * Handle project loaded event
      */
     async handleProjectLoaded(projectData) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        const domMessageCount = messagesContainer?.children.length || 0;
+        
+        console.log('📊📊📊 handleProjectLoaded CALLED - ABOUT TO LOAD PROJECT MESSAGES', {
+            projectId: projectData.id,
+            projectTitle: projectData.title,
+            currentDomMessageCount: domMessageCount,
+            appStateMessageCount: this.appState?.state?.messages?.length || 0,
+            timestamp: new Date().toISOString(),
+            WARNING: '⚠️ This will call loadProjectMessages which CLEARS DOM'
+        });
+        
         logger.info(`📊 [ProjectManager] Handling project switch:`, {
             newProjectId: projectData.id,
             newProjectTitle: projectData.title,
@@ -579,6 +625,7 @@ export class ProjectManager {
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;
         
+        console.log('⚠️⚠️⚠️ ABOUT TO CALL loadProjectMessages - DOM WILL BE CLEARED');
         // Load and display project messages
         await this.loadProjectMessages(projectData.id);
         
@@ -595,10 +642,21 @@ export class ProjectManager {
      */
     async loadProjectMessages(projectId) {
         const messagesContainer = document.getElementById('messagesContainer');
+        const domMessageCountBefore = messagesContainer?.children.length || 0;
+        
+        console.log('💣💣💣 loadProjectMessages CALLED - DOM CLEAR IMMINENT', {
+            projectId: projectId,
+            domMessageCountBefore: domMessageCountBefore,
+            appStateMessageCount: this.appState?.getConversationHistory()?.length || 0,
+            isRestoring: this._isRestoring,
+            timestamp: new Date().toISOString(),
+            CRITICAL: '🔥 This function WILL clear innerHTML and wipe all chat messages'
+        });
         
         try {
             // Guard against concurrent restores
             if (this._isRestoring) {
+                console.log('⚠️ SKIPPING - Already restoring messages');
                 logger.warn(`⚠️  [ProjectManager] Already restoring messages, skipping...`);
                 return;
             }
@@ -626,6 +684,7 @@ export class ProjectManager {
             if (messages.length === 0) {
                 // Clear and show welcome message for empty project
                 if (messagesContainer) {
+                    console.log('🔥🔥🔥 CLEARING DOM NOW - No messages (empty project) - innerHTML = ""');
                     messagesContainer.innerHTML = '';
                 }
                 this.appState.clearConversation();
@@ -656,8 +715,10 @@ export class ProjectManager {
                 
                 // Single atomic swap: clear + append fragment
                 if (messagesContainer) {
+                    console.log('🔥🔥🔥 CLEARING DOM NOW - Atomic swap with ' + messages.length + ' messages - innerHTML = ""');
                     messagesContainer.innerHTML = '';
                     messagesContainer.appendChild(fragment);
+                    console.log('✅ DOM REBUILT with', messages.length, 'messages from database');
                 }
                 
                 // Update AppState in single batch after DOM is ready
