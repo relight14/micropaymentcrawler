@@ -19,6 +19,30 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
+     * Get sources from outline (single source of truth)
+     * @private
+     * @returns {Object} { sources: Array, count: number, totalPrice: number }
+     */
+    _getOutlineSourcesFromStore() {
+        const outlineSnapshot = projectStore.getOutlineSnapshot();
+        
+        // Flatten all sources from all sections
+        const sources = [];
+        if (outlineSnapshot && outlineSnapshot.sections) {
+            outlineSnapshot.sections.forEach(section => {
+                if (section.sources && Array.isArray(section.sources)) {
+                    sources.push(...section.sources);
+                }
+            });
+        }
+        
+        const count = sources.length;
+        const totalPrice = calculateProPrice(count);
+        
+        return { sources, count, totalPrice };
+    }
+
+    /**
      * Shows the report builder interface
      * @returns {HTMLElement} The report builder DOM element
      */
@@ -619,9 +643,8 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement}
      */
     _generateReportBuilderDOM() {
-        const selectedSources = this.appState.getSelectedSources();
-        const sourceCount = selectedSources.length;
-        const totalCost = this.appState.getSelectedSourcesTotal();
+        // Get sources from outline (single source of truth)
+        const { sources, count: sourceCount, totalPrice } = this._getOutlineSourcesFromStore();
         
         // Create modal-style takeover container
         const container = document.createElement('div');
@@ -634,7 +657,7 @@ export class ReportBuilder extends EventTarget {
             <div class="progress-checkmark">✅</div>
             <div class="progress-content">
                 <div class="progress-title">${sourceCount} Vetted Sources Ready</div>
-                <div class="progress-subtitle">Choose Your Research Package → Report Generation Begins</div>
+                <div class="progress-subtitle">Your Research Package → Report Generation Begins</div>
             </div>
         `;
         container.appendChild(progressHeader);
@@ -796,10 +819,8 @@ export class ReportBuilder extends EventTarget {
      * @private
      */
     _createTierCard(tier) {
-        // Calculate dynamic pricing based on selected sources
-        const selectedSources = this.appState.getSelectedSources();
-        const sourceCount = selectedSources.length;
-        const calculatedPrice = calculateProPrice(sourceCount);
+        // Calculate dynamic pricing based on outline sources (single source of truth)
+        const { count: sourceCount, totalPrice: calculatedPrice } = this._getOutlineSourcesFromStore();
         
         const cardDiv = document.createElement('div');
         cardDiv.className = 'tier-card tier-card-pro'; // Only Pro tier now
@@ -878,8 +899,9 @@ export class ReportBuilder extends EventTarget {
                 
                 console.log(`💰 Purchase initiated - Tier: ${tier}, Price: $${price.toFixed(2)} ${actualPrice ? '(dynamic)' : '(static fallback)'}, Quote unavailable: ${quoteUnavailable}`);
                 
-                const selectedSources = this.appState.getSelectedSources();
-                const useSelectedSources = selectedSources && selectedSources.length > 0;
+                // Get sources from outline (single source of truth)
+                const { sources: outlineSources } = this._getOutlineSourcesFromStore();
+                const useSelectedSources = outlineSources && outlineSources.length > 0;
                 
                 this.dispatchEvent(new CustomEvent('tierPurchase', {
                     detail: { 
