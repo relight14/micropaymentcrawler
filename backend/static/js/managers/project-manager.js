@@ -11,13 +11,12 @@ import { analytics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
 
 export class ProjectManager {
-    constructor({ apiService, authService, toastManager, messageCoordinator, appState, injectFindSourcesButtonCallback }) {
+    constructor({ apiService, authService, toastManager, messageCoordinator, appState }) {
         this.apiService = apiService;
         this.authService = authService;
         this.toastManager = toastManager;
         this.messageCoordinator = messageCoordinator;
         this.appState = appState;
-        this.injectFindSourcesButtonCallback = injectFindSourcesButtonCallback;
         
         // Create component instances
         this.sidebar = new ProjectListSidebar({ apiService, authService, toastManager });
@@ -218,15 +217,16 @@ export class ProjectManager {
         if (newProjectId) {
             await this.sidebar.loadProject(newProjectId);
             
-            // No automatic search after login - user must manually trigger search via "Run Source Search" button
-            logger.info('✅ Project loaded after login. User can now manually trigger source search.');
-        }
-        
-        // 4) Check for pending "find sources" action and inject button if needed
-        const pendingAction = this.appState.getPendingAction();
-        if (pendingAction?.type === 'find_sources' && this.injectFindSourcesButtonCallback) {
-            logger.info('💡 Pending find sources action detected, injecting button');
-            this.injectFindSourcesButtonCallback(pendingAction.query);
+            // Only dispatch SOURCE_SEARCH_TRIGGER after restore completes
+            const query = this.appState.getCurrentQuery();
+            if (query && query.trim() && !this._isRestoring) {
+                logger.info('🔍 Dispatching SOURCE_SEARCH_TRIGGER after login with query:', query);
+                AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+                    detail: { query }
+                }));
+            } else if (this._isRestoring) {
+                logger.warn('⚠️ Skipping SOURCE_SEARCH_TRIGGER - project still restoring');
+            }
         }
     }
 
@@ -503,11 +503,6 @@ export class ProjectManager {
             
             // Hide welcome screen
             this.hideWelcomeScreen();
-            
-            // Scroll to bottom to show latest messages and Find Sources button
-            if (this.uiManager && typeof this.uiManager.scrollToBottom === 'function') {
-                this.uiManager.scrollToBottom();
-            }
             
         } catch (error) {
             logger.error(`❌ [ProjectManager] Failed to load messages for project ${projectId}:`, error);

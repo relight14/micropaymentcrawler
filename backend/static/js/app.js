@@ -93,8 +93,7 @@ export class ChatResearchApp {
             modalController: this.modalController,
             uiManager: this.uiManager,
             toastManager: this.toastManager,
-            sourceManager: this.sourceManager,
-            authService: this.authService
+            sourceManager: this.sourceManager
         });
         
         // Initialize projects controller (handles all project/outline orchestration)
@@ -333,6 +332,12 @@ export class ChatResearchApp {
                 onCitationBadgeClick: (sourceId, price) => this.interactionHandler.handleCitationClick(sourceId, price),
                 onFeedbackSubmit: (query, sourceIds, rating, mode, feedbackSection) => 
                     this.messageCoordinator.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
+                onResearchSuggestion: (topicHint, autoExecute) => this.interactionHandler.handleResearchSuggestion(
+                    topicHint,
+                    (mode) => this.setMode(mode),
+                    autoExecute,
+                    () => this.sendMessage() // Pass sendMessage callback for auto-execution
+                ),
                 onChatInput: (e) => {
                     this.uiManager.updateCharacterCount();
                     this.uiManager.autoResizeTextarea(e.target);
@@ -377,8 +382,7 @@ export class ChatResearchApp {
                 sourceManager: this.sourceManager,
                 messageCoordinator: this.messageCoordinator,
                 addMessageCallback: (sender, content, metadata) => this.addMessage(sender, content, metadata),
-                hideWelcomeCallback: () => this.hideWelcomeScreen(),
-                injectFindSourcesButtonCallback: (query) => this.injectFindSourcesButton(query)
+                hideWelcomeCallback: () => this.hideWelcomeScreen()
             });
         } catch (error) {
             console.error('Error initializing app:', error);
@@ -391,48 +395,6 @@ export class ChatResearchApp {
         const message = chatInput?.value?.trim();
         
         if (!message) return;
-        
-        // Detect "find sources" command
-        const findSourcesMatch = message.match(/find sources:?\s*(.*)/i);
-        if (findSourcesMatch || message.toLowerCase() === 'find sources') {
-            chatInput.value = '';
-            this.uiManager.updateCharacterCount();
-            
-            // Add user message to chat
-            this.addMessage('user', message);
-            
-            // Extract the actual research query (text after "find sources")
-            // If user just said "find sources", use last user query from conversation
-            let researchQuery = findSourcesMatch ? findSourcesMatch[1].trim() : '';
-            if (!researchQuery) {
-                researchQuery = this.appState.getCurrentQuery() || '';
-            }
-            
-            // Guard: require a valid query to proceed
-            if (!researchQuery || !researchQuery.trim()) {
-                this.addMessage('system', '⚠️ Please provide a research topic. Try "find sources: [your topic]" or chat first to establish context.');
-                return;
-            }
-            
-            // Set as current query for research flow
-            this.appState.setCurrentQuery(researchQuery);
-            
-            // Set pending action with the query context
-            this.appState.setPendingAction({
-                type: 'find_sources',
-                query: researchQuery
-            });
-            
-            // If not authenticated, show login modal
-            if (!this.authService.isAuthenticated()) {
-                this.modalController.showAuthModal('Sign in to search premium sources');
-                return;
-            }
-            
-            // If authenticated, inject the button directly and stop (don't continue to normal send flow)
-            this.injectFindSourcesButton(researchQuery);
-            return;
-        }
         
         const currentMode = this.appState.getMode();
         
@@ -508,50 +470,6 @@ export class ChatResearchApp {
         }
     }
 
-    injectFindSourcesButton(query) {
-        console.log('💡 Injecting Find Sources button for query:', query);
-        
-        // Create button container
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'find-sources-cta';
-        buttonContainer.style.cssText = 'margin: 20px 0; text-align: center;';
-        
-        // Create the button
-        const button = document.createElement('button');
-        button.className = 'primary-button';
-        button.textContent = '🔍 Find Sources';
-        button.style.cssText = 'padding: 12px 24px; font-size: 16px; cursor: pointer;';
-        
-        // Button click handler - one-shot execution
-        button.onclick = () => {
-            console.log('🎯 Find Sources button clicked');
-            
-            // Pre-fill input with query
-            const chatInput = document.getElementById('newChatInput');
-            if (chatInput && query) {
-                chatInput.value = query;
-                this.uiManager.updateCharacterCount();
-            }
-            
-            // Switch to research mode (this auto-fires sendMessage with the query)
-            this.setMode('research');
-            
-            // Remove button after click
-            buttonContainer.remove();
-            
-            // Clear pending action
-            this.appState.clearPendingAction();
-        };
-        
-        buttonContainer.appendChild(button);
-        
-        // Add as system message
-        this.addMessage('system', buttonContainer);
-        
-        // Scroll to bottom
-        this.uiManager.scrollToBottom();
-    }
-
     setMode(mode) {
         // Check authentication for research mode
         if (mode === 'research' && !this.authService.isAuthenticated()) {
@@ -560,7 +478,7 @@ export class ChatResearchApp {
                 type: 'mode_switch', 
                 mode: 'research' 
             });
-            this.modalController.showAuthModal('Sign in to search premium sources');
+            this.modalController.showAuthModal();
             return;
         }
         
@@ -589,7 +507,7 @@ export class ChatResearchApp {
             const reportBuilderElement = this.reportBuilder.show();
             this.addMessage('system', reportBuilderElement);
         } else if (mode === 'research') {
-            // Auto-fire search when entering research mode
+            // FIX A: Auto-fire search when entering research mode
             const query = this.appState.getCurrentQuery();
             if (query && query.trim()) {
                 // Populate input with query and trigger send
@@ -599,8 +517,10 @@ export class ChatResearchApp {
                     chatInput.value = query;
                     this.sendMessage();
                 }
+                // Note: pendingSearchFromLogin flag is set BEFORE setMode is called (see auth callback)
+                // and checked in SOURCE_SEARCH_TRIGGER listener to prevent duplicates
             } else {
-                // Show mode switch message when no query available
+                // FIX D: UX nudge when no query available
                 if (this.appState.getConversationHistory().length > 0) {
                     this.addMessage('system', "📚 Switched to Sources mode - I'll find and license authoritative sources.");
                 }
@@ -814,14 +734,6 @@ export class ChatResearchApp {
             } else if (action.type === 'mode_switch') {
                 // Switch to the pending mode after login
                 this.setMode(action.mode);
-            } else if (action.type === 'research_suggestion') {
-                // User clicked Find Sources before login - now execute the suggestion
-                this.interactionHandler.handleResearchSuggestion(
-                    action.topicHint,
-                    (mode) => this.setMode(mode),
-                    action.autoExecute,
-                    () => this.sendMessage()
-                );
             }
         } catch (error) {
             console.error('Error executing pending action:', error);

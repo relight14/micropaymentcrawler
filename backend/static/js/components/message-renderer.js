@@ -360,19 +360,17 @@ export class MessageRenderer {
         button.innerHTML = '🔍 Find Sources';
         button.setAttribute('data-topic-hint', topicHint || '');
         
-        // Direct onclick handler - triggers the same "find sources" flow
+        // Add click handler - auto-execute search
         button.onclick = () => {
-            // Simulate typing "find sources: [topic]" in the input
-            const chatInput = document.getElementById('newChatInput');
-            if (chatInput) {
-                chatInput.value = `find sources: ${topicHint || ''}`.trim();
-                // Trigger the send button click to activate the flow
-                const sendButton = document.getElementById('newSendButton');
-                if (sendButton) {
-                    sendButton.click();
+            // Dispatch custom event that app.js will listen for
+            const event = new CustomEvent('switchToResearch', {
+                detail: { 
+                    topicHint: topicHint || '',
+                    autoExecute: true // Signal to auto-run the search
                 }
-            }
-        }
+            });
+            document.dispatchEvent(event);
+        };
         
         suggestionDiv.appendChild(textSpan);
         suggestionDiv.appendChild(button);

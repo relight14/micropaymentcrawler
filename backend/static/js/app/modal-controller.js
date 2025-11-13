@@ -38,9 +38,8 @@ export class ModalController {
 
     /**
      * Show authentication modal (login/signup)
-     * @param {string} customMessage - Optional custom message to display instead of default
      */
-    showAuthModal(customMessage = null) {
+    showAuthModal() {
         // Remove any existing modal
         const existingModal = document.getElementById('authModal');
         if (existingModal) {
@@ -49,17 +48,13 @@ export class ModalController {
 
         // Create modal HTML
         const isLogin = this.appState.isInLoginMode();
-        const defaultLoginMessage = 'Sign in to unlock full research access';
-        const defaultSignupMessage = 'Join Clearcite to access premium features';
-        const displayMessage = customMessage || (isLogin ? defaultLoginMessage : defaultSignupMessage);
-        
         const modalHTML = `
             <div id="authModal" class="modal-overlay">
                 <div class="modal-content auth-modal">
                     <div class="auth-modal-header">
                         <img src="/static/clearcite-logo.png" alt="Clearcite" class="auth-modal-logo">
                         <h2 id="authTitle">${isLogin ? 'Welcome back!' : 'Create Account'}</h2>
-                        <p>${displayMessage}</p>
+                        <p>${isLogin ? 'Sign in to unlock full research access' : 'Join Clearcite to access premium features'}</p>
                         <button class="modal-close" onclick="document.getElementById('authModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
                     <div class="auth-modal-content">
@@ -122,7 +117,7 @@ export class ModalController {
                 if (this.onAuthToggle) {
                     this.onAuthToggle();
                 }
-                this.showAuthModal(customMessage); // Refresh modal with new mode, preserve custom message
+                this.showAuthModal(); // Refresh modal with new mode
             });
         }
 

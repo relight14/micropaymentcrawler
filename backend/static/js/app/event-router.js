@@ -31,17 +31,6 @@ export class EventRouter {
     }
 
     /**
-     * Add a tracked listener for cleanup
-     * @param {EventTarget} target - Event target to attach listener to (Element, Document, Window, etc.)
-     * @param {string} event - Event name
-     * @param {Function} handler - Event handler function
-     */
-    _addListener(target, event, handler) {
-        target.addEventListener(event, handler);
-        this.listeners.push({ element: target, event, handler });
-    }
-
-    /**
      * Initialize all event listeners
      */
     initialize() {
@@ -175,7 +164,7 @@ export class EventRouter {
      */
     _setupDelegatedEvents() {
         // Citation badge click handler
-        const citationHandler = (e) => {
+        document.addEventListener('click', (e) => {
             const badge = e.target.closest('.citation-badge');
             if (!badge) return;
             
@@ -186,11 +175,10 @@ export class EventRouter {
                 const price = parseFloat(badge.getAttribute('data-price')) || 0;
                 this.handlers.onCitationBadgeClick(sourceId, price);
             }
-        };
-        this._addListener(document, 'click', citationHandler);
+        });
         
         // Feedback button handler
-        const feedbackHandler = (e) => {
+        document.addEventListener('click', (e) => {
             const feedbackBtn = e.target.closest('.feedback-btn');
             if (!feedbackBtn) return;
             
@@ -213,8 +201,18 @@ export class EventRouter {
                 
                 this.handlers.onFeedbackSubmit(query, sourceIds, rating, mode, feedbackSection);
             }
-        };
-        this._addListener(document, 'click', feedbackHandler);
+        });
+        
+        // Research mode suggestion handler (custom event)
+        document.addEventListener('switchToResearch', (e) => {
+            const topicHint = e.detail?.topicHint || '';
+            const autoExecute = e.detail?.autoExecute || false;
+            console.log('💡 Switching to research mode with topic:', topicHint, 'autoExecute:', autoExecute);
+            
+            if (this.handlers.onResearchSuggestion) {
+                this.handlers.onResearchSuggestion(topicHint, autoExecute);
+            }
+        });
     }
 
     /**
@@ -222,9 +220,7 @@ export class EventRouter {
      */
     cleanup() {
         this.listeners.forEach(({ element, event, handler }) => {
-            if (element && element.removeEventListener) {
-                element.removeEventListener(event, handler);
-            }
+            element.removeEventListener(event, handler);
         });
         this.listeners = [];
     }

@@ -1,12 +1,11 @@
 export class InteractionHandler {
-    constructor({ appState, apiService, modalController, uiManager, toastManager, sourceManager, authService }) {
+    constructor({ appState, apiService, modalController, uiManager, toastManager, sourceManager }) {
         this.appState = appState;
         this.apiService = apiService;
         this.modalController = modalController;
         this.uiManager = uiManager;
         this.toastManager = toastManager;
         this.sourceManager = sourceManager;
-        this.authService = authService;
     }
 
     handleCitationClick(sourceId, price) {
@@ -27,18 +26,6 @@ export class InteractionHandler {
     }
 
     handleResearchSuggestion(topicHint, setModeCallback, autoExecute = false, sendMessageCallback = null) {
-        // Check authentication first
-        if (!this.authService.isAuthenticated()) {
-            // Save pending action to switch to research mode and auto-execute search after login
-            this.appState.setPendingAction({ 
-                type: 'research_suggestion', 
-                topicHint: topicHint || '',
-                autoExecute: autoExecute  // Persist the autoExecute flag so search fires after login
-            });
-            this.modalController.showAuthModal('Sign in to search premium sources');
-            return;
-        }
-        
         // Switch to research mode
         setModeCallback('research');
         

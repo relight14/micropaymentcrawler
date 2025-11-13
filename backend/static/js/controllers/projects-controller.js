@@ -33,7 +33,6 @@ export class ProjectsController {
         // Set callbacks BEFORE initialization to avoid missing early events
         this.addMessageCallback = deps.addMessageCallback;
         this.hideWelcomeCallback = deps.hideWelcomeCallback;
-        this.injectFindSourcesButtonCallback = deps.injectFindSourcesButtonCallback;
         
         // Create and initialize ProjectManager
         this.projectManager = new ProjectManager({
@@ -41,8 +40,7 @@ export class ProjectsController {
             authService: deps.authService,
             toastManager: deps.toastManager,
             messageCoordinator: deps.messageCoordinator,
-            appState: deps.appState,
-            injectFindSourcesButtonCallback: this.injectFindSourcesButtonCallback
+            appState: deps.appState
         });
         
         // Set up all event listeners
