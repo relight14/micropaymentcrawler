@@ -30,6 +30,7 @@ export class ProjectManager {
         this.pendingReload = false; // Flag to queue a retry if load is requested during active load
         this.hasMigratedLoginChat = false; // One-shot flag to prevent duplicate login migration
         this._autoCreateLock = false; // Mutex guard to prevent concurrent auto-create calls
+        this.suppressNextAutoLoad = false; // Flow A guard: prevent auto-loading project after creation
     }
 
     /**
@@ -383,6 +384,10 @@ export class ProjectManager {
                     this.toastManager.show(`🔁 Using project "${existing.title}"`, 'info');
                 } else {
                     // Create new project (just metadata, no messages yet)
+                    // FLOW A GUARD: Suppress auto-load to preserve DOM
+                    this.suppressNextAutoLoad = true;
+                    logger.info('🛡️ FLOW A: Setting suppressNextAutoLoad flag before project creation');
+                    
                     const project = await this.sidebar.createProject(candidateTitle, query);
                     if (project) {
                         projectId = project.id;
@@ -409,6 +414,10 @@ export class ProjectManager {
             // Create minimal project with just the query
             logger.info('⚠️ No pre-login chat but query exists - creating minimal project');
             try {
+                // FLOW A GUARD: Suppress auto-load to preserve DOM
+                this.suppressNextAutoLoad = true;
+                logger.info('🛡️ FLOW A: Setting suppressNextAutoLoad flag before minimal project creation');
+                
                 const project = await this.sidebar.createProject('Research Query', query);
                 if (project) {
                     projectId = project.id;
@@ -586,6 +595,14 @@ export class ProjectManager {
      * Handle project loaded event
      */
     async handleProjectLoaded(projectData) {
+        // FLOW A GUARD: Skip auto-loading if suppression flag is set
+        if (this.suppressNextAutoLoad) {
+            logger.info('🛡️ FLOW A: Auto-load suppressed - skipping handleProjectLoaded to preserve DOM');
+            console.log('🛡️🛡️🛡️ FLOW A GUARD: suppressNextAutoLoad is TRUE - SKIPPING handleProjectLoaded entirely');
+            this.suppressNextAutoLoad = false; // Clear flag for next time
+            return;
+        }
+        
         const messagesContainer = document.getElementById('messagesContainer');
         const domMessageCount = messagesContainer?.children.length || 0;
         
@@ -627,8 +644,44 @@ export class ProjectManager {
         this.hasAutoCreatedProject = false;
         
         console.log('⚠️⚠️⚠️ ABOUT TO CALL loadProjectMessages - DOM WILL BE CLEARED');
-        // Load and display project messages
+        // Load and display project messages (this clears and rebuilds chat DOM)
         await this.loadProjectMessages(projectData.id);
+        
+        // FLOW B: Re-apply outline and sources AFTER DOM rebuild
+        logger.info('🔄 FLOW B: Re-applying outline and sources after DOM rebuild');
+        
+        // Re-apply outline state (in case DOM rebuild cleared it)
+        projectStore.setOutline(projectData.outline);
+        this.outlineBuilder.setProject(projectData.id, projectData);
+        logger.info(`✅ FLOW B: Outline restored with ${projectData.outline?.sections?.length || 0} sections`);
+        
+        // Restore and display sources if available
+        const savedSources = projectData.selected_sources || projectData.sources || [];
+        if (savedSources.length > 0) {
+            logger.info(`🔄 FLOW B: Rebuilding ${savedSources.length} source cards...`);
+            
+            // Rebuild source cards in DOM
+            if (this.sourceManager) {
+                await this.sourceManager.displayCards(savedSources);
+                logger.info(`✅ FLOW B: Source cards displayed`);
+                
+                // Reattach click handlers to source cards
+                if (this.sourceManager.sourceCardComponent) {
+                    const rehydratedCount = this.sourceManager.sourceCardComponent.rehydrateCards();
+                    logger.info(`✅ FLOW B: Rehydrated ${rehydratedCount} source card handlers`);
+                } else {
+                    logger.warn('⚠️ FLOW B: sourceCardComponent not available for rehydration');
+                }
+            } else {
+                logger.warn('⚠️ FLOW B: sourceManager not available for displaying cards');
+            }
+            
+            // Update selected sources in store
+            projectStore.setSelectedSources(savedSources);
+            logger.info(`✅ FLOW B: Restored ${savedSources.length} selected sources to store`);
+        } else {
+            logger.info(`ℹ️ FLOW B: No saved sources to restore`);
+        }
         
         // Emit global event
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_SWITCHED, {
