@@ -5,13 +5,25 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import logging
 import json
+import os
 from datetime import datetime
+from anthropic import Anthropic
 from utils.rate_limit import limiter
 from config import Config
 from services.ai.outline_suggester import get_outline_suggester
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Initialize Anthropic client for title generation
+anthropic_client = None
+try:
+    anthropic_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if anthropic_key:
+        anthropic_client = Anthropic(api_key=anthropic_key)
+        logger.info("AI title generation enabled")
+except Exception as e:
+    logger.warning(f"AI title generation disabled: {e}")
 
 router = APIRouter()
 
@@ -74,6 +86,63 @@ def extract_bearer_token(authorization: str) -> str:
     return access_token
 
 
+def generate_smart_title(research_query: str, fallback_title: str) -> str:
+    """
+    Generate a professional project title from a research query using AI.
+    Falls back to the provided title if AI is unavailable or fails.
+    
+    Examples:
+    - "investigative journalism" → "Investigative Journalism Analysis"
+    - "climate change" → "Climate Change Research"
+    - "medieval castles" → "Medieval Castles Study"
+    """
+    if not anthropic_client:
+        logger.warning(f"⚠️  AI title generation unavailable (Anthropic client not initialized), using fallback: {fallback_title}")
+        return fallback_title
+    
+    if not research_query:
+        return fallback_title
+    
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=50,
+            temperature=0.7,
+            messages=[{
+                "role": "user",
+                "content": f"""Generate a professional 2-5 word project title for this research topic: "{research_query}"
+
+Requirements:
+- Make it professional and descriptive
+- Keep it concise (2-5 words maximum)
+- Capitalize properly
+- Add a relevant suffix like "Analysis", "Research", "Study", or "Investigation" if appropriate
+- Return ONLY the title, no explanation
+
+Examples:
+- "dogs" → "Canine Behavior Study"
+- "investigative journalism" → "Investigative Journalism Analysis"  
+- "climate change impacts" → "Climate Change Impact Research"
+
+Title:"""
+            }]
+        )
+        
+        generated_title = response.content[0].text.strip().strip('"\'')
+        
+        # Validate the generated title
+        if generated_title and len(generated_title) > 3 and len(generated_title) < 100:
+            logger.info(f"✨ Generated title: '{generated_title}' from query: '{research_query}'")
+            return generated_title
+        else:
+            logger.warning(f"Invalid AI-generated title, using fallback: {generated_title}")
+            return fallback_title
+            
+    except Exception as e:
+        logger.warning(f"Title generation failed, using fallback: {e}")
+        return fallback_title
+
+
 def extract_user_id_from_token(access_token: str) -> str:
     """
     Extract user ID from JWT token by decoding the payload.
@@ -132,10 +201,18 @@ async def create_project(
     project_request: CreateProjectRequest,
     authorization: str = Header(None, alias="Authorization")
 ):
-    """Create a new project"""
+    """Create a new project with AI-enhanced title generation"""
     try:
         access_token = extract_bearer_token(authorization)
         user_id = extract_user_id_from_token(access_token)
+        
+        # Generate smart title if research_query is provided
+        final_title = project_request.title
+        if project_request.research_query:
+            final_title = generate_smart_title(
+                project_request.research_query,
+                project_request.title
+            )
         
         # Insert project into database
         if Config.USE_POSTGRES:
@@ -146,7 +223,7 @@ async def create_project(
             """
             with db.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute(query, (user_id, project_request.title, project_request.research_query))
+                    cursor.execute(query, (user_id, final_title, project_request.research_query))
                     result = cursor.fetchone()
                     conn.commit()
                     
@@ -164,7 +241,7 @@ async def create_project(
                 INSERT INTO projects (user_id, title, research_query, created_at, updated_at, is_active)
                 VALUES (?, ?, ?, datetime('now'), datetime('now'), 1)
             """
-            project_id = db.execute_write(query, (user_id, project_request.title, project_request.research_query))
+            project_id = db.execute_write(query, (user_id, final_title, project_request.research_query))
             
             # Fetch the created project
             result = db.execute_query(

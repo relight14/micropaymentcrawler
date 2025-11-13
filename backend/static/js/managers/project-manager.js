@@ -49,9 +49,14 @@ export class ProjectManager {
         // Initialize outline builder with persistent event delegation
         this.outlineBuilder.init();
 
-        // Load initial data if authenticated
+        // Load initial data if authenticated, clear stale data if not
         if (this.authService.isAuthenticated()) {
             await this.loadInitialData();
+        } else {
+            // Clear any stale conversation data from previous unauthenticated sessions
+            // This ensures browser refresh gives a clean slate
+            this.appState.clearConversation();
+            logger.info('🧹 [ProjectManager] Cleared stale conversation data (user not authenticated)');
         }
 
         this.isInitialized = true;
@@ -197,9 +202,20 @@ export class ProjectManager {
             this.toastManager.show('💾 Syncing your research...', 'info');
             
             try {
-                // derive candidate title
-                const firstUserMessage = preLoginChat.find(m => m.sender === 'user');
-                const candidateTitle = this._extractProjectTitle(firstUserMessage?.content);
+                // Use current research query as the project title (most accurate topic)
+                // This avoids issues where stale messages from browser refresh create wrong titles
+                let candidateTitle = this.appState.getCurrentQuery();
+                
+                // Fallback: If currentQuery is empty, extract from latest user message
+                if (!candidateTitle) {
+                    const lastUserMessage = [...preLoginChat].reverse().find(m => m.sender === 'user');
+                    candidateTitle = lastUserMessage?.content 
+                        ? this._extractProjectTitle(lastUserMessage.content) 
+                        : 'Untitled Research';
+                    logger.info(`📝 [ProjectManager] currentQuery empty, using latest user message for title`);
+                }
+                
+                logger.info(`📝 [ProjectManager] Creating project from login with title: "${candidateTitle}"`);
                 
                 // If a project with the same title exists, reuse it
                 const existing = this._findExistingProjectByTitle(candidateTitle);
@@ -279,12 +295,19 @@ export class ProjectManager {
             
             logger.info(`💾 Creating project from ${messagesToSave.length} messages...`);
             
-            // Extract project title from first user message
-            const firstUserMessage = messagesToSave.find(msg => msg.sender === 'user');
-            const projectTitle = this._extractProjectTitle(firstUserMessage?.content);
+            // Use current research query for both title and query (most accurate)
+            // Fallback to latest user message if currentQuery is empty
+            let researchQuery = this.appState.getCurrentQuery() || null;
+            let projectTitle = researchQuery;
             
-            // Get research query from AppState
-            const researchQuery = this.appState.getCurrentQuery() || null;
+            if (!projectTitle) {
+                // Fallback: Extract from latest user message in conversation
+                const lastUserMessage = [...messagesToSave].reverse().find(m => m.sender === 'user');
+                projectTitle = lastUserMessage ? this._extractProjectTitle(lastUserMessage.content) : 'Untitled Research';
+                // Also set research_query to enable AI title generation in backend
+                researchQuery = projectTitle !== 'Untitled Research' ? projectTitle : null;
+                logger.info(`💾 currentQuery empty, extracted title and query from latest message: "${projectTitle}"`);
+            }
             
             // Create new project with preserveConversation flag for login migration
             const project = await this.sidebar.createProject(projectTitle, researchQuery, { preserveConversation: true });
