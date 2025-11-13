@@ -264,18 +264,50 @@ export class OutlineBuilder extends EventTarget {
     /**
      * Update selected sources from source manager
      * Auto-categorizes and places new sources into relevant sections
+     * CRITICAL: Merges new sources with existing outline sources to prevent data loss
      */
     async setSelectedSources(sources) {
-        const newSources = sources || [];
+        const incomingSources = sources || [];
         
-        // Find sources that are newly selected
+        // Extract all sources currently embedded in outline sections
+        const outlineSources = [];
+        const outlineSourceIds = new Set();
+        this.sections.forEach(section => {
+            if (section.sources && Array.isArray(section.sources)) {
+                section.sources.forEach(sourceWrapper => {
+                    const source = sourceWrapper.source_data;
+                    if (source && source.id && !outlineSourceIds.has(source.id)) {
+                        outlineSources.push(source);
+                        outlineSourceIds.add(source.id);
+                    }
+                });
+            }
+        });
+        
+        // Merge: Start with outline sources (preserve), then add incoming sources (new selections)
+        const mergedSources = [...outlineSources];
+        const mergedIds = new Set(outlineSourceIds);
+        
+        incomingSources.forEach(source => {
+            if (!mergedIds.has(source.id)) {
+                mergedSources.push(source);
+                mergedIds.add(source.id);
+            }
+        });
+        
+        // Find truly new sources (not in selectedSources AND not in outline)
         const previousIds = new Set(this.selectedSources.map(s => s.id));
-        const newlySelected = newSources.filter(s => !previousIds.has(s.id));
+        const newlySelected = incomingSources.filter(s => 
+            !previousIds.has(s.id) && !outlineSourceIds.has(s.id)
+        );
         
-        this.selectedSources = newSources;
+        // Update selectedSources with merged set
+        this.selectedSources = mergedSources;
         this.render();
         
-        // Auto-place newly selected sources into relevant sections
+        console.log(`[OutlineBuilder] Merged sources: ${outlineSources.length} from outline + ${incomingSources.length} incoming = ${mergedSources.length} total, ${newlySelected.length} truly new`);
+        
+        // Auto-place only truly new sources into relevant sections
         if (newlySelected.length > 0 && this.sections.length > 0 && this.currentProjectId) {
             await this.autoPlaceNewSources(newlySelected);
         }
