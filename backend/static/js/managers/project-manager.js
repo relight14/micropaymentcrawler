@@ -46,6 +46,9 @@ export class ProjectManager {
         // Initialize sidebar (renders mobile login prompt if not authenticated)
         await this.sidebar.init();
 
+        // Initialize outline builder with persistent event delegation
+        this.outlineBuilder.init();
+
         // Load initial data if authenticated
         if (this.authService.isAuthenticated()) {
             await this.loadInitialData();

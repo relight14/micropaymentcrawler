@@ -23,6 +23,76 @@ export class OutlineBuilder extends EventTarget {
     }
 
     /**
+     * Initialize persistent event listeners using event delegation
+     * Called once when component is created - survives all re-renders
+     */
+    init() {
+        const container = document.getElementById('outline-builder');
+        if (!container) {
+            console.warn('⚠️ OutlineBuilder container not found during init');
+            return;
+        }
+
+        // Event delegation: Listen on persistent container, not individual buttons
+        // This survives innerHTML replacements in render()
+        container.addEventListener('click', (e) => {
+            // Build Research Packet button
+            if (e.target.id === 'build-packet-btn' || e.target.closest('#build-packet-btn')) {
+                console.log('🔘 Build Packet button clicked via delegation!');
+                this.handleBuildResearchPacket();
+                return;
+            }
+
+            // Outline toggle button
+            if (e.target.id === 'outline-toggle-btn' || e.target.closest('#outline-toggle-btn')) {
+                this.toggleCollapse();
+                return;
+            }
+
+            // Add section button
+            if (e.target.id === 'add-section-btn' || e.target.closest('#add-section-btn')) {
+                this.addSection();
+                return;
+            }
+
+            // File upload button
+            if (e.target.id === 'upload-file-btn' || e.target.closest('#upload-file-btn')) {
+                const fileInput = document.getElementById('file-upload-input');
+                if (fileInput) fileInput.click();
+                return;
+            }
+
+            // Section move buttons
+            const moveBtnTarget = e.target.closest('.section-move-btn');
+            if (moveBtnTarget) {
+                const index = parseInt(moveBtnTarget.dataset.index);
+                const direction = moveBtnTarget.dataset.direction;
+                this.moveSection(index, direction);
+                return;
+            }
+
+            // Section delete buttons
+            const deleteBtnTarget = e.target.closest('.section-delete-btn');
+            if (deleteBtnTarget) {
+                const index = parseInt(deleteBtnTarget.dataset.index);
+                this.deleteSection(index);
+                return;
+            }
+
+            // Remove source buttons
+            const removeSourceTarget = e.target.closest('.remove-source-btn');
+            if (removeSourceTarget) {
+                const sectionIndex = parseInt(removeSourceTarget.dataset.sectionIndex);
+                const sourceIndex = parseInt(removeSourceTarget.dataset.sourceIndex);
+                this.removeSourceFromSection(sectionIndex, sourceIndex);
+                return;
+            }
+        });
+
+        console.log('✅ OutlineBuilder persistent listeners initialized via delegation');
+    }
+
+    /**
      * Toggle outline builder collapsed state
      */
     toggleCollapse() {
@@ -906,43 +976,26 @@ export class OutlineBuilder extends EventTarget {
 
     /**
      * Attach event listeners
+     * NOTE: Most buttons use event delegation via init() to survive re-renders
+     * Only attach listeners here for elements that need special handling
      */
     attachEventListeners() {
-        // Outline toggle button
-        const outlineToggleBtn = document.getElementById('outline-toggle-btn');
-        if (outlineToggleBtn) {
-            outlineToggleBtn.addEventListener('click', () => this.toggleCollapse());
-        }
-
-        const addSectionBtn = document.getElementById('add-section-btn');
-        if (addSectionBtn) {
-            addSectionBtn.addEventListener('click', () => this.addSection());
-        }
-
-        // Build Research Packet button
-        const buildPacketBtn = document.getElementById('build-packet-btn');
-        console.log('🔘 Build Packet button found:', !!buildPacketBtn);
-        if (buildPacketBtn) {
-            buildPacketBtn.addEventListener('click', () => {
-                console.log('🔘 Build Packet button clicked!');
-                this.handleBuildResearchPacket();
-            });
-        }
-
-        // File upload button
-        const uploadBtn = document.getElementById('upload-file-btn');
+        // File upload input (needs special handling for 'change' event)
         const fileInput = document.getElementById('file-upload-input');
-        if (uploadBtn && fileInput) {
-            uploadBtn.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        if (fileInput) {
+            // Remove old listener to avoid duplicates
+            fileInput.replaceWith(fileInput.cloneNode(true));
+            const newFileInput = document.getElementById('file-upload-input');
+            newFileInput.addEventListener('change', (e) => this.handleFileUpload(e));
         }
 
-        // Resize handle
+        // Resize handle (needs special drag event handling)
         const resizeHandle = document.getElementById('outline-resize-handle');
         if (resizeHandle) {
             this.setupResizeHandle(resizeHandle);
         }
 
+        // Section title inputs (need blur and keydown events)
         document.querySelectorAll('.section-title-input').forEach(input => {
             input.addEventListener('blur', (e) => {
                 const index = parseInt(e.target.dataset.sectionIndex);
@@ -952,29 +1005,6 @@ export class OutlineBuilder extends EventTarget {
                 if (e.key === 'Enter') {
                     e.target.blur();
                 }
-            });
-        });
-
-        document.querySelectorAll('.section-move-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(btn.dataset.index);
-                const direction = btn.dataset.direction;
-                this.moveSection(index, direction);
-            });
-        });
-
-        document.querySelectorAll('.section-delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(btn.dataset.index);
-                this.deleteSection(index);
-            });
-        });
-
-        document.querySelectorAll('.remove-source-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const sectionIndex = parseInt(btn.dataset.sectionIndex);
-                const sourceIndex = parseInt(btn.dataset.sourceIndex);
-                this.removeSourceFromSection(sectionIndex, sourceIndex);
             });
         });
     }
