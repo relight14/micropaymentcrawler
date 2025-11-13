@@ -79,8 +79,21 @@ export class ProjectManager {
         // Listen to auth state changes
         AppEvents.addEventListener('authStateChanged', async (e) => {
             if (e.detail.isAuthenticated) {
-                // Capture conversation history before loading projects
-                await this.handleLogin();
+                // Route to appropriate login handler based on context
+                const query = this.appState.getCurrentQuery();
+                const hasQuery = query && query.trim();
+                
+                if (hasQuery) {
+                    // Flow A: Unauthenticated user with pending source query
+                    // Preserve existing DOM and fire source search
+                    logger.info('🔍 Routing to handleAuthenticatedSourceQuery (Flow A: preserve DOM)');
+                    await this.handleAuthenticatedSourceQuery(query);
+                } else {
+                    // Flow B: Regular login without pending source query
+                    // Use traditional flow (may rebuild DOM if loading existing project)
+                    logger.info('🔐 Routing to handleLogin (Flow B: traditional)');
+                    await this.handleLogin();
+                }
             } else {
                 this.handleLogout();
             }
