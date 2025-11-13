@@ -749,14 +749,16 @@ export class OutlineBuilder extends EventTarget {
             <div class="resize-handle" id="outline-resize-handle"></div>
             <div class="outline-builder">
                 <div class="outline-header">
-                    ${!this.isCollapsed ? `
-                        <div>
+                    <div>
+                        ${!this.isCollapsed ? `
                             <h3>Research Outline</h3>
                             <p class="outline-prompt">Build a research packet based on this outline</p>
-                            <button class="build-packet-btn" id="build-packet-btn" title="Generate a comprehensive research report">
-                                📊 Build Research Packet
-                            </button>
-                        </div>
+                        ` : ''}
+                        <button class="build-packet-btn" id="build-packet-btn" title="Generate a comprehensive research report">
+                            📊 Build Research Packet
+                        </button>
+                    </div>
+                    ${!this.isCollapsed ? `
                         <span class="save-indicator" id="outline-save-indicator"></span>
                     ` : ''}
                     <button class="outline-toggle-btn" id="outline-toggle-btn">
