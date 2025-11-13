@@ -679,14 +679,8 @@ export class ReportBuilder extends EventTarget {
         const contentArea = document.createElement('div');
         contentArea.className = 'tier-selection-content';
         
-        // Header
-        contentArea.appendChild(this._createHeader());
-        
         // Tier cards (Pro tier only)
         contentArea.appendChild(this._createTierCardsContainer());
-        
-        // Security footer
-        contentArea.appendChild(this._createSecurityFooter());
         
         container.appendChild(contentArea);
         
