@@ -310,6 +310,7 @@ export class ProjectManager {
             }
             
             // Create new project with preserveConversation flag for login migration
+            // Note: Message saving is handled by projects-controller.js via PROJECT_CREATED event
             const project = await this.sidebar.createProject(projectTitle, researchQuery, { preserveConversation: true });
             
             if (!project) {
@@ -317,14 +318,7 @@ export class ProjectManager {
                 return null;
             }
             
-            // Save all messages to the project
-            for (const msg of messagesToSave) {
-                const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
-                const messageData = msg.metadata ? { metadata: msg.metadata } : null;
-                await this.apiService.saveMessage(project.id, normalizedSender, msg.content, messageData);
-            }
-            
-            logger.info(`✅ Conversation saved to project ${project.id}`);
+            logger.info(`✅ Project created for login migration: ${project.id} (messages will be saved by PROJECT_CREATED handler)`);
             
             // Return the created project (caller will handle loading projects)
             return project;
@@ -411,9 +405,9 @@ export class ProjectManager {
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;
         
-        // Emit global event
+        // Emit global event with preserveConversation flag
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_CREATED, {
-            detail: { project }
+            detail: { project, preserveConversation }
         }));
     }
 

@@ -1,0 +1,55 @@
+Copilot said: Good catch — that lines up with
+Good catch — that lines up with what I traced earlier. I updated the event flow so creating a project with preserveConversation: true will no longer clear the live chat, and it will persist the in-memory messages to the newly created project immediately after creation.
+
+I made two small, focused changes:
+
+projects-controller.js — handleProjectCreated now checks the preserveConversation flag before clearing the conversation. When preserveConversation is true it saves the in-memory messages to the new project via the API, sets the active project, and avoids any chat reload/clear.
+project-manager.js — when the manager creates a project from the in-memory conversation (migration flow started by Find Sources), it dispatches PROJECT_CREATED with preserveConversation: true so the projects controller can handle it non-destructively.
+Below are the concrete patch files. Apply these into your repo at the indicated paths. I kept the changes minimal and defensive (it falls back if the exact API helper isn't available).
+
+
+backend/static/js/controllers/projects-controller.js
+// ProjectsController (updated handleProjectCreated)
+// - Respect preserveConversation before clearing the conversation
+// - If preserveConversation === true, save the in-memory messages to the new project (POST to /api/projects/:id/messages)
+// - Do not clear or reload the chat DOM when preserveConversation is requested
+
+class ProjectsController {
+
+backend/static/js/managers/project-manager.js
+v2
+// ProjectManager - when creating a project from conversation in the login migration flow
+// - Dispatch PROJECT_CREATED with preserveConversation: true
+// - This keeps the projects controller from clearing the live chat and saves messages server-side
+
+class ProjectManager {
+  // ... constructor, helpers, etc. ...
+What I changed and why (short narrative)
+
+I found the exact destructive call you described: projects-controller's handler that clears the conversation on project creation. The fix is to guard that behavior with a preserveConversation flag.
+The projects controller now:
+Adds the project to the sidebar and sets it active in the store in both cases.
+When preserveConversation is true it persists the in-memory messages into the newly created project (via an API helper if available or a fallback POST).
+When preserveConversation is false it preserves previous behavior (clear UI + load server messages).
+The project manager now explicitly dispatches PROJECT_CREATED with preserveConversation: true when creating a project from the in-memory conversation after a login triggered by Find Sources. That ensures the projects controller runs the non-destructive path.
+Testing steps (how to verify)
+
+Start logged out. Send two messages: "syria", then "humanitarian assistance". Confirm messages appear in the UI and appState holds them.
+Click Find Sources → login modal shown, chat still visible (no clearing).
+Login. ProjectManager.createProjectFromConversation should execute and dispatch PROJECT_CREATED with preserveConversation: true.
+projects-controller.handleProjectCreated should run the preserve path:
+Sidebar shows the new project,
+No clearing or reloading of chat DOM,
+A POST call should be made to persist messages under /api/projects/:id/messages (watch network panel or server logs).
+After project creation, source discovery should run (per your earlier flow) using the preserved in-memory conversation context. Confirm the source results are relevant to the multi-message conversation (not just the last generic query).
+Notes / potential adjustments
+
+API helper names: I conservatively check for this.api.saveProjectMessages and this.api.createProjectMessages and fall back to a plain POST with api.post. If your project API helper uses a different function name, update the check accordingly (or wire this.api to the correct helper).
+If some other module is still calling appState.clearConversation() as part of sidebar.loadProject or elsewhere, you’ll need to ensure those calls are guarded or that loadProject supports skipMessageRestore (we proposed skipMessageRestore earlier). This patch assumes the clear was happening specifically in handleProjectCreated.
+If your event naming differs (PROJECT_CREATED vs PROJECT_CREATE_COMPLETE), adapt the event constants.
+If you want, I’ll:
+
+open a PR with these exact changes against a branch in relight14/micropaymentcrawler and run a couple of smoke checks (search for API helper names, ensure no other code will clear conversation unguarded), or
+update the fallback API call to match the exact helper name you have in api.js if you tell me the real function name used to save project messages.
+I’ve implemented the minimal, targeted fix so the login→project-creation flow keeps the live chat intact, persists it to the new project, and avoids the destructive reload you saw. Would you like me to push these changes as a branch/PR now?
+

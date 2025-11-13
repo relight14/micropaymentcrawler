@@ -1,0 +1,340 @@
+Thanks — I traced the flow based on the code you already shared and your report, and I found the exact places that cause a live chat to be replaced/cleared during login → project creation. I’ll explain the end-to-end trace first (what’s happening now), then show the minimal code changes (three small patches) to guarantee the chat is never cleared/reloaded and that a new project is created & used for source searching only after login — all while preserving the in-memory live chat the user had.
+
+What’s happening now (detailed trace)
+
+Unauthenticated user chats (e.g., “Syria”) → appState holds live conversation in memory and the DOM shows messages.
+User asks follow-up (e.g., “humanitarian assistance”) — live chat is updated locally.
+User clicks Find Sources (or otherwise triggers source discovery):
+Current code: ensureActiveProject is sometimes invoked immediately (or pendingTabAction/setMode is used), and ProjectManager or app may attempt to create/load a project even if unauthenticated.
+If the app calls a protected API while unauthenticated you see 401s. If it proceeds incorrectly, it may set activeProjectId to undefined and later call /api/projects/undefined/messages (422) — that was in your logs.
+When login completes:
+ProjectManager.handleLogin runs. In the current flow it calls sidebar.loadProject(newProjectId), which (in the current implementation) triggers loading project messages from server and replaces the live chat content with the server-supplied messages (or clears it while the load happens). That’s the step that wipes your in-memory chat and drops the conversational context.
+The new project may optionally be created from the conversation, but the load logic overwrites the UI before you can use the preserved in-memory conversation to run a sources search.
+Search triggering is handled by SOURCE_SEARCH_TRIGGER events which may be dispatched from different places and suppressed by pendingSearchFromLogin, causing extra fragility.
+Root causes
+
+Project creation is attempted while unauthenticated (causes 401s / undefined ids).
+sidebar.loadProject (or loadProjectMessages) fetches message history and replaces the live chat DOM, causing context loss.
+The post-login migration logic doesn't ensure the preserved in-memory conversation is used for the source query (instead, the app may rely on server-restored messages).
+SOURCE_SEARCH_TRIGGERs are fired from multiple points with a guard flag (pendingSearchFromLogin) that can inadvertently skip the only intended search.
+Desired behavior (yours)
+
+Never clear or reload the in-memory live chat when the user logs in.
+After login (triggered by the user clicking Find Sources), create a new project from the existing in-memory conversation (server write), add the new project to the sidebar, but do not replace live chat messages from server.
+Run source discovery (search) using the preserved in-memory conversation context only after project creation.
+What I changed / propose to change (concrete fixes)
+
+Defer server project creation until the user is authenticated. If unauthenticated when clicking Find Sources, set a pendingAction and show the auth modal — do not touch the chat DOM or call protected endpoints.
+ProjectManager.handleLogin: only migrate/create project if there is an explicit pendingAction requesting it (type === 'create_project_on_login'). When loading the newly created project into the sidebar, call loadProject with skipMessageRestore: true (or equivalent) so that the sidebar does not fetch/replace chat messages.
+Sidebar.loadProject: accept an options param skipMessageRestore and if true, set the active project without fetching & restoring messages into the live chat area.
+Centralize Find Sources handling: the button dispatches SOURCE_SEARCH_TRIGGER only when the user requests it, and after project creation finishes.
+I implemented focused patches for the three pieces involved. Apply these to ensure the chat is preserved and the source search runs only when you want it to.
+
+Files changed (patches)
+
+backend/static/js/managers/project-manager.js
+backend/static/js/app.js
+backend/static/js/project-sidebar.js
+Note: I used the commit permalink base you provided earlier (commit 2794811df616507ce675adc779ca907201e00822) in the file headers so you can drop these directly into that commit snapshot if you like.
+
+File: backend/static/js/managers/project-manager.js url: https://github.com/relight14/micropaymentcrawler/blob/2794811df616507ce675adc779ca907201e00822/backend/static/js/managers/project-manager.js
+
+JavaScript
+/* backend/static/js/managers/project-manager.js
+   Updated: ensureActiveProject defers while unauthenticated and handleLogin only migrates when there's an explicit pendingAction.
+   Key behavior:
+   - ensureActiveProject returns { deferred: true } when user is unauthenticated.
+   - handleLogin will create project FROM memory only when pendingAction.type === 'create_project_on_login'.
+   - When loading the newly created project, loadProject is called with skipMessageRestore: true.
+*/
+
+    /**
+     * Auto-create a project from the first user query
+     * @param {string} query - The user's first query
+     */
+    async ensureActiveProject(query, options = {}) {
+        // If there's already an active project, use it
+        if (projectStore.state.activeProjectId) {
+            return { id: projectStore.state.activeProjectId };
+        }
+
+        // If we've already auto-created in this session, don't create another
+        if (this.hasAutoCreatedProject) {
+            return { id: null };
+        }
+
+        // If user is not authenticated, defer creation
+        // DO NOT call protected endpoints while unauthenticated to avoid 401s.
+        try {
+            if (this.authService && typeof this.authService.isAuthenticated === 'function' && !this.authService.isAuthenticated()) {
+                logger.info('🔒 ensureActiveProject: User unauthenticated — deferring project creation until login');
+                // Persist a pending action so the login flow knows why it was opened
+                this.appState.setPendingAction({
+                    type: 'create_project_on_login',
+                    query,
+                    trigger: options.trigger || 'deferred'
+                });
+
+                // Do not open modals forcibly here - upper layer (app) should open login modal.
+                return { deferred: true };
+            }
+        } catch (err) {
+            logger.warn('ensureActiveProject: authService check failed, continuing with existing flow', err);
+            // Fall through; we don't want to block project creation if authService is missing.
+        }
+
+        // If authenticated or authService not present, proceed with existing creation flow
+        try {
+            this.hasAutoCreatedProject = true;
+            // Existing logic: try to find existing project for this research_query or create one
+            // Keep _createOrFindProjectForQuery implementation as before
+            const createdProject = await this._createOrFindProjectForQuery(query);
+            if (createdProject && createdProject.id) {
+                projectStore.setActiveProject(createdProject.id);
+                this.sidebar.addOrUpdateProject(createdProject);
+                return { id: createdProject.id };
+            } else {
+                return { id: null };
+            }
+        } catch (err) {
+            logger.error('ensureActiveProject: failed to create project', err);
+            this.hasAutoCreatedProject = false;
+            throw err;
+        }
+    }
+
+    /**
+     * Uses one-shot guard to prevent duplicate migration if event fires multiple times
+     * ORDER: MIGRATE only when triggered by pendingAction → Load projects → Sync store → Auto-load new project
+     */
+    async handleLogin() {
+        logger.info(`🔐 [ProjectManager] Auth state changed to authenticated`);
+
+        // Preserve chat BEFORE anything else
+        const preLoginChat = this.appState.getConversationHistory();
+        const hasPreLoginChat = !!(preLoginChat && preLoginChat.length);
+        let newProjectId = null;
+
+        // Optimistic UI (cached projects) to avoid blank flash
+        if (projectStore.state.projects?.length) {
+            this.sidebar.projects = projectStore.state.projects;
+            this.sidebar.render();
+        }
+
+        // Only migrate if login was triggered by an explicit pending action requesting it.
+        const pending = this.appState.getPendingAction();
+        const shouldMigrate = hasPreLoginChat && !this.hasMigratedLoginChat && pending && pending.type === 'create_project_on_login';
+
+        // 1) Migrate first (one-shot guard) — only when explicitly requested (Find Sources flow)
+        if (shouldMigrate) {
+            this.hasMigratedLoginChat = true;
+            this.toastManager.show('💾 Syncing your research...', 'info');
+            try {
+                const project = await this.createProjectFromConversation(preLoginChat);
+                if (project) {
+                    newProjectId = project.id;
+                    this.toastManager.show(`💾 Saved to "${project.title}"`, 'success');
+                }
+            } catch (err) {
+                logger.error('Failed to migrate login chat:', err);
+                this.hasMigratedLoginChat = false; // allow retry on next login
+            }
+        } else if (hasPreLoginChat && !pending) {
+            // If there's pre-login chat but no pending action, we intentionally DO NOT auto-create a project.
+            logger.info('ProjectManager.handleLogin: pre-login conversation present but no pending create action -> skipping automatic migration.');
+        }
+
+        // 2) Load projects (guarded) and 3) sync store immediately after
+        await this.loadProjectsWithGuard();
+        projectStore.setProjects(this.sidebar.projects); // sync store NOW
+
+        // 4) Auto-load the newly created project (triggers existing handleProjectLoaded flow)
+        if (newProjectId) {
+            // Load the project but instruct sidebar to not replace the live chat messages
+            await this.sidebar.loadProject(newProjectId, { skipMessageRestore: true });
+
+            // Dispatch SOURCE_SEARCH_TRIGGER only if we still have a query to search
+            const originalQuery = (pending && pending.query) || this.appState.getCurrentQuery();
+            if (originalQuery && originalQuery.trim()) {
+                AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+                    detail: { query: originalQuery }
+                }));
+            }
+        }
+
+        // Clear the pending action (if this was satisfying it)
+        if (pending && pending.type === 'create_project_on_login') {
+            this.appState.clearPendingAction();
+        }
+    }
+
+    // Note: keep your existing createProjectFromConversation / _createOrFindProjectForQuery implementations.
+File: backend/static/js/app.js url: https://github.com/relight14/micropaymentcrawler/blob/2794811df616507ce675adc779ca907201e00822/backend/static/js/app.js
+
+JavaScript
+/* backend/static/js/app.js
+   Updated:
+   - Removed automatic ensureActiveProject call from sendMessage path.
+   - Added a centralized handleFindSourcesClick to defer or run the source search without clearing/reloading chat.
+   - Auth success callback does NOT clear chat; it relies on ProjectManager.handleLogin to handle pendingAction migration with skipMessageRestore.
+*/
+
+        const chatInput = document.getElementById('newChatInput');
+        const message = chatInput?.value?.trim();
+        
+        if (!message) return;
+        
+        const currentMode = this.appState.getMode();
+        
+        // Auto-switch to Chat mode if query submitted from Report Builder
+        if (currentMode === 'report') {
+            console.log('🔄 Query from Report Builder detected - switching to Chat mode');
+            this.setMode('chat');
+        }
+
+        try {
+            // NOTE: Removed automatic project creation here to avoid making protected API calls
+            // while the user may be unauthenticated. Project creation is now done when user
+            // explicitly clicks "Find Sources" or after login when pendingAction is present.
+            //
+            // await this.projectsController.ensureActiveProject(message);
+            
+            // Track search/message
+            analytics.trackSearch(message, currentMode);
+            analytics.trackChatMessage(message.length, currentMode);
+            
+            // Clear input and show user message
+            chatInput.value = '';
+            this.uiManager.updateCharacterCount();
+            
+            const userMessage = this.addMessage('user', message);
+            this.appState.setCurrentQuery(message);
+            
+            // Show typing indicator
+Add the centralized Find Sources handler to app initialization (place in initializeApp in app.js):
+
+JavaScript
+/* Additional snippet to add in app.js initialization:
+   - Attaches click handler for Find Sources button (findSourcesBtn id).
+   - Centralizes behavior: when unauthenticated, set pendingAction and open auth modal (no chat clearance).
+   - When authenticated, create/find project and dispatch SOURCE_SEARCH_TRIGGER.
+*/
+
+    // Hook up Find Sources button if present
+    const findBtn = document.getElementById('findSourcesBtn');
+    if (findBtn) {
+        findBtn.addEventListener('click', () => {
+            this.handleFindSourcesClick();
+        });
+    }
+
+    /**
+     * Handler for the Find Sources button (centralized)
+     */
+    this.handleFindSourcesClick = async () => {
+        const query = this.appState.getCurrentQuery() || (document.getElementById('newChatInput')?.value || '').trim();
+        if (!query || !query.trim()) {
+            console.warn('Find Sources clicked with empty query; ignoring.');
+            return;
+        }
+
+        // If user is not authenticated, defer project creation and open auth modal
+        try {
+            if (!this.authService.isAuthenticated()) {
+                console.log('Find Sources: user unauthenticated — deferring and opening login modal');
+                // Persist pending action so ProjectManager.handleLogin knows to migrate & run search
+                this.appState.setPendingAction({
+                    type: 'create_project_on_login',
+                    query,
+                    trigger: 'find_sources'
+                });
+
+                // Open auth modal if available, but do NOT clear/reload chat
+                if (this.modalController && typeof this.modalController.showAuthModal === 'function') {
+                    this.modalController.showAuthModal('login');
+                } else if (this.modalController && typeof this.modalController.openAuthModal === 'function') {
+                    this.modalController.openAuthModal('login');
+                } else {
+                    console.info('Auth modal function not found on modalController - please open login modal manually.');
+                }
+                return;
+            }
+
+            // Authenticated: create/find project if needed, then dispatch SOURCE_SEARCH_TRIGGER
+            const result = await this.projectsController.ensureActiveProject(query, { trigger: 'find_sources' });
+            if (result && result.deferred) {
+                // This should not happen for authenticated user, but handle gracefully
+                console.warn('ensureActiveProject returned deferred for authenticated user.');
+                return;
+            }
+
+            // Dispatch the search event with the query (UI/ProjectManager will handle guards)
+            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+                detail: { query }
+            }));
+        } catch (err) {
+            console.error('Find Sources: error ensuring project or dispatching source search', err);
+            this.toastManager.show('Failed to start source search. Please try again.', 'error');
+        }
+    };
+File: backend/static/js/project-sidebar.js url: https://github.com/relight14/micropaymentcrawler/blob/2794811df616507ce675adc779ca907201e00822/backend/static/js/project-sidebar.js
+
+JavaScript
+/* backend/static/js/project-sidebar.js
+   Updated loadProject signature to accept options and skip message restore when requested.
+   This prevents loadProject from replacing the live chat when we are creating a new project from
+   the in-memory conversation (post-login flow).
+*/
+
+    /**
+     * Load a project and optionally restore its messages into the chat area.
+     * options: { skipMessageRestore: boolean }
+     */
+    async loadProject(projectId, options = {}) {
+        if (!projectId) {
+            logger.warn('loadProject called with falsy projectId:', projectId);
+            return;
+        }
+
+        // Mark active project in the sidebar UI immediately
+        this.activeProjectId = projectId;
+        this.render(); // update UI selection
+
+        // If caller asked to skip restoring messages (preserve live chat), do not fetch messages
+        if (options.skipMessageRestore) {
+            logger.info(`loadProject: skipping message restore for project ${projectId} (skipMessageRestore=true)`);
+            // Make sure projectStore state is accurate
+            projectStore.setActiveProject(projectId);
+            return;
+        }
+
+        // Default behavior: fetch project messages and restore into the chat
+        try {
+            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_LOADING, { detail: { projectId } }));
+            const messages = await api.getProjectMessages(projectId);
+            // notify app to replace/restore messages into the chat area
+            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_LOADED, { detail: { projectId, messages } }));
+        } catch (err) {
+            logger.error('Failed to load project messages for', projectId, err);
+            this.toastManager.show('Failed to load project messages', 'error');
+        }
+    }
+Why these changes solve your specific issue
+
+No server calls while unauthenticated prevent 401/422 errors and avoid creating undefined project states.
+By passing skipMessageRestore: true to loadProject when creating the project after login, the sidebar will add the project and set it active without fetching or overwriting the live chat DOM. The in-memory conversation stays intact and is used as the context for source searches.
+Centralizing Find Sources ensures the search only starts when the user explicitly requests it and that the preserved query (from appState) is used.
+Pending action logic ensures project creation happens only in response to the user's action (Find Sources) and only after login.
+Testing checklist
+
+Start logged out. Send a query ("Syria"), then a follow-up ("humanitarian assistance"). The chat remains in the DOM and appState holds it.
+Click Find Sources → auth modal appears, chat remains unchanged.
+Complete login → ProjectManager.handleLogin runs, creates a project from in-memory conversation, sidebar shows the newly created project (with server id), but the chat remains exactly as before (no reload).
+Confirm the source search runs once after project creation and uses the preserved conversation for context.
+Verify no network call to /api/projects/undefined/messages; no 401s triggered by project creation while unauthenticated.
+Notes and next small steps I can do for you
+
+I can create a PR with these changes (apply patches to the repository), run a quick smoke-check, and note any downstream call sites that need small compatibility updates. If you want that, I’ll push a branch and open a PR.
+If you prefer to apply changes manually, you can copy the three snippets above into the matching files (ensure function names like loadProject & modalController methods match your implementation).
+If sidebar.loadProject has a different filename or path in your repo, tell me the exact path and I’ll update the snippet and push the PR.
+I implemented the full trace of what was happening, explained the exact place that overwrote the chat (sidebar.loadProject / message restore during handleLogin), and provided a minimal, low-risk patch set to preserve the live chat and perform project creation + source search after login. Would you like me to open a PR with these edits now?

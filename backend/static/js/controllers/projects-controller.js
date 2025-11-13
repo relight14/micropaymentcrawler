@@ -88,26 +88,63 @@ export class ProjectsController {
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
 
-        // PROJECT_CREATED: Clear chat and show welcome message for new project
-        AppEvents.addEventListener(EVENT_TYPES.PROJECT_CREATED, (e) => {
+        // PROJECT_CREATED: Handle new project creation
+        AppEvents.addEventListener(EVENT_TYPES.PROJECT_CREATED, async (e) => {
+            const preserveConversation = e.detail?.preserveConversation || false;
+            
             console.log('📡 AppEvents: New project created', {
                 projectId: e.detail.project.id,
-                projectTitle: e.detail.project.title
+                projectTitle: e.detail.project.title,
+                preserveConversation
             });
             
-            // Clear old messages and show welcome for new project
-            const { appState, uiManager, sourceManager, reportBuilder } = this.dependencies;
-            appState.clearConversation();
-            uiManager.clearConversationDisplay();
-            sourceManager.updateSelectionUI();
-            reportBuilder.update();
+            const { appState, uiManager, sourceManager, reportBuilder, apiService } = this.dependencies;
             
-            // Show welcome message for new project (don't save it)
-            this.isRestoringMessages = true;
-            this._addMessage('system', `🎯 Welcome to "${e.detail.project.title}". Start your research here.`);
-            this.isRestoringMessages = false;
+            if (preserveConversation) {
+                // Login migration flow: preserve in-memory chat and save to new project
+                console.log('💾 Preserving conversation for login migration - saving messages to project');
+                
+                // Save all in-memory messages to the newly created project
+                const messages = appState.getConversationHistory();
+                if (messages && messages.length > 0) {
+                    try {
+                        // Save messages one by one to preserve order
+                        for (const msg of messages) {
+                            const normalizedSender = msg.sender === 'assistant' ? 'ai' : msg.sender;
+                            if (['user', 'ai', 'system'].includes(normalizedSender)) {
+                                await apiService.saveMessage(
+                                    e.detail.project.id,
+                                    normalizedSender,
+                                    msg.content,
+                                    msg.metadata ? { metadata: msg.metadata } : null
+                                );
+                            }
+                        }
+                        console.log(`✅ Saved ${messages.length} messages to project ${e.detail.project.id}`);
+                    } catch (error) {
+                        console.error('Failed to save conversation to project:', error);
+                        this.dependencies.toastManager.show('⚠️ Some messages may not have been saved', 'warning');
+                    }
+                }
+                
+                // Don't clear chat - messages stay visible
+                // Update UI components without clearing
+                sourceManager.updateSelectionUI();
+                reportBuilder.update();
+            } else {
+                // Normal project creation: clear old messages and show welcome
+                appState.clearConversation();
+                uiManager.clearConversationDisplay();
+                sourceManager.updateSelectionUI();
+                reportBuilder.update();
+                
+                // Show welcome message for new project (don't save it)
+                this.isRestoringMessages = true;
+                this._addMessage('system', `🎯 Welcome to "${e.detail.project.title}". Start your research here.`);
+                this.isRestoringMessages = false;
+            }
             
-            // Hide welcome screen
+            // Hide welcome screen in both cases
             this._hideWelcomeScreen();
         });
 
