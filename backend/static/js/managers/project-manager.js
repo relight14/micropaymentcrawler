@@ -68,7 +68,11 @@ export class ProjectManager {
 
         // Immediate UI update when project loading starts
         this.sidebar.addEventListener('projectLoadingStarted', (e) => {
-            this.handleProjectLoadingStarted(e.detail.projectId, e.detail.projectTitle);
+            this.handleProjectLoadingStarted(
+                e.detail.projectId, 
+                e.detail.projectTitle,
+                e.detail.preserveConversation
+            );
         });
 
         this.sidebar.addEventListener('projectLoaded', (e) => {
@@ -216,19 +220,34 @@ export class ProjectManager {
             }
         }
         
-        // 3) If we created or found one, load it
+        // 3) If we created or found one, load it WITH preserveConversation flag
         if (newProjectId) {
-            await this.sidebar.loadProject(newProjectId);
-            
-            // Only dispatch SOURCE_SEARCH_TRIGGER after restore completes
-            const query = this.appState.getCurrentQuery();
-            if (query && query.trim() && !this._isRestoring) {
-                logger.info('🔍 Dispatching SOURCE_SEARCH_TRIGGER after login with query:', query);
-                AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
-                    detail: { query }
-                }));
-            } else if (this._isRestoring) {
-                logger.warn('⚠️ Skipping SOURCE_SEARCH_TRIGGER - project still restoring');
+            await this.sidebar.loadProject(newProjectId, { preserveConversation: true });
+        }
+        
+        // 4) Check for pending source search from Find Sources button
+        const pendingSearch = sessionStorage.getItem('pendingSourceSearch');
+        if (pendingSearch) {
+            try {
+                const { query, mode } = JSON.parse(pendingSearch);
+                sessionStorage.removeItem('pendingSourceSearch'); // Clear immediately
+                
+                if (query && query.trim()) {
+                    logger.info('🔍 Processing pending source search after login:', query);
+                    
+                    // Switch to research mode if needed
+                    if (mode === 'research' && this.appState.getMode() !== 'research') {
+                        this.appState.setMode('research');
+                    }
+                    
+                    // Dispatch source search trigger
+                    AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, {
+                        detail: { query }
+                    }));
+                }
+            } catch (err) {
+                logger.error('Failed to process pending source search:', err);
+                sessionStorage.removeItem('pendingSourceSearch');
             }
         }
     }
@@ -360,15 +379,16 @@ export class ProjectManager {
     /**
      * Handle project loading started (immediate UI update)
      */
-    handleProjectLoadingStarted(projectId, projectTitle) {
+    handleProjectLoadingStarted(projectId, projectTitle, preserveConversation = false) {
         logger.info(`⚡ [ProjectManager] Project loading started immediately:`, {
             projectId,
-            projectTitle
+            projectTitle,
+            preserveConversation
         });
         
-        // Show loading UI immediately
+        // Show loading UI immediately, forward preserveConversation flag
         AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.PROJECT_LOADING_STARTED, {
-            detail: { projectId, projectTitle }
+            detail: { projectId, projectTitle, preserveConversation }
         }));
     }
 
@@ -587,9 +607,18 @@ export class ProjectManager {
 
     /**
      * Auto-create a project from the first user query
+     * DEFERS when unauthenticated - login flow will handle project creation
      * @param {string} query - The user's first query
+     * @returns {Promise<number|null|{deferred: true}>} Project ID, null, or {deferred: true}
      */
     async ensureActiveProject(query) {
+        // CRITICAL: If unauthenticated, defer project creation to login flow
+        // This prevents 401 errors when Find Sources button is clicked before login
+        if (!this.authService.isAuthenticated()) {
+            logger.info('📋 ensureActiveProject: User not authenticated - deferring project creation to login flow');
+            return { deferred: true };
+        }
+        
         // If there's already an active project, use it
         if (projectStore.state.activeProjectId) {
             return projectStore.state.activeProjectId;

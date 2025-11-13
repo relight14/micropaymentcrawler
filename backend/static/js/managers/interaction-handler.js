@@ -25,7 +25,39 @@ export class InteractionHandler {
         this.sourceManager.unlockSource(null, sourceId, price);
     }
 
-    handleResearchSuggestion(topicHint, setModeCallback, autoExecute = false, sendMessageCallback = null) {
+    handleResearchSuggestion(topicHint, setModeCallback, autoExecute = false, sendMessageCallback = null, authService = null) {
+        // CRITICAL AUTH CHECK: If user is not authenticated, show auth modal
+        // The login flow will handle project creation and source search
+        if (authService && !authService.isAuthenticated()) {
+            console.log('🔒 User not authenticated - showing auth modal before source search');
+            
+            // Extract query for later use after login
+            let queryText = topicHint || this.appState.getCurrentQuery() || '';
+            if (!queryText) {
+                const messages = this.appState.getConversationHistory();
+                const lastUserMessage = messages.filter(m => m.sender === 'user').pop();
+                if (lastUserMessage?.content) {
+                    const content = lastUserMessage.content;
+                    if (typeof content === 'string') {
+                        queryText = content.substring(0, 100);
+                    } else if (content instanceof HTMLElement) {
+                        queryText = content.textContent?.substring(0, 100) || '';
+                    }
+                }
+            }
+            
+            // Store pending action for post-login processing
+            sessionStorage.setItem('pendingSourceSearch', JSON.stringify({
+                query: queryText,
+                mode: 'research'
+            }));
+            
+            // Show auth modal
+            this.modalController.showAuthModal();
+            return;
+        }
+        
+        // User is authenticated - proceed with normal flow
         // Switch to research mode
         setModeCallback('research');
         

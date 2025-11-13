@@ -150,10 +150,15 @@ export class ProjectListSidebar extends EventTarget {
 
     /**
      * Load a specific project
+     * @param {number} projectId - Project ID to load
+     * @param {Object} options - Load options
+     * @param {boolean} options.preserveConversation - If true, skip clearing chat UI (for login flow)
      */
-    async loadProject(projectId) {
+    async loadProject(projectId, options = {}) {
+        const { preserveConversation = false } = options;
+        
         try {
-            console.log(`🔄 [ProjectSidebar] Loading project ${projectId}...`);
+            console.log(`🔄 [ProjectSidebar] Loading project ${projectId}...`, { preserveConversation });
             
             // Update UI immediately for instant feedback
             this.activeProjectId = projectId;
@@ -167,7 +172,8 @@ export class ProjectListSidebar extends EventTarget {
             this.dispatchEvent(new CustomEvent('projectLoadingStarted', {
                 detail: { 
                     projectId,
-                    projectTitle 
+                    projectTitle,
+                    preserveConversation
                 }
             }));
             
@@ -205,7 +211,10 @@ export class ProjectListSidebar extends EventTarget {
                 });
 
                 this.dispatchEvent(new CustomEvent('projectLoaded', {
-                    detail: { projectData }
+                    detail: { 
+                        projectData,
+                        preserveConversation
+                    }
                 }));
                 
                 return projectData;

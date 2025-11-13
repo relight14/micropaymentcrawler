@@ -113,17 +113,22 @@ export class ProjectsController {
 
         // PROJECT_LOADING_STARTED: Show loading UI immediately
         AppEvents.addEventListener(EVENT_TYPES.PROJECT_LOADING_STARTED, (e) => {
+            const preserveConversation = e.detail?.preserveConversation || false;
+            
             console.log('⚡ AppEvents: Project loading started', {
                 projectId: e.detail.projectId,
-                projectTitle: e.detail.projectTitle
+                projectTitle: e.detail.projectTitle,
+                preserveConversation
             });
             
-            // Immediately clear and show loading state
-            const { appState, uiManager, sourceManager, reportBuilder } = this.dependencies;
-            appState.clearConversation();
-            uiManager.clearConversationDisplay(true); // Show loading state
-            sourceManager.updateSelectionUI();
-            reportBuilder.update();
+            // Only clear chat for manual project switches, not login flow
+            if (!preserveConversation) {
+                const { appState, uiManager, sourceManager, reportBuilder } = this.dependencies;
+                appState.clearConversation();
+                uiManager.clearConversationDisplay(true); // Show loading state
+                sourceManager.updateSelectionUI();
+                reportBuilder.update();
+            }
         });
 
         // PROJECT_SWITCHED: Message loading is now handled by ProjectManager

@@ -336,7 +336,8 @@ export class ChatResearchApp {
                     topicHint,
                     (mode) => this.setMode(mode),
                     autoExecute,
-                    () => this.sendMessage() // Pass sendMessage callback for auto-execution
+                    () => this.sendMessage(), // Pass sendMessage callback for auto-execution
+                    this.authService // Pass authService for auth check
                 ),
                 onChatInput: (e) => {
                     this.uiManager.updateCharacterCount();
