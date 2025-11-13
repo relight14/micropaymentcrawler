@@ -16,81 +16,6 @@ export class ReportBuilder extends EventTarget {
         this.authService = authService;
         this.toastManager = toastManager;
         this.uiManager = uiManager;
-        this.pricingRefreshDebounceTimer = null;
-        this.sourceSelectionHandler = null;
-        this.isActive = false;
-    }
-    
-    /**
-     * Setup listener for source selection changes to refresh pricing
-     * @private
-     */
-    _setupSourceSelectionListener() {
-        // Remove existing listener if any
-        if (this.sourceSelectionHandler) {
-            document.removeEventListener('sourceSelectionChanged', this.sourceSelectionHandler);
-        }
-        
-        // Create bound handler for cleanup
-        this.sourceSelectionHandler = () => {
-            if (!this.isActive) return; // Only refresh if builder is active
-            
-            if (this.pricingRefreshDebounceTimer) {
-                clearTimeout(this.pricingRefreshDebounceTimer);
-            }
-            
-            this.pricingRefreshDebounceTimer = setTimeout(() => {
-                console.log('📊 Source selection changed - refreshing pricing');
-                this._fetchAndUpdatePricing();
-            }, 500);
-        };
-        
-        document.addEventListener('sourceSelectionChanged', this.sourceSelectionHandler);
-    }
-    
-    /**
-     * Cleanup listeners when builder is no longer needed
-     */
-    destroy() {
-        this.isActive = false;
-        if (this.sourceSelectionHandler) {
-            document.removeEventListener('sourceSelectionChanged', this.sourceSelectionHandler);
-            this.sourceSelectionHandler = null;
-        }
-        if (this.pricingRefreshDebounceTimer) {
-            clearTimeout(this.pricingRefreshDebounceTimer);
-            this.pricingRefreshDebounceTimer = null;
-        }
-    }
-
-    /**
-     * Get merged selected sources from both AppState and ProjectStore
-     * Deduplicates by source ID to handle dual-state scenarios
-     * @returns {Array} Merged and deduplicated sources array
-     * @private
-     */
-    _getMergedSelectedSources() {
-        const projectStoreSources = projectStore?.getState?.().selectedSources || [];
-        const appStateSources = this.appState.getSelectedSources() || [];
-        
-        // Merge and deduplicate by ID
-        const sourceMap = new Map();
-        const sourcesWithoutId = [];
-        
-        [...projectStoreSources, ...appStateSources].forEach((source, index) => {
-            if (!source) return; // Skip null/undefined
-            
-            if (source.id) {
-                sourceMap.set(source.id, source);
-            } else {
-                // Preserve sources without ID using index as fallback key
-                console.warn('⚠️ Source without ID detected, preserving with index key:', source);
-                sourcesWithoutId.push(source);
-            }
-        });
-        
-        // Return merged sources (ID-based + non-ID sources)
-        return [...Array.from(sourceMap.values()), ...sourcesWithoutId];
     }
 
     /**
@@ -98,15 +23,6 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement} The report builder DOM element
      */
     show() {
-        // Clean up any previous state first (singleton pattern protection)
-        if (this.isActive) {
-            this.destroy();
-        }
-        
-        // Mark as active and setup listener
-        this.isActive = true;
-        this._setupSourceSelectionListener();
-        
         // Render DOM with static pricing first (optimistic render)
         const container = this._generateReportBuilderDOM();
         
@@ -124,8 +40,8 @@ export class ReportBuilder extends EventTarget {
      * @private
      */
     async _fetchAndUpdatePricing() {
-        // Defensive guard - don't refresh if builder is inactive
-        if (!this.isActive || !this.authService.isAuthenticated()) {
+        if (!this.authService.isAuthenticated()) {
+            // User not logged in - keep default pricing
             return;
         }
         
@@ -164,16 +80,7 @@ export class ReportBuilder extends EventTarget {
      */
     _updateTierCardPricing(tierId, quote) {
         const tierCard = document.querySelector(`[data-tier-id="${tierId}"]`);
-        if (!tierCard) {
-            console.warn(`⚠️ Tier card not found for: ${tierId}`);
-            return;
-        }
-        
-        // Null-guard: return early if quote is missing (after DOM check)
-        if (!quote) {
-            console.warn(`⚠️ No quote provided for tier: ${tierId}`);
-            return;
-        }
+        if (!tierCard) return;
         
         const priceElement = tierCard.querySelector('.tier-price');
         const detailsElement = tierCard.querySelector('.tier-pricing-details');
@@ -257,104 +164,38 @@ export class ReportBuilder extends EventTarget {
             const reportPacket = await this.apiService.generateReport(query, tier, selectedSources, outlineStructure);
             
             if (reportPacket) {
-                this._handleReportSuccess(button, tier, selectedSources, reportPacket);
+                // Track report generation
+                analytics.trackReportGenerate(selectedSources.length, tier);
+                
+                // Update button state
+                if (button) {
+                    button.textContent = 'Report Generated';
+                    button.disabled = true;
+                }
+                
+                // Dispatch success event with report data
+                this.dispatchEvent(new CustomEvent('reportGenerated', {
+                    detail: {
+                        reportData: reportPacket,
+                        tier,
+                        sourceCount: selectedSources.length
+                    }
+                }));
             }
         } catch (error) {
-            this._handleReportError(button, tier, error);
-        }
-    }
-    
-    /**
-     * Handle successful report generation
-     * @private
-     */
-    _handleReportSuccess(button, tier, selectedSources, reportPacket) {
-        // Track report generation
-        analytics.trackReportGenerate(selectedSources.length, tier);
-        
-        // Update button state
-        if (button) {
-            button.textContent = 'Report Generated';
-            button.disabled = true;
-        }
-        
-        // Show success toast
-        if (this.toastManager) {
-            this.toastManager.show(`${tier === 'research' ? 'Research' : 'Pro'} report generated successfully`, 'success');
-        }
-        
-        // Dispatch success event with report data
-        this.dispatchEvent(new CustomEvent('reportGenerated', {
-            detail: {
-                reportData: reportPacket,
-                tier,
-                sourceCount: selectedSources.length
+            console.error('Error generating report:', error);
+            
+            // Dispatch error event
+            this.dispatchEvent(new CustomEvent('reportError', {
+                detail: { error, tier }
+            }));
+            
+            // Reset button state
+            if (button) {
+                button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
+                button.disabled = false;
             }
-        }));
-    }
-    
-    /**
-     * Handle report generation errors
-     * @private
-     */
-    _handleReportError(button, tier, error) {
-        console.error('Error generating report:', error);
-        
-        // Parse error message for user-friendly display
-        const errorMessage = this._parseErrorMessage(error);
-        
-        // Show error toast with retry guidance
-        if (this.toastManager) {
-            this.toastManager.show(errorMessage, 'error');
         }
-        
-        // Dispatch error event
-        this.dispatchEvent(new CustomEvent('reportError', {
-            detail: { error, tier, userMessage: errorMessage }
-        }));
-        
-        // Reset button state
-        if (button) {
-            button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
-            button.disabled = false;
-        }
-    }
-    
-    /**
-     * Parse error into user-friendly message with retry guidance
-     * @private
-     */
-    _parseErrorMessage(error) {
-        // Check if we have structured error from backend
-        if (error.retryGuidance) {
-            return `${error.message}. ${error.retryGuidance}`;
-        }
-        
-        const errorStr = error?.message || String(error);
-        
-        // Handle specific error types
-        if (errorStr.includes('insufficient funds') || errorStr.includes('balance')) {
-            return 'Insufficient wallet balance. Please add funds and try again.';
-        }
-        
-        if (errorStr.includes('401') || errorStr.includes('unauthorized') || errorStr.includes('session')) {
-            return 'Your session expired. Please log in again.';
-        }
-        
-        if (errorStr.includes('429') || errorStr.includes('rate limit')) {
-            return 'Too many requests. Please wait a moment and try again.';
-        }
-        
-        if (errorStr.includes('timeout') || errorStr.includes('timed out')) {
-            return 'Request timed out. Please check your connection and try again.';
-        }
-        
-        if (errorStr.includes('network') || errorStr.includes('fetch')) {
-            return 'Network error. Please check your connection and try again.';
-        }
-        
-        // Generic fallback with retry guidance
-        return 'Report generation failed. Please try again or contact support if the issue persists.';
     }
 
     /**
@@ -749,21 +590,13 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
-     * Escapes CSV field values (handles quotes, commas, newlines, formula injection)
+     * Escapes CSV field values (handles quotes, commas, newlines)
      * @private
      */
     _escapeCSV(field) {
         if (field == null) return '';
         
-        let stringField = String(field);
-        
-        // Security: Prevent CSV formula injection by escaping dangerous prefixes
-        // Excel/Google Sheets interpret =, +, -, @, tab, CR as formula starters
-        // Also check for Unicode variants and leading whitespace
-        const trimmed = stringField.trimStart();
-        if (/^[=+\-@\t\r]/.test(trimmed) || /^[\u003D\u002B\u002D\u0040]/.test(trimmed)) {
-            stringField = "'" + stringField;
-        }
+        const stringField = String(field);
         
         // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
         if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
@@ -779,7 +612,7 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement}
      */
     _generateReportBuilderDOM() {
-        const selectedSources = this._getMergedSelectedSources();
+        const selectedSources = this.appState.getSelectedSources();
         const sourceCount = selectedSources.length;
         const totalCost = this.appState.getSelectedSourcesTotal();
         
@@ -805,11 +638,6 @@ export class ReportBuilder extends EventTarget {
         
         // Header
         contentArea.appendChild(this._createHeader());
-        
-        // Selected sources section (if any sources selected)
-        if (sourceCount > 0) {
-            contentArea.appendChild(this._createSelectedSourcesSection(selectedSources, sourceCount, totalCost));
-        }
         
         // Tier cards with asymmetric layout
         contentArea.appendChild(this._createTierCardsContainer());
@@ -1097,7 +925,7 @@ export class ReportBuilder extends EventTarget {
                 
                 console.log(`💰 Purchase initiated - Tier: ${tier}, Price: $${price.toFixed(2)} ${actualPrice ? '(dynamic)' : '(static fallback)'}, Quote unavailable: ${quoteUnavailable}`);
                 
-                const selectedSources = this._getMergedSelectedSources();
+                const selectedSources = this.appState.getSelectedSources();
                 const useSelectedSources = selectedSources && selectedSources.length > 0;
                 
                 this.dispatchEvent(new CustomEvent('tierPurchase', {

@@ -138,67 +138,6 @@ class SourceCard {
     }
     
     /**
-     * Rehydrate click handlers on existing source cards in the DOM
-     * Used after DOM rebuild (e.g., project switching) to restore interactivity
-     * @param {string} containerSelector - CSS selector for container (default: '#messagesContainer')
-     * @returns {number} Number of cards rehydrated
-     */
-    rehydrateCards(containerSelector = '#messagesContainer') {
-        console.log('🔄 REHYDRATE: Starting source card rehydration...');
-        
-        const container = document.querySelector(containerSelector);
-        if (!container) {
-            console.warn(`⚠️ REHYDRATE: Container not found: ${containerSelector}`);
-            return 0;
-        }
-        
-        // Find all source cards in the DOM
-        const sourceCards = container.querySelectorAll('.source-card[data-source-id]');
-        console.log(`🔄 REHYDRATE: Found ${sourceCards.length} source cards to rehydrate`);
-        
-        let rehydratedCount = 0;
-        
-        sourceCards.forEach(sourceCard => {
-            const sourceId = sourceCard.dataset.sourceId;
-            
-            // Skip if handler already exists
-            if (this.eventListeners.has(sourceCard)) {
-                console.log(`⏭️ REHYDRATE: Card ${sourceId} already has handler, skipping`);
-                return;
-            }
-            
-            // Create and attach the click handler (same logic as create() method)
-            const cardClickHandler = (e) => {
-                const actionBtn = e.target.closest('[data-action]');
-                if (!actionBtn) return;
-                
-                const action = actionBtn.dataset.action;
-                const cardSourceId = sourceCard.dataset.sourceId;
-                
-                if (action === 'unlock') {
-                    e.preventDefault();
-                    this._handleUnlock(cardSourceId);
-                } else if (action === 'download') {
-                    e.preventDefault();
-                    this._handleDownload(cardSourceId);
-                } else if (action === 'summarize') {
-                    e.preventDefault();
-                    this._handleSummarize(cardSourceId, actionBtn);
-                }
-                // view-external opens naturally via href, no handler needed
-            };
-            
-            sourceCard.addEventListener('click', cardClickHandler);
-            this.eventListeners.set(sourceCard, { type: 'click', handler: cardClickHandler });
-            rehydratedCount++;
-            console.log(`✅ REHYDRATE: Attached handler to card ${sourceId}`);
-        });
-        
-        console.log(`✅ REHYDRATE: Successfully rehydrated ${rehydratedCount} source cards`);
-        return rehydratedCount;
-    }
-    
-    /**
      * Handle progressive enrichment updates
      */
     handleEnrichmentUpdate(event) {

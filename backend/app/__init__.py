@@ -16,7 +16,6 @@ from utils.rate_limit import limiter
 from utils.static import NoCacheStaticFiles
 from middleware.error_handler import ErrorHandlerMiddleware, BudgetExceededError
 from app.api.routes import auth, research, purchase, chat, sources, health, wallet, projects, files
-from app.api.routes.purchase import StructuredHTTPException
 
 
 # Configure logging
@@ -101,14 +100,6 @@ def create_app() -> FastAPI:
     app.add_middleware(SlowAPIMiddleware)
     
     # Custom exception handlers
-    @app.exception_handler(StructuredHTTPException)
-    async def structured_error_handler(request, exc: StructuredHTTPException):
-        """Handle structured errors with consistent JSON format"""
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"detail": exc.detail}  # detail is already structured dict
-        )
-    
     @app.exception_handler(RateLimitExceeded)
     async def rate_limit_handler(request, exc):
         return JSONResponse(
