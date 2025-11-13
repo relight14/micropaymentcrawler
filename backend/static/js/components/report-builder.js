@@ -6,7 +6,7 @@
 
 import { analytics } from '../utils/analytics.js';
 import { projectStore } from '../state/project-store.js';
-import { TIERS } from '../config/tier-catalog.js';
+import { TIERS, calculateProPrice, PER_SOURCE_RATE } from '../config/tier-catalog.js';
 
 export class ReportBuilder extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager }) {
@@ -41,7 +41,7 @@ export class ReportBuilder extends EventTarget {
      */
     async _fetchAndUpdatePricing() {
         if (!this.authService.isAuthenticated()) {
-            // User not logged in - keep default pricing
+            // User not logged in - pricing already calculated from sources × $0.05
             return;
         }
         
@@ -49,32 +49,26 @@ export class ReportBuilder extends EventTarget {
         const outlineStructure = projectStore.getOutlineSnapshot();
         
         try {
-            // Fetch quotes for both tiers in parallel
-            const [researchQuote, proQuote] = await Promise.all([
-                this.apiService.getPricingQuote('research', query, outlineStructure),
-                this.apiService.getPricingQuote('pro', query, outlineStructure)
-            ]);
+            // Fetch quote for Pro tier only
+            const proQuote = await this.apiService.getPricingQuote('pro', query, outlineStructure);
             
-            this.pricingQuotes = {
-                research: researchQuote,
-                pro: proQuote
-            };
+            this.pricingQuotes = { pro: proQuote };
             
-            console.log('💵 Pricing quotes fetched:', this.pricingQuotes);
+            console.log('💵 Pro pricing quote fetched:', proQuote);
             
-            // Update tier cards with dynamic pricing
-            this._updateTierCardPricing('research', researchQuote);
+            // Update Pro tier card with backend quote (may differ from local calculation)
             this._updateTierCardPricing('pro', proQuote);
             
         } catch (error) {
-            console.error('Failed to fetch pricing quotes:', error);
+            console.error('Failed to fetch pricing quote:', error);
+            // Fallback: Keep local calculation (sources × $0.05)
             this.pricingQuotes = {};
         }
     }
     
     /**
      * Update tier card with dynamic pricing
-     * @param {string} tierId - Tier ID (research/pro)
+     * @param {string} tierId - Tier ID (pro)
      * @param {Object} quote - Pricing quote object
      * @private
      */
@@ -84,6 +78,7 @@ export class ReportBuilder extends EventTarget {
         
         const priceElement = tierCard.querySelector('.tier-price');
         const detailsElement = tierCard.querySelector('.tier-pricing-details');
+        const buttonElement = tierCard.querySelector('.tier-purchase-btn');
         
         if (!priceElement) return;
         
@@ -91,6 +86,12 @@ export class ReportBuilder extends EventTarget {
         if (quote.quote_unavailable) {
             const price = quote.calculated_price || 0;
             priceElement.textContent = `$${price.toFixed(2)}`;
+            
+            // Update button text with price
+            if (buttonElement) {
+                buttonElement.textContent = `Generate Pro Report — $${price.toFixed(2)}`;
+                buttonElement.dataset.price = price.toFixed(2);
+            }
             
             if (detailsElement) {
                 detailsElement.textContent = 'Quote unavailable — showing list price';
@@ -110,6 +111,12 @@ export class ReportBuilder extends EventTarget {
         
         // Update price display
         priceElement.textContent = `$${price.toFixed(2)}`;
+        
+        // Update button text with price
+        if (buttonElement) {
+            buttonElement.textContent = `Generate Pro Report — $${price.toFixed(2)}`;
+            buttonElement.dataset.price = price.toFixed(2);
+        }
         
         // Update pricing details with full transparency
         if (detailsElement) {
@@ -137,7 +144,7 @@ export class ReportBuilder extends EventTarget {
     /**
      * Generates a report from selected sources
      * @param {HTMLButtonElement} button - The purchase button
-     * @param {string} tier - Tier ID (research/pro)
+     * @param {string} tier - Tier ID (pro)
      * @param {string} query - Research query
      * @param {Array} selectedSources - Selected sources array
      */
@@ -192,7 +199,7 @@ export class ReportBuilder extends EventTarget {
             
             // Reset button state
             if (button) {
-                button.textContent = `Generate ${tier === 'research' ? 'Research' : 'Pro'} Report`;
+                button.textContent = 'Generate Pro Report';
                 button.disabled = false;
             }
         }
@@ -281,7 +288,7 @@ export class ReportBuilder extends EventTarget {
      */
     _displayMarkdownReport(reportData) {
         // Build report header
-        const headerText = `# Research Report: ${reportData.query}\n**${(reportData.tier || 'research').toUpperCase()} TIER**\n\n`;
+        const headerText = `# Research Report: ${reportData.query}\n**${(reportData.tier || 'pro').toUpperCase()} TIER**\n\n`;
         
         // Build complete report content
         let reportContent = headerText + reportData.summary;
@@ -327,8 +334,8 @@ export class ReportBuilder extends EventTarget {
         title.textContent = `Research Report: ${reportData.query}`;
         
         const tierBadge = document.createElement('span');
-        tierBadge.className = `tier-badge tier-${reportData.tier || 'research'}`;
-        tierBadge.textContent = `${(reportData.tier || 'research').toUpperCase()} TIER`;
+        tierBadge.className = `tier-badge tier-${reportData.tier || 'pro'}`;
+        tierBadge.textContent = `${(reportData.tier || 'pro').toUpperCase()} TIER`;
         
         header.appendChild(title);
         header.appendChild(tierBadge);
@@ -639,11 +646,8 @@ export class ReportBuilder extends EventTarget {
         // Header
         contentArea.appendChild(this._createHeader());
         
-        // Tier cards with asymmetric layout
+        // Tier cards (Pro tier only)
         contentArea.appendChild(this._createTierCardsContainer());
-        
-        // Expandable comparison (What's inside?)
-        contentArea.appendChild(this._createComparisonAccordion());
         
         // Security footer
         contentArea.appendChild(this._createSecurityFooter());
@@ -662,7 +666,7 @@ export class ReportBuilder extends EventTarget {
         headerDiv.className = 'tier-cards-header';
         
         const headerTitle = document.createElement('h3');
-        headerTitle.textContent = 'Choose Your Research Package';
+        headerTitle.textContent = 'Your Research Package';
         
         headerDiv.appendChild(headerTitle);
         
@@ -779,7 +783,7 @@ export class ReportBuilder extends EventTarget {
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'tier-cards-asymmetric';
         
-        // Create tier cards from config (Pro first, then Research)
+        // Create tier card (Pro tier only)
         TIERS.forEach(tier => {
             cardsContainer.appendChild(this._createTierCard(tier));
         });
@@ -792,93 +796,42 @@ export class ReportBuilder extends EventTarget {
      * @private
      */
     _createTierCard(tier) {
+        // Calculate dynamic pricing based on selected sources
+        const selectedSources = this.appState.getSelectedSources();
+        const sourceCount = selectedSources.length;
+        const calculatedPrice = calculateProPrice(sourceCount);
+        
         const cardDiv = document.createElement('div');
-        cardDiv.className = tier.highlighted ? 'tier-card tier-card-pro' : 'tier-card tier-card-research';
+        cardDiv.className = 'tier-card tier-card-pro'; // Only Pro tier now
         cardDiv.dataset.tier = tier.id;
         cardDiv.dataset.tierId = tier.id; // For DOM querying in price updates
+        cardDiv.dataset.actualPrice = calculatedPrice.toFixed(2);
         
         const badgeHTML = tier.badge ? `<div class="tier-badge">${tier.badge}</div>` : '';
         const microcopyHTML = tier.microcopy ? `<div class="tier-microcopy">${tier.microcopy}</div>` : '';
-        const buttonClass = tier.highlighted ? 'tier-purchase-btn tier-btn-primary' : 'tier-purchase-btn tier-btn-ghost';
+        
+        // Dynamic pricing labels
+        const priceLabel = `$${calculatedPrice.toFixed(2)}`;
+        const buttonText = `Generate Pro Report — $${calculatedPrice.toFixed(2)}`;
+        const pricingDetails = `${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${PER_SOURCE_RATE.toFixed(2)} each`;
         
         cardDiv.innerHTML = `
             ${badgeHTML}
             <div class="tier-icon">${tier.icon}</div>
             <h4 class="tier-title-new">${tier.title}</h4>
-            <div class="tier-price tier-price-new">${tier.priceLabel}</div>
-            <div class="tier-pricing-details" style="display: none; font-size: 0.8rem; color: #666; margin-top: 4px;"></div>
+            <div class="tier-price tier-price-new">${priceLabel}</div>
+            <div class="tier-pricing-details" style="display: block; font-size: 0.8rem; color: #666; margin-top: 4px;">${pricingDetails}</div>
             <div class="tier-subtitle">${tier.subtitle}</div>
             <ul class="tier-features-compact">
                 ${tier.features.map(feature => `<li>✓ ${feature}</li>`).join('')}
             </ul>
-            <button class="${buttonClass}" data-tier="${tier.id}" data-price="${tier.price}">
-                ${tier.buttonText}
+            <button class="tier-purchase-btn tier-btn-primary" data-tier="${tier.id}" data-price="${calculatedPrice.toFixed(2)}">
+                ${buttonText}
             </button>
             ${microcopyHTML}
         `;
         
         return cardDiv;
-    }
-
-    /**
-     * Creates expandable comparison accordion
-     * @private
-     */
-    _createComparisonAccordion() {
-        const accordionDiv = document.createElement('details');
-        accordionDiv.className = 'tier-comparison-accordion';
-        
-        const summary = document.createElement('summary');
-        summary.className = 'accordion-summary';
-        summary.textContent = "What's inside? ▼";
-        
-        const content = document.createElement('div');
-        content.className = 'accordion-content';
-        
-        // Build comparison table
-        content.innerHTML = `
-            <table class="tier-comparison-table">
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>Research</th>
-                        <th>Pro</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Professional summary & analysis</td>
-                        <td>✓</td>
-                        <td>✓</td>
-                    </tr>
-                    <tr>
-                        <td>Source compilation & citations</td>
-                        <td>✓</td>
-                        <td>✓</td>
-                    </tr>
-                    <tr>
-                        <td>Strategic insights & recommendations</td>
-                        <td>—</td>
-                        <td>✓</td>
-                    </tr>
-                    <tr>
-                        <td>Executive summary format</td>
-                        <td>—</td>
-                        <td>✓</td>
-                    </tr>
-                    <tr>
-                        <td>Enhanced formatting & presentation</td>
-                        <td>—</td>
-                        <td>✓</td>
-                    </tr>
-                </tbody>
-            </table>
-        `;
-        
-        accordionDiv.appendChild(summary);
-        accordionDiv.appendChild(content);
-        
-        return accordionDiv;
     }
 
     /**

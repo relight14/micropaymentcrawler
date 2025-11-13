@@ -462,30 +462,18 @@ export class SourceManager extends EventTarget {
     }
 
     checkBudget(totalCost) {
-        const { research: researchBudget, pro: proBudget, warningThreshold } = getBudgetThresholds();
+        const { pro: proBudget, warningThreshold } = getBudgetThresholds();
         
+        // With per-source pricing, budget warnings are less relevant
+        // but we keep them for very high totals as a sanity check
         if (totalCost >= proBudget) {
-            const warning = `⚠️ Selected sources exceed Pro budget ($${Number(proBudget || 0).toFixed(2)})`;
+            const warning = `⚠️ Selected sources cost is very high ($${Number(totalCost || 0).toFixed(2)})`;
             AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.BUDGET_WARNING, {
                 detail: { warning, totalCost }
             }));
             return warning;
         } else if (totalCost >= proBudget * warningThreshold) {
-            const warning = `⚠️ Selected sources approaching Pro budget limit ($${Number(proBudget || 0).toFixed(2)})`;
-            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.BUDGET_WARNING, {
-                detail: { warning, totalCost }
-            }));
-            return warning;
-        }
-        
-        if (totalCost >= researchBudget) {
-            const warning = `⚠️ Selected sources exceed Research budget ($${Number(researchBudget || 0).toFixed(2)})`;
-            AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.BUDGET_WARNING, {
-                detail: { warning, totalCost }
-            }));
-            return warning;
-        } else if (totalCost >= researchBudget * warningThreshold) {
-            const warning = `⚠️ Selected sources approaching Research budget limit ($${Number(researchBudget || 0).toFixed(2)})`;
+            const warning = `⚠️ Selected sources approaching high cost ($${Number(totalCost || 0).toFixed(2)})`;
             AppEvents.dispatchEvent(new CustomEvent(EVENT_TYPES.BUDGET_WARNING, {
                 detail: { warning, totalCost }
             }));

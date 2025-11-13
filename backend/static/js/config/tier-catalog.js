@@ -1,22 +1,26 @@
 /**
  * Tier Catalog - Single Source of Truth
- * Canonical pricing, features, and metadata for all research tiers
+ * Canonical pricing, features, and metadata for research tier
+ * SIMPLIFIED: Only Pro Package, priced at $0.05 per source
  */
 
-export const TIER_PRICING = {
-    research: 0.35,
-    pro: 0.65
-};
+// Per-source pricing rate
+export const PER_SOURCE_RATE = 0.05;
+
+// Calculate Pro tier price based on source count
+export function calculateProPrice(sourceCount) {
+    return sourceCount * PER_SOURCE_RATE;
+}
 
 export const TIERS = [
     {
         id: 'pro',
         icon: '⭐',
         title: 'Pro Package',
-        price: TIER_PRICING.pro,
-        priceLabel: `$${TIER_PRICING.pro.toFixed(2)}`,
+        price: 0, // Will be calculated dynamically
+        priceLabel: '$0.00', // Will be updated dynamically
         subtitle: 'Executive Analysis',
-        description: 'Everything in Research plus strategic insights and executive formatting',
+        description: 'Professional research report with strategic insights and executive formatting',
         features: [
             'Source compilation & citations',
             'Strategic insights & recommendations',
@@ -30,31 +34,10 @@ export const TIERS = [
             'Enhanced formatting and presentation',
             'Ready for download'
         ],
-        buttonText: `Generate Pro Report — $${TIER_PRICING.pro.toFixed(2)}`,
+        buttonText: 'Generate Pro Report', // Will be updated dynamically with price
         microcopy: 'Trusted by analysts • Ready in ~3 min',
         highlighted: true,
         badge: 'Most Popular'
-    },
-    {
-        id: 'research',
-        icon: '🔬',
-        title: 'Research Package',
-        price: TIER_PRICING.research,
-        priceLabel: `Only $${TIER_PRICING.research.toFixed(2)}`,
-        subtitle: 'Quick Brief',
-        description: 'Professional summary and analysis with source compilation',
-        features: [
-            'Source compilation & citations',
-            'Basic analysis',
-            'Download ready'
-        ],
-        expandedFeatures: [
-            'Professional summary and analysis',
-            'Source compilation with citations',
-            'Ready for download'
-        ],
-        buttonText: `Basic Report — $${TIER_PRICING.research.toFixed(2)}`,
-        highlighted: false
     }
 ];
 
@@ -62,14 +45,19 @@ export function getTierById(tierId) {
     return TIERS.find(tier => tier.id === tierId);
 }
 
-export function getBudgetForTier(tierId) {
-    return TIER_PRICING[tierId] || 0;
+// Note: These functions are kept for backwards compatibility
+// but are less relevant now that we have per-source pricing
+export function getBudgetForTier(tierId = 'pro') {
+    // With per-source pricing, there's no fixed budget
+    // Return a high value to prevent budget warnings
+    return 999.99;
 }
 
 export function getBudgetThresholds() {
+    // With per-source pricing, budgets are dynamic
+    // Return high values to effectively disable budget warnings
     return {
-        research: TIER_PRICING.research,
-        pro: TIER_PRICING.pro,
+        pro: 999.99,
         warningThreshold: 0.8
     };
 }
