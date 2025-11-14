@@ -471,8 +471,11 @@ export class ChatResearchApp {
                     const loginPrompt = document.createElement('div');
                     loginPrompt.className = 'anonymous-chat-prompt';
                     loginPrompt.innerHTML = `
-                        <p class="prompt-text">Want to search for authoritative sources?</p>
-                        <button id="promptLoginButton" class="login-button">Log in</button>
+                        <p class="prompt-text">
+                            Want to search for authoritative sources? 
+                            <button id="promptLoginButton" class="login-button">Log in</button> 
+                            to find sources on this topic.
+                        </p>
                     `;
                     
                     // Add to last message
