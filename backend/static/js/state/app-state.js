@@ -13,7 +13,7 @@ export class AppState {
         };
         
         // Core state with persistence
-        this.currentMode = 'chat';
+        this.currentMode = 'research';
         this.conversationHistory = this._loadFromStorage('conversationHistory', []);
         this.currentResearchData = this._loadFromStorage('currentResearchData', null);
         this.purchasedItems = new Set(this._loadFromStorage('purchasedItems', []));

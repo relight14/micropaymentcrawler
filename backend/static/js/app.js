@@ -193,8 +193,40 @@ export class ChatResearchApp {
         AppEvents.addEventListener('buildResearchPacket', (e) => {
             console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
             
-            // Switch to report builder mode - tier selection cards will render automatically
-            this.setMode('report');
+            // Get deduplicated sources from outline (same logic as report-builder.js)
+            const outlineSnapshot = projectStore.getOutlineSnapshot();
+            const sourceMap = new Map();
+            
+            if (outlineSnapshot && outlineSnapshot.sections) {
+                outlineSnapshot.sections.forEach(section => {
+                    if (section.sources && Array.isArray(section.sources)) {
+                        section.sources.forEach(source => {
+                            if (source && source.id && !sourceMap.has(source.id)) {
+                                sourceMap.set(source.id, source);
+                            }
+                        });
+                    }
+                });
+            }
+            
+            const sources = Array.from(sourceMap.values());
+            const sourceCount = sources.length;
+            const price = sourceCount * 0.05; // $0.05 per source (Pro tier only)
+            const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+            const useSelectedSources = sources.length > 0;
+            
+            // Validate we have sources before launching modal
+            if (!useSelectedSources) {
+                console.warn('⚠️ No sources in outline - cannot launch purchase modal');
+                this.addMessage('system', 'Please add sources to your outline before generating a report.');
+                return;
+            }
+            
+            console.log(`💰 Launching purchase modal - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
+            
+            // Call tierManager.purchaseTier() directly with Pro tier
+            // Note: Passing null for button bypasses some UI state handling
+            this.tierManager.purchaseTier(null, 'pro', price, query, useSelectedSources, false);
         });
         
         // Guard to prevent duplicate search triggers during login flow
@@ -396,21 +428,13 @@ export class ChatResearchApp {
         
         if (!message) return;
         
-        const currentMode = this.appState.getMode();
-        
-        // Auto-switch to Chat mode if query submitted from Report Builder
-        if (currentMode === 'report') {
-            console.log('🔄 Query from Report Builder detected - switching to Chat mode');
-            this.setMode('chat');
-        }
-
         try {
             // Auto-create project from first query if user has no projects
             await this.projectsController.ensureActiveProject(message);
             
-            // Track search/message
-            analytics.trackSearch(message, currentMode);
-            analytics.trackChatMessage(message.length, currentMode);
+            // Track search/message (always research mode now)
+            analytics.trackSearch(message, 'research');
+            analytics.trackChatMessage(message.length, 'research');
             
             // Clear input and show user message
             chatInput.value = '';
@@ -422,10 +446,9 @@ export class ChatResearchApp {
             // Show typing indicator
             this.uiManager.showTypingIndicator();
             
-            // Send to backend with conversation context for research mode
-            const conversationContext = this.appState.getMode() === 'research' ? 
-                this.appState.getConversationHistory() : null;
-            const response = await this.apiService.sendMessage(message, this.appState.getMode(), conversationContext);
+            // Always send in research mode with conversation context
+            const conversationContext = this.appState.getConversationHistory();
+            const response = await this.apiService.sendMessage(message, 'research', conversationContext);
             
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();
