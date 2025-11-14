@@ -23,7 +23,16 @@ Authentication features secure JWT token management, LedeWire integration, and r
 ## Feature Specifications
 The project provides dynamic research services with **simplified Pro Package-only pricing** at **$0.05 per source**. The Research Package tier has been removed to streamline the user experience. Dynamic pricing is calculated client-side using `sources × $0.05` and verified by backend API quotes. The Report Builder displays both the calculated price in the card header and the dynamic price in the button text (e.g., "Generate Pro Report — $0.40" for 8 sources). Content licensing utilizes a multi-protocol abstraction layer (RSL, Tollbit, Cloudflare) with server-authoritative pricing. A robust mock mode is available for development. Secure integration with LedeWire handles wallet balance checks, purchase processing, and content access.
 
-**Recent Changes (2025-11-13):**
+**Recent Changes (2025-11-14):**
+- **Anonymous Chat Support:** Implemented cost-protection by routing anonymous users to conversational chat endpoint (/api/chat) without expensive Tavily source searches
+- **Auth-Based Routing:** Frontend now detects authentication status and routes to appropriate endpoint:
+  - Anonymous users: /api/chat (conversational AI only, no Tavily, 30/min rate limit)
+  - Authenticated users: /api/research/analyze (full research with Tavily source searches, 15/min rate limit)
+- **Login Prompts:** Added "Login to search sources" prompt after anonymous chat responses to encourage authentication
+- **Conversation Persistence:** Anonymous chat history is automatically preserved when user logs in via existing handleLogin() flow
+- **Debug Logging:** Added console logs to trace auth-based routing flow for debugging
+
+**Previous Changes (2025-11-13):**
 - Simplified pricing to single Pro Package tier at $0.05 per source
 - Removed Research Package tier from tier catalog and UI
 - Implemented dynamic pricing calculation: `calculateProPrice(sourceCount)`

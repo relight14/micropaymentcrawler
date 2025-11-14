@@ -437,6 +437,7 @@ export class ChatResearchApp {
             // Authenticated users: full research mode with source searching
             const isAuthenticated = this.authService.isAuthenticated();
             const mode = isAuthenticated ? 'research' : 'chat';
+            console.log(`🔐 Auth-based routing: isAuthenticated=${isAuthenticated}, mode=${mode}, endpoint=${isAuthenticated ? '/api/research/analyze' : '/api/chat'}`);
             
             // Track search/message
             analytics.trackSearch(message, mode);

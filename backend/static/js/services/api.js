@@ -42,12 +42,16 @@ export class APIService {
     }
 
     async sendMessage(message, mode, conversationContext = null) {
+        console.log(`📡 [API] sendMessage called with mode="${mode}"`);
+        
         // Use optimized research endpoint for research mode
         if (mode === 'research') {
+            console.log(`📡 [API] Routing to /api/research/analyze (authenticated research)`);
             return await this.analyzeResearchQuery(message, conversationContext);
         }
         
         // Use chat endpoint for other modes
+        console.log(`📡 [API] Routing to /api/chat (anonymous conversational)`);
         const response = await fetch(`${this.baseURL}/api/chat`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
