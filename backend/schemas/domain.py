@@ -39,6 +39,7 @@ class SourceCard(BaseModel):
     relevance_score: Optional[float] = None
     source_type: Optional[str] = None  # "academic", "journalism", "business", "government"
     composite_score: Optional[float] = None  # Recency-weighted composite ranking score
+    domain_tier: Optional[str] = None  # "premium", "standard", "blocked" for quality classification
     
     # Uploaded file fields
     is_uploaded_file: bool = False  # Flag to indicate if this source is an uploaded file

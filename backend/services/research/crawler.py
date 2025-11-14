@@ -141,7 +141,7 @@ class ContentCrawlerStub:
         return 0.0  # Unknown domain
     
     def _rerank_with_recency(self, sources: List[SourceCard], classification: Optional[Dict[str, Any]] = None) -> List[SourceCard]:
-        """Rerank sources using recency, relevance, and authority based on classification."""
+        """Rerank sources using recency, relevance, domain tier, and licensing based on classification."""
         if not classification:
             # No classification - just sort by relevance
             sources.sort(key=lambda x: x.relevance_score or 0.0, reverse=True)
@@ -157,13 +157,29 @@ class ContentCrawlerStub:
                 getattr(source, 'published_date', None),
                 temporal_bucket
             )
-            authority = self._get_domain_authority(source.domain)
             
-            # DYNAMIC BOOST: Apply 1.3x multiplier to paid sources' authority (capped at 1.0)
+            # Base authority from legacy domain_weights
+            base_authority = self._get_domain_authority(source.domain)
+            
+            # Enhanced authority with domain tier classification
+            domain_tier = DomainClassifier.get_domain_tier(source.url)
+            tier_boost = {
+                "premium": 0.35,  # Significant boost for .edu, major publishers
+                "standard": 0.0,  # No boost
+                "blocked": -0.5   # Should never happen (filtered by Tavily), but penalize if present
+            }.get(domain_tier, 0.0)
+            
+            authority = min(1.0, base_authority + tier_boost)
+            
+            # LICENSING BOOST: Prioritize paid sources from premium domains
             is_paid_source = (source.unlock_price and source.unlock_price > 0 and 
                             source.licensing_protocol and source.licensing_protocol.upper() != 'FREE')
-            if is_paid_source and authority > 0:
-                authority = min(1.0, authority * 1.3)  # Cap at 1.0 to prevent overflow
+            
+            # Premium domain + licensing = top priority
+            if is_paid_source and domain_tier == "premium":
+                authority = min(1.0, authority * 1.4)  # Extra boost for premium + licensed
+            elif is_paid_source:
+                authority = min(1.0, authority * 1.2)  # Boost for any licensed source
             
             # Weighted combination (must sum to 1.0)
             # ADJUSTED: Reduced topicality from 0.35 to 0.28 for more authority room
@@ -498,7 +514,8 @@ class ContentCrawlerStub:
                     licensing_protocol=None,  # Will be set by licensing discovery 
                     licensing_cost=None,
                     relevance_score=relevance_score,  # Add relevance score immediately
-                    source_type=source_type  # Add source type for blended results
+                    source_type=source_type,  # Add source type for blended results
+                    domain_tier=DomainClassifier.get_domain_tier(url)  # Premium/standard/blocked classification
                 )
                 
                 # Check budget constraint
@@ -710,7 +727,8 @@ class ContentCrawlerStub:
                     url=url,
                     unlock_price=0.0,  # Free by default, real licensing sets authentic price
                     is_unlocked=False,
-                    relevance_score=relevance_score
+                    relevance_score=relevance_score,
+                    domain_tier=DomainClassifier.get_domain_tier(url)  # Premium/standard/blocked classification
                 )
                 
                 # Step 5: Real licensing detection on actual URL

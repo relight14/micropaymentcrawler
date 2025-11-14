@@ -23,13 +23,18 @@ class DomainClassifier:
         "npr.org", "www.npr.org",
         "pbs.org", "www.pbs.org",
         "propublica.org", "www.propublica.org",
+        "time.com", "www.time.com",
+        "theatlantic.com", "www.theatlantic.com",
+        "newyorker.com", "www.newyorker.com",
+        "foreignaffairs.com", "www.foreignaffairs.com",
+        "foreignpolicy.com", "www.foreignpolicy.com",
         
         # International Publications
         "bbc.com", "www.bbc.com", "bbc.co.uk", "www.bbc.co.uk",
         "theguardian.com", "www.theguardian.com",
         "telegraph.co.uk", "www.telegraph.co.uk",
         
-        # Academic Publishers
+        # Academic Publishers & Research
         "nature.com", "www.nature.com",
         "science.org", "www.science.org",
         "sciencedirect.com", "www.sciencedirect.com",
@@ -40,12 +45,28 @@ class DomainClassifier:
         "ncbi.nlm.nih.gov",
         "nih.gov", "www.nih.gov",
         "cdc.gov", "www.cdc.gov",
+        "nber.org", "www.nber.org",  # National Bureau of Economic Research
         
         # Think Tanks & Research Institutions
         "brookings.edu", "www.brookings.edu",
         "rand.org", "www.rand.org",
         "pewresearch.org", "www.pewresearch.org",
         "cfr.org", "www.cfr.org",
+        "carnegieendowment.org", "www.carnegieendowment.org",
+        "csis.org", "www.csis.org",
+        
+        # International Organizations
+        "un.org", "www.un.org",
+        "who.int", "www.who.int",
+        "worldbank.org", "www.worldbank.org",
+        "imf.org", "www.imf.org",
+        "oecd.org", "www.oecd.org",
+        "wto.org", "www.wto.org",
+        
+        # Government - International
+        "gov.uk", "www.gov.uk",
+        "gov.au", "www.gov.au",
+        "gov.ca", "www.gov.ca",
         
         # Business & Tech
         "harvard.edu", "hbr.org", "www.hbr.org",
@@ -59,9 +80,12 @@ class DomainClassifier:
     
     # Premium Domain Patterns (wildcards)
     PREMIUM_PATTERNS = [
-        ".edu",  # Educational institutions
-        ".gov",  # Government sites
+        ".edu",  # Educational institutions (US)
+        ".gov",  # US Government sites
         ".ac.uk",  # UK academic institutions
+        ".edu.au",  # Australian universities
+        ".edu.ca",  # Canadian universities
+        ".int",  # International organizations
     ]
     
     # Blocked Tier: Social media, UGC, low-quality sources
