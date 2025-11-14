@@ -471,7 +471,8 @@ export class ChatResearchApp {
                     const loginPrompt = document.createElement('div');
                     loginPrompt.className = 'anonymous-chat-prompt';
                     loginPrompt.innerHTML = `
-                        <p class="prompt-text">💡 Want to search for authoritative sources? <a href="#" id="promptLoginLink" class="login-link">Log in</a> to unlock research mode.</p>
+                        <p class="prompt-text">Want to search for authoritative sources?</p>
+                        <button id="promptLoginButton" class="login-button">Log in</button>
                     `;
                     
                     // Add to last message
@@ -480,9 +481,9 @@ export class ChatResearchApp {
                         lastMsg.appendChild(loginPrompt);
                         
                         // Attach login click handler
-                        const loginLink = loginPrompt.querySelector('#promptLoginLink');
-                        if (loginLink) {
-                            loginLink.addEventListener('click', (e) => {
+                        const loginButton = loginPrompt.querySelector('#promptLoginButton');
+                        if (loginButton) {
+                            loginButton.addEventListener('click', (e) => {
                                 e.preventDefault();
                                 this.modalController.showAuthModal();
                             });

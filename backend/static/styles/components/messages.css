@@ -159,24 +159,39 @@
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .anonymous-chat-prompt .prompt-text {
     color: var(--muted-foreground);
     font-size: 0.9rem;
     margin: 0;
+    flex: 1;
 }
 
-.anonymous-chat-prompt .login-link {
-    color: var(--primary);
-    text-decoration: none;
+.anonymous-chat-prompt .login-button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
     font-weight: var(--font-weight-medium);
-    transition: color 0.2s ease;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
-.anonymous-chat-prompt .login-link:hover {
-    color: var(--accent);
-    text-decoration: underline;
+.anonymous-chat-prompt .login-button:hover {
+    background: #f5e65c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.anonymous-chat-prompt .login-button:active {
+    transform: translateY(0);
 }
 
 /* Dark Mode Anonymous Chat Prompt */
@@ -186,6 +201,15 @@
 
 .dark .anonymous-chat-prompt .prompt-text {
     color: rgba(255, 255, 255, 0.7);
+}
+
+.dark .anonymous-chat-prompt .login-button {
+    background: var(--accent);
+    color: #000;
+}
+
+.dark .anonymous-chat-prompt .login-button:hover {
+    background: #f5e65c;
 }
 
 /* Report Download Button */
