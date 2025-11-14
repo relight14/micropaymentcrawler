@@ -76,7 +76,7 @@ For each result, respond with JSON:
             
             print(f"📡 Calling Claude API for relevance filtering...")
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",  # Fast and cheap for filtering
+                model="claude-sonnet-4-20250514",  # High-quality filtering with current knowledge
                 max_tokens=2000,
                 temperature=0.0,  # Deterministic for consistency
                 system=system_prompt,
@@ -207,7 +207,7 @@ Generate an optimized search query (max 120 chars):"""
 
             print(f"📡 Calling Claude API for query optimization...")
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",  # Fast and cheap
+                model="claude-sonnet-4-20250514",  # Fast and cheap
                 max_tokens=150,
                 temperature=0.1,  # Low but not 0.0 - stable without brittleness
                 system=system_prompt,
@@ -409,7 +409,7 @@ If needs_sources is true, extract a clear search query from the context."""
         try:
             # Use Claude to detect intent
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",  # Fast and cheap
+                model="claude-sonnet-4-20250514",  # Fast and cheap
                 max_tokens=200,
                 temperature=0.0,  # Deterministic
                 system=system_prompt,
@@ -509,7 +509,7 @@ When they ask about current events or seem ready for deep research, suggest they
         
         try:
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",
+                model="claude-sonnet-4-20250514",
                 max_tokens=1000,
                 temperature=0.7,
                 system=system_prompt,
@@ -582,7 +582,7 @@ Be specific and targeted based on our conversation. Don't be generic."""
         try:
             # Get research strategy from Claude
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",
+                model="claude-sonnet-4-20250514",
                 max_tokens=500,
                 temperature=0.3,
                 system=system_prompt,
@@ -717,7 +717,7 @@ Include a mix of free and licensed sources when licensed sources offer significa
 Return only the numbers separated by commas, like: 0,3,7,12"""
 
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",
+                model="claude-sonnet-4-20250514",
                 max_tokens=100,
                 temperature=0.1,
                 messages=[{"role": "user", "content": prompt}]
@@ -756,7 +756,7 @@ Create a compelling research outline that shows:
 Keep it concise but compelling - make the user excited about what they'll discover."""
 
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",
+                model="claude-sonnet-4-20250514",
                 max_tokens=400,
                 temperature=0.6,
                 messages=[{"role": "user", "content": prompt}]
