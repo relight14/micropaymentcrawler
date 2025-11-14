@@ -36,45 +36,7 @@
     /* Logo already has good contrast in dark mode */
 }
 
-/* Mode Switcher */
-.mode-switcher {
-    display: flex;
-    align-items: center;
-    background: var(--muted);
-    border-radius: var(--radius);
-    padding: 4px;
-    gap: 2px;
-}
-
-.mode-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    background: transparent;
-    color: var(--muted-foreground);
-    border-radius: calc(var(--radius) - 4px);
-    font-size: 0.875rem;
-    font-weight: var(--font-weight-medium);
-    font-family: 'Montserrat', sans-serif;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.mode-btn.active {
-    background: var(--primary);
-    color: var(--primary-foreground);
-    box-shadow: var(--shadow-sm);
-}
-
-.mode-btn:hover:not(.active) {
-    background: rgba(70, 70, 70, 0.05);
-}
-
-.mode-icon {
-    font-size: 1rem;
-}
+/* Mode Switcher - REMOVED (UI simplified to single chat interface) */
 
 .app-header h1 {
     font-size: 1.25rem;
