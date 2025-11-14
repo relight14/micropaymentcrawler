@@ -276,6 +276,12 @@ class SourceCard {
         const badges = document.createElement('div');
         badges.className = 'source-badges';
 
+        // Domain tier badge (premium/standard)
+        if (source.domain_tier === 'premium') {
+            const tierBadge = this._createDomainTierBadge(source);
+            badges.appendChild(tierBadge);
+        }
+
         // Source type badge with emoji
         const typeBadge = this._createSourceTypeBadge(source);
         badges.appendChild(typeBadge);
@@ -285,6 +291,31 @@ class SourceCard {
         badges.appendChild(licenseBadge);
 
         return badges;
+    }
+    
+    /**
+     * Create domain tier badge for premium sources
+     */
+    _createDomainTierBadge(source) {
+        const badge = document.createElement('span');
+        badge.className = 'domain-tier-badge premium';
+        badge.textContent = '⭐ Premium';
+        badge.setAttribute('title', 'High-quality source from major publication, academic institution, or government agency');
+        badge.setAttribute('data-domain-tier', 'premium');
+        
+        // Inline styles for premium badge
+        badge.style.cssText = `
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 4px;
+        `;
+        
+        return badge;
     }
     
     /**
