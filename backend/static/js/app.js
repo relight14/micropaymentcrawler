@@ -432,12 +432,11 @@ export class ChatResearchApp {
             // Auto-create project from first query if user has no projects
             await this.projectsController.ensureActiveProject(message);
             
-            // Determine mode based on authentication status
-            // Anonymous users: conversational chat only (no expensive Tavily searches)
-            // Authenticated users: full research mode with source searching
+            // Everyone defaults to conversational chat mode
+            // Sources are only searched when explicitly requested (button click or intent detection)
             const isAuthenticated = this.authService.isAuthenticated();
-            const mode = isAuthenticated ? 'research' : 'chat';
-            console.log(`🔐 Auth-based routing: isAuthenticated=${isAuthenticated}, mode=${mode}, endpoint=${isAuthenticated ? '/api/research/analyze' : '/api/chat'}`);
+            const mode = 'chat'; // Always use chat mode for regular messages
+            console.log(`💬 Chat mode: isAuthenticated=${isAuthenticated}, mode=${mode}`);
             
             // Track search/message
             analytics.trackSearch(message, mode);
@@ -453,10 +452,8 @@ export class ChatResearchApp {
             // Show typing indicator
             this.uiManager.showTypingIndicator();
             
-            // Route to appropriate endpoint based on auth status
-            // - Authenticated: /api/research/analyze (with Tavily source searching)
-            // - Anonymous: /api/chat (conversational AI only, no Tavily)
-            const conversationContext = isAuthenticated ? this.appState.getConversationHistory() : null;
+            // Always use conversational chat endpoint with conversation context
+            const conversationContext = this.appState.getConversationHistory();
             const response = await this.apiService.sendMessage(message, mode, conversationContext);
             
             // Hide typing indicator
@@ -466,21 +463,20 @@ export class ChatResearchApp {
             if (response.content) {
                 this.addMessage('assistant', response.content, response.metadata);
                 
-                // Add login prompt for anonymous users after chat response
-                if (!isAuthenticated) {
-                    const loginPrompt = document.createElement('div');
-                    loginPrompt.className = 'anonymous-chat-prompt';
-                    loginPrompt.innerHTML = `
-                        <p class="prompt-text">
-                            Want to search for authoritative sources? 
-                            <button id="promptLoginButton" class="login-button">Log in</button> 
-                            to find sources on this topic.
-                        </p>
-                    `;
-                    
-                    // Add to last message
-                    const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
-                    if (lastMsg) {
+                // Add appropriate CTA based on authentication status
+                const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
+                if (lastMsg) {
+                    if (!isAuthenticated) {
+                        // Anonymous users: encourage login to access sources
+                        const loginPrompt = document.createElement('div');
+                        loginPrompt.className = 'anonymous-chat-prompt';
+                        loginPrompt.innerHTML = `
+                            <p class="prompt-text">
+                                Want to search for authoritative sources? 
+                                <button id="promptLoginButton" class="login-button">Log in</button> 
+                                to find sources on this topic.
+                            </p>
+                        `;
                         lastMsg.appendChild(loginPrompt);
                         
                         // Attach login click handler
@@ -489,6 +485,26 @@ export class ChatResearchApp {
                             loginButton.addEventListener('click', (e) => {
                                 e.preventDefault();
                                 this.modalController.showAuthModal();
+                            });
+                        }
+                    } else {
+                        // Authenticated users: show "Find Sources" button
+                        const sourcesPrompt = document.createElement('div');
+                        sourcesPrompt.className = 'find-sources-prompt';
+                        sourcesPrompt.innerHTML = `
+                            <button id="findSourcesButton" class="find-sources-button">
+                                <span class="icon">🔍</span>
+                                Find Authoritative Sources
+                            </button>
+                        `;
+                        lastMsg.appendChild(sourcesPrompt);
+                        
+                        // Attach source search handler
+                        const findSourcesButton = sourcesPrompt.querySelector('#findSourcesButton');
+                        if (findSourcesButton) {
+                            findSourcesButton.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                await this.triggerSourceSearch();
                             });
                         }
                     }
@@ -527,6 +543,48 @@ export class ChatResearchApp {
             console.error('❌ ERROR STACK:', error.stack);
             this.uiManager.hideTypingIndicator();
             this.addMessage('system', `Sorry, I encountered an error: ${error.message}. Please try again.`);
+        }
+    }
+
+    async triggerSourceSearch() {
+        console.log('🔍 User requested source search via button');
+        
+        try {
+            // Show typing indicator
+            this.uiManager.showTypingIndicator();
+            
+            // Get conversation context and current query
+            const conversationContext = this.appState.getConversationHistory();
+            const currentQuery = this.appState.getCurrentQuery() || 'Find sources on this topic';
+            
+            // Call research endpoint with full conversation context
+            const response = await this.apiService.analyzeResearchQuery(currentQuery, conversationContext);
+            
+            // Hide typing indicator
+            this.uiManager.hideTypingIndicator();
+            
+            // Handle research data (source cards)
+            if (response.research_data) {
+                this.appState.setCurrentResearchData(response.research_data);
+                
+                // Display source cards
+                const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
+                if (cardsResult) {
+                    this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+                    
+                    // Append feedback section
+                    const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
+                    if (lastMsg) {
+                        const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
+                        lastMsg.appendChild(feedbackSection);
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Error triggering source search:', error);
+            this.uiManager.hideTypingIndicator();
+            this.addMessage('system', `Sorry, I couldn't search for sources: ${error.message}`);
         }
     }
 

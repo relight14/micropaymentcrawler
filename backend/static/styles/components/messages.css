@@ -212,6 +212,58 @@
     background: #f5e65c;
 }
 
+/* Find Sources Prompt (Authenticated Users) */
+.find-sources-prompt {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-start;
+}
+
+.find-sources-button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 0.65rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.find-sources-button .icon {
+    font-size: 1rem;
+}
+
+.find-sources-button:hover {
+    background: #f5e65c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.find-sources-button:active {
+    transform: translateY(0);
+}
+
+/* Dark Mode Find Sources Prompt */
+.dark .find-sources-prompt {
+    border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark .find-sources-button {
+    background: var(--accent);
+    color: #000;
+}
+
+.dark .find-sources-button:hover {
+    background: #f5e65c;
+}
+
 /* Report Download Button */
 .report-download-container {
     margin-top: 1rem;
