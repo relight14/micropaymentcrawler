@@ -509,6 +509,21 @@ export class ChatResearchApp {
                         }
                     }
                 }
+                
+                // INTENT DETECTION: Auto-trigger source search if backend detected intent
+                if (isAuthenticated && response.metadata?.source_search_requested) {
+                    console.log(`🧠 Intent detected: source_search_requested=true (confidence=${response.metadata.source_confidence})`);
+                    console.log(`🔍 Auto-triggering source search with query: "${response.metadata.source_query}"`);
+                    
+                    // Small delay to let user see the assistant's response first
+                    setTimeout(async () => {
+                        try {
+                            await this.triggerSourceSearch(response.metadata.source_query);
+                        } catch (error) {
+                            console.error('Failed to auto-trigger source search:', error);
+                        }
+                    }, 500);
+                }
             }
             
             // Handle research data with progressive loading
@@ -546,8 +561,8 @@ export class ChatResearchApp {
         }
     }
 
-    async triggerSourceSearch() {
-        console.log('🔍 User requested source search via button');
+    async triggerSourceSearch(intentQuery = null) {
+        console.log('🔍 User requested source search via button or intent detection');
         
         try {
             // Show typing indicator
@@ -555,7 +570,8 @@ export class ChatResearchApp {
             
             // Get conversation context and current query
             const conversationContext = this.appState.getConversationHistory();
-            const currentQuery = this.appState.getCurrentQuery() || 'Find sources on this topic';
+            // Use intent query if provided, otherwise fall back to current query
+            const currentQuery = intentQuery || this.appState.getCurrentQuery() || 'Find sources on this topic';
             
             // Call research endpoint with full conversation context
             const response = await this.apiService.analyzeResearchQuery(currentQuery, conversationContext);

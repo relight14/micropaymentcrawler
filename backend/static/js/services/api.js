@@ -76,7 +76,11 @@ export class APIService {
                 total_cost: result.total_cost,
                 refined_query: result.refined_query,
                 suggest_research: result.suggest_research || false,
-                topic_hint: result.topic_hint || null
+                topic_hint: result.topic_hint || null,
+                // Intent detection fields
+                source_search_requested: result.source_search_requested || false,
+                source_query: result.source_query || '',
+                source_confidence: result.source_confidence || 0.0
             }
         };
     }
