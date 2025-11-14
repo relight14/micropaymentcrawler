@@ -432,9 +432,15 @@ export class ChatResearchApp {
             // Auto-create project from first query if user has no projects
             await this.projectsController.ensureActiveProject(message);
             
-            // Track search/message (always research mode now)
-            analytics.trackSearch(message, 'research');
-            analytics.trackChatMessage(message.length, 'research');
+            // Determine mode based on authentication status
+            // Anonymous users: conversational chat only (no expensive Tavily searches)
+            // Authenticated users: full research mode with source searching
+            const isAuthenticated = this.authService.isAuthenticated();
+            const mode = isAuthenticated ? 'research' : 'chat';
+            
+            // Track search/message
+            analytics.trackSearch(message, mode);
+            analytics.trackChatMessage(message.length, mode);
             
             // Clear input and show user message
             chatInput.value = '';
@@ -446,9 +452,11 @@ export class ChatResearchApp {
             // Show typing indicator
             this.uiManager.showTypingIndicator();
             
-            // Always send in research mode with conversation context
-            const conversationContext = this.appState.getConversationHistory();
-            const response = await this.apiService.sendMessage(message, 'research', conversationContext);
+            // Route to appropriate endpoint based on auth status
+            // - Authenticated: /api/research/analyze (with Tavily source searching)
+            // - Anonymous: /api/chat (conversational AI only, no Tavily)
+            const conversationContext = isAuthenticated ? this.appState.getConversationHistory() : null;
+            const response = await this.apiService.sendMessage(message, mode, conversationContext);
             
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();
@@ -456,6 +464,30 @@ export class ChatResearchApp {
             // Display response
             if (response.content) {
                 this.addMessage('assistant', response.content, response.metadata);
+                
+                // Add login prompt for anonymous users after chat response
+                if (!isAuthenticated) {
+                    const loginPrompt = document.createElement('div');
+                    loginPrompt.className = 'anonymous-chat-prompt';
+                    loginPrompt.innerHTML = `
+                        <p class="prompt-text">💡 Want to search for authoritative sources? <a href="#" id="promptLoginLink" class="login-link">Log in</a> to unlock research mode.</p>
+                    `;
+                    
+                    // Add to last message
+                    const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
+                    if (lastMsg) {
+                        lastMsg.appendChild(loginPrompt);
+                        
+                        // Attach login click handler
+                        const loginLink = loginPrompt.querySelector('#promptLoginLink');
+                        if (loginLink) {
+                            loginLink.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                this.modalController.showAuthModal();
+                            });
+                        }
+                    }
+                }
             }
             
             // Handle research data with progressive loading

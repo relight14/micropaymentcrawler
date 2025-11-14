@@ -154,6 +154,40 @@
 
 /* Research Mode Suggestion - REMOVED (always in research mode now) */
 
+/* Anonymous Chat Prompt */
+.anonymous-chat-prompt {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.anonymous-chat-prompt .prompt-text {
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.anonymous-chat-prompt .login-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    transition: color 0.2s ease;
+}
+
+.anonymous-chat-prompt .login-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+/* Dark Mode Anonymous Chat Prompt */
+.dark .anonymous-chat-prompt {
+    border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark .anonymous-chat-prompt .prompt-text {
+    color: rgba(255, 255, 255, 0.7);
+}
+
 /* Report Download Button */
 .report-download-container {
     margin-top: 1rem;
