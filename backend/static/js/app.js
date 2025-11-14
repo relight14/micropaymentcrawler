@@ -322,7 +322,6 @@ export class ChatResearchApp {
             // Setup event router handlers
             this.eventRouter.setHandlers({
                 onSendMessage: () => this.sendMessage(),
-                onModeSwitch: (mode) => this.setMode(mode),
                 onClearConversation: () => this.interactionHandler.clearConversation(
                     (sender, content) => this.addMessage(sender, content),
                     () => this.reportBuilder.update()
@@ -334,10 +333,10 @@ export class ChatResearchApp {
                     this.messageCoordinator.submitFeedback(query, sourceIds, rating, mode, feedbackSection),
                 onResearchSuggestion: (topicHint, autoExecute) => this.interactionHandler.handleResearchSuggestion(
                     topicHint,
-                    (mode) => this.setMode(mode),
+                    null,
                     autoExecute,
-                    () => this.sendMessage(), // Pass sendMessage callback for auto-execution
-                    this.authService // Pass authService for auth check
+                    () => this.sendMessage(),
+                    this.authService
                 ),
                 onChatInput: (e) => {
                     this.uiManager.updateCharacterCount();
@@ -472,72 +471,7 @@ export class ChatResearchApp {
     }
 
     setMode(mode) {
-        // Check authentication for research mode
-        if (mode === 'research' && !this.authService.isAuthenticated()) {
-            // Save pending mode switch and show login modal
-            this.appState.setPendingAction({ 
-                type: 'mode_switch', 
-                mode: 'research' 
-            });
-            this.modalController.showAuthModal();
-            return;
-        }
-        
-        // Check authentication for report builder mode
-        if (mode === 'report' && !this.authService.isAuthenticated()) {
-            // Save pending mode switch and show login modal
-            this.appState.setPendingAction({ 
-                type: 'mode_switch', 
-                mode: 'report' 
-            });
-            this.modalController.showAuthModal();
-            return;
-        }
-        
-        const modeChanged = this.appState.setMode(mode);
-        if (!modeChanged) return;
-
-        // Track mode switch
-        analytics.trackModeSwitch(mode);
-
-        this.uiManager.updateModeDisplay();
-        
-        // Handle mode-specific UI changes
-        if (mode === 'report') {
-            this.addMessage('system', '📊 Switched to Report Builder - Generate professional research reports from your selected sources.');
-            const reportBuilderElement = this.reportBuilder.show();
-            this.addMessage('system', reportBuilderElement);
-        } else if (mode === 'research') {
-            // FIX A: Auto-fire search when entering research mode
-            const query = this.appState.getCurrentQuery();
-            if (query && query.trim()) {
-                // Populate input with query and trigger send
-                console.log('🔍 Research mode entered with query - auto-firing search:', query);
-                const chatInput = document.getElementById('newChatInput');
-                if (chatInput) {
-                    chatInput.value = query;
-                    this.sendMessage();
-                }
-                // Note: pendingSearchFromLogin flag is set BEFORE setMode is called (see auth callback)
-                // and checked in SOURCE_SEARCH_TRIGGER listener to prevent duplicates
-            } else {
-                // FIX D: UX nudge when no query available
-                if (this.appState.getConversationHistory().length > 0) {
-                    this.addMessage('system', "📚 Switched to Sources mode - I'll find and license authoritative sources.");
-                }
-                console.log('📚 Research mode entered but no query available');
-            }
-        } else {
-            // Add mode change message if there's history
-            if (this.appState.getConversationHistory().length > 0) {
-                const modeMessages = {
-                    'chat': "💬 Switched to Chat mode - Let's explore your interests through natural conversation."
-                };
-                if (modeMessages[mode]) {
-                    this.addMessage('system', modeMessages[mode]);
-                }
-            }
-        }
+        console.log(`⚠️ setMode called with '${mode}' but mode switching is disabled - everything stays in chat mode`);
     }
 
     addMessage(sender, content, metadata = null) {

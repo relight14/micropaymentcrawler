@@ -35,7 +35,6 @@ export class EventRouter {
      */
     initialize() {
         this._setupChatEvents();
-        this._setupModeEvents();
         this._setupUIEvents();
         this._setupAuthEvents();
         this._setupDelegatedEvents();
@@ -72,39 +71,6 @@ export class EventRouter {
                     this.handlers.onChatInput(e);
                 }
             }, 100));
-        }
-    }
-
-    /**
-     * Setup mode switching events
-     */
-    _setupModeEvents() {
-        const chatModeBtn = document.getElementById('chatModeBtn');
-        const researchModeBtn = document.getElementById('researchModeBtn');
-        const reportModeBtn = document.getElementById('reportModeBtn');
-        
-        if (chatModeBtn) {
-            chatModeBtn.addEventListener('click', () => {
-                if (this.handlers.onModeSwitch) {
-                    this.handlers.onModeSwitch('chat');
-                }
-            });
-        }
-        
-        if (researchModeBtn) {
-            researchModeBtn.addEventListener('click', () => {
-                if (this.handlers.onModeSwitch) {
-                    this.handlers.onModeSwitch('research');
-                }
-            });
-        }
-        
-        if (reportModeBtn) {
-            reportModeBtn.addEventListener('click', () => {
-                if (this.handlers.onModeSwitch) {
-                    this.handlers.onModeSwitch('report');
-                }
-            });
         }
     }
 
