@@ -2,7 +2,7 @@
 Domain Quality Classification System
 Categorizes domains into premium, standard, and blocked tiers for source quality control.
 """
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional
 from urllib.parse import urlparse
 
 
@@ -11,7 +11,7 @@ class DomainClassifier:
     
     # Premium Tier: Major publications, academic institutions, government sources
     PREMIUM_DOMAINS = {
-        # Major US Publications
+        # Major US Publications - News
         "nytimes.com", "www.nytimes.com",
         "wsj.com", "www.wsj.com",
         "washingtonpost.com", "www.washingtonpost.com",
@@ -20,23 +20,40 @@ class DomainClassifier:
         "reuters.com", "www.reuters.com",
         "apnews.com", "www.apnews.com",
         "bloomberg.com", "www.bloomberg.com",
-        "npr.org", "www.npr.org",
-        "pbs.org", "www.pbs.org",
-        "propublica.org", "www.propublica.org",
-        "time.com", "www.time.com",
+        
+        # Major US Publications - Magazines & Long-Form
         "theatlantic.com", "www.theatlantic.com",
         "newyorker.com", "www.newyorker.com",
+        "nymag.com", "www.nymag.com",  # New York Magazine
+        "time.com", "www.time.com",
+        "wired.com", "www.wired.com",
+        
+        # Policy & International Affairs
         "foreignaffairs.com", "www.foreignaffairs.com",
         "foreignpolicy.com", "www.foreignpolicy.com",
+        
+        # Investigative & Public Interest
+        "propublica.org", "www.propublica.org",
+        "npr.org", "www.npr.org",
+        "pbs.org", "www.pbs.org",
         
         # International Publications
         "bbc.com", "www.bbc.com", "bbc.co.uk", "www.bbc.co.uk",
         "theguardian.com", "www.theguardian.com",
         "telegraph.co.uk", "www.telegraph.co.uk",
         
-        # Academic Publishers & Research
+        # Science & Health Publications
         "nature.com", "www.nature.com",
         "science.org", "www.science.org",
+        "scientificamerican.com", "www.scientificamerican.com",
+        "thelancet.com", "www.thelancet.com",
+        "nejm.org", "www.nejm.org",  # New England Journal of Medicine
+        "jamanetwork.com", "www.jamanetwork.com",  # JAMA
+        "statnews.com", "www.statnews.com",
+        "quantamagazine.org", "www.quantamagazine.org",
+        "nationalgeographic.com", "www.nationalgeographic.com",
+        
+        # Academic Publishers & Research Databases
         "sciencedirect.com", "www.sciencedirect.com",
         "springer.com", "www.springer.com",
         "wiley.com", "www.wiley.com",
@@ -69,14 +86,22 @@ class DomainClassifier:
         "gov.au", "www.gov.au",
         "gov.ca", "www.gov.ca",
         
-        # Business & Tech
-        "harvard.edu", "hbr.org", "www.hbr.org",
-        "mckinsey.com", "www.mckinsey.com",
-        "bcg.com", "www.bcg.com",
+        # Business & Tech Publications
+        "forbes.com", "www.forbes.com",
+        "fortune.com", "www.fortune.com",
+        "hbr.org", "www.hbr.org",  # Harvard Business Review
+        "technologyreview.com", "www.technologyreview.com",  # MIT Tech Review
         "techcrunch.com", "www.techcrunch.com",
-        "wired.com", "www.wired.com",
+        "protocol.com", "www.protocol.com",
+        "theinformation.com", "www.theinformation.com",
+        "vox.com", "www.vox.com",
         "arstechnica.com", "arstechnica.com",
         "theverge.com", "www.theverge.com",
+        
+        # Consulting & Business Research
+        "harvard.edu",
+        "mckinsey.com", "www.mckinsey.com",
+        "bcg.com", "www.bcg.com",
     }
     
     # Premium Domain Patterns (wildcards)
@@ -193,7 +218,7 @@ class DomainClassifier:
         return [s for s in sources if not cls.is_blocked(s.get('url', ''))]
     
     @classmethod
-    def rank_sources_by_quality(cls, sources: List[Dict], has_licensing: Set[str] = None) -> List[Dict]:
+    def rank_sources_by_quality(cls, sources: List[Dict], has_licensing: Optional[Set[str]] = None) -> List[Dict]:
         """
         Rank sources by quality: premium + licensed > premium > standard.
         
