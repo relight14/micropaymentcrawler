@@ -33,6 +33,12 @@ The project provides dynamic research services with **simplified Pro Package-onl
 - **Login Prompts:** Added "Login to search sources" prompt after anonymous chat responses to encourage authentication
 - **Conversation Persistence:** Anonymous chat history is automatically preserved when user logs in via existing handleLogin() flow
 - **Debug Logging:** Added console logs to trace auth-based routing flow for debugging
+- **Premium Source Quality System:** Implemented three-tier domain classification system (premium/standard/blocked) to surface high-quality, licensable sources as key product differentiator:
+  - **DomainClassifier**: Centralized quality classification with curated lists of major publications (NYT, WSJ, Time, The Atlantic, Foreign Affairs, etc.), academic sources (.edu, Nature, JSTOR, NBER), government agencies (.gov, .gov.uk, .int, WHO, UN, World Bank, IMF), and international organizations
+  - **Tavily Integration**: Blocks low-quality sources upfront via exclude_domains parameter (social media, Quora, YouTube, user-generated content)
+  - **Licensing-Aware Reranking**: Enhanced source ranking algorithm prioritizes premium domains with licensable content (1.4× boost for premium+licensed sources, 0.35 tier boost for premium domains)
+  - **UI Premium Badges**: Gold gradient "⭐ Premium" badges display on source cards for major publications and academic/government sources
+  - **Quality Focus**: Keeps credible platforms (Medium, Substack) while blocking social media and UGC to maintain research quality standards
 
 **Previous Changes (2025-11-13):**
 - Simplified pricing to single Pro Package tier at $0.05 per source

@@ -65,6 +65,7 @@ class DomainClassifier:
         
         # Government - International
         "gov.uk", "www.gov.uk",
+        "nhs.uk", "www.nhs.uk",  # UK National Health Service
         "gov.au", "www.gov.au",
         "gov.ca", "www.gov.ca",
         
@@ -82,6 +83,9 @@ class DomainClassifier:
     PREMIUM_PATTERNS = [
         ".edu",  # Educational institutions (US)
         ".gov",  # US Government sites
+        ".gov.uk",  # UK Government sites (e.g., education.gov.uk, www.gov.uk)
+        ".gov.au",  # Australian Government sites
+        ".gov.ca",  # Canadian Government sites
         ".ac.uk",  # UK academic institutions
         ".edu.au",  # Australian universities
         ".edu.ca",  # Canadian universities
