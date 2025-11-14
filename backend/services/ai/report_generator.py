@@ -79,6 +79,46 @@ Example table_data entry (DO NOT copy this, extract from YOUR sources):
 Output only the JSON object, no additional text before or after.
 """
 
+# Section-specific prompt for outline-driven reports (respects user's source assignments)
+SECTION_EXTRACTION_PROMPT = """You are a professional research analyst extracting structured data for a specific section of a research report.
+
+Query: {query}
+
+SECTION TOPIC: {topic}
+
+SOURCES ASSIGNED TO THIS SECTION (extract from ONLY these sources):
+{sources}
+
+CRITICAL: The user has specifically assigned these sources to THIS section. You must extract content from ALL of these sources for this topic ONLY. Do NOT redistribute sources to other topics.
+
+Your task: Extract 2-5 relevant quotes or key concepts from EACH source provided above for the section topic "{topic}".
+
+Output your analysis as a JSON object with this EXACT structure:
+
+{{
+  "table_data": [
+    {{
+      "topic": "{topic}",
+      "source": "Source title (from sources above)",
+      "content": "Direct quote or key concept from the source (1-2 sentences max)",
+      "takeaway": "Your concise analysis or interpretation (1 sentence)",
+      "link": "Source URL"
+    }}
+  ]
+}}
+
+CRITICAL REQUIREMENTS:
+1. **Use exact topic**: ALL entries must use topic = "{topic}"
+2. **Extract from ALL sources**: Every source listed above must contribute 2-5 entries
+3. **Direct quotes preferred**: Use actual text from sources when possible
+4. **Concise takeaways**: One sentence interpretation or significance
+5. **Stay focused**: Only extract content relevant to "{topic}"
+6. **Valid JSON only**: Output MUST be valid, parseable JSON
+7. **No redistribution**: Do NOT create entries for other topics - this is section-specific extraction
+
+Output only the JSON object, no additional text before or after.
+"""
+
 PRO_TABLE_PROMPT = """You are a professional research analyst extracting structured data with advanced cross-source analysis.
 
 Query: {query}
@@ -340,83 +380,169 @@ class ReportGeneratorService:
         logger.info(f"⚠️ [REPORT] No outline structure - using {len(default_topics)} generic topics")
         return default_topics
     
+    def _generate_section_data(self, query: str, topic: str, section_sources: List[SourceCard]) -> List[Dict]:
+        """Generate table data for a single outline section with its assigned sources."""
+        if not section_sources:
+            logger.warning(f"⚠️  No sources for section '{topic}', skipping")
+            return []
+        
+        # Format sources for this section
+        sources_text = self._format_sources_for_prompt(section_sources)
+        
+        # Use section-specific prompt that prevents redistribution
+        prompt = SECTION_EXTRACTION_PROMPT.format(
+            query=query,
+            topic=topic,
+            sources=sources_text
+        )
+        
+        logger.info(f"   📄 Extracting section: '{topic}' ({len(section_sources)} sources)")
+        
+        # Call Claude for this section
+        try:
+            response = self.client.messages.create(
+                model=REPORT_MODEL,
+                max_tokens=2000,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+            
+            # Parse response
+            response_text = self._extract_response_text(response)
+            section_dict = self._parse_json_response(response_text)
+            table_data = section_dict.get('table_data', [])
+            
+            logger.info(f"      ✅ Extracted {len(table_data)} entries for '{topic}'")
+            return table_data
+            
+        except Exception as e:
+            logger.error(f"      ❌ Failed to extract section '{topic}': {e}")
+            return []
+    
     def _generate_claude_report(self, query: str, sources: List[SourceCard], tier: TierType, outline_structure: Optional[Dict] = None) -> Dict:
         """Generate structured report using Claude API with JSON output."""
         if not self.client:
             raise ValueError("Anthropic client not initialized")
         
-        # Extract topics from outline structure
-        topics = self._extract_topics(outline_structure)
-        topics_text = "\n".join([f"- {topic}" for topic in topics])
-        
-        # Format sources for prompt
-        sources_text = self._format_sources_for_prompt(sources)
-        
-        # Select prompt based on tier
-        if tier == TierType.PRO:
-            prompt = PRO_TABLE_PROMPT.format(
-                query=query,
-                topics=topics_text,
-                sources=sources_text
-            )
+        # Check if we have an outline structure with section-specific source assignments
+        if outline_structure and outline_structure.get('sections'):
+            logger.info("📋 [OUTLINE MODE] Processing sections individually to respect user's source assignments")
+            
+            # Build source lookup by ID
+            source_lookup = {source.id: source for source in sources}
+            
+            # Process each section with its assigned sources
+            all_table_data = []
+            total_sections = len(outline_structure['sections'])
+            
+            for idx, section in enumerate(outline_structure['sections'], 1):
+                topic = section.get('title', f'Section {idx}')
+                source_ids = section.get('sources', [])
+                
+                # Get actual source objects for this section
+                section_sources = []
+                for src_id in source_ids:
+                    if isinstance(src_id, dict):
+                        src_id = src_id.get('id')
+                    if src_id in source_lookup:
+                        section_sources.append(source_lookup[src_id])
+                
+                logger.info(f"   Section {idx}/{total_sections}: '{topic}' - {len(section_sources)} assigned sources")
+                
+                # Extract data for this section
+                section_data = self._generate_section_data(query, topic, section_sources)
+                all_table_data.extend(section_data)
+            
+            logger.info(f"✅ [OUTLINE MODE] Completed all sections: {len(all_table_data)} total entries")
+            
+            # Build report structure
+            report_dict = {
+                'table_data': all_table_data,
+                'summary': f"This research report analyzes {len(sources)} sources across {total_sections} key topics related to '{query}'."
+            }
+            
+            # Add citation metadata
+            citation_metadata = self._extract_citation_metadata(all_table_data, sources)
+            report_dict['citation_metadata'] = citation_metadata
+            
         else:
-            prompt = RESEARCH_TABLE_PROMPT.format(
-                query=query,
-                topics=topics_text,
-                sources=sources_text
+            # Original behavior: all sources at once with topic distribution
+            logger.info("📋 [STANDARD MODE] Processing all sources together")
+            
+            # Extract topics from outline structure
+            topics = self._extract_topics(outline_structure)
+            topics_text = "\n".join([f"- {topic}" for topic in topics])
+            
+            # Format sources for prompt
+            sources_text = self._format_sources_for_prompt(sources)
+            
+            # Select prompt based on tier
+            if tier == TierType.PRO:
+                prompt = PRO_TABLE_PROMPT.format(
+                    query=query,
+                    topics=topics_text,
+                    sources=sources_text
+                )
+            else:
+                prompt = RESEARCH_TABLE_PROMPT.format(
+                    query=query,
+                    topics=topics_text,
+                    sources=sources_text
+                )
+            
+            # Log context size
+            prompt_length = len(prompt)
+            estimated_tokens = prompt_length // 4
+            logger.info(f"Generating {tier.value} structured report:")
+            logger.info(f"   - Sources: {len(sources)}")
+            logger.info(f"   - Topics: {len(topics)}")
+            logger.info(f"   - Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
+            logger.info(f"   - Model: {REPORT_MODEL}")
+            
+            # Call Claude
+            start_time = time.time()
+            response = self.client.messages.create(
+                model=REPORT_MODEL,
+                max_tokens=4000 if tier == TierType.PRO else 2500,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
             )
-        
-        # Log context size
-        prompt_length = len(prompt)
-        estimated_tokens = prompt_length // 4
-        logger.info(f"Generating {tier.value} structured report:")
-        logger.info(f"   - Sources: {len(sources)}")
-        logger.info(f"   - Topics: {len(topics)}")
-        logger.info(f"   - Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
-        logger.info(f"   - Model: {REPORT_MODEL}")
-        
-        # Call Claude
-        start_time = time.time()
-        response = self.client.messages.create(
-            model=REPORT_MODEL,
-            max_tokens=4000 if tier == TierType.PRO else 2500,
-            messages=[{
-                "role": "user",
-                "content": prompt
-            }]
-        )
-        
-        generation_time = time.time() - start_time
-        
-        # Log token usage
-        if hasattr(response, 'usage'):
-            input_tokens = response.usage.input_tokens if hasattr(response.usage, 'input_tokens') else 0
-            output_tokens = response.usage.output_tokens if hasattr(response.usage, 'output_tokens') else 0
-            total_tokens = input_tokens + output_tokens
             
-            input_cost = (input_tokens / 1_000_000) * 3.0
-            output_cost = (output_tokens / 1_000_000) * 15.0
-            total_cost = input_cost + output_cost
+            generation_time = time.time() - start_time
             
-            logger.info(f"   Report generated in {generation_time:.2f}s")
-            logger.info(f"   - Tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
-            logger.info(f"   - Est. cost: ${total_cost:.4f} (input: ${input_cost:.4f}, output: ${output_cost:.4f})")
-        
-        # Extract and parse JSON response
-        response_text = self._extract_response_text(response)
-        report_dict = self._parse_json_response(response_text)
-        
-        # Add citation metadata
-        table_data = report_dict.get('table_data', [])
-        citation_metadata = self._extract_citation_metadata(table_data, sources)
-        report_dict['citation_metadata'] = citation_metadata
-        
-        # Validate structure
-        if not report_dict.get('table_data'):
-            logger.warning("No table_data in response, using fallback")
-            return self._generate_fallback_report(query, sources, tier)
-        
-        logger.info(f"   - Generated {len(report_dict['table_data'])} table entries")
+            # Log token usage
+            if hasattr(response, 'usage'):
+                input_tokens = response.usage.input_tokens if hasattr(response.usage, 'input_tokens') else 0
+                output_tokens = response.usage.output_tokens if hasattr(response.usage, 'output_tokens') else 0
+                total_tokens = input_tokens + output_tokens
+                
+                input_cost = (input_tokens / 1_000_000) * 3.0
+                output_cost = (output_tokens / 1_000_000) * 15.0
+                total_cost = input_cost + output_cost
+                
+                logger.info(f"   Report generated in {generation_time:.2f}s")
+                logger.info(f"   - Tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
+                logger.info(f"   - Est. cost: ${total_cost:.4f} (input: ${input_cost:.4f}, output: ${output_cost:.4f})")
+            
+            # Extract and parse JSON response
+            response_text = self._extract_response_text(response)
+            report_dict = self._parse_json_response(response_text)
+            
+            # Add citation metadata
+            table_data = report_dict.get('table_data', [])
+            citation_metadata = self._extract_citation_metadata(table_data, sources)
+            report_dict['citation_metadata'] = citation_metadata
+            
+            # Validate structure
+            if not report_dict.get('table_data'):
+                logger.warning("No table_data in response, using fallback")
+                return self._generate_fallback_report(query, sources, tier)
+            
+            logger.info(f"   - Generated {len(report_dict['table_data'])} table entries")
         
         # PRO TIER: Validate and generate missing advanced sections
         if tier == TierType.PRO:
