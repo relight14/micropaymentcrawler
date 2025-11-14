@@ -30,6 +30,10 @@ class ChatResponse(BaseModel):
     refined_query: Optional[str] = None
     suggest_research: bool = False
     topic_hint: Optional[str] = None
+    # Intent detection fields
+    source_search_requested: bool = False
+    source_query: str = ""
+    source_confidence: float = 0.0
 
 
 def extract_bearer_token(authorization: str) -> str:

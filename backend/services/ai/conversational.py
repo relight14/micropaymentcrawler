@@ -369,6 +369,84 @@ Generate an optimized search query (max 120 chars):"""
             print(f"⚠️ Research suggestion detection error: {e}")
         
         return False, None
+    
+    def _detect_source_intent(self, user_message: str, user_id: str) -> Dict[str, Any]:
+        """
+        Detect if user is explicitly requesting source/research search.
+        Returns: {needs_sources: bool, query: str, confidence: float}
+        """
+        # Get recent conversation context (last assistant + user turns)
+        user_history = self.user_conversations.get(user_id, [])
+        recent_messages = user_history[-4:] if len(user_history) >= 4 else user_history
+        
+        # Build context for Claude
+        context = "\n".join([
+            f"{msg['role'].upper()}: {msg['content'][:200]}"
+            for msg in recent_messages
+        ])
+        
+        system_prompt = """You are an intent classifier. Analyze if the user is explicitly requesting to search for sources, articles, or research.
+
+EXPLICIT source requests include:
+- "find sources on this"
+- "search for sources about X"
+- "show me sources/articles/research"
+- "I'd like to see sources on X"
+- "get me sources/articles about this"
+- "that's interesting, find sources on this aspect"
+- Natural variations expressing intent to search for authoritative content
+
+DO NOT flag as source requests:
+- General research questions without explicit search intent
+- Asking for explanations or opinions
+- Continuing normal conversation
+
+Respond with ONLY valid JSON (no markdown):
+{"needs_sources": true/false, "query": "extracted search query", "confidence": 0.0-1.0}
+
+If needs_sources is true, extract a clear search query from the context."""
+
+        try:
+            # Use Claude to detect intent
+            response = self.client.messages.create(
+                model="claude-3-haiku-20240307",  # Fast and cheap
+                max_tokens=200,
+                temperature=0.0,  # Deterministic
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": f"Recent conversation:\n{context}\n\nLatest message: {user_message}\n\nDoes the user want to search for sources?"
+                }]
+            )
+            
+            response_text = self._extract_response_text(response).strip()
+            
+            # Parse JSON response
+            try:
+                result = json.loads(response_text)
+                needs_sources = result.get("needs_sources", False)
+                query = result.get("query", user_message)
+                confidence = result.get("confidence", 0.0)
+                
+                if needs_sources:
+                    print(f"🔍 Intent Detection: Source search requested (confidence: {confidence:.2f})")
+                    print(f"   Extracted query: {query}")
+                
+                return {
+                    "needs_sources": needs_sources,
+                    "query": query,
+                    "confidence": confidence
+                }
+                
+            except json.JSONDecodeError:
+                print(f"⚠️ Intent detection JSON parse failed: {response_text}")
+                # Default to no intent detected
+                return {"needs_sources": False, "query": user_message, "confidence": 0.0}
+                
+        except Exception as e:
+            print(f"⚠️ Intent detection error: {e}")
+            # Default to no intent detected
+            return {"needs_sources": False, "query": user_message, "confidence": 0.0}
         
     async def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
@@ -387,12 +465,17 @@ Generate an optimized search query (max 120 chars):"""
         })
         
         if mode == "chat" or mode == "conversational":
-            return self._conversational_response(user_message, user_id)
+            # Detect if user is explicitly requesting sources
+            intent_result = self._detect_source_intent(user_message, user_id)
+            return self._conversational_response(user_message, user_id, intent_result)
         else:  # research or deep_research
             return await self._deep_research_response(user_message, user_id)
     
-    def _conversational_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
+    def _conversational_response(self, user_message: str, user_id: str, intent_result: Dict[str, Any] = None) -> Dict[str, Any]:
         """Generate conversational response to help explore research interests"""
+        
+        if intent_result is None:
+            intent_result = {"needs_sources": False, "query": "", "confidence": 0.0}
         
         current_date = datetime.now().strftime("%B %d, %Y")
         
@@ -450,7 +533,11 @@ When they ask about current events or seem ready for deep research, suggest they
                 "response": ai_response,
                 "mode": "conversational",
                 "conversation_length": len(self.user_conversations[user_id]),
-                "suggest_research": should_suggest
+                "suggest_research": should_suggest,
+                # Intent detection fields
+                "source_search_requested": intent_result.get("needs_sources", False),
+                "source_query": intent_result.get("query", ""),
+                "source_confidence": intent_result.get("confidence", 0.0)
             }
             
             # Mark that we've suggested for this user (regardless of topic_hint)
@@ -469,6 +556,9 @@ When they ask about current events or seem ready for deep research, suggest they
                 "response": f"I'm having trouble connecting right now. Let me help you explore your research interests anyway - what specific aspect of your topic are you most curious about?",
                 "mode": "conversational", 
                 "suggest_research": False,
+                "source_search_requested": False,
+                "source_query": "",
+                "source_confidence": 0.0,
                 "error": str(e)
             }
     
