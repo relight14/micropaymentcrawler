@@ -68,13 +68,9 @@ export class UIManager {
         if (!this.chatInput) return;
         
         const hasMessages = this.appState.getConversationHistory().length > 0;
-        const placeholders = {
-            'chat': hasMessages ? 'Continue the conversation...' : 'Ask me anything or switch to Sources for articles...',
-            'research': hasMessages ? 'Search for more sources...' : 'What would you like to research? I\'ll find authoritative sources...',
-            'report': hasMessages ? 'Add more sources or create report...' : 'Build a research report from licensed sources...'
-        };
-        
-        this.chatInput.placeholder = placeholders[this.appState.getMode()] || placeholders['chat'];
+        this.chatInput.placeholder = hasMessages 
+            ? 'Continue your research...' 
+            : 'What would you like to research? I\'ll find authoritative sources...';
     }
 
     // Character count management with configurable thresholds
