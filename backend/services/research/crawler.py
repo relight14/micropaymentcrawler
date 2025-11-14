@@ -10,6 +10,7 @@ from functools import wraps
 from schemas.domain import SourceCard
 from services.licensing.content_licensing import ContentLicenseService
 from services.ai.polishing import ContentPolishingService
+from services.research.domain_classifier import DomainClassifier
 
 # Setup structured logging
 logger = logging.getLogger(__name__)
@@ -358,20 +359,8 @@ class ContentCrawlerStub:
     async def _call_tavily_api(self, query: str, max_results: int = 20, include_domains: Optional[List[str]] = None) -> Dict[str, Any]:
         """Make async REST API call to Tavily search endpoint with retry logic."""
         
-        # Low-quality domains to exclude from search results
-        exclude_domains = [
-            "wikipedia.org",
-            "en.wikipedia.org",
-            "reddit.com",
-            "www.reddit.com",
-            "quora.com",
-            "www.quora.com",
-            "answers.yahoo.com",
-            "medium.com",  # Can vary in quality
-            "facebook.com",
-            "twitter.com",
-            "x.com"
-        ]
+        # Get blocked domains from DomainClassifier (social media, UGC, low-quality sources)
+        exclude_domains = DomainClassifier.get_exclude_list()
         
         payload = {
             "api_key": self.tavily_api_key,
@@ -381,7 +370,7 @@ class ContentCrawlerStub:
             "include_answer": False,
             "include_images": False,
             "include_raw_content": False,
-            "exclude_domains": exclude_domains  # Block low-quality sources upfront
+            "exclude_domains": exclude_domains  # Block social media and UGC sources upfront
         }
         
         # Add domain filter if provided (for specific publication searches)
@@ -389,7 +378,7 @@ class ContentCrawlerStub:
             payload["include_domains"] = include_domains
             print(f"📰 Tavily REST API call with domain filter: {include_domains}")
         
-        print(f"🚫 Excluding low-quality domains: {len(exclude_domains)} domains blocked")
+        print(f"🚫 Excluding {len(exclude_domains)} blocked domains (social media, UGC, low-quality)")
         
         try:
             client = await self._get_http_client()
