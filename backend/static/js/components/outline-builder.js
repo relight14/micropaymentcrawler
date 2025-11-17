@@ -298,18 +298,20 @@ export class OutlineBuilder extends EventTarget {
 
     /**
      * Handle Build Research Packet button click
-     * Switches user to Report Builder tab where they can see purchase options
+     * Launches the purchase modal directly
      */
     handleBuildResearchPacket() {
-        console.log('🚀 handleBuildResearchPacket - Switching to Report Builder tab');
+        console.log('🚀 handleBuildResearchPacket - Launching purchase modal');
         
-        // Switch to Report Builder tab by clicking the header button
-        const reportModeBtn = document.getElementById('reportModeBtn');
-        if (reportModeBtn) {
-            reportModeBtn.click();
+        // Dispatch event to trigger purchase modal (app.js listens for this)
+        // Import AppEvents at the top of file if not already imported
+        if (typeof AppEvents !== 'undefined') {
+            AppEvents.dispatchEvent(new CustomEvent('buildResearchPacket', {
+                detail: { source: 'outline-builder' }
+            }));
         } else {
-            console.error('❌ Report Builder button not found in header');
-            this.toastManager.show('Unable to switch to Report Builder', 'error');
+            console.error('❌ AppEvents not available');
+            this.toastManager.show('Unable to launch purchase modal', 'error');
         }
     }
 
