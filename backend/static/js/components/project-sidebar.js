@@ -8,11 +8,12 @@ import { analytics } from '../utils/analytics.js';
 import { viewport } from '../utils/viewport.js';
 
 export class ProjectListSidebar extends EventTarget {
-    constructor({ apiService, authService, toastManager }) {
+    constructor({ apiService, authService, toastManager, containerId = 'project-sidebar-dropdown' }) {
         super();
         this.apiService = apiService;
         this.authService = authService;
         this.toastManager = toastManager;
+        this.containerId = containerId; // Support both 'project-sidebar' and 'project-sidebar-dropdown'
         this.projects = [];
         this.activeProjectId = null;
         this.isCollapsed = false;
@@ -318,30 +319,30 @@ export class ProjectListSidebar extends EventTarget {
     }
 
     /**
-     * Render the sidebar
+     * Render the sidebar (works in both dropdown and legacy sidebar)
      */
     render() {
         console.log('🔧 [ProjectListSidebar] render() called', {
+            containerId: this.containerId,
             isAuthenticated: this.authService.isAuthenticated(),
             projectCount: this.projects.length,
-            activeProjectId: this.activeProjectId,
-            windowWidth: window.innerWidth
+            activeProjectId: this.activeProjectId
         });
         
-        const container = document.getElementById('project-sidebar');
+        const container = document.getElementById(this.containerId);
         if (!container) {
-            console.error('🔧 [ProjectListSidebar] ERROR: #project-sidebar container not found!');
+            console.error(`🔧 [ProjectListSidebar] ERROR: #${this.containerId} container not found!`);
             return;
         }
 
-        // Check if mobile viewport using matchMedia (works in Replit iframe)
+        // Check if mobile viewport
         const isMobile = viewport.isMobile();
-        console.log('🔧 [ProjectListSidebar] isMobile:', isMobile);
+        const isDropdownMode = this.containerId === 'project-sidebar-dropdown';
         
         if (!this.authService.isAuthenticated()) {
-            // On mobile, show login prompt instead of hiding
-            if (isMobile) {
-                container.style.display = '';  // Clear inline style, let CSS handle it
+            // Show login prompt only for non-dropdown mode on mobile
+            if (!isDropdownMode && isMobile) {
+                container.style.display = '';
                 container.innerHTML = `
                     <div class="mobile-login-prompt">
                         <div class="login-prompt-icon">
@@ -356,39 +357,59 @@ export class ProjectListSidebar extends EventTarget {
                         </button>
                     </div>
                 `;
-                
-                // Ensure panel is visible on mobile (maintain mobile-active class from MobileNavigation)
                 container.classList.add('visible', 'mobile-active');
                 
-                // Attach login button listener
                 const loginBtn = document.getElementById('mobile-login-btn');
                 if (loginBtn) {
                     loginBtn.addEventListener('click', () => {
                         this.authService.login();
                     });
                 }
+            } else if (isDropdownMode) {
+                // In dropdown mode, show minimal login message
+                container.innerHTML = `
+                    <div class="project-sidebar">
+                        <div class="empty-state" style="padding: 32px 16px; text-align: center;">
+                            <p style="margin: 0 0 16px 0;">Log in to access your projects</p>
+                        </div>
+                    </div>
+                `;
             } else {
                 container.innerHTML = '';
                 container.style.display = 'none';
-                container.classList.remove('visible');  // Ensure hidden on desktop when logged out
+                container.classList.remove('visible');
             }
+            
+            // Dispatch project count for dropdown badge
+            this.dispatchProjectCountUpdate(0);
             return;
         }
 
-        // Authenticated - show sidebar with .visible class for CSS
-        container.style.display = '';
-        container.classList.add('visible');  // CSS uses this to show sidebar across all breakpoints
+        // Authenticated - show projects list
+        if (!isDropdownMode) {
+            container.style.display = '';
+            container.classList.add('visible');
+        }
+
+        // Hide collapse button in dropdown mode
+        const showCollapseBtn = !isDropdownMode;
 
         container.innerHTML = `
             <div class="project-sidebar ${this.isCollapsed ? 'collapsed' : ''}">
-                <div class="sidebar-header">
-                    <button class="toggle-btn" id="sidebar-toggle">
-                        ${this.isCollapsed ? '▶' : '◀'}
-                    </button>
-                    ${!this.isCollapsed ? '<h3>Projects</h3>' : ''}
-                </div>
+                ${showCollapseBtn ? `
+                    <div class="sidebar-header">
+                        <button class="toggle-btn" id="sidebar-toggle">
+                            ${this.isCollapsed ? '▶' : '◀'}
+                        </button>
+                        ${!this.isCollapsed ? '<h3>Projects</h3>' : ''}
+                    </div>
+                ` : `
+                    <div class="sidebar-header" style="padding: 12px 16px;">
+                        <h3 style="margin: 0;">Projects</h3>
+                    </div>
+                `}
                 
-                ${!this.isCollapsed ? `
+                ${!this.isCollapsed || isDropdownMode ? `
                     <button class="new-project-btn" id="new-project-btn">
                         + New Project
                     </button>
@@ -422,6 +443,9 @@ export class ProjectListSidebar extends EventTarget {
         `;
 
         this.attachEventListeners();
+        
+        // Dispatch project count for dropdown badge
+        this.dispatchProjectCountUpdate(this.projects.length);
     }
 
     /**
@@ -495,5 +519,14 @@ export class ProjectListSidebar extends EventTarget {
         }
         
         return cleaned.substring(0, maxLength - 3) + '...';
+    }
+
+    /**
+     * Dispatch project count update for dropdown badge
+     */
+    dispatchProjectCountUpdate(count) {
+        this.dispatchEvent(new CustomEvent('projectCountUpdated', {
+            detail: { count }
+        }));
     }
 }

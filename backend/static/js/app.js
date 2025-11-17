@@ -18,6 +18,7 @@ import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
 import { ProjectsController } from './controllers/projects-controller.js';
 import { MobileNavigation } from './components/mobile-navigation.js';
+import { ProjectsDropdown } from './components/projects-dropdown.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
 import { summaryPopover } from './components/summary-popover.js';
@@ -98,6 +99,9 @@ export class ChatResearchApp {
         
         // Initialize projects controller (handles all project/outline orchestration)
         this.projectsController = new ProjectsController();
+        
+        // Initialize projects dropdown menu
+        this.projectsDropdown = new ProjectsDropdown();
         
         // Initialize mobile navigation for responsive mobile experience
         this.mobileNavigation = new MobileNavigation();
@@ -416,6 +420,17 @@ export class ChatResearchApp {
                 addMessageCallback: (sender, content, metadata) => this.addMessage(sender, content, metadata),
                 hideWelcomeCallback: () => this.hideWelcomeScreen()
             });
+            
+            // Initialize projects dropdown and wire it to sidebar
+            this.projectsDropdown.init();
+            
+            // Listen for project count updates from sidebar
+            const sidebar = this.projectsController.projectManager?.sidebar;
+            if (sidebar) {
+                sidebar.addEventListener('projectCountUpdated', (e) => {
+                    this.projectsDropdown.updateCount(e.detail.count);
+                });
+            }
         } catch (error) {
             console.error('Error initializing app:', error);
             this.addMessage('system', 'Application initialization failed. Please refresh the page.');
