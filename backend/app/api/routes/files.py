@@ -18,6 +18,11 @@ try:
 except ImportError:
     Document = None
 
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -27,7 +32,7 @@ else:
     from data.db import db
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_EXTENSIONS = {'.md', '.doc', '.docx'}
+ALLOWED_EXTENSIONS = {'.md', '.doc', '.docx', '.pdf'}
 
 
 def extract_bearer_token(authorization: str) -> str:
@@ -126,6 +131,31 @@ def parse_markdown(file_content: bytes) -> str:
         raise HTTPException(status_code=400, detail="Invalid markdown file encoding (must be UTF-8)")
 
 
+def parse_pdf(file_content: bytes) -> str:
+    """Parse PDF file and extract text content"""
+    if PdfReader is None:
+        raise HTTPException(status_code=500, detail="PDF parsing not available")
+    
+    try:
+        pdf_reader = PdfReader(io.BytesIO(file_content))
+        text_parts = []
+        
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if page_text and page_text.strip():
+                text_parts.append(page_text.strip())
+        
+        if not text_parts:
+            raise HTTPException(status_code=400, detail="PDF appears to be empty or contains no extractable text")
+        
+        return '\n\n'.join(text_parts)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error parsing PDF file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
+
+
 @router.post("/upload", response_model=UploadedFileResponse)
 @limiter.limit("20/minute")
 async def upload_file(
@@ -135,7 +165,7 @@ async def upload_file(
     authorization: str = Header(None, alias="Authorization")
 ):
     """
-    Upload a document file (.doc, .docx, .md) to a project
+    Upload a document file (.doc, .docx, .md, .pdf) to a project
     """
     try:
         access_token = extract_bearer_token(authorization)
@@ -184,6 +214,9 @@ async def upload_file(
         elif file_ext == '.md':
             file_type = 'markdown'
             parsed_content = parse_markdown(file_content)
+        elif file_ext == '.pdf':
+            file_type = 'pdf'
+            parsed_content = parse_pdf(file_content)
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_ext}")
         
