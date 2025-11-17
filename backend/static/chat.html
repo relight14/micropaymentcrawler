@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="/static/styles/components/research-results.css">
     <link rel="stylesheet" href="/static/styles/components/source-card.css">
     <link rel="stylesheet" href="/static/styles/components/project-sidebar.css">
+    <link rel="stylesheet" href="/static/styles/components/projects-dropdown.css">
     <link rel="stylesheet" href="/static/styles/components/outline-builder.css">
     <link rel="stylesheet" href="/static/styles/components/mobile-navigation.css">
     
@@ -51,6 +52,21 @@
             <!-- Clean Header with Mode Switcher -->
             <header class="modern-header">
             <div class="header-content">
+                <!-- Projects Dropdown Menu -->
+                <div class="projects-menu-container">
+                    <button class="projects-menu-btn" id="projectsMenuBtn" title="Projects">
+                        <svg class="layers-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="4" rx="1"></rect>
+                            <rect x="3" y="10" width="18" height="4" rx="1"></rect>
+                            <rect x="3" y="17" width="18" height="4" rx="1"></rect>
+                        </svg>
+                        <span class="projects-count" id="projectsCount">0</span>
+                    </button>
+                    <div class="projects-dropdown" id="projectsDropdown">
+                        <div id="project-sidebar-dropdown"></div>
+                    </div>
+                </div>
+                
                 <div class="logo-section">
                     <img src="/static/clearcite-wide-logo.png" alt="Clearcite" class="logo-image">
                 </div>
