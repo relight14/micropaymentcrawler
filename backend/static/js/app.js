@@ -421,15 +421,22 @@ export class ChatResearchApp {
                 hideWelcomeCallback: () => this.hideWelcomeScreen()
             });
             
-            // Initialize projects dropdown and wire it to sidebar
+            // Initialize dropdown AFTER projectsController so DOM is ready
+            // Wait a tick for any dynamic DOM updates to complete
+            await new Promise(resolve => setTimeout(resolve, 0));
             this.projectsDropdown.init();
             
-            // Listen for project count updates from sidebar
+            // Wire project count updates from sidebar to dropdown badge
             const sidebar = this.projectsController.projectManager?.sidebar;
             if (sidebar) {
                 sidebar.addEventListener('projectCountUpdated', (e) => {
+                    console.log('📊 Project count updated:', e.detail.count);
                     this.projectsDropdown.updateCount(e.detail.count);
                 });
+                
+                // Initialize count to current project count
+                const currentCount = sidebar.projects?.length || 0;
+                this.projectsDropdown.updateCount(currentCount);
             }
         } catch (error) {
             console.error('Error initializing app:', error);

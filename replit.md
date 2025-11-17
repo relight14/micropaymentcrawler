@@ -9,7 +9,7 @@ Preferred communication style: Simple, everyday language.
 # System Architecture
 
 ## UI/UX Decisions
-The frontend is a responsive, modern Single Page Application (SPA) built with vanilla HTML/CSS/JavaScript, utilizing a modular ES6 architecture. It features tier selection cards, dynamic content loading, story cards with quotes and descriptions, and professional presentation of search results with transparent licensing badges. The UI uses a three-column flexbox layout with responsive adjustments for desktop, laptop, tablet, and mobile, including a mobile-specific tab navigation bar.
+The frontend is a responsive, modern Single Page Application (SPA) built with vanilla HTML/CSS/JavaScript, utilizing a modular ES6 architecture. It features tier selection cards, dynamic content loading, story cards with quotes and descriptions, and professional presentation of search results with transparent licensing badges. The UI features a clean two-column layout (chat + outline) with a projects dropdown menu accessible via a layers icon button in the top-left header. The layout includes responsive adjustments for desktop, laptop, tablet, and mobile, with a mobile-specific tab navigation bar. The projects dropdown provides space-efficient access to project creation, switching, and management without consuming horizontal screen real estate.
 
 ## Technical Implementations
 The frontend uses a modular layered architecture with an Application Controller, Infrastructure Managers, Controllers, Domain Managers, Core Services, and UI Components. It supports anonymous users with seamless conversation history persistence upon login via a localStorage bridge pattern. A single message rendering pipeline ensures consistent formatting. Project management includes loading and displaying saved messages, and report status management uses a five-state machine (idle → pricing → generating → complete → error). State synchronization is maintained between `AppState` and `ProjectStore` via event listeners. Research queries persist with projects, and a robust analytics integration uses Google Analytics 4.
@@ -45,6 +45,13 @@ The project provides dynamic research services with **simplified Pro Package-onl
   - **Text Extraction**: parse_pdf() function extracts text from all PDF pages with proper error handling
   - **Claude Analysis**: Extracted PDF content is processed by Claude Sonnet 4 for summarization and integration into research reports
   - **Seamless Integration**: PDFs work identically to Word docs - upload → extract → summarize → integrate into outlines and reports
+- **Projects Dropdown Menu:** Moved projects sidebar into a space-efficient dropdown menu to maximize chat and outline areas:
+  - **Layers Icon Button**: Clean SVG layers icon in top-left header with project count badge
+  - **Dropdown Component**: Smooth animations, click-outside-to-close, mobile-responsive design
+  - **Full Functionality**: Retains all project features - create, load, delete, switch projects
+  - **Dual-Mode Rendering**: ProjectListSidebar supports both legacy sidebar and dropdown containers
+  - **Event-Driven Badge**: Project count badge updates automatically via event system
+  - **Expanded Layout**: Chat and outline now use full horizontal width without permanent sidebar
 
 **Previous Changes (2025-11-13):**
 - Simplified pricing to single Pro Package tier at $0.05 per source
