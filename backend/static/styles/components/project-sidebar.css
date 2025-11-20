@@ -160,7 +160,7 @@
 .project-title {
     font-size: 14px;
     font-weight: 500;
-    color: var(--text-primary, #fff);
+    color: #ffffff;
     margin-bottom: 4px;
     white-space: nowrap;
     overflow: hidden;
@@ -173,7 +173,7 @@
 
 .project-timestamp {
     font-size: 12px;
-    color: var(--text-secondary, #999);
+    color: #b0b0b0;
 }
 
 .project-item.active .project-timestamp {
@@ -183,7 +183,7 @@
 .delete-project-btn {
     background: none;
     border: none;
-    color: var(--text-secondary, #999);
+    color: #b0b0b0;
     cursor: pointer;
     font-size: 16px;
     padding: 4px 8px;
@@ -212,7 +212,7 @@
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: var(--text-secondary, #999);
+    color: #b0b0b0;
 }
 
 .empty-state p {
