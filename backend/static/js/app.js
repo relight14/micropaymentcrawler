@@ -22,6 +22,7 @@ import { ProjectsDropdown } from './components/projects-dropdown.js';
 import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
 import { summaryPopover } from './components/summary-popover.js';
+import { projectStore } from './state/project-store.js';
 
 // SourceCard and SummaryPopover loaded globally - access them dynamically when needed
 window.summaryPopover = summaryPopover;
