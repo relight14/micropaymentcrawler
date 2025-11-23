@@ -37,6 +37,7 @@
     <link rel="stylesheet" href="/static/styles/components/source-card.css">
     <link rel="stylesheet" href="/static/styles/components/project-sidebar.css">
     <link rel="stylesheet" href="/static/styles/components/projects-dropdown.css">
+    <link rel="stylesheet" href="/static/styles/components/sources-panel.css">
     <link rel="stylesheet" href="/static/styles/components/outline-builder.css">
     <link rel="stylesheet" href="/static/styles/components/mobile-navigation.css">
     
@@ -143,6 +144,9 @@
         </div>
         <!-- /main-content -->
         
+        <!-- Sources Panel (Middle-Right) -->
+        <div id="sources-panel" class="sources-panel"></div>
+        
         <!-- Outline Builder (Right) -->
         <div id="outline-builder"></div>
     </div>
@@ -170,6 +174,12 @@
     <script type="module">
         import { OutlineBuilder } from '/static/js/components/outline-builder.js';
         window.OutlineBuilder = OutlineBuilder;
+    </script>
+    
+    <!-- Sources Panel Component -->
+    <script type="module">
+        import { SourcesPanel } from '/static/js/components/sources-panel.js';
+        window.SourcesPanel = SourcesPanel;
     </script>
     
     <!-- Modular Chat app JavaScript -->

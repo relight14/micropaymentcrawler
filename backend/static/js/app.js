@@ -104,6 +104,11 @@ export class ChatResearchApp {
         // Initialize projects dropdown menu
         this.projectsDropdown = new ProjectsDropdown();
         
+        // Initialize sources panel
+        if (window.SourcesPanel) {
+            this.sourcesPanel = new window.SourcesPanel(projectStore, this.authService, this.apiService, this.toastManager);
+        }
+        
         // Initialize mobile navigation for responsive mobile experience
         this.mobileNavigation = new MobileNavigation();
         

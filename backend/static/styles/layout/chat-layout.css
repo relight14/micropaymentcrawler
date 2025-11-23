@@ -1,9 +1,9 @@
 /**
  * Chat Application Layout
- * Three-column flexbox structure: Project Sidebar | Main Content | Outline Builder
+ * Four-column flexbox structure: Project Sidebar | Main Content | Sources Panel | Outline Builder
  */
 
-/* Main app container with three-column layout */
+/* Main app container with multi-column layout */
 .app-container {
     display: flex;
     height: 100vh;
@@ -49,6 +49,25 @@
     min-width: 0;
 }
 
+/* Sources panel - middle-right */
+#sources-panel {
+    display: none;  /* Hidden by default when user not authenticated */
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+    position: relative;
+}
+
+/* Show sources panel when user is authenticated */
+#sources-panel.visible {
+    display: block;
+}
+
 /* Outline builder - right sidebar */
 #outline-builder {
     display: none;  /* Hidden by default when user not authenticated */
@@ -90,8 +109,29 @@
     }
 }
 
-/* Tablet screens - make outline a slide-over panel */
+/* Large laptop screens - hide sources panel for now, keep outline */
+@media (max-width: 1600px) {
+    #sources-panel {
+        position: fixed;
+        top: 0;
+        right: 320px;  /* Offset by outline width */
+        bottom: 0;
+        z-index: 999;
+        transform: translateX(100%);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    #sources-panel.visible {
+        transform: translateX(0);
+    }
+}
+
+/* Tablet screens - make both sources and outline slide-over panels */
 @media (max-width: 1024px) {
+    #sources-panel {
+        right: 0;  /* Full right alignment on tablet */
+    }
+    
     #outline-builder {
         position: fixed;
         top: 0;
@@ -110,6 +150,7 @@
 /* Mobile - full width panels */
 @media (max-width: 640px) {
     #project-sidebar,
+    #sources-panel,
     #outline-builder {
         width: 100%;
         max-width: 100%;
@@ -118,6 +159,7 @@
 
 /* Dark mode */
 body.dark-mode #project-sidebar,
+body.dark-mode #sources-panel,
 body.dark-mode #outline-builder {
     background: var(--card);
     border-color: rgba(255, 255, 255, 0.1);

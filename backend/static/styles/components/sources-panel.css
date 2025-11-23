@@ -1,0 +1,104 @@
+/**
+ * Sources Panel Styles
+ * Dedicated panel for displaying research sources
+ */
+
+.sources-panel {
+    background: var(--card-background, #f9f9f9);
+    border-left: 1px solid var(--border-color, #e5e5e5);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.sources-panel-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color, #e5e5e5);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-background, #ffffff);
+}
+
+.sources-panel-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary, #333);
+}
+
+.source-count {
+    font-size: 14px;
+    color: var(--text-secondary, #666);
+    background: var(--background-secondary, #f0f0f0);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.sources-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.sources-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-secondary, #888);
+}
+
+.sources-empty-state svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+    color: var(--text-secondary, #888);
+}
+
+.sources-empty-state p {
+    margin: 8px 0 4px;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary, #666);
+}
+
+.sources-empty-state span {
+    font-size: 14px;
+    color: var(--text-secondary, #999);
+}
+
+/* Dark mode */
+.dark-mode .sources-panel {
+    background: var(--card-background-dark, #1a1a1a);
+    border-left-color: var(--border-color-dark, #333);
+}
+
+.dark-mode .sources-panel-header {
+    background: var(--card-background-dark, #222);
+    border-bottom-color: var(--border-color-dark, #333);
+}
+
+.dark-mode .sources-panel-header h3 {
+    color: var(--text-primary-dark, #eee);
+}
+
+.dark-mode .source-count {
+    background: var(--background-secondary-dark, #333);
+    color: var(--text-secondary-dark, #aaa);
+}
+
+.dark-mode .sources-empty-state {
+    color: var(--text-secondary-dark, #888);
+}
+
+.dark-mode .sources-empty-state p {
+    color: var(--text-primary-dark, #aaa);
+}
+
+.dark-mode .sources-empty-state span {
+    color: var(--text-secondary-dark, #666);
+}

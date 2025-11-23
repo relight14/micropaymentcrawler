@@ -81,6 +81,18 @@ class DatabaseConnection:
                 )
             """)
             
+            # Create project_sources table for source panel history
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS project_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    source_data_json TEXT NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                )
+            """)
+            
             # Create messages table for conversation history
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
@@ -180,6 +192,18 @@ class DatabaseConnection:
                     order_index INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (section_id) REFERENCES outline_sections(id) ON DELETE CASCADE
+                )
+            """)
+            
+            # Create project_sources table for source panel history
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS project_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    source_data_json TEXT NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
                 )
             """)
             

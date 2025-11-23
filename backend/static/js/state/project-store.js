@@ -11,6 +11,7 @@ export class ProjectStore {
             currentResearchQuery: null,
             projects: [],
             currentOutline: this.getDefaultOutline(),
+            currentSources: [],  // Sources panel history
             selectedSources: []
         };
         
@@ -36,6 +37,7 @@ export class ProjectStore {
             ...this.state,
             projects: [...this.state.projects],
             currentOutline: JSON.parse(JSON.stringify(this.state.currentOutline)),
+            currentSources: JSON.parse(JSON.stringify(this.state.currentSources)),
             selectedSources: [...this.state.selectedSources]
         };
     }
@@ -149,6 +151,20 @@ export class ProjectStore {
     }
 
     /**
+     * Set current sources (for sources panel)
+     */
+    setSources(sources) {
+        this.setState({ currentSources: sources || [] });
+    }
+
+    /**
+     * Get current sources (for sources panel)
+     */
+    getSources() {
+        return [...this.state.currentSources];
+    }
+
+    /**
      * Set selected sources
      */
     setSelectedSources(sources) {
@@ -191,6 +207,7 @@ export class ProjectStore {
             currentProjectTitle: '',
             projects: [],
             currentOutline: this.getDefaultOutline(),
+            currentSources: [],
             selectedSources: []
         });
     }

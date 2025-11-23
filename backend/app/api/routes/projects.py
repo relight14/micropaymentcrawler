@@ -70,6 +70,18 @@ class UpdateOutlineRequest(BaseModel):
     sections: List[OutlineSection]
 
 
+class ProjectSource(BaseModel):
+    """Source in the sources panel"""
+    id: Optional[int] = None
+    source_data: Dict[str, Any]  # Full source card data
+    order_index: int
+
+
+class UpdateSourcesRequest(BaseModel):
+    """Request to update project sources"""
+    sources: List[ProjectSource]
+
+
 def extract_bearer_token(authorization: str) -> str:
     """Extract and validate Bearer token from Authorization header."""
     if not authorization:
@@ -523,6 +535,143 @@ async def update_project_outline(
     except Exception as e:
         logger.error(f"Error updating outline: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update outline: {str(e)}")
+
+
+@router.get("/{project_id}/sources")
+@limiter.limit("30/minute")
+async def get_project_sources(
+    request: Request,
+    project_id: int,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """Get sources for a project"""
+    try:
+        access_token = extract_bearer_token(authorization)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Verify project ownership
+        project_query = """
+            SELECT id FROM projects WHERE id = ? AND user_id = ?
+        """ if not Config.USE_POSTGRES else """
+            SELECT id FROM projects WHERE id = %s AND user_id = %s
+        """
+        
+        project_result = db.execute_query(project_query, (project_id, user_id))
+        
+        if not project_result:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Fetch sources
+        sources_query = """
+            SELECT id, project_id, source_data_json, order_index, created_at
+            FROM project_sources
+            WHERE project_id = ?
+            ORDER BY order_index
+        """ if not Config.USE_POSTGRES else """
+            SELECT id, project_id, source_data_json, order_index, created_at
+            FROM project_sources
+            WHERE project_id = %s
+            ORDER BY order_index
+        """
+        
+        sources_results = db.execute_many(sources_query, (project_id,))
+        
+        sources = []
+        for source_row in sources_results:
+            sources.append(ProjectSource(
+                id=source_row['id'],
+                source_data=json.loads(source_row['source_data_json']),
+                order_index=source_row['order_index']
+            ))
+        
+        return {"sources": sources}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching project sources: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sources: {str(e)}")
+
+
+@router.put("/{project_id}/sources")
+@limiter.limit("20/minute")
+async def update_project_sources(
+    request: Request,
+    project_id: int,
+    sources_request: UpdateSourcesRequest,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """Update sources for a project"""
+    try:
+        access_token = extract_bearer_token(authorization)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Verify project ownership
+        project_query = """
+            SELECT id FROM projects WHERE id = ? AND user_id = ?
+        """ if not Config.USE_POSTGRES else """
+            SELECT id FROM projects WHERE id = %s AND user_id = %s
+        """
+        
+        project_result = db.execute_query(project_query, (project_id, user_id))
+        
+        if not project_result:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Delete existing sources and insert new ones
+        if Config.USE_POSTGRES:
+            with db.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Delete existing sources
+                    cursor.execute(
+                        "DELETE FROM project_sources WHERE project_id = %s",
+                        (project_id,)
+                    )
+                    
+                    # Insert new sources
+                    for source in sources_request.sources:
+                        cursor.execute("""
+                            INSERT INTO project_sources (project_id, source_data_json, order_index, created_at)
+                            VALUES (%s, %s, %s, NOW())
+                        """, (project_id, json.dumps(source.source_data), source.order_index))
+                    
+                    # Update project updated_at
+                    cursor.execute(
+                        "UPDATE projects SET updated_at = NOW() WHERE id = %s",
+                        (project_id,)
+                    )
+                    
+                    conn.commit()
+        else:
+            with db.get_connection() as conn:
+                # Delete existing sources
+                conn.execute(
+                    "DELETE FROM project_sources WHERE project_id = ?",
+                    (project_id,)
+                )
+                
+                # Insert new sources
+                for source in sources_request.sources:
+                    conn.execute("""
+                        INSERT INTO project_sources (project_id, source_data_json, order_index, created_at)
+                        VALUES (?, ?, ?, datetime('now'))
+                    """, (project_id, json.dumps(source.source_data), source.order_index))
+                
+                # Update project updated_at
+                conn.execute(
+                    "UPDATE projects SET updated_at = datetime('now') WHERE id = ?",
+                    (project_id,)
+                )
+                
+                conn.commit()
+        
+        return {"status": "success", "message": "Sources updated successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating project sources: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update sources: {str(e)}")
 
 
 @router.put("/{project_id}")
