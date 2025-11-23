@@ -106,7 +106,7 @@ export class ChatResearchApp {
         
         // Initialize sources panel
         if (window.SourcesPanel) {
-            this.sourcesPanel = new window.SourcesPanel(projectStore, this.authService, this.apiService, this.toastManager);
+            this.sourcesPanel = new window.SourcesPanel(this.appState, projectStore, this.authService, this.apiService, this.toastManager);
         }
         
         // Initialize mobile navigation for responsive mobile experience

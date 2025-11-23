@@ -4,7 +4,8 @@
  */
 
 export class SourcesPanel {
-    constructor(projectStore, authService, apiService, toastManager) {
+    constructor(appState, projectStore, authService, apiService, toastManager) {
+        this.appState = appState;
         this.projectStore = projectStore;
         this.authService = authService;
         this.apiService = apiService;
