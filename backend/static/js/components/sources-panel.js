@@ -43,6 +43,11 @@ export class SourcesPanel {
             }
         });
         
+        // Show panel if user is authenticated (mirror OutlineBuilder pattern)
+        if (this.authService.isAuthenticated() && this.container) {
+            this.container.classList.add('visible');
+        }
+        
         this.render();
         console.log('✅ [SourcesPanel] Initialized');
     }
@@ -193,6 +198,11 @@ export class SourcesPanel {
         
         // Always re-render to show sources in panel
         this.render();
+        
+        // Show panel when sources are added
+        if (this.sources.length > 0 && this.container) {
+            this.container.classList.add('visible');
+        }
     }
     
     /**
