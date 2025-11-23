@@ -60,15 +60,26 @@ export class ProjectStore {
         const oldState = this.getState();
         this.state = { ...this.state, ...updates };
         
+        console.log('🏪 [ProjectStore] setState called:', {
+            updates,
+            subscriberCount: this.subscribers.size,
+            oldActiveProjectId: oldState.activeProjectId,
+            newActiveProjectId: this.state.activeProjectId
+        });
+        
         // Notify all subscribers with new state
         const newState = this.getState();
+        let notifiedCount = 0;
         this.subscribers.forEach(callback => {
             try {
+                console.log(`🏪 [ProjectStore] Notifying subscriber ${notifiedCount + 1}/${this.subscribers.size}`);
                 callback(newState, oldState);
+                notifiedCount++;
             } catch (error) {
                 console.error('Error in state subscriber:', error);
             }
         });
+        console.log(`✅ [ProjectStore] Notified ${notifiedCount} subscribers`);
     }
 
     /**
