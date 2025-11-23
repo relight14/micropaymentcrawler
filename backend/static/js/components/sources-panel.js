@@ -3,6 +3,8 @@
  * Mirrors OutlineBuilder pattern with clean state management and debounced saves
  */
 
+import { AppEvents } from '../utils/event-bus.js';
+
 export class SourcesPanel {
     constructor(appState, projectStore, authService, apiService, toastManager) {
         this.appState = appState;
@@ -43,7 +45,18 @@ export class SourcesPanel {
             }
         });
         
-        // Show panel if user is authenticated (mirror OutlineBuilder pattern)
+        // Listen for authentication state changes
+        AppEvents.addEventListener('authStateChanged', (e) => {
+            if (e.detail.isAuthenticated && this.container) {
+                this.container.classList.add('visible');
+                console.log('📚 [SourcesPanel] Shown after login');
+            } else if (this.container) {
+                this.container.classList.remove('visible');
+                console.log('📚 [SourcesPanel] Hidden after logout');
+            }
+        });
+        
+        // Show panel if user is already authenticated on page load
         if (this.authService.isAuthenticated() && this.container) {
             this.container.classList.add('visible');
         }
