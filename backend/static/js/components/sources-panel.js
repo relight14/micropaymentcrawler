@@ -44,7 +44,13 @@ export class SourcesPanel {
         
         // Listen for project changes
         this.projectStore.subscribe((newState, oldState) => {
+            console.log('📚 [SourcesPanel] ProjectStore subscription fired:', {
+                newProjectId: newState.activeProjectId,
+                oldProjectId: oldState.activeProjectId,
+                changed: newState.activeProjectId !== oldState.activeProjectId
+            });
             if (newState.activeProjectId !== oldState.activeProjectId) {
+                console.log('📚 [SourcesPanel] Project changed, calling onProjectChange');
                 this.onProjectChange(newState.activeProjectId);
             }
         });
@@ -73,10 +79,13 @@ export class SourcesPanel {
      * Handle project change - load sources for new project
      */
     async onProjectChange(projectId) {
+        console.log(`📚 [SourcesPanel] onProjectChange called with projectId: ${projectId}`);
+        
         // Cancel any pending saves before project change to avoid race conditions
         this.cancelPendingSave();
         
         if (!projectId) {
+            console.log('📚 [SourcesPanel] No projectId, clearing sources');
             this.sources = [];
             this.currentProjectId = null;
             this.render();
@@ -86,8 +95,10 @@ export class SourcesPanel {
         // ALWAYS preserve current sources before loading (even when switching between projects)
         // This prevents data loss when switching projects mid-research
         const stagedSources = this.sources.map(s => s.source_data || s);
+        console.log(`📚 [SourcesPanel] Staged ${stagedSources.length} existing sources before loading`);
         
         this.currentProjectId = projectId;
+        console.log(`📚 [SourcesPanel] Calling loadSources for project ${projectId}...`);
         await this.loadSources(projectId);
         
         // Merge staged sources with loaded sources (dedupe using composite key)
@@ -142,12 +153,22 @@ export class SourcesPanel {
      * Load sources from backend for a project
      */
     async loadSources(projectId) {
+        console.log(`📚 [SourcesPanel] loadSources called:`, {
+            projectId,
+            isAuthenticated: this.authService.isAuthenticated(),
+            willLoad: this.authService.isAuthenticated() && projectId
+        });
+        
         if (!this.authService.isAuthenticated() || !projectId) {
+            console.log('❌ [SourcesPanel] Cannot load sources - auth or projectId missing');
             return;
         }
         
         try {
+            console.log(`📡 [SourcesPanel] Fetching sources from /api/projects/${projectId}/sources`);
             const data = await this.apiService.get(`/api/projects/${projectId}/sources`);
+            console.log(`📡 [SourcesPanel] API response:`, data);
+            
             this.sources = data.sources || [];
             
             // Update ProjectStore with loaded sources
@@ -262,24 +283,33 @@ export class SourcesPanel {
      * Save sources to backend
      */
     async saveToBackend(projectId, sources) {
+        console.log(`💾 [SourcesPanel] saveToBackend called:`, {
+            projectId,
+            sourceCount: sources.length,
+            isAuthenticated: this.authService.isAuthenticated(),
+            currentProjectId: this.currentProjectId
+        });
+        
         if (!projectId || !this.authService.isAuthenticated()) {
+            console.log('❌ [SourcesPanel] Cannot save - auth or projectId missing');
             return;
         }
         
         // Guard: Abort if project changed since save was scheduled
         if (this.currentProjectId !== projectId) {
-            console.log('Project changed since save scheduled, aborting save');
+            console.log('⚠️ [SourcesPanel] Project changed since save scheduled, aborting save');
             return;
         }
         
         this.isSaving = true;
         
         try {
+            console.log(`📡 [SourcesPanel] Saving ${sources.length} sources to /api/projects/${projectId}/sources`);
             await this.apiService.put(`/api/projects/${projectId}/sources`, {
                 sources: sources
             });
             
-            console.log(`✅ [SourcesPanel] Saved ${sources.length} sources`);
+            console.log(`✅ [SourcesPanel] Saved ${sources.length} sources to database`);
             
         } catch (error) {
             console.error('❌ [SourcesPanel] Error saving sources:', error);
