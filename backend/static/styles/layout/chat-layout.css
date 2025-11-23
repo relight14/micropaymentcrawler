@@ -40,6 +40,21 @@
     overflow-x: hidden;
 }
 
+/* Sources panel - left side */
+#sources-panel {
+    display: none;  /* Hidden by default when user not authenticated */
+    width: 320px;
+    min-width: 200px;
+    max-width: 600px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: width 0.2s ease;
+    position: relative;
+    order: 1;  /* First: Sources (leftmost) */
+}
+
 /* Main content area - center */
 #main-content {
     flex: 1;
@@ -47,23 +62,7 @@
     flex-direction: column;
     overflow: hidden;
     min-width: 0;
-    order: 1;  /* First: Chat */
-}
-
-/* Sources panel - middle (between chat and outline) */
-#sources-panel {
-    display: none;  /* Hidden by default when user not authenticated */
-    width: 320px;
-    min-width: 200px;
-    max-width: 600px;
-    background: var(--card);
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-    overflow-y: auto;
-    flex-shrink: 0;
-    transition: width 0.2s ease;
-    position: relative;
-    order: 2;  /* Second: Sources (between chat and outline) */
+    order: 2;  /* Second: Chat (center) */
 }
 
 /* Show sources panel when user is authenticated */
@@ -143,15 +142,15 @@
     }
 }
 
-/* Large laptop screens - hide sources panel for now, keep outline */
+/* Large laptop screens - make sources panel slide-over from left */
 @media (max-width: 1600px) {
     #sources-panel {
         position: fixed;
         top: 0;
-        right: 320px;  /* Offset by outline width */
+        left: 0;
         bottom: 0;
         z-index: 999;
-        transform: translateX(100%);
+        transform: translateX(-100%);
         box-shadow: var(--shadow-lg);
     }
     
@@ -163,7 +162,7 @@
 /* Tablet screens - make both sources and outline slide-over panels */
 @media (max-width: 1024px) {
     #sources-panel {
-        right: 0;  /* Full right alignment on tablet */
+        left: 0;  /* Full left alignment on tablet */
     }
     
     #outline-builder {
