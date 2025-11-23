@@ -125,7 +125,7 @@
     display: block;
 }
 
-/* Laptop screens - hide project sidebar, keep outline beside chat */
+/* Laptop screens - hide project sidebar dropdown (now in header), keep 3-column layout */
 @media (max-width: 1400px) {
     #project-sidebar {
         position: fixed;
@@ -142,8 +142,8 @@
     }
 }
 
-/* Large laptop screens - make sources panel slide-over from left */
-@media (max-width: 1600px) {
+/* Tablet screens - make sources and outline slide-over panels */
+@media (max-width: 1024px) {
     #sources-panel {
         position: fixed;
         top: 0;
@@ -156,13 +156,6 @@
     
     #sources-panel.visible {
         transform: translateX(0);
-    }
-}
-
-/* Tablet screens - make both sources and outline slide-over panels */
-@media (max-width: 1024px) {
-    #sources-panel {
-        left: 0;  /* Full left alignment on tablet */
     }
     
     #outline-builder {
