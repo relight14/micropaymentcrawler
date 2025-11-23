@@ -559,18 +559,17 @@ export class ChatResearchApp {
                 // Backend is single source of truth for enrichment status
                 this.appState.setCurrentResearchData(response.research_data);
                 
-                // Display immediate source cards using SourceManager
-                const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
-                if (cardsResult) {
-                    // First add the message with source cards
-                    this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+                // Route sources to SourcesPanel instead of chat
+                if (response.research_data.sources && response.research_data.sources.length > 0) {
+                    const sourceCount = response.research_data.sources.length;
                     
-                    // Then append feedback AFTER message is in DOM (avoids serialization loss)
-                    const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
-                    if (lastMsg) {
-                        const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
-                        lastMsg.appendChild(feedbackSection);
+                    // Send sources to SourcesPanel
+                    if (this.sourcesPanel) {
+                        this.sourcesPanel.handleNewSources(response.research_data.sources);
                     }
+                    
+                    // Add simple confirmation message to chat
+                    this.addMessage('assistant', `Found ${sourceCount} sources. Check the Sources panel to review and select sources for your research.`);
                 }
                 
                 // If enrichment is needed, let the progressive system handle updates
@@ -607,21 +606,21 @@ export class ChatResearchApp {
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();
             
-            // Handle research data (source cards)
+            // Handle research data (send sources to SourcesPanel)
             if (response.research_data) {
                 this.appState.setCurrentResearchData(response.research_data);
                 
-                // Display source cards
-                const cardsResult = await this.sourceManager.displayCards(response.research_data.sources);
-                if (cardsResult) {
-                    this.addMessage('assistant', cardsResult.element, cardsResult.metadata);
+                // Route sources to SourcesPanel instead of chat
+                if (response.research_data.sources && response.research_data.sources.length > 0) {
+                    const sourceCount = response.research_data.sources.length;
                     
-                    // Append feedback section
-                    const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
-                    if (lastMsg) {
-                        const feedbackSection = this.messageCoordinator.createFeedback(response.research_data.sources);
-                        lastMsg.appendChild(feedbackSection);
+                    // Send sources to SourcesPanel
+                    if (this.sourcesPanel) {
+                        this.sourcesPanel.handleNewSources(response.research_data.sources);
                     }
+                    
+                    // Add simple confirmation message to chat
+                    this.addMessage('assistant', `Found ${sourceCount} sources. Check the Sources panel to review and select sources for your research.`);
                 }
             }
             

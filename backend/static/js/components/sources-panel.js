@@ -50,6 +50,9 @@ export class SourcesPanel {
      * Handle project change - load sources for new project
      */
     async onProjectChange(projectId) {
+        // Cancel any pending saves before project change to avoid race conditions
+        this.cancelPendingSave();
+        
         if (!projectId) {
             this.sources = [];
             this.currentProjectId = null;
@@ -57,8 +60,59 @@ export class SourcesPanel {
             return;
         }
         
+        // ALWAYS preserve current sources before loading (even when switching between projects)
+        // This prevents data loss when switching projects mid-research
+        const stagedSources = this.sources.map(s => s.source_data || s);
+        
         this.currentProjectId = projectId;
         await this.loadSources(projectId);
+        
+        // Merge staged sources with loaded sources (dedupe using composite key)
+        // Merge whenever we have staged sources - deduplication handles overlap
+        if (stagedSources.length > 0) {
+            console.log(`📚 [SourcesPanel] Merging ${stagedSources.length} staged sources into loaded project ${projectId}`);
+            
+            // Use same deduplication logic as handleNewSources
+            const sourceMap = new Map();
+            
+            const getSourceKey = (source) => {
+                const url = source.url || '';
+                const title = source.title || '';
+                const excerpt = (source.excerpt || '').substring(0, 50);
+                return `${url}|||${title}|||${excerpt}`;
+            };
+            
+            // Add loaded sources first
+            this.sources.forEach((s, idx) => {
+                const sourceData = s.source_data || s;
+                const key = getSourceKey(sourceData);
+                sourceMap.set(key, { source_data: sourceData, order_index: idx });
+            });
+            
+            // Merge staged sources (avoid duplicates)
+            let nextIndex = this.sources.length;
+            stagedSources.forEach(source => {
+                const key = getSourceKey(source);
+                if (!sourceMap.has(key)) {
+                    sourceMap.set(key, { source_data: source, order_index: nextIndex++ });
+                }
+            });
+            
+            // Update with merged sources
+            this.sources = Array.from(sourceMap.values());
+            
+            // Update ProjectStore
+            const sourcesData = this.sources.map(s => s.source_data);
+            this.projectStore.setSources(sourcesData);
+            
+            // Save merged sources to backend
+            if (this.authService.isAuthenticated()) {
+                this.debouncedSave();
+            }
+            
+            // Re-render with merged sources
+            this.render();
+        }
     }
     
     /**
@@ -129,19 +183,32 @@ export class SourcesPanel {
         const sourcesData = this.sources.map(s => s.source_data);
         this.projectStore.setSources(sourcesData);
         
-        // Save to backend
-        this.debouncedSave();
+        // Save to backend (only if project is active)
+        if (this.currentProjectId && this.authService.isAuthenticated()) {
+            this.debouncedSave();
+        } else {
+            console.log('📚 [SourcesPanel] Sources staged in-memory (no active project yet)');
+        }
         
-        // Re-render
+        // Always re-render to show sources in panel
         this.render();
     }
     
     /**
      * Debounced save to backend
+     * Only saves when both auth and project are active
      */
     debouncedSave() {
+        // ALWAYS clear existing timer first (prevents stale saves)
         if (this.saveTimeout) {
             clearTimeout(this.saveTimeout);
+            this.saveTimeout = null;
+        }
+        
+        // Gate: Only save when both authenticated AND project is active
+        if (!this.authService.isAuthenticated() || !this.currentProjectId) {
+            console.log('📚 [SourcesPanel] Skipping save - no auth or no active project');
+            return;
         }
         
         const projectIdToSave = this.currentProjectId;
@@ -150,6 +217,17 @@ export class SourcesPanel {
         this.saveTimeout = setTimeout(() => {
             this.saveToBackend(projectIdToSave, sourcesToSave);
         }, 1000);
+    }
+    
+    /**
+     * Cancel any pending saves (called before project changes)
+     */
+    cancelPendingSave() {
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = null;
+            console.log('📚 [SourcesPanel] Cancelled pending save');
+        }
     }
     
     /**

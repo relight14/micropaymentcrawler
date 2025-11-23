@@ -55,6 +55,22 @@ export class MobileNavigation {
             </button>
             
             <button 
+                class="mobile-nav-tab ${this.currentPanel === 'sources' ? 'active' : ''}" 
+                data-panel="sources"
+                aria-label="Sources"
+                ${this.currentPanel === 'sources' ? 'aria-current="page"' : ''}
+            >
+                <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                    <path d="M16 13H8"/>
+                    <path d="M16 17H8"/>
+                    <path d="M10 9H8"/>
+                </svg>
+                <span class="mobile-nav-label">Sources</span>
+            </button>
+            
+            <button 
                 class="mobile-nav-tab ${this.currentPanel === 'outline' ? 'active' : ''}" 
                 data-panel="outline"
                 aria-label="Outline"
@@ -130,24 +146,26 @@ export class MobileNavigation {
         
         const projectSidebar = document.getElementById('project-sidebar');
         const mainContent = document.getElementById('main-content');
+        const sourcesPanel = document.getElementById('sources-panel');
         const outlineBuilder = document.getElementById('outline-builder');
         const backdrop = document.getElementById('mobile-backdrop');
 
         console.log('📱 [MobileNav] DOM elements check:', {
             projectSidebar: !!projectSidebar,
             mainContent: !!mainContent,
+            sourcesPanel: !!sourcesPanel,
             outlineBuilder: !!outlineBuilder,
-            backdrop: !!backdrop,
-            projectSidebarHTML: projectSidebar ? projectSidebar.innerHTML.substring(0, 100) : 'NULL'
+            backdrop: !!backdrop
         });
 
-        if (!projectSidebar || !mainContent || !outlineBuilder) {
+        if (!projectSidebar || !mainContent || !sourcesPanel || !outlineBuilder) {
             console.error('📱 [MobileNav] ERROR: Missing required DOM elements!');
             return;
         }
 
         projectSidebar.classList.remove('visible', 'mobile-active');
         mainContent.classList.remove('mobile-hidden');
+        sourcesPanel.classList.remove('visible', 'mobile-active');
         outlineBuilder.classList.remove('visible', 'mobile-active');
         backdrop.classList.remove('visible');
 
@@ -163,6 +181,11 @@ export class MobileNavigation {
                 break;
             case 'chat':
                 console.log('📱 [MobileNav] Showing Chat panel (default)');
+                break;
+            case 'sources':
+                console.log('📱 [MobileNav] Showing Sources panel');
+                sourcesPanel.classList.add('visible', 'mobile-active');
+                backdrop.classList.add('visible');
                 break;
             case 'outline':
                 console.log('📱 [MobileNav] Showing Outline panel');

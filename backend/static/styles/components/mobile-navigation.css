@@ -121,6 +121,7 @@
 @media (max-width: 768px) {
     /* By default, hide sidebars on mobile */
     #project-sidebar,
+    #sources-panel,
     #outline-builder {
         position: fixed;
         top: 0;
@@ -132,12 +133,17 @@
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    #sources-panel,
     #outline-builder {
         transform: translateX(100%);
     }
 
     /* Show panels when active */
     #project-sidebar.mobile-active {
+        transform: translateX(0);
+    }
+
+    #sources-panel.mobile-active {
         transform: translateX(0);
     }
 
