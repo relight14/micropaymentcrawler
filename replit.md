@@ -31,6 +31,7 @@ The project provides dynamic research services with **simplified Pro Package-onl
   - **Smart Persistence**: Sources stage in-memory without active project, then merge and save when project loads - handles all scenarios (no-project, project reload, cross-project switching)
   - **Mobile Support**: Added 4th tab to mobile navigation (Projects/Chat/Sources/Outline) with proper slide-in behavior
   - **Integration**: Research results now route to Sources panel instead of chat messages, with confirmation messages in chat
+  - **Auto-Visibility**: Sources panel automatically shows `.visible` class when authenticated or when sources are found, mirroring OutlineBuilder pattern
   - **Production-Ready**: Architect-reviewed implementation with no data loss scenarios, race condition prevention via timer cancellation, and proper auth/project gating
 
 **Previous Changes (2025-11-14):**
