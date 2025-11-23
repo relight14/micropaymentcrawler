@@ -41,6 +41,86 @@ export class APIService {
         }
     }
 
+    /**
+     * Generic GET request
+     * @param {string} endpoint - API endpoint (e.g., '/api/projects/83/sources')
+     * @returns {Promise<any>} Response JSON
+     */
+    async get(endpoint) {
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+            method: 'GET',
+            headers: this.getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            this._handle401(response);
+            throw new Error(`GET ${endpoint} failed: ${response.statusText}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Generic POST request
+     * @param {string} endpoint - API endpoint
+     * @param {Object} data - Request body data
+     * @returns {Promise<any>} Response JSON
+     */
+    async post(endpoint, data = {}) {
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            this._handle401(response);
+            throw new Error(`POST ${endpoint} failed: ${response.statusText}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Generic PUT request
+     * @param {string} endpoint - API endpoint
+     * @param {Object} data - Request body data
+     * @returns {Promise<any>} Response JSON
+     */
+    async put(endpoint, data = {}) {
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+            method: 'PUT',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            this._handle401(response);
+            throw new Error(`PUT ${endpoint} failed: ${response.statusText}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Generic DELETE request
+     * @param {string} endpoint - API endpoint
+     * @returns {Promise<any>} Response JSON
+     */
+    async delete(endpoint) {
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+            method: 'DELETE',
+            headers: this.getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            this._handle401(response);
+            throw new Error(`DELETE ${endpoint} failed: ${response.statusText}`);
+        }
+
+        return await response.json();
+    }
+
     async sendMessage(message, mode, conversationContext = null) {
         console.log(`📡 [API] sendMessage called with mode="${mode}"`);
         

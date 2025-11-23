@@ -1,0 +1,36 @@
+📚 [SourcesPanel] loadSources called: Object
+sources-panel.js:168 📡 [SourcesPanel] Fetching sources from /api/projects/83/sources
+sources-panel.js:182 ❌ [SourcesPanel] Error loading sources: TypeError: this.apiService.get is not a function
+    at SourcesPanel.loadSources (sources-panel.js:169:48)
+    at SourcesPanel.onProjectChange (sources-panel.js:102:20)
+    at sources-panel.js:54:22
+    at project-store.js:76:17
+    at Set.forEach (<anonymous>)
+    at ProjectStore.setState (project-store.js:73:26)
+    at ProjectStore.setActiveProject (project-store.js:89:14)
+    at ProjectManager.handleProjectLoaded (project-manager.js:446:22)
+    at ProjectListSidebar.<anonymous> (project-manager.js:83:18)
+    at ProjectListSidebar.loadProject (project-sidebar.js:223:22)
+loadSources @ sources-panel.js:182Understand this error
+project-store.js:75 🏪 [ProjectStore] Notifying subscriber 2/2
+outline-builder.js:362 [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+project-store.js:82 ✅ [ProjectStore] Notified 2 subscribers
+project-store.js:63 🏪 [ProjectStore] setState called: Object
+project-store.js:75 🏪 [ProjectStore] Notifying subscriber 1/2
+sources-panel.js:47 📚 [SourcesPanel] ProjectStore subscription fired: Object
+project-store.js:75 🏪 [ProjectStore] Notifying subscriber 2/2
+outline-builder.js:362 [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+project-store.js:82 ✅ [ProjectStore] Notified 2 subscribers
+logger.js:2 ℹ️  [ProjectManager] Project has no saved research query
+project-store.js:63 🏪 [ProjectStore] setState called: Object
+project-store.js:75 🏪 [ProjectStore] Notifying subscriber 1/2
+sources-panel.js:47 📚 [SourcesPanel] ProjectStore subscription fired: Object
+project-store.js:75 🏪 [ProjectStore] Notifying subscriber 2/2
+outline-builder.js:362 [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+project-store.js:82 ✅ [ProjectStore] Notified 2 subscribers
+outline-builder.js:148 [Sync] Loaded 0 sources from outline to ProjectStore
+logger.js:2 📨 [ProjectManager] Loading messages for project 83...
+logger.js:2 📬 [ProjectManager] Fetched 16 messages
+2app-state.js:111 Duplicate message prevented: Sorry, I couldn't search for sources: Cannot read properties of undefined (reading 'isEnrichmentPend
+addMessage @ app-state.js:111Understand this warning
+logger.js:2 ✅ [ProjectManager] Loaded and displayed 16 messages
