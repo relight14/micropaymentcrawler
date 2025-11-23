@@ -18,6 +18,10 @@ export class SourcesPanel {
         this.currentProjectId = null;
         this.saveTimeout = null;
         this.isSaving = false;
+        this.isCollapsed = false;
+        this.isResizing = false;
+        this.startX = 0;
+        this.startWidth = 0;
         
         if (!this.container) {
             console.error('❌ Sources panel container not found');
@@ -297,16 +301,36 @@ export class SourcesPanel {
         
         this.container.innerHTML = `
             <div class="sources-panel-header">
-                <h3>Research Sources</h3>
-                <span class="source-count">${sourcesData.length} sources</span>
+                <button class="collapse-toggle" id="sourcesCollapseToggle" title="${this.isCollapsed ? 'Expand' : 'Collapse'} sources panel">
+                    ${this.isCollapsed ? '→' : '←'}
+                </button>
+                ${this.isCollapsed ? '' : `
+                    <h3>Research Sources</h3>
+                    <span class="source-count">${sourcesData.length} sources</span>
+                `}
             </div>
-            <div class="sources-list" id="sources-list">
-                ${sourcesData.length === 0 ? this.renderEmptyState() : ''}
-            </div>
+            ${this.isCollapsed ? '' : `
+                <div class="sources-list" id="sources-list">
+                    ${sourcesData.length === 0 ? this.renderEmptyState() : ''}
+                </div>
+            `}
+            <div class="resize-handle" id="sourcesResizeHandle"></div>
         `;
         
-        // Render source cards
-        if (sourcesData.length > 0) {
+        // Add collapse toggle listener
+        const collapseBtn = document.getElementById('sourcesCollapseToggle');
+        if (collapseBtn) {
+            collapseBtn.addEventListener('click', () => this.toggleCollapse());
+        }
+        
+        // Add resize handle listeners
+        const resizeHandle = document.getElementById('sourcesResizeHandle');
+        if (resizeHandle && !this.isCollapsed) {
+            resizeHandle.addEventListener('mousedown', (e) => this.startResize(e));
+        }
+        
+        // Render source cards (if not collapsed)
+        if (!this.isCollapsed && sourcesData.length > 0) {
             const sourcesList = document.getElementById('sources-list');
             const sourceCardFactory = window.SourceCard ? new window.SourceCard(this.appState) : null;
             
@@ -323,6 +347,64 @@ export class SourcesPanel {
                 sourcesList.appendChild(card);
             });
         }
+    }
+    
+    /**
+     * Toggle collapse/expand state
+     */
+    toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed;
+        
+        if (this.isCollapsed) {
+            this.container.classList.add('collapsed');
+        } else {
+            this.container.classList.remove('collapsed');
+        }
+        
+        this.render();
+    }
+    
+    /**
+     * Start resize drag
+     */
+    startResize(e) {
+        e.preventDefault();
+        this.isResizing = true;
+        this.startX = e.clientX;
+        this.startWidth = this.container.offsetWidth;
+        
+        document.addEventListener('mousemove', this.handleResize);
+        document.addEventListener('mouseup', this.stopResize);
+        
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+    }
+    
+    /**
+     * Handle resize drag
+     */
+    handleResize = (e) => {
+        if (!this.isResizing) return;
+        
+        const delta = this.startX - e.clientX;  // Reversed because we're sizing from right edge
+        const newWidth = this.startWidth + delta;
+        
+        // Constrain to min/max width (200px - 600px)
+        const constrainedWidth = Math.max(200, Math.min(600, newWidth));
+        this.container.style.width = `${constrainedWidth}px`;
+    }
+    
+    /**
+     * Stop resize drag
+     */
+    stopResize = () => {
+        this.isResizing = false;
+        
+        document.removeEventListener('mousemove', this.handleResize);
+        document.removeEventListener('mouseup', this.stopResize);
+        
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
     }
     
     /**

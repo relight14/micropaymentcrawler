@@ -47,25 +47,58 @@
     flex-direction: column;
     overflow: hidden;
     min-width: 0;
+    order: 1;  /* First: Chat */
 }
 
-/* Sources panel - middle-right */
+/* Sources panel - middle (between chat and outline) */
 #sources-panel {
     display: none;  /* Hidden by default when user not authenticated */
-    width: 300px;
-    min-width: 300px;
-    max-width: 300px;
+    width: 320px;
+    min-width: 200px;
+    max-width: 600px;
     background: var(--card);
     border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
     overflow-y: auto;
     flex-shrink: 0;
-    transition: transform 0.3s ease;
+    transition: width 0.2s ease;
     position: relative;
+    order: 2;  /* Second: Sources (between chat and outline) */
 }
 
 /* Show sources panel when user is authenticated */
 #sources-panel.visible {
-    display: block;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Collapsed state - thin vertical bar */
+#sources-panel.collapsed {
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    overflow: hidden;
+}
+
+/* Resize handle */
+#sources-panel .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: transparent;
+    cursor: ew-resize;
+    z-index: 10;
+    transition: background-color 0.2s;
+}
+
+#sources-panel .resize-handle:hover {
+    background-color: var(--primary);
+}
+
+#sources-panel .resize-handle:active {
+    background-color: var(--primary);
 }
 
 /* Outline builder - right sidebar */
@@ -80,6 +113,7 @@
     flex-shrink: 0;
     transition: transform 0.3s ease;
     position: relative;
+    order: 3;  /* Third: Outline (rightmost) */
 }
 
 /* Show outline when user is authenticated and has content */
