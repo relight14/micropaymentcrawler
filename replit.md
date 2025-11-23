@@ -31,7 +31,10 @@ The project provides dynamic research services with **simplified Pro Package-onl
   - **Smart Persistence**: Sources stage in-memory without active project, then merge and save when project loads - handles all scenarios (no-project, project reload, cross-project switching)
   - **Mobile Support**: Added 4th tab to mobile navigation (Projects/Chat/Sources/Outline) with proper slide-in behavior
   - **Integration**: Research results now route to Sources panel instead of chat messages, with confirmation messages in chat
-  - **Auto-Visibility**: Sources panel automatically shows `.visible` class when authenticated or when sources are found, mirroring OutlineBuilder pattern
+  - **Auto-Visibility**: Sources panel automatically shows `.visible` class when authenticated (via authStateChanged event) or when sources are found
+  - **Panel Reordering**: Updated layout order to Chat | Sources | Outline (sources positioned between chat and outline) using CSS flex order
+  - **Resizable Panel**: Sources panel supports drag-to-resize with 4px handle, constrained between 200-600px width
+  - **Collapsible Panel**: Toggle button collapses sources to 48px thin bar, maximizing chat space when sources not needed
   - **Production-Ready**: Architect-reviewed implementation with no data loss scenarios, race condition prevention via timer cancellation, and proper auth/project gating
 
 **Previous Changes (2025-11-14):**
