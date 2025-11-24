@@ -1,0 +1,124 @@
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+✨ Enhanced query: 'AI capex spending hyperscalers economic risks US economy investor perspective' → 'AI capex spending hyperscalers economic risks US economy investor perspective United States'
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+🚫 Excluding 28 blocked domains (social media, UGC, low-quality)
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+🔍 [ANALYZE] Crawler instance ID: 140118786913616, cache entries: 0
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+{"time":"2025-11-24 19:20:22,881", "level":"WARNING", "name":"app.api.routes.research", "message":"⚠️ Failed to save query to project: name 'Config' is not defined"}
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+Final query for search: 'AI capex spending hyperscalers economic risks US economy investor perspective'
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+🌐 Calling Tavily API - Query: 'AI capex spending hyperscalers economic risks US economy investor perspective United States', Max Results: 30, Domains: None
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+Progressive Tavily generation error: name 'raw_results' is not defined
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+❌ CACHE MISS for query: 'AI capex spending hyperscalers economic risks US economy investor perspective' - Will call Tavily API
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+Enhanced: AI capex spending hyperscalers economic risks US economy investor perspective United States
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+✅ Claude relevance filtering: 22 → 15 results
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+Original: AI capex spending hyperscalers economic risks US economy investor perspective
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+✅ Query optimized: 'AI capex spending economic risks latest' → 'AI capex spending hyperscalers economic risks US economy investor perspective'
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+✅ Claude API response received
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+📡 Calling Claude API for query optimization...
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+📡 Calling Claude API for relevance filtering...
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+📦 Current cache size: 0 entries
+2025-11-24 12:20:22.88
+cb45b9a0
+User
+INFO: 35.222.136.131:0 - "POST /api/research/analyze HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/mobile-navigation.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 35.222.136.131:0 - "GET /static/styles/components/header.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/sources-panel.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/modals.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/project-sidebar.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/projects-dropdown.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.37
+cb45b9a0
+User
+INFO: 35.222.136.131:0 - "GET /static/styles/components/toast.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.39
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/source-card.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.39
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/outline-builder.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.39
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/messages.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.39
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/tier-selection.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.40
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/styles/components/research-results.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.40
+cb45b9a0
+User
+INFO: 104.154.217.247:0 - "GET /static/styles/layout/chat-layout.css HTTP/1.1" 200 OK
+2025-11-24 12:21:11.40
+cb45b9a0
+User
+INFO: 34.172.232.11:0 - "GET /static/chat-style.css HTTP/1.1" 200 OK
