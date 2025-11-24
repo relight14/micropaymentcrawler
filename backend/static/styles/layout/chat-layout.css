@@ -43,13 +43,12 @@
 /* Sources panel - left side */
 #sources-panel {
     display: none;  /* Hidden by default when user not authenticated */
-    width: 320px;
+    flex: 0 0 320px;  /* Use flex-basis for reliable sizing */
     min-width: 200px;
     max-width: 600px;
     background: var(--card);
     border-right: 1px solid var(--border);
     overflow-y: auto;
-    flex-shrink: 0;
     transition: width 0.2s ease;
     position: relative;
     order: 1;  /* First: Sources (leftmost) */

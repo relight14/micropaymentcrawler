@@ -1,0 +1,63 @@
+/* patch: ensure resize direction is correct and collapse toggles set a class/width */
+
+    /**
+     * Start resize drag
+     */
+    startResize(e) {
+        this.isResizing = true;
+        this.startX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
+        this.startWidth = this.container.getBoundingClientRect().width;
+        // capture pointer events on document
+        document.addEventListener('mousemove', this.handleResize, { passive: true });
+        document.addEventListener('mouseup', this.stopResize, { passive: true });
+        // support pointer events if available
+        document.addEventListener('pointermove', this.handleResize, { passive: true });
+        document.addEventListener('pointerup', this.stopResize, { passive: true });
+    }
+
+    /**
+     * Handle resize drag
+     */
+    handleResize = (e) => {
+        if (!this.isResizing) return;
+
+        // CORRECTED: compute delta as currentX - startX so dragging right increases width
+        const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
+        const delta = clientX - this.startX;
+        const newWidth = this.startWidth + delta;
+
+        // Constrain to min/max width (200px - 600px)
+        const constrainedWidth = Math.max(200, Math.min(600, newWidth));
+        this.container.style.width = `${constrainedWidth}px`;
+    }
+
+    /**
+     * Stop resize drag
+     */
+    stopResize = () => {
+        this.isResizing = false;
+        document.removeEventListener('mousemove', this.handleResize);
+        document.removeEventListener('mouseup', this.stopResize);
+        document.removeEventListener('pointermove', this.handleResize);
+        document.removeEventListener('pointerup', this.stopResize);
+    }
+
+    /**
+     * Toggle collapse/expand state
+     */
+    toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed;
+
+        if (this.isCollapsed) {
+            this.container.classList.add('collapsed');
+            // set a small collapsed width so layout reserves a slot
+            this.container.style.width = '48px';
+        } else {
+            this.container.classList.remove('collapsed');
+            // restore to default or remove inline width to allow CSS/defaults
+            this.container.style.width = '';
+        }
+
+        // Re-render or update UI (header shows different icon)
+        this.render();
+    }

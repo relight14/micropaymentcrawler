@@ -1,0 +1,84 @@
+Short summary of what I traced and why the Sources panel is misbehaving
+
+The SourcesPanel component is mounted into an element with id="sources-panel" (backend/static/js/components/sources-panel.js). The component renders its own innerHTML, toggles a visible class, and implements collapse + drag-resize behavior.
+
+The CSS for the panel lives in backend/static/styles/components/sources-panel.css and sets .sources-panel { height: 100%; overflow: hidden; }.
+
+Two key problems I found that will produce the symptoms you described (panel hidden / mis-sized / collapsing unexpectedly / not draggable):
+
+Parent-height/layout problem: the panel CSS uses height:100%, but the parent container that should size the layout (the main content wrapper below the header) does not appear to guarantee a fixed height (calc(100vh - header)). When the parent has no explicit height, children with height:100% collapse to zero. That makes the left panel look “missing” or collapsed even though it’s present in the DOM.
+
+Resize sign bug and collapse behavior:
+
+In sources-panel.js, handleResize computes delta as startX - e.clientX and then sets newWidth = startWidth + delta. That inverts the direction of width changes (dragging to the right can shrink width). This causes surprising or broken resizing behavior.
+The component’s render writes an innerHTML snapshot and expects toggle listeners to be attached afterwards. If toggleCollapse doesn’t set a collapsed class or set a small width, the panel visually disappears but the rest of the layout may not respect the intended widths.
+The outline builder hides itself (outline-builder.js removes content when unauthenticated). If outline is hidden (or removed) the right column may be absent and flex behavior may shift things unexpectedly — so make sure the main layout is 3-column flex and each column can still reserve space when hidden (or use a collapsed placeholder).
+Secondary items to check (these amplify the UI issues):
+
+Ensure the sources-panel element exists inside the same main layout wrapper as chat & outline (siblings). If it’s appended elsewhere (or outside the layout), flex rules won’t apply and you'll get alignment issues.
+Confirm the sources-panel stylesheet is loaded (network tab). If the markup is present but class names or rules changed, styles won’t apply.
+Confirm that the code binds toggle/resize listeners after render (render sets innerHTML — listeners must be attached after that).
+Concrete fixes (minimal, targeted changes) — exact patches you can drop in
+
+Fix the resize direction bug and add robust collapse toggling in sources-panel.js
+Change the delta sign (use e.clientX - this.startX) and implement toggleCollapse to add/remove a 'collapsed' class and set a sane collapsed width.
+
+backend/static/js/components/sources-panel.js
+/* patch: ensure resize direction is correct and collapse toggles set a class/width */
+
+    /**
+     * Start resize drag
+     */
+    startResize(e) {
+Why this helps
+
+Dragging right now increases width as expected; left decreases. Stop/remove listeners properly to avoid stale handlers.
+toggleCollapse uses a collapsed class + inline width so the layout never collapses to 0 (prevents main chat from taking over unexpectedly).
+Add defensive panel / layout CSS so the left panel is placed and visible (and collapsible) within a three-column flex layout
+Ensure your main content wrapper (the element that sits below the header) uses a flex layout and a fixed height (so children using height:100% get a real height).
+Add/adjust the SourcesPanel CSS: set default width, a collapsed class, and .visible behavior.
+
+backend/static/styles/components/sources-panel.css
+/* additions / adjustments for reliable layout */
+
+.sources-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 280px; /* fixed-ish left column by default */
+Also ensure the main layout wrapper is a flex row with explicit height:
+
+
+backend/static/styles/layout.css
+/* New / ensure existence of layout rules for header + three-column layout */
+
+:root {
+  --header-height: 64px;
+}
+
+Why this helps
+
+A fixed container height ensures .sources-panel { height:100% } produces usable height (not zero).
+Using flex layout with explicit flex for left / center / right guarantees the three-column arrangement and predictable resizing.
+Verify event binding timing and render side-effects
+sources-panel.render assigns innerHTML each render. Make sure event listeners for the collapse toggle and resize handle are attached after render completes (I saw comments in the file — verify they actually run and bind to the elements returned by getElementById / querySelector).
+If you replace the whole #sources-panel element at any point, reattach event listeners (or attach via event delegation on a stable ancestor).
+If outline-builder hides itself by removing innerHTML when unauthenticated (outline-builder.js does that), make sure the main layout still reserves the right column (use a collapsed placeholder) so center and left don't reflow unexpectedly.
+What to look for while verifying in the browser (quick checklist)
+
+DOM structure: header + #main-content (parent) with three children: #sources-panel, #chat-panel, #outline-panel. If sources-panel is not a sibling, fix where it’s inserted.
+Computed styles: select #sources-panel and verify width, height, display, flex-basis and parent height. If height is 0, inspect parent for missing height.
+Console: any JS errors during init/render can abort the code that attaches toggle/resize handlers — fix those errors first.
+Drag test: open DevTools, set a breakpoint inside handleResize and test dragging — confirm the delta is positive when dragging right.
+Collapse test: click the collapse toggle — do you see class 'collapsed' added? Does panel size change but remain visible as a narrow bar?
+Evidence / pointers from the code I used while tracing
+
+sources-panel.mount and render flow, and the existence of startResize/handleResize (backend/static/js/components/sources-panel.js).
+CSS uses height:100% for .sources-panel (backend/static/styles/components/sources-panel.css) — that needs a parent height to work.
+outline-builder hides itself when unauthenticated by removing innerHTML (backend/static/js/components/outline-builder.js: render()) — that can change layout if not handled in CSS.
+app.js wires search results to the panel (this.sourcesPanel.handleNewSources) so the panel will get content but must be visible and sized correctly to show it.
+If you apply the three targeted changes above you should immediately see:
+
+predictable left panel width and drag behavior,
+collapse/expand that keeps a visible bar rather than removing the column entirely,
+three-column layout below the header (left sources, center chat, right outline) with the chat occupying the center space.
+If anything in your actual DOM or class names differs from the IDs/classes I referenced (e.g., main content wrapper id, header id, or the exact CSS filenames), adjust the selectors above to match.

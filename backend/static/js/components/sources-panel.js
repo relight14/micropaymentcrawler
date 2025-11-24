@@ -387,8 +387,12 @@ export class SourcesPanel {
         
         if (this.isCollapsed) {
             this.container.classList.add('collapsed');
+            // Set inline width to prevent zero-width collapse
+            this.container.style.width = '48px';
         } else {
             this.container.classList.remove('collapsed');
+            // Restore to default width (remove inline style to allow CSS/defaults)
+            this.container.style.width = '';
         }
         
         this.render();
@@ -416,7 +420,8 @@ export class SourcesPanel {
     handleResize = (e) => {
         if (!this.isResizing) return;
         
-        const delta = this.startX - e.clientX;  // Reversed because we're sizing from right edge
+        // FIXED: delta should be currentX - startX so dragging right increases width
+        const delta = e.clientX - this.startX;
         const newWidth = this.startWidth + delta;
         
         // Constrain to min/max width (200px - 600px)
