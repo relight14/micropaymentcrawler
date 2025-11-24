@@ -13,8 +13,9 @@
  */
 
 class SourceCard {
-    constructor(appState) {
+    constructor(appState, projectStore = null) {
         this.appState = appState;
+        this.projectStore = projectStore;
         this.eventListeners = new Map(); // Track listeners for cleanup
         
         // Bind enrichment handler for proper cleanup
@@ -906,6 +907,13 @@ class SourceCard {
             if (this.appState?.removeSelectedSource) {
                 this.appState.removeSelectedSource(source.id);
             }
+        }
+
+        // CRITICAL: Sync to ProjectStore so OutlineBuilder receives the update
+        if (this.projectStore && this.appState) {
+            const selectedSources = this.appState.getSelectedSources();
+            this.projectStore.setSelectedSources(selectedSources);
+            console.log(`[SourceCard] Synced to ProjectStore: ${selectedSources.length} selected sources`);
         }
 
         // Dispatch custom event for other components

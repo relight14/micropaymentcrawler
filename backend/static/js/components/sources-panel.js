@@ -334,7 +334,7 @@ export class SourcesPanel {
         // Render source cards (if not collapsed)
         if (!this.isCollapsed && sourcesData.length > 0) {
             const sourcesList = document.getElementById('sources-list');
-            const sourceCardFactory = window.SourceCard ? new window.SourceCard(this.appState) : null;
+            const sourceCardFactory = window.SourceCard ? new window.SourceCard(this.appState, this.projectStore) : null;
             
             if (!sourceCardFactory) {
                 console.error('❌ SourceCard component not available');
