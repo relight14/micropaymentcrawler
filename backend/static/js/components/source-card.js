@@ -717,7 +717,10 @@ class SourceCard {
         
         // Create stable event handler
         const changeHandler = (e) => {
+            console.log(`☑️ [CHECKBOX] Change event fired for source: ${source.id}`);
+            console.log(`☑️ [CHECKBOX] New checked state: ${e.target.checked}`);
             const cardElement = e.target.closest('[data-source-id]');
+            console.log(`☑️ [CHECKBOX] Card element found:`, !!cardElement);
             this._handleSelectionChange(source, e.target.checked, cardElement);
         };
         
@@ -879,41 +882,61 @@ class SourceCard {
      * @param cardElement - The card element (passed from event handler to avoid global queries)
      */
     _handleSelectionChange(source, isSelected, cardElement = null) {
+        console.log(`🔄 [SELECTION CHANGE] Starting for source: ${source?.id}, isSelected: ${isSelected}`);
+        
         if (!source || !source.id) {
-            console.error('Invalid source in selection change:', source);
+            console.error('❌ [SELECTION CHANGE] Invalid source in selection change:', source);
             return;
         }
         
         // Use passed cardElement or fallback to query (for backwards compatibility)
         const sourceCard = cardElement || document.querySelector(`[data-source-id="${source.id}"]`);
+        console.log(`🔄 [SELECTION CHANGE] Source card element:`, !!sourceCard);
         
         if (isSelected) {
+            console.log(`✅ [SELECTION CHANGE] Adding source to selection...`);
             if (sourceCard) {
                 sourceCard.classList.add('selected');
                 // Update outline button state
                 this._updateOutlineButtonState(sourceCard, true);
+                console.log(`✅ [SELECTION CHANGE] Updated card UI (selected)`);
             }
             // Use appState as single source of truth
             if (this.appState?.toggleSourceSelection) {
                 this.appState.toggleSourceSelection(source.id, source);
+                console.log(`✅ [SELECTION CHANGE] Added to AppState`);
+            } else {
+                console.error(`❌ [SELECTION CHANGE] AppState.toggleSourceSelection not available!`);
             }
         } else {
+            console.log(`➖ [SELECTION CHANGE] Removing source from selection...`);
             if (sourceCard) {
                 sourceCard.classList.remove('selected');
                 // Update outline button state
                 this._updateOutlineButtonState(sourceCard, false);
+                console.log(`✅ [SELECTION CHANGE] Updated card UI (deselected)`);
             }
             // Remove from appState
             if (this.appState?.removeSelectedSource) {
                 this.appState.removeSelectedSource(source.id);
+                console.log(`✅ [SELECTION CHANGE] Removed from AppState`);
+            } else {
+                console.error(`❌ [SELECTION CHANGE] AppState.removeSelectedSource not available!`);
             }
         }
 
         // CRITICAL: Sync to ProjectStore so OutlineBuilder receives the update
         if (this.projectStore && this.appState) {
             const selectedSources = this.appState.getSelectedSources();
+            console.log(`🔗 [SELECTION CHANGE] Syncing to ProjectStore...`);
+            console.log(`🔗 [SELECTION CHANGE] Current AppState selections:`, selectedSources);
             this.projectStore.setSelectedSources(selectedSources);
-            console.log(`[SourceCard] Synced to ProjectStore: ${selectedSources.length} selected sources`);
+            console.log(`✅ [SELECTION CHANGE] Synced to ProjectStore: ${selectedSources.length} selected sources`);
+        } else {
+            console.error(`❌ [SELECTION CHANGE] Cannot sync to ProjectStore!`, {
+                hasProjectStore: !!this.projectStore,
+                hasAppState: !!this.appState
+            });
         }
 
         // Dispatch custom event for other components
@@ -925,6 +948,7 @@ class SourceCard {
             }
         });
         document.dispatchEvent(event);
+        console.log(`✅ [SELECTION CHANGE] Dispatched sourceSelectionChanged event`);
     }
     
     /**
@@ -1184,14 +1208,31 @@ class SourceCard {
      * Handle adding source to outline - just click the checkbox
      */
     _handleAddToOutline(sourceId, buttonElement) {
+        console.log(`📋 [ADD TO OUTLINE] Button clicked for source: ${sourceId}`);
+        console.log(`📋 [ADD TO OUTLINE] Button element:`, buttonElement);
+        
         // Find the checkbox and click it - let existing logic handle everything
         const cardElement = buttonElement.closest('[data-source-id]');
-        if (!cardElement) return;
+        if (!cardElement) {
+            console.error(`❌ [ADD TO OUTLINE] Could not find card element for source: ${sourceId}`);
+            return;
+        }
+        
+        console.log(`📋 [ADD TO OUTLINE] Found card element:`, cardElement);
         
         const checkbox = cardElement.querySelector('.source-selection-checkbox');
-        if (checkbox) {
-            checkbox.click();
+        if (!checkbox) {
+            console.error(`❌ [ADD TO OUTLINE] Could not find checkbox for source: ${sourceId}`);
+            return;
         }
+        
+        console.log(`📋 [ADD TO OUTLINE] Found checkbox:`, checkbox);
+        console.log(`📋 [ADD TO OUTLINE] Current checkbox state: ${checkbox.checked}`);
+        console.log(`📋 [ADD TO OUTLINE] Clicking checkbox to toggle state...`);
+        
+        checkbox.click();
+        
+        console.log(`📋 [ADD TO OUTLINE] Checkbox clicked! New state: ${checkbox.checked}`);
     }
 
     /**
