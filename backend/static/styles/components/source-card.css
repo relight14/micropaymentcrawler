@@ -20,6 +20,35 @@
     animation: fadeIn 0.4s ease-out;
 }
 
+/* Dismiss button positioned at top-right */
+.source-dismiss-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+    opacity: 0.6;
+}
+
+.source-dismiss-btn:hover {
+    background: var(--destructive);
+    color: white;
+    opacity: 1;
+}
+
+.source-dismiss-btn svg {
+    display: block;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -165,6 +194,7 @@
     transition: all 0.2s ease !important;
     position: relative !important;
     font-family: 'Montserrat', var(--font-sans, sans-serif) !important;
+    min-height: 85px; /* More height to accommodate actions below title */
 }
 
 .source-card.filtered-hidden {
@@ -191,18 +221,28 @@
 }
 
 /* =============================================================================
-   COMPACT LAYOUT
+   COMPACT LAYOUT (REORGANIZED)
    ============================================================================= */
 
 .source-card-compact {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+}
+
+/* Top row: Checkbox + Content */
+.source-card-top-row {
+    display: flex;
+    align-items: flex-start;
     gap: 12px;
+    padding-right: 24px; /* Space for dismiss button */
 }
 
 /* Checkbox */
 .source-checkbox-compact {
     flex-shrink: 0;
+    padding-top: 2px; /* Align with title baseline */
 }
 
 .source-selection-checkbox {
@@ -304,14 +344,15 @@
 }
 
 /* =============================================================================
-   ICON-ONLY ACTIONS
+   ICON-ONLY ACTIONS (Below title/metadata)
    ============================================================================= */
 
 .source-icon-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
+    padding-left: 30px; /* Align with content (checkbox width + gap) */
+    margin-top: 4px;
 }
 
 .icon-action-btn {
@@ -339,10 +380,10 @@
     display: block;
 }
 
-.icon-action-btn.star-btn:hover {
-    background: #fef3c7;
-    border-color: #fbbf24;
-    color: #d97706;
+.icon-action-btn.unlock-icon-btn:hover {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    color: #2563eb;
 }
 
 /* =============================================================================

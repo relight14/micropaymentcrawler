@@ -42,6 +42,11 @@ export class SourcesPanel {
             this.handleNewSources(e.detail.sources);
         });
         
+        // Listen for source dismissal events
+        document.addEventListener('sourceDismissed', (e) => {
+            this.handleSourceDismissed(e.detail.sourceId);
+        });
+        
         this.render();
         console.log('✅ [SourcesPanel] Initialized');
     }
@@ -159,6 +164,33 @@ export class SourcesPanel {
         // Re-render to show sources in panel
         // Visibility is controlled by render() based on currentProjectId, not source count
         this.render();
+    }
+    
+    /**
+     * Handle source dismissal
+     */
+    handleSourceDismissed(sourceId) {
+        console.log(`🗑️ [SourcesPanel] handleSourceDismissed called for:`, sourceId);
+        
+        // Remove source from array (normalize ID comparison to handle string vs numeric)
+        const initialCount = this.sources.length;
+        this.sources = this.sources.filter(s => {
+            const id = s.source_data?.id || s.id;
+            return String(id) !== String(sourceId);
+        });
+        
+        const removed = initialCount - this.sources.length;
+        console.log(`📚 [SourcesPanel] Removed ${removed} source(s). Remaining: ${this.sources.length}`);
+        
+        // Update ProjectStore
+        const sourcesData = this.sources.map(s => s.source_data || s);
+        this.projectStore.setSources(sourcesData);
+        
+        // Re-render panel to update header counts and UI
+        this.render();
+        
+        // Save to backend
+        this.debouncedSave();
     }
     
     /**

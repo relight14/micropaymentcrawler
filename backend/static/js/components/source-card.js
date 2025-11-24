@@ -105,6 +105,9 @@ class SourceCard {
             } else if (action === 'summarize') {
                 e.preventDefault();
                 this._handleSummarize(sourceId, actionBtn);
+            } else if (action === 'dismiss') {
+                e.preventDefault();
+                this._handleDismiss(sourceId, sourceCard);
             }
             // view-external opens naturally via href, no handler needed
         };
@@ -125,10 +128,18 @@ class SourceCard {
         const container = document.createElement('div');
         container.className = 'source-card-compact';
         
+        // Top-right: Dismiss button
+        const dismissBtn = this._createDismissButton();
+        container.appendChild(dismissBtn);
+        
+        // Top row: Checkbox + Content (title + metadata)
+        const topRow = document.createElement('div');
+        topRow.className = 'source-card-top-row';
+        
         // Left: Checkbox
         if (showCheckbox) {
             const checkbox = this._createCompactCheckbox(source);
-            container.appendChild(checkbox);
+            topRow.appendChild(checkbox);
         }
         
         // Middle: Content (title + metadata)
@@ -143,15 +154,32 @@ class SourceCard {
         
         content.appendChild(title);
         content.appendChild(metadata);
-        container.appendChild(content);
+        topRow.appendChild(content);
         
-        // Right: Icon-only action buttons
+        container.appendChild(topRow);
+        
+        // Bottom row: Icon-only action buttons (below title/metadata)
         if (showActions) {
             const actions = this._createIconActions(source);
             container.appendChild(actions);
         }
         
         return container;
+    }
+    
+    /**
+     * Create dismiss button (X) for removing source from panel
+     */
+    _createDismissButton() {
+        const btn = document.createElement('button');
+        btn.className = 'source-dismiss-btn';
+        btn.setAttribute('data-action', 'dismiss');
+        btn.setAttribute('title', 'Remove source');
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>`;
+        return btn;
     }
     
     /**
@@ -1091,6 +1119,31 @@ class SourceCard {
         } catch (error) {
             console.error('✨ SUMMARIZE: ERROR in _handleSummarize:', error);
         }
+    }
+
+    /**
+     * Handle source dismissal (removal from panel)
+     */
+    _handleDismiss(sourceId, cardElement) {
+        console.log('🗑️ DISMISS: Removing source:', sourceId);
+        
+        // Fade out animation
+        cardElement.style.opacity = '0';
+        cardElement.style.transform = 'translateX(-20px)';
+        cardElement.style.transition = 'opacity 0.2s, transform 0.2s';
+        
+        setTimeout(() => {
+            // Remove from DOM
+            cardElement.remove();
+            
+            // Dispatch event so SourcesPanel can update its state
+            const event = new CustomEvent('sourceDismissed', {
+                detail: { sourceId }
+            });
+            document.dispatchEvent(event);
+            
+            console.log('✅ DISMISS: Source removed from panel');
+        }, 200);
     }
 
     /**
