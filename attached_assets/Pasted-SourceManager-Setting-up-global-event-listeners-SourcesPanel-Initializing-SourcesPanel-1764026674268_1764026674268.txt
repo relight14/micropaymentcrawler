@@ -1,0 +1,163 @@
+SourceManager: Setting up global event listeners
+ 📚 [SourcesPanel] Initializing...
+ ✅ [SourcesPanel] Initialized
+ 📱 [MobileNav] updatePanelVisibility() called Object
+ 📱 [MobileNav] DOM elements check: Object
+ 📱 [MobileNav] Showing Chat panel (default)
+ Updating profile UI: Object
+ Set initials to: RI
+ Set balance to: 4.2
+ Setting up profile dropdown: Object
+ 📦 ProjectsController: Attaching with dependencies...
+ 📦 ProjectsController: Event listeners set up
+ 🔧 [ProjectListSidebar] init() called Object
+ 🔧 [ProjectListSidebar] User authenticated - skipping render (will load via loadInitialData)
+ ✅ OutlineBuilder persistent listeners initialized via delegation
+ 📋 [ProjectManager] Loading projects...
+ 🔧 [ProjectListSidebar] render() called Object
+ ✅ [ProjectManager] Projects loaded successfully
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ [Sync] Cleared selected sources from ProjectStore (logout)
+ 📚 [SourcesPanel] setProject called: Object
+ 📚 [SourcesPanel] No projectId, clearing sources
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ 📦 ProjectsController: ProjectManager initialized
+ ✅ [ProjectsDropdown] Initialized
+ 📂 [ProjectsDropdown] Opened
+ 🔄 [ProjectSidebar] Loading project 84... Object
+ 🔧 [ProjectListSidebar] render() called Object
+ 📊 Project count updated: 8
+ ⚡ [ProjectManager] Project loading started immediately: Object
+ ⚡ AppEvents: Project loading started Object
+ Sources selected: 0
+ Report builder display updated
+ ✅ [ProjectSidebar] Project data loaded: Object
+ [Analytics] project_loaded Object
+ 📊 [ProjectManager] Handling project switch: Object
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 0 from outline + 0 incoming = 0 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ ℹ️  [ProjectManager] Project has no saved research query
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 8 from outline + 8 incoming = 8 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ [Sync] Loaded 8 sources from outline to ProjectStore
+ 📚 [SourcesPanel] setProject called: Object
+ 📚 [SourcesPanel] loadSources called: Object
+ 📡 [SourcesPanel] Fetching sources from /api/projects/84/sources
+ 📨 [ProjectManager] Loading messages for project 84...
+ 📡 [SourcesPanel] API response: Object
+ 🏪 [ProjectStore] setState called: Object
+ 🏪 [ProjectStore] Notifying subscriber 1/1
+ [OutlineBuilder] Merged sources: 8 from outline + 8 incoming = 8 total, 0 truly new
+ ✅ [ProjectStore] Notified 1 subscribers
+ ✅ [SourcesPanel] Loaded 15 sources for project 84
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: c86c8d31-06ce-445c-ab5a-cf87d0b8ac59
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'c86c8d31-06ce-445c-ab5a-cf87d0b8ac59'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: c86c8d31-06ce-445c-ab5a-cf87d0b8ac59
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 93b3e11b-501e-4e47-abdc-7ee795e32272
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '93b3e11b-501e-4e47-abdc-7ee795e32272'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 93b3e11b-501e-4e47-abdc-7ee795e32272
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 8a924044-6591-45ed-958a-6675124bf26f
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '8a924044-6591-45ed-958a-6675124bf26f'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 8a924044-6591-45ed-958a-6675124bf26f
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 3ddd0c3b-c42b-4803-84ff-c38279f96749
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '3ddd0c3b-c42b-4803-84ff-c38279f96749'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 3ddd0c3b-c42b-4803-84ff-c38279f96749
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: aface6a5-693a-40ca-91bf-4294d9e19356
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'aface6a5-693a-40ca-91bf-4294d9e19356'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: aface6a5-693a-40ca-91bf-4294d9e19356
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 63705712-0d3c-4354-b770-47944ec40d22
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '63705712-0d3c-4354-b770-47944ec40d22'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 63705712-0d3c-4354-b770-47944ec40d22
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: aece5f11-329b-4dd2-9d63-f61039ecde5a
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'aece5f11-329b-4dd2-9d63-f61039ecde5a'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: aece5f11-329b-4dd2-9d63-f61039ecde5a
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 88e63d20-aa55-4f57-a796-a09593e03701
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '88e63d20-aa55-4f57-a796-a09593e03701'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 88e63d20-aa55-4f57-a796-a09593e03701
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: bc83cc70-f7ab-45f3-955e-637b47eaafd1
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'bc83cc70-f7ab-45f3-955e-637b47eaafd1'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: bc83cc70-f7ab-45f3-955e-637b47eaafd1
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 2fefef08-5236-423a-919b-8142e7e43f63
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '2fefef08-5236-423a-919b-8142e7e43f63'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 2fefef08-5236-423a-919b-8142e7e43f63
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: de6f55af-2a4f-410a-bc64-592ae496fb69
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'de6f55af-2a4f-410a-bc64-592ae496fb69'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: de6f55af-2a4f-410a-bc64-592ae496fb69
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 580f3a62-cdc0-4289-96e8-589f12ab596f
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '580f3a62-cdc0-4289-96e8-589f12ab596f'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 580f3a62-cdc0-4289-96e8-589f12ab596f
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: f671e17f-466b-415c-882a-3d7d07f167bf
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'f671e17f-466b-415c-882a-3d7d07f167bf'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: f671e17f-466b-415c-882a-3d7d07f167bf
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: 0d0f8031-6f5e-47af-a6f1-4501870b6043
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID '0d0f8031-6f5e-47af-a6f1-4501870b6043'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: 0d0f8031-6f5e-47af-a6f1-4501870b6043
+ 🎨 SOURCE CARD: create() called for source: Object
+ 🎨 SOURCE CARD: options: Object
+ ✅ SOURCE CARD: Creating card for source ID: dd7cf138-a51b-4622-9a30-266fe098e5f7
+ 🎨 SOURCE CARD: Creating main card container...
+ ✅ SOURCE CARD: Main container created with class 'source-card' and ID 'dd7cf138-a51b-4622-9a30-266fe098e5f7'
+ 🎯 EVENT DELEGATION: Attached single click handler to card: dd7cf138-a51b-4622-9a30-266fe098e5f7
+ 📬 [ProjectManager] Fetched 9 messages
+ ✅ [ProjectManager] Loaded and displayed 9 messages
+ 📁 [ProjectsDropdown] Closed
