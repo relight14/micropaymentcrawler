@@ -40,7 +40,8 @@ export class ProjectsController {
             authService: deps.authService,
             toastManager: deps.toastManager,
             messageCoordinator: deps.messageCoordinator,
-            appState: deps.appState
+            appState: deps.appState,
+            sourcesPanel: deps.sourcesPanel  // Pass sourcesPanel for project lifecycle management
         });
         
         // Set up all event listeners

@@ -11,12 +11,13 @@ import { analytics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
 
 export class ProjectManager {
-    constructor({ apiService, authService, toastManager, messageCoordinator, appState }) {
+    constructor({ apiService, authService, toastManager, messageCoordinator, appState, sourcesPanel }) {
         this.apiService = apiService;
         this.authService = authService;
         this.toastManager = toastManager;
         this.messageCoordinator = messageCoordinator;
         this.appState = appState;
+        this.sourcesPanel = sourcesPanel;  // Accept sourcesPanel instance
         
         // Create component instances
         this.sidebar = new ProjectListSidebar({ apiService, authService, toastManager });
@@ -362,6 +363,7 @@ export class ProjectManager {
             // Don't auto-load any project - start with fresh chat
             // User can manually select a project or start a new one
             this.outlineBuilder.setProject(null, null);
+            if (this.sourcesPanel) this.sourcesPanel.setProject(null, null);
             projectStore.setActiveProject(null);
             
             // Clear any stale conversation history from sessionStorage
@@ -396,6 +398,7 @@ export class ProjectManager {
             this.appState.clearConversation();
             projectStore.setOutline(projectStore.getDefaultOutline());
             this.outlineBuilder.setProject(project.id, { outline: [] });
+            if (this.sourcesPanel) this.sourcesPanel.setProject(project.id, project);
         } else {
             logger.info(`💾 [ProjectManager] Preserving conversation for login migration (preserveConversation: true)`);
             // For login migration, skip outline setup - loadProject() will fetch full data
@@ -454,8 +457,9 @@ export class ProjectManager {
             logger.info(`ℹ️  [ProjectManager] Project has no saved research query`);
         }
         
-        // Update outline builder
+        // Update outline builder and sources panel
         this.outlineBuilder.setProject(projectData.id, projectData);
+        if (this.sourcesPanel) this.sourcesPanel.setProject(projectData.id, projectData);
         
         // Reset auto-creation flag so user can auto-create another project later
         this.hasAutoCreatedProject = false;
@@ -627,6 +631,7 @@ export class ProjectManager {
                 // No projects left - clear everything
                 projectStore.setActiveProject(null);
                 this.outlineBuilder.setProject(null, null);
+                if (this.sourcesPanel) this.sourcesPanel.setProject(null, null);
                 this.appState.clearConversation();
                 this.clearChatInterface();
             }
@@ -647,6 +652,7 @@ export class ProjectManager {
         this.sidebar.activeProjectId = null;
         this.sidebar.render();
         this.outlineBuilder.setProject(null, null);
+        if (this.sourcesPanel) this.sourcesPanel.setProject(null, null);
         this.hasAutoCreatedProject = false;
         this.hasMigratedLoginChat = false; // Reset migration flag for next login
         

@@ -423,6 +423,7 @@ export class ChatResearchApp {
                 reportBuilder: this.reportBuilder,
                 sourceManager: this.sourceManager,
                 messageCoordinator: this.messageCoordinator,
+                sourcesPanel: this.sourcesPanel,  // Pass sourcesPanel for project lifecycle management
                 addMessageCallback: (sender, content, metadata) => this.addMessage(sender, content, metadata),
                 hideWelcomeCallback: () => this.hideWelcomeScreen()
             });
