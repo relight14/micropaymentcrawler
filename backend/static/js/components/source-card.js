@@ -1173,32 +1173,17 @@ class SourceCard {
     }
 
     /**
-     * Handle adding source to outline
+     * Handle adding source to outline - just click the checkbox
      */
     _handleAddToOutline(sourceId, buttonElement) {
-        console.log('📋 ADD TO OUTLINE: Button clicked for source:', sourceId);
-        
-        // Find the card element from the button (safer than document.querySelector)
+        // Find the checkbox and click it - let existing logic handle everything
         const cardElement = buttonElement.closest('[data-source-id]');
-        if (!cardElement) {
-            console.error('📋 ADD TO OUTLINE: Card not found for button');
-            return;
-        }
+        if (!cardElement) return;
         
         const checkbox = cardElement.querySelector('.source-selection-checkbox');
-        if (!checkbox) {
-            console.error('📋 ADD TO OUTLINE: Checkbox not found in card');
-            return;
+        if (checkbox) {
+            checkbox.click();
         }
-        
-        // Toggle checkbox (this will trigger _handleSelectionChange which updates button state)
-        checkbox.checked = !checkbox.checked;
-        
-        // Dispatch change event to trigger selection handlers
-        const changeEvent = new Event('change', { bubbles: true });
-        checkbox.dispatchEvent(changeEvent);
-        
-        console.log('✅ ADD TO OUTLINE: Source selection toggled:', checkbox.checked);
     }
 
     /**
