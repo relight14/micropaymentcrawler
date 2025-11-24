@@ -84,7 +84,7 @@
     right: 0;
     top: 0;
     bottom: 0;
-    width: 4px;
+    width: 12px;  /* Increased from 4px for easier grabbing */
     background: transparent;
     cursor: ew-resize;
     z-index: 10;
