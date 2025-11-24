@@ -79,12 +79,20 @@ export class OutlineBuilder extends EventTarget {
                 return;
             }
 
-            // Remove source buttons
+            // Remove source buttons (from sections)
             const removeSourceTarget = e.target.closest('.remove-source-btn');
             if (removeSourceTarget) {
                 const sectionIndex = parseInt(removeSourceTarget.dataset.sectionIndex);
                 const sourceIndex = parseInt(removeSourceTarget.dataset.sourceIndex);
                 this.removeSourceFromSection(sectionIndex, sourceIndex);
+                return;
+            }
+
+            // Remove source chip buttons (from Selected Sources pool)
+            const removeChipTarget = e.target.closest('.remove-chip-btn');
+            if (removeChipTarget) {
+                const sourceId = removeChipTarget.dataset.sourceId;
+                this.removeSourceCompletely(sourceId);
                 return;
             }
         });
@@ -568,6 +576,47 @@ export class OutlineBuilder extends EventTarget {
     }
 
     /**
+     * Remove source completely from Selected Sources pool and all sections
+     */
+    removeSourceCompletely(sourceId) {
+        // Find source for logging
+        const source = this.selectedSources.find(s => s.id === sourceId);
+        const sourceTitle = source ? (source.title || source.url) : sourceId;
+        
+        // Remove from selectedSources array
+        this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
+        
+        // Remove from all sections
+        let removedCount = 0;
+        this.sections.forEach(section => {
+            const initialLength = section.sources.length;
+            section.sources = section.sources.filter(s => s.source_data.id !== sourceId);
+            removedCount += initialLength - section.sources.length;
+            
+            // Re-index remaining sources
+            section.sources.forEach((source, i) => {
+                source.order_index = i;
+            });
+        });
+        
+        // Sync with ProjectStore
+        projectStore.setSelectedSources(this.selectedSources);
+        console.log(`[OutlineBuilder] Removed source "${sourceTitle}" from ${removedCount} section(s)`);
+        
+        // Update UI and save
+        this.render();
+        this.debouncedSave();
+        
+        // Show feedback
+        this.toastManager.show(`Removed source from outline`, 'success');
+
+        analytics.track('outline_source_removed_completely', {
+            project_id: this.currentProjectId,
+            removed_from_sections: removedCount
+        });
+    }
+
+    /**
      * Debounced save to backend with race condition protection
      * Captures project ID and sections snapshot when scheduled
      */
@@ -861,13 +910,14 @@ export class OutlineBuilder extends EventTarget {
                                     <p>No sources selected</p>
                                     <p class="hint">Select sources from the search results to organize them</p>
                                 </div>
-                            ` : this.selectedSources.map(source => `
+                            ` : this.selectedSources.map((source, sourceIdx) => `
                                 <div class="source-chip" 
                                      draggable="true" 
                                      data-source-id="${source.id}"
                                      data-source-json='${JSON.stringify(source).replace(/'/g, "&apos;")}'>
                                     <span class="source-chip-icon">${this.getSourceIcon(source.source_type)}</span>
                                     <span class="source-chip-title">${this.escapeHtml(source.title || source.url)}</span>
+                                    <button class="remove-chip-btn" data-source-id="${source.id}" title="Remove source">✕</button>
                                 </div>
                             `).join('')}
                         </div>
