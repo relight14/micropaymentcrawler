@@ -19,6 +19,7 @@ from schemas.domain import TierType, ResearchPacket, SourceCard
 from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
+from config import Config
 
 router = APIRouter()
 

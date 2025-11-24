@@ -534,8 +534,8 @@ class ContentCrawlerStub:
                 include_domains=domain_filter
             )
             
-            results = response.get('results', [])
-            print(f"📥 Tavily returned {len(results)} results")
+            raw_results = response.get('results', [])
+            print(f"📥 Tavily returned {len(raw_results)} results")
             
             # Step 2.5: Apply Claude relevance filtering to all results using full conversation context
             # Lazy import to avoid circular dependency
@@ -553,7 +553,7 @@ class ContentCrawlerStub:
             
             results = await ai_filter.filter_search_results_by_relevance(
                 query=clean_query,
-                results=results,
+                results=raw_results,
                 publication=publication_name,  # Pass publication if available, None otherwise
                 conversation_context=conversation_context,  # Pass full conversation for context-aware filtering
                 enhanced_context=enhanced_context  # Pass enhanced context with geographic/temporal constraints
