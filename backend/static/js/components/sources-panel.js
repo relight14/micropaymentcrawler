@@ -343,7 +343,7 @@ export class SourcesPanel {
             
             sourcesData.forEach(source => {
                 const card = sourceCardFactory.create(source, {
-                    showCheckbox: false,
+                    showCheckbox: true,
                     showActions: true
                 });
                 sourcesList.appendChild(card);
