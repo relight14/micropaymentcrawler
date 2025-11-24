@@ -71,38 +71,16 @@ class SourceCard {
         sourceCard.setAttribute('data-source-id', source.id);
         sourceCard.setAttribute('data-source-type', source.source_type || 'journalism');
         
-        // Add basic inline styles as fallback
-        sourceCard.style.cssText = `
-            border: 1px solid #ddd; 
-            padding: 16px; 
-            margin: 8px 0; 
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        `;
-        
         console.log(`✅ SOURCE CARD: Main container created with class '${className}' and ID '${source.id}'`);
 
-        // Source header with title and badges
-        const header = this._createHeader(source);
-        sourceCard.appendChild(header);
+        // Compact layout: [Checkbox] Title + Metadata + Actions [Icons]
+        const compactLayout = this._createCompactLayout(source, { showCheckbox, showActions });
+        sourceCard.appendChild(compactLayout);
 
-        // Rating (if available)
-        if (source.rating || source.quality_score || source.relevance_score) {
-            const rating = this._createRating(source);
-            sourceCard.appendChild(rating);
-        }
-
-        // Source excerpt
+        // Source excerpt (hidden by default, shows on hover)
         if (source.excerpt || source.content_preview) {
             const excerpt = this._createExcerpt(source);
             sourceCard.appendChild(excerpt);
-        }
-
-        // Actions section (buttons + checkbox)
-        if (showActions) {
-            const actions = this._createActions(source, { showCheckbox });
-            sourceCard.appendChild(actions);
         }
 
         // Add skeleton loading indicator if enrichment is pending
@@ -136,6 +114,140 @@ class SourceCard {
         console.log('🎯 EVENT DELEGATION: Attached single click handler to card:', source.id);
         
         return sourceCard;
+    }
+    
+    /**
+     * Create compact layout with checkbox, title, metadata, and icon-only actions
+     */
+    _createCompactLayout(source, options = {}) {
+        const { showCheckbox = true, showActions = true } = options;
+        
+        const container = document.createElement('div');
+        container.className = 'source-card-compact';
+        
+        // Left: Checkbox
+        if (showCheckbox) {
+            const checkbox = this._createCompactCheckbox(source);
+            container.appendChild(checkbox);
+        }
+        
+        // Middle: Content (title + metadata)
+        const content = document.createElement('div');
+        content.className = 'source-card-content';
+        
+        const title = document.createElement('h4');
+        title.className = 'source-title';
+        title.textContent = source.title || 'Untitled Source';
+        
+        const metadata = this._createMetadataLine(source);
+        
+        content.appendChild(title);
+        content.appendChild(metadata);
+        container.appendChild(content);
+        
+        // Right: Icon-only action buttons
+        if (showActions) {
+            const actions = this._createIconActions(source);
+            container.appendChild(actions);
+        }
+        
+        return container;
+    }
+    
+    /**
+     * Create single-line metadata: domain • LICENSE • ★ rating
+     */
+    _createMetadataLine(source) {
+        const meta = document.createElement('div');
+        meta.className = 'source-metadata-line';
+        
+        const parts = [];
+        
+        // Domain - safely extract from URL or use provided domain
+        const domain = this._extractDomain(source);
+        if (domain) {
+            parts.push(`<span class="meta-domain">${domain}</span>`);
+        }
+        
+        // License badge text
+        const licenseBadge = this._getLicenseText(source);
+        parts.push(`<span class="meta-license ${licenseBadge.className}" data-license-type="${licenseBadge.className}">${licenseBadge.text}</span>`);
+        
+        // Rating
+        const rating = this._getRatingText(source);
+        if (rating) {
+            parts.push(`<span class="meta-rating">★ ${rating}</span>`);
+        }
+        
+        meta.innerHTML = parts.join(' <span class="meta-separator">•</span> ');
+        
+        return meta;
+    }
+    
+    /**
+     * Safely extract domain from source (handles malformed URLs)
+     */
+    _extractDomain(source) {
+        // If domain is already provided, use it
+        if (source.domain) {
+            return source.domain;
+        }
+        
+        // Try to parse URL safely
+        if (source.url) {
+            try {
+                // Handle absolute URLs
+                if (source.url.startsWith('http://') || source.url.startsWith('https://')) {
+                    return new URL(source.url).hostname;
+                }
+                // Handle URLs without protocol
+                return new URL('https://' + source.url).hostname;
+            } catch (e) {
+                // Fallback to raw URL string if parsing fails
+                return source.url.replace(/^https?:\/\//, '').split('/')[0];
+            }
+        }
+        
+        return '';
+    }
+    
+    /**
+     * Get license text for compact display
+     */
+    _getLicenseText(source) {
+        const protocol = source.licensing_protocol;
+        const cost = source.unlock_price || source.licensing_cost || 0;
+        
+        if (protocol && protocol.toLowerCase() === 'tollbit' && cost > 0) {
+            return { text: 'TOLLBIT', className: 'license-paid' };
+        } else if (protocol && protocol.toLowerCase() === 'rsl') {
+            return { text: 'RSL', className: 'license-demo' };
+        } else if (protocol && protocol.toLowerCase() === 'cloudflare') {
+            return { text: 'CLOUDFLARE', className: 'license-demo' };
+        } else if (cost === 0) {
+            return { text: 'FREE', className: 'license-free' };
+        } else {
+            return { text: 'CHECKING...', className: 'license-loading' };
+        }
+    }
+    
+    /**
+     * Get rating text for compact display
+     */
+    _getRatingText(source) {
+        const rawScore = source.relevance_score || source.rating || source.quality_score;
+        if (!rawScore) return null;
+        
+        let normalizedScore;
+        if (rawScore <= 1.0) {
+            normalizedScore = Math.max(1.0, rawScore * 5);
+        } else if (rawScore <= 5.0) {
+            normalizedScore = Math.max(1.0, rawScore);
+        } else {
+            normalizedScore = Math.max(1.0, (rawScore / 100) * 5);
+        }
+        
+        return normalizedScore.toFixed(1);
     }
     
     /**
@@ -217,26 +329,61 @@ class SourceCard {
                 excerptElement.classList.add('content-updated'); // Visual feedback
             }
             
-            // Update action button with fresh state
-            this._updateActionButton(cardElement, enrichedSource);
-            
-            // Update badges with new licensing information
-            const badgesContainer = cardElement.querySelector('.source-badges');
-            if (badgesContainer) {
-                // Remove old license badge
-                const oldLicenseBadge = badgesContainer.querySelector('.license-badge');
-                if (oldLicenseBadge) {
-                    oldLicenseBadge.remove();
+            // Update metadata line with new licensing information (compact layout)
+            const metadataLine = cardElement.querySelector('.source-metadata-line');
+            if (metadataLine) {
+                // Update license badge within metadata line
+                const licenseBadge = metadataLine.querySelector('.meta-license');
+                if (licenseBadge) {
+                    const newLicenseInfo = this._getLicenseText(enrichedSource);
+                    licenseBadge.textContent = newLicenseInfo.text;
+                    licenseBadge.className = `meta-license ${newLicenseInfo.className}`;
+                    licenseBadge.setAttribute('data-license-type', newLicenseInfo.className);
+                    licenseBadge.classList.add('badge-updated'); // Visual feedback
                 }
-                
-                // Add new license badge with enriched data
-                const newLicenseBadge = this._createLicenseBadge(enrichedSource);
-                newLicenseBadge.classList.add('badge-updated'); // Visual feedback
-                badgesContainer.appendChild(newLicenseBadge);
             }
+            
+            // Update unlock/download icon button with fresh state
+            this._updateIconActionButton(cardElement, enrichedSource);
         });
         
         console.log(`✅ Card updated: ${enrichedSource.title}`);
+    }
+    
+    /**
+     * Update icon action button with fresh state (for compact layout)
+     */
+    _updateIconActionButton(cardElement, freshSource) {
+        const unlockBtn = cardElement.querySelector('.unlock-icon-btn');
+        if (!unlockBtn || !freshSource) return;
+        
+        const cost = freshSource.unlock_price || 0;
+        const isUnlocked = freshSource.is_unlocked || false;
+        
+        // Update data-action attribute
+        unlockBtn.setAttribute('data-action', isUnlocked ? 'download' : 'unlock');
+        
+        // Update icon, tooltip, and visibility
+        if (isUnlocked) {
+            unlockBtn.setAttribute('title', 'Download source');
+            unlockBtn.style.display = '';
+            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>`;
+        } else if (cost > 0) {
+            unlockBtn.setAttribute('title', `Unlock for $${cost.toFixed(2)}`);
+            unlockBtn.style.display = '';
+            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+            </svg>`;
+        } else {
+            // Free source - hide the button
+            unlockBtn.setAttribute('title', 'Free source');
+            unlockBtn.style.display = 'none';
+        }
     }
 
     /**
@@ -520,6 +667,116 @@ class SourceCard {
         return actions;
     }
 
+    /**
+     * Create compact checkbox (no label, just checkbox)
+     */
+    _createCompactCheckbox(source) {
+        const container = document.createElement('div');
+        container.className = 'source-checkbox-compact';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'source-selection-checkbox';
+        checkbox.setAttribute('aria-label', 'Select source');
+        checkbox.setAttribute('title', 'Add to Outline');
+        
+        // Use appState as single source of truth
+        checkbox.checked = this.appState?.isSourceSelected(source.id) || false;
+        
+        // Create stable event handler
+        const changeHandler = (e) => {
+            this._handleSelectionChange(source, e.target.checked);
+        };
+        
+        checkbox.addEventListener('change', changeHandler);
+        
+        // Track listener for cleanup
+        this.eventListeners.set(checkbox, {
+            type: 'change',
+            handler: changeHandler
+        });
+        
+        container.appendChild(checkbox);
+        
+        return container;
+    }
+    
+    /**
+     * Create icon-only action buttons
+     */
+    _createIconActions(source) {
+        const actions = document.createElement('div');
+        actions.className = 'source-icon-actions';
+        
+        // External link icon
+        if (source.url) {
+            const linkBtn = document.createElement('a');
+            linkBtn.className = 'icon-action-btn';
+            linkBtn.href = source.url;
+            linkBtn.target = '_blank';
+            linkBtn.rel = 'noopener noreferrer';
+            linkBtn.setAttribute('title', 'View source');
+            linkBtn.setAttribute('data-action', 'view-external');
+            linkBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>`;
+            actions.appendChild(linkBtn);
+        }
+        
+        // Add to report / summarize icon
+        const addBtn = document.createElement('button');
+        addBtn.className = 'icon-action-btn';
+        addBtn.setAttribute('title', 'Summarize article');
+        addBtn.setAttribute('data-action', 'summarize');
+        addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+        </svg>`;
+        actions.appendChild(addBtn);
+        
+        // Unlock/download icon (always render, hide if pending/free)
+        const cost = source.unlock_price || 0;
+        const isUnlocked = source.is_unlocked || false;
+        
+        const unlockBtn = document.createElement('button');
+        unlockBtn.className = 'icon-action-btn unlock-icon-btn';
+        unlockBtn.setAttribute('data-action', isUnlocked ? 'download' : 'unlock');
+        
+        if (isUnlocked) {
+            unlockBtn.setAttribute('title', 'Download source');
+            unlockBtn.style.display = '';
+            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>`;
+        } else if (cost > 0) {
+            unlockBtn.setAttribute('title', `Unlock for $${cost.toFixed(2)}`);
+            unlockBtn.style.display = '';
+            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+            </svg>`;
+        } else {
+            // Pending enrichment or free source - hide but keep in DOM
+            unlockBtn.setAttribute('title', 'Checking pricing...');
+            unlockBtn.style.display = 'none';
+            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+            </svg>`;
+        }
+        
+        // Always append unlock button (visibility controlled via display style)
+        actions.appendChild(unlockBtn);
+        
+        return actions;
+    }
+    
     /**
      * Create checkbox for report selection with proper event cleanup
      */

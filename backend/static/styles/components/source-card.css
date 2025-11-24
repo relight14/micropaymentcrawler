@@ -1,14 +1,9 @@
 /**
- * SourceCard Component Styles
+ * SourceCard Component Styles - COMPACT REDESIGN
  * OWNER: Frontend team
  * SINGLE SOURCE OF TRUTH for all source card styling
  * 
- * This file consolidates all source-related CSS from:
- * - chat-style.css
- * - sources-preview.css  
- * - link-styles.css
- *
- * DO NOT add source card styles to other CSS files!
+ * Updated: Compact layout with hover-to-reveal description
  */
 
 /* =============================================================================
@@ -98,7 +93,7 @@
 }
 
 /* =============================================================================
-   FILTER CHIPS (MVP Frontend-only)
+   FILTER CHIPS
    ============================================================================= */
 
 .source-type-filters {
@@ -158,17 +153,16 @@
 }
 
 /* =============================================================================
-   SOURCE CARD
+   COMPACT SOURCE CARD
    ============================================================================= */
 
 .source-card {
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    padding: 1rem !important;
-    margin-bottom: 0.75rem !important;
-    transition: all 0.15s ease !important;
-    box-shadow: var(--shadow-sm) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    margin-bottom: 8px !important;
+    transition: all 0.2s ease !important;
     position: relative !important;
     font-family: 'Montserrat', var(--font-sans, sans-serif) !important;
 }
@@ -177,355 +171,50 @@
     display: none;
 }
 
-/* Progressive loading state */
-.source-card.skeleton-loading {
-    background: linear-gradient(90deg, #f3f4f6 25%, #ffffff 50%, #f3f4f6 75%);
-    background-size: 200% 100%;
-    animation: skeleton-loading 2s infinite;
-}
-
-@keyframes skeleton-loading {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
 .source-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
     border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.source-card:hover .source-excerpt {
+    display: block !important;
 }
 
 .source-card:last-child {
     margin-bottom: 0;
 }
 
-/* Selected state styling */
+/* Selected state */
 .source-card.selected {
     border-color: var(--primary) !important;
     background-color: var(--primary-light, #f0f9ff) !important;
 }
 
-/* Dark mode selected state - ensure text contrast */
-.dark .source-card.selected {
-    background-color: #e0f2fe !important;
-}
-
-.dark .source-card.selected .source-title,
-.dark .source-card.selected .source-meta,
-.dark .source-card.selected .source-excerpt,
-.dark .source-card.selected .source-url {
-    color: #1e293b !important;
-}
-
-.dark .source-card.selected .relevance-badge {
-    color: #334155 !important;
-}
-
 /* =============================================================================
-   SOURCE HEADER
+   COMPACT LAYOUT
    ============================================================================= */
 
-.source-header {
+.source-card-compact {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.5rem;
-    gap: 1rem;
-}
-
-.source-title {
-    color: var(--card-foreground);
-    font-size: 1rem;
-    line-height: 1.4;
-    font-weight: var(--font-weight-medium);
-    margin: 0 0 0.25rem 0;
-}
-
-.source-meta {
-    color: var(--muted-foreground);
-    font-size: 0.875rem;
-    margin: 0;
-}
-
-.source-badges {
-    display: flex;
-    gap: 0.5rem;
     align-items: center;
+    gap: 12px;
+}
+
+/* Checkbox */
+.source-checkbox-compact {
     flex-shrink: 0;
 }
 
-.source-type-badge {
-    font-size: 1.125rem;
-    line-height: 1;
-    padding: 0.125rem;
-    cursor: help;
-    transition: transform 0.15s ease;
-}
-
-.source-type-badge:hover {
-    transform: scale(1.15);
-}
-
-/* =============================================================================
-   LICENSING BADGES
-   ============================================================================= */
-
-.license-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius);
-    font-size: 0.75rem;
-    font-weight: var(--font-weight-medium);
-    white-space: nowrap;
-}
-
-.license-free {
-    background: rgba(34, 197, 94, 0.1);
-    color: #059669;
-}
-
-.license-paid {
-    background: rgba(59, 130, 246, 0.1);
-    color: #2563eb;
-}
-
-.license-premium {
-    background: rgba(245, 158, 11, 0.1);
-    color: #d97706;
-}
-
-/* Enhanced licensing badges from link-styles.css */
-.license-badge.enhanced {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    background: rgba(251, 191, 36, 0.1);
-    border: 1px solid rgba(251, 191, 36, 0.3);
-    color: var(--text-primary);
-}
-
-/* Progressive and hybrid badge styles */
-.license-loading {
-    background: rgba(107, 114, 128, 0.1);
-    color: #6b7280;
-    animation: pulse 2s infinite;
-}
-
-.license-demo {
-    background: rgba(139, 92, 246, 0.1);
-    color: #8b5cf6;
-    position: relative;
-}
-
-.license-demo::after {
-    content: "DEMO";
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background-color: #ec4899;
-    color: white;
-    font-size: 6px;
-    padding: 1px 2px;
-    border-radius: 2px;
-    line-height: 1;
-}
-
-/* Update animations */
-.content-updated {
-    animation: contentFlash 0.6s ease-out;
-}
-
-.badge-updated {
-    animation: badgeSlideIn 0.5s ease-out;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-
-@keyframes contentFlash {
-    0% { background-color: #fef3c7; }
-    100% { background-color: transparent; }
-}
-
-@keyframes badgeSlideIn {
-    0% { 
-        transform: scale(0.8) translateY(-10px);
-        opacity: 0;
-    }
-    100% { 
-        transform: scale(1) translateY(0);
-        opacity: 1;
-    }
-}
-
-/* =============================================================================
-   SOURCE CONTENT
-   ============================================================================= */
-
-.source-rating {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin: 0.5rem 0;
-}
-
-.star {
-    width: 12px;
-    height: 12px;
-    color: #fbbf24;
-}
-
-.star.filled {
-    color: #fbbf24;
-}
-
-.star.partial {
-    color: #fbbf24;
-    opacity: 0.7;
-}
-
-.star.empty {
-    color: #d1d5db;
-}
-
-.rating-text,
-.rating-number {
-    font-size: 0.75rem;
-    color: var(--muted-foreground);
-    margin-left: 0.25rem;
-}
-
-.source-excerpt {
-    color: var(--muted-foreground);
-    line-height: 1.4;
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    max-height: 3em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-/* =============================================================================
-   SOURCE ACTIONS (Buttons + Checkbox)
-   ============================================================================= */
-
-.source-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.source-actions__left {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.source-actions__right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* =============================================================================
-   ACTION BUTTONS
-   ============================================================================= */
-
-.view-source-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--foreground);
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.view-source-btn:hover {
-    background: var(--muted);
-}
-
-.unlock-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    background: var(--accent);
-    color: var(--accent-foreground);
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-}
-
-.unlock-btn:hover {
-    background: var(--accent);
-    opacity: 0.9;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-yellow);
-}
-
-.download-btn {
-    background: #10b981;
-    color: white;
-}
-
-.download-btn:hover {
-    background: #059669;
-    opacity: 1;
-}
-
-/* =============================================================================
-   SOURCE SELECTION (Checkbox for Report Builder)
-   ============================================================================= */
-
-.source-selection {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    border: none;
-}
-
-.source-selection-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    font-weight: var(--font-weight-medium);
-    user-select: none;
-}
-
 .source-selection-checkbox {
-    width: 1rem;
-    height: 1rem;
+    width: 18px;
+    height: 18px;
     border: 2px solid var(--border);
-    border-radius: calc(var(--radius) - 4px);
+    border-radius: 4px;
     background: var(--background);
     cursor: pointer;
     position: relative;
     transition: all 0.2s ease;
     appearance: none;
-    flex-shrink: 0;
 }
 
 .source-selection-checkbox:checked {
@@ -539,8 +228,8 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: var(--accent-foreground);
-    font-size: 0.75rem;
+    color: #000;
+    font-size: 12px;
     font-weight: bold;
 }
 
@@ -548,26 +237,143 @@
     border-color: var(--accent);
 }
 
-.selection-text {
+/* Content */
+.source-card-content {
     flex: 1;
+    min-width: 0;
+}
+
+.source-title {
+    color: var(--card-foreground);
+    font-size: 15px;
+    line-height: 1.4;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* =============================================================================
-   UPSELL MESSAGE
+   METADATA LINE
    ============================================================================= */
 
-.upsell-message {
-    margin: 1.5rem 0;
-    text-align: center;
+.source-metadata-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted-foreground);
+    line-height: 1;
 }
 
-.upsell-content {
-    background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
-    border: 2px solid #3b82f6;
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    margin: 0 auto;
-    max-width: 600px;
+.meta-domain {
+    color: var(--muted-foreground);
+}
+
+.meta-separator {
+    color: var(--muted-foreground);
+    opacity: 0.5;
+}
+
+.meta-license {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+}
+
+.meta-license.license-free {
+    color: #059669;
+}
+
+.meta-license.license-paid {
+    color: #2563eb;
+}
+
+.meta-license.license-demo {
+    color: #8b5cf6;
+}
+
+.meta-license.license-loading {
+    color: #6b7280;
+}
+
+.meta-rating {
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+/* =============================================================================
+   ICON-ONLY ACTIONS
+   ============================================================================= */
+
+.source-icon-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.icon-action-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--foreground);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+    text-decoration: none;
+}
+
+.icon-action-btn:hover {
+    background: var(--muted);
+    border-color: var(--accent);
+}
+
+.icon-action-btn svg {
+    display: block;
+}
+
+.icon-action-btn.star-btn:hover {
+    background: #fef3c7;
+    border-color: #fbbf24;
+    color: #d97706;
+}
+
+/* =============================================================================
+   SOURCE EXCERPT (Hidden by default, shows on hover)
+   ============================================================================= */
+
+.source-excerpt {
+    color: var(--muted-foreground);
+    line-height: 1.5;
+    margin-top: 8px;
+    font-size: 13px;
+    display: none !important;
+    animation: fadeInExcerpt 0.2s ease-out;
+}
+
+@keyframes fadeInExcerpt {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* =============================================================================
+   DARK MODE OVERRIDES
+   ============================================================================= */
+
+.dark .source-card.selected {
+    background-color: #1e3a8a !important;
+}
+
+.dark .source-card.selected .source-title,
+.dark .source-card.selected .source-metadata-line {
+    color: #e0f2fe !important;
 }
 
 /* =============================================================================
@@ -575,40 +381,45 @@
    ============================================================================= */
 
 @media (max-width: 768px) {
-    .source-actions {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
+    .source-card-compact {
+        gap: 8px;
     }
     
-    .source-actions__left,
-    .source-actions__right {
-        justify-content: center;
+    .source-title {
+        font-size: 14px;
     }
     
-    .source-header {
-        flex-direction: column;
-        gap: 0.5rem;
+    .source-metadata-line {
+        font-size: 12px;
     }
     
-    .source-badges {
-        align-self: flex-start;
+    .source-icon-actions {
+        gap: 4px;
+    }
+    
+    .icon-action-btn {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .icon-action-btn svg {
+        width: 14px;
+        height: 14px;
     }
 }
 
 @media (max-width: 480px) {
-    .licensing-counts {
-        flex-direction: column;
-        align-items: center;
-    }
-    
     .source-card {
-        padding: 0.875rem;
+        padding: 10px 12px !important;
     }
     
-    .source-actions__left,
-    .source-actions__right {
-        flex-direction: column;
+    .source-card-compact {
+        flex-wrap: wrap;
+    }
+    
+    .source-icon-actions {
         width: 100%;
+        justify-content: flex-end;
+        margin-left: 30px;
     }
 }
