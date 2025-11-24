@@ -108,6 +108,9 @@ class SourceCard {
             } else if (action === 'dismiss') {
                 e.preventDefault();
                 this._handleDismiss(sourceId, sourceCard);
+            } else if (action === 'add-to-outline') {
+                e.preventDefault();
+                this._handleAddToOutline(sourceId, actionBtn);
             }
             // view-external opens naturally via href, no handler needed
         };
@@ -713,7 +716,8 @@ class SourceCard {
         
         // Create stable event handler
         const changeHandler = (e) => {
-            this._handleSelectionChange(source, e.target.checked);
+            const cardElement = e.target.closest('[data-source-id]');
+            this._handleSelectionChange(source, e.target.checked, cardElement);
         };
         
         checkbox.addEventListener('change', changeHandler);
@@ -753,7 +757,29 @@ class SourceCard {
             actions.appendChild(linkBtn);
         }
         
-        // Add to report / summarize icon
+        // Add to outline icon
+        const outlineBtn = document.createElement('button');
+        outlineBtn.className = 'icon-action-btn add-to-outline-btn';
+        outlineBtn.setAttribute('data-action', 'add-to-outline');
+        
+        // Set initial state based on whether source is selected
+        const isSelected = this.appState?.isSourceSelected(source.id) || false;
+        if (isSelected) {
+            outlineBtn.classList.add('active');
+            outlineBtn.setAttribute('title', 'Added to outline');
+        } else {
+            outlineBtn.setAttribute('title', 'Add to outline');
+        }
+        
+        outlineBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3h7v7H3z"></path>
+            <path d="M14 3h7v7h-7z"></path>
+            <path d="M14 14h7v7h-7z"></path>
+            <path d="M3 14h7v7H3z"></path>
+        </svg>`;
+        actions.appendChild(outlineBtn);
+        
+        // Summarize article icon
         const addBtn = document.createElement('button');
         addBtn.className = 'icon-action-btn';
         addBtn.setAttribute('title', 'Summarize article');
@@ -824,7 +850,8 @@ class SourceCard {
         
         // Create stable event handler
         const changeHandler = (e) => {
-            this._handleSelectionChange(source, e.target.checked);
+            const cardElement = e.target.closest('[data-source-id]');
+            this._handleSelectionChange(source, e.target.checked, cardElement);
         };
         
         checkbox.addEventListener('change', changeHandler);
@@ -847,19 +874,23 @@ class SourceCard {
     }
 
     /**
-     * Handle checkbox selection change - sync with appState only
+     * Handle checkbox selection change - sync with appState and update outline button
+     * @param cardElement - The card element (passed from event handler to avoid global queries)
      */
-    _handleSelectionChange(source, isSelected) {
+    _handleSelectionChange(source, isSelected, cardElement = null) {
         if (!source || !source.id) {
             console.error('Invalid source in selection change:', source);
             return;
         }
         
-        const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
+        // Use passed cardElement or fallback to query (for backwards compatibility)
+        const sourceCard = cardElement || document.querySelector(`[data-source-id="${source.id}"]`);
         
         if (isSelected) {
             if (sourceCard) {
                 sourceCard.classList.add('selected');
+                // Update outline button state
+                this._updateOutlineButtonState(sourceCard, true);
             }
             // Use appState as single source of truth
             if (this.appState?.toggleSourceSelection) {
@@ -868,6 +899,8 @@ class SourceCard {
         } else {
             if (sourceCard) {
                 sourceCard.classList.remove('selected');
+                // Update outline button state
+                this._updateOutlineButtonState(sourceCard, false);
             }
             // Remove from appState
             if (this.appState?.removeSelectedSource) {
@@ -884,6 +917,24 @@ class SourceCard {
             }
         });
         document.dispatchEvent(event);
+    }
+    
+    /**
+     * Update outline button visual state
+     */
+    _updateOutlineButtonState(cardElement, isSelected) {
+        if (!cardElement) return;
+        
+        const outlineBtn = cardElement.querySelector('.add-to-outline-btn');
+        if (!outlineBtn) return;
+        
+        if (isSelected) {
+            outlineBtn.classList.add('active');
+            outlineBtn.setAttribute('title', 'Added to outline');
+        } else {
+            outlineBtn.classList.remove('active');
+            outlineBtn.setAttribute('title', 'Add to outline');
+        }
     }
 
     /**
@@ -1119,6 +1170,35 @@ class SourceCard {
         } catch (error) {
             console.error('✨ SUMMARIZE: ERROR in _handleSummarize:', error);
         }
+    }
+
+    /**
+     * Handle adding source to outline
+     */
+    _handleAddToOutline(sourceId, buttonElement) {
+        console.log('📋 ADD TO OUTLINE: Button clicked for source:', sourceId);
+        
+        // Find the card element from the button (safer than document.querySelector)
+        const cardElement = buttonElement.closest('[data-source-id]');
+        if (!cardElement) {
+            console.error('📋 ADD TO OUTLINE: Card not found for button');
+            return;
+        }
+        
+        const checkbox = cardElement.querySelector('.source-selection-checkbox');
+        if (!checkbox) {
+            console.error('📋 ADD TO OUTLINE: Checkbox not found in card');
+            return;
+        }
+        
+        // Toggle checkbox (this will trigger _handleSelectionChange which updates button state)
+        checkbox.checked = !checkbox.checked;
+        
+        // Dispatch change event to trigger selection handlers
+        const changeEvent = new Event('change', { bubbles: true });
+        checkbox.dispatchEvent(changeEvent);
+        
+        console.log('✅ ADD TO OUTLINE: Source selection toggled:', checkbox.checked);
     }
 
     /**

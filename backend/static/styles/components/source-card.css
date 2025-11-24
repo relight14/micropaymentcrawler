@@ -386,6 +386,23 @@
     color: #2563eb;
 }
 
+.icon-action-btn.add-to-outline-btn:hover {
+    background: #f3e8ff;
+    border-color: #a855f7;
+    color: #7c3aed;
+}
+
+.icon-action-btn.add-to-outline-btn.active {
+    background: #7c3aed;
+    border-color: #7c3aed;
+    color: white;
+}
+
+.icon-action-btn.add-to-outline-btn.active:hover {
+    background: #6d28d9;
+    border-color: #6d28d9;
+}
+
 /* =============================================================================
    SOURCE EXCERPT (Hidden by default, shows on hover)
    ============================================================================= */
