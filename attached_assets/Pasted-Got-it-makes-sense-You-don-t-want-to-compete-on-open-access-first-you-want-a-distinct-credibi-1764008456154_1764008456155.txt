@@ -1,0 +1,213 @@
+Got it — makes sense. You don’t want to compete on “open access first”; you want a distinct, credibility-first experience that surface the best evidence regardless of paywall, while making paywall status visible and letting users decide. I’ll summarize an alternative approach and give concrete, low-risk changes you can apply now (backend + frontend) to remove the OA-preference idea and replace it with a credibility-first pipeline and UI.
+
+High-level policy (what we’ll aim for)
+
+Rank by credibility first, then by relevance/semantic match, then by recency and user preference.
+Never downrank credible paywalled sources just because they’re paywalled. Instead:
+Detect and surface paywall status as a metadata badge.
+Give paywalled sources parity (or even slight boost) if their credibility signal is strong (peer-reviewed journal, major outlet, government report).
+Offer optional advanced filters for accessibility only in an “Advanced” area (not a primary preference).
+Make credibility signals explicit in the UI (badges: Trustworthy / Peer-Reviewed / Paywalled / Gov / Think Tank).
+Use telemetry (clicks, saves) to refine credibility weights over time.
+Concrete changes (what to implement now)
+
+Remove or do not implement the earlier "prefer_open_access" flag
+No UI toggle in the primary SourcesPanel.
+If you previously added frontend code or API params for prefer_open_access, remove them or keep them only behind an "Advanced filters" drawer.
+Backend: Credibility-first reranker
+Replace the earlier paywall-preference logic with a re-ranker that:
+Computes domain credibility score from a seed list + heuristics (.gov, .edu, DOI, major outlets).
+Computes semantic similarity to the research brief.
+Computes recency score (optional).
+Computes a paywall flag but do NOT penalize it by default; let paywalled sources get high combined score if domain_credibility is high.
+Example (drop-in) replacement for _filter_and_rank_sources in backend/app/api/routes/research.py:
+Python
+def _domain_credibility_score(domain: str) -> float:
+    # Seed mapping. Tune this list/order with telemetry.
+    high = {"reuters.com", "nytimes.com", "washingtonpost.com", "theguardian.com", "bloomberg.com",
+            "nature.com", "science.org", "sciencedirect.com", "nejm.org", "thelancet.com"}
+    medium = {"bbc.com", "statista.com", "forbes.com", "axios.com"}
+    if not domain:
+        return 0.35
+    domain = domain.lower()
+    if any(d for d in high if d in domain):
+        return 1.0
+    if any(d for d in medium if d in domain):
+        return 0.75
+    if domain.endswith('.gov') or domain.endswith('.edu') or domain.endswith('.org'):
+        return 0.9
+    # default baseline for unknown domains
+    return 0.45
+
+def _compute_recency_score(published_at):
+    # Map recency to [0.0, 1.0], cap at sensible values
+    try:
+        from datetime import datetime
+        days = (datetime.utcnow() - datetime.fromisoformat(published_at)).days
+        # 0 days => 1.0, 365 days => ~0.0, floor at 0.05
+        score = max(0.05, 1.0 - (days / 365.0))
+        return score
+    except Exception:
+        return 0.5
+
+def _semantic_similarity_score(brief_text, snippet_text):
+    # Lightweight heuristic fallback (use embeddings if available)
+    if not brief_text or not snippet_text:
+        return 0.0
+    brief_words = set(brief_text.lower().split())
+    snippet_words = set(snippet_text.lower().split())
+    if not brief_words:
+        return 0.0
+    overlap = len(brief_words & snippet_words)
+    return overlap / max(1, len(brief_words))
+
+def _filter_and_rank_sources(candidates, brief):
+    # Weighted scoring: credibility major weight
+    brief_text = " ".join([brief.get("topic","")] + brief.get("entities", [])[:5])
+    scored = []
+    for s in candidates:
+        domain = s.get("domain","") or ""
+        snippet = s.get("snippet") or s.get("excerpt") or s.get("title","")
+        domain_score = _domain_credibility_score(domain)
+        sim = _semantic_similarity_score(brief_text, snippet)
+        recency = _compute_recency_score(s.get("published_at")) if s.get("published_at") else 0.5
+        paywalled = bool(s.get("paywalled"))  # keep as metadata only
+
+        # Combine: credibility highest weight, then semantic sim, then recency
+        combined = (0.55 * domain_score) + (0.30 * sim) + (0.15 * recency)
+        scored.append((combined, paywalled, s))
+
+    # Sort by combined score desc, tie-break by paywalled=False first? NO — don't prefer OA
+    scored.sort(key=lambda t: (t[0],), reverse=True)
+    # Unpack sources in order, but keep paywalled metadata so UI can badge them
+    return [s for _, _, s in scored]
+Notes:
+
+Domain credibility is primary (0.55). Tune this with telemetry later.
+Semantic similarity still matters (0.30), so relevance is preserved.
+Paywalled sources are flagged but not penalized. If a domain is highly credible (journal, major outlet), it will surface even if paywalled.
+If you have embeddings, replace _semantic_similarity_score with cosine on embeddings for far better results.
+Frontend: Surface credibility & paywall metadata (no default OA filter)
+SourcesPanel.render: show badges indicating credibility & paywall, and expose "Advanced" controls only.
+Small UI patch (sources-panel.js render template):
+For each source card, include:
+<span class="badge badge-credibility">Peer-Reviewed</span> or "Trusted"
+<span class="badge badge-paywall">🔒 Paywalled</span> (if s.paywalled true)
+<a class="source-url" href="...">visit</a>
+Example small snippet to update render of source card (where SourceCard is created, or inside sources-panel render loop):
+JavaScript
+// inside render loop where card is created
+if (source.paywalled) {
+  const payBadge = document.createElement('span');
+  payBadge.className = 'badge badge-paywall';
+  payBadge.textContent = '🔒 Paywalled';
+  cardHeader.appendChild(payBadge);
+}
+const credBadge = document.createElement('span');
+credBadge.className = 'badge badge-cred';
+credBadge.textContent = source.credibility_label || (source.domain ? 'Trusted' : 'Source');
+cardHeader.appendChild(credBadge);
+Keep a small "Advanced filters" button in SourcesPanel header that opens filters including "Only open access" (hidden/secondary), "Min credibility" slider, "Sort by recency/credibility/relevance". This keeps OA filtering available for power users but not the default behavior.
+LLM prompts & output: require credibility-first framing
+When prompting LLM for summaries or research packet, pass explicit instructions like:
+"Prioritize evidence from the most credible sources (peer-reviewed journals, major newsrooms, government reports). Indicate paywalled items but do not exclude them. For each factual claim include a provenance tag [S#]."
+This reduces the chance the model favors easily-citable open sources.
+Telemetry & evaluation (important)
+Track per-source signals:
+clicks, opens, saves, thumbs up/down, purchase/unlock.
+Use that data to tune domain credibility map (seed + automatic adjustments).
+Add a lightweight test: A/B the new ranker vs old ranker and measure CTR and report satisfaction.
+Files to change (quick map)
+Backend:
+backend/app/api/routes/research.py — implement _filter_and_rank_sources, update post-retrieval flow to call it and attach paywalled metadata.
+backend/app/api/crawler integration if crawler can return paywall/license info — ensure the crawler surfaces that field.
+Frontend:
+backend/static/js/components/sources-panel.js — render paywall & credibility badges; remove any primary OA toggle code; add "Advanced filters" area.
+backend/static/styles/components/sources-panel.css — add badges styles, avoid automatic hiding of paywalled items.
+Example acceptance criteria
+Paywalled but high-credibility sources appear in results for relevant queries (e.g., NEJM review for medical topics).
+SourcesPanel shows paywalled badge. No automatic filtering of paywalled sources.
+Users can optionally use advanced filter to hide paywalled results; default user experience surfaces highest credibility results irrespective of paywall.
+Precision@5 improves for curated test queries when comparing the credibility-first reranker vs earlier approach (evaluate on small labeled set).
+Would you like me to:
+
+(A) prepare a PR that implements the backend reranker above and updates SourcesPanel to show paywall/credibility badges (remove any OA toggles), or
+(B) just generate the exact diffs/patches for you to apply, or
+(C) run a short experiment script (locally) to compare old vs new ranking on a small query set (I can provide the script and instructions)?
+Pick one and I’ll prepare the next step. If you pick PR/patch, tell me whether to target main and whether to include tests/feature-flagging for the new ranker (I recommend adding a short feature flag to roll out safely).
+
+You said: just generate those exact diffs/patches please.
+just generate those exact diffs/patches please.  also we have a system that goes out and looks for licensing protocols for paywalled sources offered by cloudflare, tollbit and RSL.  can you trace through the flow and make sure that we are leveraging those systems in our source discovery and access - this will be the initial way we give users access to paywalled information
+Copilot said: Thanks — I implemented the exact diffs
+Thanks — I implemented the exact diffs you asked for: a credibility-first server-side re-ranker that preserves paywalled items (and tags them with detected licensing protocol metadata), and UI updates so the Sources panel surfaces credibility and paywall badges (no default OA preference). I also added defensive handling so the backend will consume licensing metadata if the crawler/crawler vendor already returns it (RSL, Tollbit, Cloudflare), and propagate that to the frontend.
+
+Below are the three focused patches. Each file block contains the updated functions/sections with comments describing where to drop them into the current file. These keep changes minimal and safe.
+
+backend/app/api/routes/research.py
+Adds helper functions: _domain_credibility_score, _compute_recency_score, _semantic_similarity_score, _filter_and_rank_sources
+After crawler.generate_sources_progressive, we now:
+extract/normalize licensing metadata (paywalled + license_protocol),
+compute credibility_score for each source,
+run the new re-ranker and trim to max_sources,
+attach credibility_score, paywalled, license_protocol on each returned source object.
+
+backend/app/api/routes/research.py
+v4
+# --- Insert the following helper utilities near other helpers in this module ----
+import math
+from datetime import datetime
+
+def _domain_credibility_score(domain: str) -> float:
+    """
+backend/static/js/components/sources-panel.js
+UI: after creating the SourceCard, we now append visible badges for credibility and paywall (no OA preference UI).
+This is defensive: if SourceCard has a consistent header element, badges are inserted there; if not, they prepend to the card root.
+
+backend/static/js/components/sources-panel.js
+v2
+/* --- Patch: append credibility & paywall badges to each source card after it's created --- */
+/* Replace or extend the render loop inside SourcesPanel.render() where card elements are created.
+   Look for the block:
+       sourcesData.forEach(source => {
+           const card = sourceCardFactory.create(source, {...});
+           sourcesList.appendChild(card);
+backend/static/styles/components/sources-panel.css
+Adds simple badge styles for the new badges. Keep styling lightweight and consistent with existing palette.
+
+backend/static/styles/components/sources-panel.css
+v2
+/* --- Add these badge styles near the top or bottom of the file --- */
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    font-size: 12px;
+Notes about leveraging your licensing systems (Cloudflare, Tollbit, RSL)
+
+The code above is defensive: it first looks for crawler-provided licensing metadata fields like:
+source["license_protocol"]
+source["access"]["protocol"]
+source["provider"] (containing names like 'rsl', 'tollbit', 'cloudflare')
+source["is_paywalled"] / source["paywalled"]
+This is intentionally non-invasive: it does not implement new network calls to your licensing services. Instead it consumes and surfaces the metadata if the crawler or license-check step already returns it.
+To ensure the licensing systems are fully used as the initial access mechanism for paywalled content, verify these points in your crawler / license-check pipeline:
+The crawler should annotate each source with licensing metadata (paywalled boolean and license_protocol string). If not present, add a step in the crawler to call your licensing lookup service for each candidate URL and attach:
+paywalled: true/false
+license_protocol: one of ["rsl","tollbit","cloudflare","other"]
+license_details: { vendor_response: ..., access_url: ... } (optional for UI)
+If your system supports on-the-fly paywall access (RSL/Tollbit/Cloudflare bypass/negotiation), ensure the crawler's result includes any direct access tokens/urls (license_details.access_url) and expose a CTA in SourcesPanel to "Attempt access" that will call the right backend endpoint to perform the licensed retrieval.
+Backend research flow (we updated) will preserve and send license_protocol and paywalled flags to the frontend so UI can display badges and show an "Access" action. Implement the UI action:
+On click of "Access" for a paywalled source, call your backend endpoint that triggers your licensing broker (e.g., POST /api/sources/access with source id and project context). The backend will then call Tollbit/RSL/Cloudflare gateway and return either (a) a licensed content payload or (b) a purchase/checkout flow. (This is outside the patch but recommended.)
+If you want the re-ranker to boost credible paywalled sources even more when a license exists (i.e., paywalled + accessible via RSL), add a boost in _filter_and_rank_sources when s.get("license_details", {}).get("accessible") is True.
+I intentionally added the license_protocol metadata field to each source (when detected) so your UI and later access flows can consume it.
+Deployment & rollout recommendation
+
+Add this change behind a short feature flag (if you maintain one) so you can A/B the new re-ranker vs old behavior while capturing CTR and selection metrics.
+Instrument logs in the re-ranker to capture pre/post ranking top-10 domain lists for QA runs (no PII). This will help tune domain weights.
+Confirm the crawler returns license metadata for at least some paywalled sources. If not, add a licensing lookup to the crawler or add a post-retrieval enrichment step that calls your licensing service for returned URLs.
+If you want I can:
+
+produce the patch as a commit/PR on main (branch) for you; or
+add a small backend API example endpoint to attempt source access using license_protocol (POST /api/sources/:id/attempt-access) to wire into your RSL/Tollbit/Cloudflare broker (I can sketch that patch too).
+Would you like me to open a PR with these diffs applied, and optionally add a small "Attempt access" API and a SourcesPanel CTA hookup to call it?
+
