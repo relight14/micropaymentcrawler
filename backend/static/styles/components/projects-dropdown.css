@@ -11,10 +11,10 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: #262626;
-    border: 1px solid #444;
+    background: #fff38D !important;
+    border: 1px solid #fff38D !important;
     border-radius: 8px;
-    color: #ffffff;
+    color: black !important;
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 14px;
@@ -22,13 +22,14 @@
 }
 
 .projects-menu-btn:hover {
-    background: var(--bg-hover, #252525);
-    border-color: var(--border-hover, #444);
+    background: #f5e65c !important;
+    border-color: #f5e65c !important;
+    transform: translateY(-1px);
 }
 
 .projects-menu-btn.active {
-    background: var(--bg-active, #2a2a2a);
-    border-color: var(--accent, #216aa4);
+    background: #fff38D !important;
+    border-color: #fff38D !important;
 }
 
 .layers-icon {
