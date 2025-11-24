@@ -40,7 +40,17 @@
     overflow-x: hidden;
 }
 
-/* Sources panel - left side */
+/* Main content area - left (chat interface) */
+#main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    order: 1;  /* First: Chat (leftmost) */
+}
+
+/* Sources panel - center */
 #sources-panel {
     display: none;  /* Hidden by default when user not authenticated */
     flex: 0 0 320px;  /* Use flex-basis for reliable sizing */
@@ -51,17 +61,7 @@
     overflow-y: auto;
     transition: width 0.2s ease;
     position: relative;
-    order: 1;  /* First: Sources (leftmost) */
-}
-
-/* Main content area - center */
-#main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-    order: 2;  /* Second: Chat (center) */
+    order: 2;  /* Second: Sources (center) */
 }
 
 /* Show sources panel when user is authenticated */
