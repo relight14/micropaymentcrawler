@@ -182,15 +182,13 @@ class ContentCrawlerStub:
                 authority = min(1.0, authority * 1.2)  # Boost for any licensed source
             
             # Weighted combination (must sum to 1.0)
-            # ADJUSTED: Reduced topicality from 0.35 to 0.28 for more authority room
-            topicality_weight = 0.28
-            # MINIMUM FLOOR: Ensure authority_weight never drops below 0.25
-            authority_weight = max(0.25, 1.0 - recency_weight - topicality_weight)
-            
-            # Recalculate recency_weight to maintain sum = 1.0 with authority floor
-            if authority_weight == 0.25 and (recency_weight + topicality_weight + 0.25) > 1.0:
-                # Need to reduce recency_weight to accommodate authority floor
-                recency_weight = max(0, 1.0 - topicality_weight - 0.25)
+            # CREDIBILITY-FIRST REBALANCING: Prioritize domain authority over recency
+            # Authority (credibility): 0.50 - Primary signal for trustworthy sources
+            # Relevance (semantic):    0.35 - Important but secondary
+            # Recency (temporal):      0.15 - Least important unless explicitly requested
+            authority_weight = 0.50  # Doubled from previous ~0.25
+            topicality_weight = 0.35  # Up from 0.28
+            recency_weight = min(recency_weight, 0.15)  # Cap at 0.15 (down from 0.3)
             
             # Normalize if needed (safety check)
             total_weight = recency_weight + topicality_weight + authority_weight
@@ -208,6 +206,13 @@ class ContentCrawlerStub:
         
         # Sort by composite score
         sources.sort(key=lambda x: getattr(x, 'composite_score', 0.0), reverse=True)
+        
+        # Log credibility-first ranking results (top 3 sources)
+        if sources:
+            print(f"🏆 Credibility-First Ranking (Authority=0.50, Relevance=0.35, Recency=0.15):")
+            for i, src in enumerate(sources[:3]):
+                domain = src.url.split('/')[2] if src.url else 'unknown'
+                print(f"   {i+1}. {domain} - Score: {getattr(src, 'composite_score', 0.0):.3f}")
         
         return sources
     
@@ -244,7 +249,7 @@ class ContentCrawlerStub:
         """Store results in cache with timestamp"""
         self._cache[cache_key] = (data, time.time())
     
-    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None, publication_name: Optional[str] = None) -> Dict[str, Any]:
+    async def generate_sources_progressive(self, query: str, count: int, budget_limit: Optional[float] = None, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None, publication_name: Optional[str] = None, research_brief: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate sources with progressive loading - returns immediate results + enrichment promise
         
         Args:
@@ -254,6 +259,7 @@ class ContentCrawlerStub:
             domain_filter: Optional list of domains to filter results (e.g., ['nytimes.com'])
             classification: Optional classification dict with intent, temporal_bucket, recency_weight
             publication_name: Optional publication name for Claude relevance filtering (e.g., 'Wall Street Journal')
+            research_brief: Optional research brief with enhanced_context for query enhancement
         """
         cache_key = self._get_cache_key(query, count, budget_limit, domain_filter)
         print(f"🔑 Cache key generated: {cache_key}")
@@ -274,7 +280,7 @@ class ContentCrawlerStub:
             }
         
         print(f"❌ CACHE MISS for query: '{query}' - Will call Tavily API")
-        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter, classification, publication_name)
+        return await self._generate_tavily_sources_progressive(query, count, budget_limit, cache_key, domain_filter, classification, publication_name, research_brief)
     
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -423,7 +429,66 @@ class ContentCrawlerStub:
         
         return query, None
     
-    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None, publication_name: Optional[str] = None) -> Dict[str, Any]:
+    def _build_enhanced_tavily_query(self, base_query: str, research_brief: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Build enhanced Tavily query using conversation context from research brief.
+        Adds geographic, temporal, and domain-specific keywords to improve relevance.
+        
+        Args:
+            base_query: Original user query
+            research_brief: Research brief with enhanced_context from Claude extraction
+        
+        Returns:
+            Enhanced query string optimized for Tavily search
+        """
+        if not research_brief or not research_brief.get("enhanced_context"):
+            # No enhanced context, use base query
+            return base_query
+        
+        enhanced_context = research_brief["enhanced_context"]
+        query_parts = [base_query]
+        
+        # Add geographic scope if specified
+        geographic_scope = enhanced_context.get("geographic_scope", "").strip()
+        if geographic_scope and geographic_scope.lower() not in ["none", "global"]:
+            # Add geographic constraint to query
+            query_parts.append(geographic_scope)
+            print(f"🌍 Adding geographic scope to query: {geographic_scope}")
+        
+        # Add temporal keywords if specified
+        temporal_scope = enhanced_context.get("temporal_scope", "").strip()
+        if temporal_scope and temporal_scope.lower() != "none":
+            # Add temporal constraint to query
+            if "2020" in temporal_scope or "2021" in temporal_scope or "2022" in temporal_scope or "2023" in temporal_scope or "2024" in temporal_scope:
+                # Specific year - add it
+                query_parts.append(temporal_scope)
+                print(f"📅 Adding temporal scope to query: {temporal_scope}")
+            elif "recent" in temporal_scope.lower() or "last" in temporal_scope.lower():
+                # Recent time period - add keyword
+                query_parts.append("recent")
+                print(f"📅 Adding temporal keyword: recent")
+        
+        # Add source type keywords if academic/scholarly preferred
+        source_prefs = enhanced_context.get("source_preferences", [])
+        if source_prefs:
+            pref_lower = [p.lower() for p in source_prefs]
+            if "academic" in pref_lower or "scholarly" in pref_lower:
+                query_parts.append("research study")
+                print(f"📚 Adding academic keywords to query")
+            elif "government" in pref_lower:
+                query_parts.append("government policy")
+                print(f"🏛️ Adding government keywords to query")
+        
+        # Combine all parts
+        enhanced_query = " ".join(query_parts)
+        
+        # Log the enhancement
+        if enhanced_query != base_query:
+            print(f"✨ Enhanced query: '{base_query}' → '{enhanced_query}'")
+        
+        return enhanced_query[:350]  # Tavily has a character limit
+    
+    async def _generate_tavily_sources_progressive(self, query: str, count: int, budget_limit: Optional[float], cache_key: str, domain_filter: Optional[List[str]] = None, classification: Optional[Dict[str, Any]] = None, publication_name: Optional[str] = None, research_brief: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate sources progressively: immediate raw results + background enrichment
         
         Args:
@@ -434,6 +499,7 @@ class ContentCrawlerStub:
             domain_filter: Optional domain filter from publication detection (takes precedence)
             classification: Optional classification for recency-weighted reranking
             publication_name: Optional publication name for Claude relevance filtering
+            research_brief: Optional research brief with enhanced_context for query enhancement
         """
         if not self.tavily_api_key:
             return await self.generate_sources_progressive(query, count, budget_limit)
@@ -448,8 +514,15 @@ class ContentCrawlerStub:
                 clean_query, extracted_filter = self._extract_domain_filter(query)
                 domain_filter = extracted_filter
             
+            # Step 1.5: Build enhanced query using conversation context
+            enhanced_query = self._build_enhanced_tavily_query(clean_query, research_brief)
+            if research_brief and enhanced_query != clean_query:
+                print(f"🔍 Context-Enhanced Query:")
+                print(f"   Original: {clean_query}")
+                print(f"   Enhanced: {enhanced_query}")
+            
             # Step 2: Get raw Tavily results immediately (this is fast)
-            tavily_query = clean_query[:350] if len(clean_query) > 350 else clean_query
+            tavily_query = enhanced_query[:350] if len(enhanced_query) > 350 else enhanced_query
             
             # Make async REST API call (non-blocking)
             # Request more results (30) to give Claude filtering more options
@@ -464,15 +537,32 @@ class ContentCrawlerStub:
             results = response.get('results', [])
             print(f"📥 Tavily returned {len(results)} results")
             
-            # Step 2.5: Apply Claude relevance filtering to all results
+            # Step 2.5: Apply Claude relevance filtering to all results using full conversation context
             # Lazy import to avoid circular dependency
             from services.ai.conversational import AIResearchService
             ai_filter = AIResearchService()
+            
+            # Extract conversation context and enhanced context from research brief
+            conversation_context = None
+            enhanced_context = None
+            if research_brief:
+                # Get conversation_context if it was stored in the brief
+                conversation_context = research_brief.get("conversation_context")
+                # Get enhanced_context from Claude extraction
+                enhanced_context = research_brief.get("enhanced_context")
+            
             results = await ai_filter.filter_search_results_by_relevance(
                 query=clean_query,
                 results=results,
-                publication=publication_name  # Pass publication if available, None otherwise
+                publication=publication_name,  # Pass publication if available, None otherwise
+                conversation_context=conversation_context,  # Pass full conversation for context-aware filtering
+                enhanced_context=enhanced_context  # Pass enhanced context with geographic/temporal constraints
             )
+            
+            # Log context-aware filtering results
+            if conversation_context or enhanced_context:
+                filtered_count = len([r for r in results if r.get("is_relevant", True)])
+                print(f"🎯 Claude Context Filter: {len(raw_results)} → {filtered_count} sources (conversation-aware)")
             
             # Step 3: Create basic source cards immediately with filtered Tavily data
             immediate_sources = []

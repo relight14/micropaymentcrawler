@@ -408,13 +408,101 @@ def _detect_output_bias(text: str) -> str:
     return "general"
 
 
+def _extract_enhanced_context_with_claude(conversation_context: List[Dict], user_query: str) -> Optional[Dict[str, Any]]:
+    """
+    Use Claude to intelligently extract rich research context from conversation.
+    Returns enhanced context dict or None if extraction fails.
+    """
+    
+    # Build conversation history (last 8-10 messages)
+    recent_messages = conversation_context[-10:] if len(conversation_context) > 10 else conversation_context
+    
+    conversation_text = ""
+    for msg in recent_messages:
+        role = msg.get('sender', msg.get('role', 'user'))
+        content = msg.get('content', '').strip()
+        if content and len(content) > 5:
+            conversation_text += f"{role.upper()}: {content}\n"
+    
+    # Build Claude prompt for context extraction
+    system_prompt = """You are a research assistant analyzing conversations to extract detailed research context.
+
+Your task: Analyze this conversation and extract structured research context to help find the most relevant sources.
+
+Extract:
+1. **core_topic**: The main research topic (concise, 3-10 words)
+2. **key_entities**: Specific people, organizations, places, events mentioned (list of strings)
+3. **geographic_scope**: Geographic focus if mentioned (e.g., "United States", "Europe", "global", "none")
+4. **temporal_scope**: Time period of interest (e.g., "recent", "2020-present", "historical", "last 24 hours", "none")
+5. **source_preferences**: Preferred source types mentioned (e.g., ["academic", "journalistic", "government"], or empty list)
+6. **specific_aspects**: Specific aspects/angles the user wants to focus on (list of strings)
+7. **exclusions**: Topics/aspects explicitly NOT wanted (list of strings, very important!)
+8. **research_intent**: Why they're researching this (e.g., "understanding policy implications", "tracking current developments")
+
+Be precise. Extract ONLY what's explicitly mentioned in the conversation. Don't infer or add context.
+
+Return ONLY valid JSON:
+{
+  "core_topic": "string",
+  "key_entities": ["entity1", "entity2"],
+  "geographic_scope": "string or none",
+  "temporal_scope": "string or none",
+  "source_preferences": ["type1", "type2"],
+  "specific_aspects": ["aspect1", "aspect2"],
+  "exclusions": ["exclude1", "exclude2"],
+  "research_intent": "string"
+}"""
+
+    user_message = f"""Conversation history:
+{conversation_text}
+
+Latest query: {user_query}
+
+Extract the research context."""
+
+    try:
+        response = claude_client.messages.create(
+            model="claude-sonnet-4-20250514",  # Fast, accurate
+            max_tokens=800,
+            temperature=0.1,  # Low temperature for precise extraction
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        
+        response_text = _extract_response_text(response).strip()
+        
+        # Parse JSON (handle markdown code blocks)
+        import json
+        response_text = response_text.replace("```json", "").replace("```", "").strip()
+        enhanced_context = json.loads(response_text)
+        
+        logger.info("✨ Claude extracted enhanced research context", extra={
+            "core_topic": enhanced_context.get("core_topic", "")[:50],
+            "geographic_scope": enhanced_context.get("geographic_scope"),
+            "temporal_scope": enhanced_context.get("temporal_scope"),
+            "exclusions_count": len(enhanced_context.get("exclusions", []))
+        })
+        
+        return enhanced_context
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Enhanced context extraction failed, using fallback: {e}")
+        return None
+
+
 def _build_research_brief(conversation_context: List[Dict], user_query: str) -> Dict[str, Any]:
     """
     Extract structured research brief from conversation + current query.
-    Returns: {topic, entities, timeframe, subtasks, output_bias}
+    Uses Claude for enhanced context extraction, falls back to regex-based extraction.
+    Returns: {topic, entities, timeframe, subtasks, output_bias, enhanced_context}
     """
     
-    # Combine recent conversation for context (last 6 messages)
+    # Try enhanced Claude-based extraction first
+    enhanced_context = None
+    if claude_client:
+        enhanced_context = _extract_enhanced_context_with_claude(conversation_context, user_query)
+    
+    # Combine recent conversation for fallback context (last 6 messages)
     context_text = ""
     if conversation_context:
         for msg in conversation_context[-6:]:
@@ -428,11 +516,57 @@ def _build_research_brief(conversation_context: List[Dict], user_query: str) -> 
     # Extract output bias first (needed for temporal defaults)
     output_bias = _detect_output_bias(full_text)
     
-    # Extract components
-    timeframe = _extract_timeframe(full_text, output_bias)
-    entities = _extract_entities(full_text)
-    topic = _extract_topic(user_query, context_text)
-    subtasks = _detect_subtasks(full_text)
+    # If we have enhanced context, use it; otherwise use fallback extraction
+    if enhanced_context:
+        # Map enhanced context to brief structure
+        topic = enhanced_context.get("core_topic", user_query)[:150]
+        entities = enhanced_context.get("key_entities", [])
+        
+        # Map temporal_scope to timeframe bucket
+        temporal_scope = enhanced_context.get("temporal_scope", "").lower()
+        if "24" in temporal_scope or "today" in temporal_scope or "current" in temporal_scope:
+            timeframe = "T0"
+        elif "recent" in temporal_scope or "last week" in temporal_scope or "days" in temporal_scope:
+            timeframe = "T1"
+        elif "month" in temporal_scope:
+            timeframe = "T7"
+        elif "historical" in temporal_scope or "years" in temporal_scope:
+            timeframe = "TH"
+        else:
+            timeframe = _extract_timeframe(full_text, output_bias)
+        
+        # Map specific_aspects to subtasks
+        specific_aspects = enhanced_context.get("specific_aspects", [])
+        subtasks = []
+        for aspect in specific_aspects:
+            aspect_lower = aspect.lower()
+            if any(word in aspect_lower for word in ["terms", "details", "specifics"]):
+                subtasks.append("terms_and_details")
+            elif any(word in aspect_lower for word in ["who", "actors", "stakeholders"]):
+                subtasks.append("actors_and_stakeholders")
+            elif any(word in aspect_lower for word in ["impact", "consequences", "effects"]):
+                subtasks.append("impact_analysis")
+            elif any(word in aspect_lower for word in ["future", "prospects", "outlook"]):
+                subtasks.append("future_outlook")
+            elif any(word in aspect_lower for word in ["background", "context", "history"]):
+                subtasks.append("background_context")
+        
+        # Override output_bias if source preferences are specified
+        source_prefs = enhanced_context.get("source_preferences", [])
+        if source_prefs:
+            pref_lower = [p.lower() for p in source_prefs]
+            if "academic" in pref_lower or "scholarly" in pref_lower:
+                output_bias = "academic"
+            elif "journalistic" in pref_lower or "news" in pref_lower:
+                output_bias = "news"
+            elif "government" in pref_lower or "policy" in pref_lower:
+                output_bias = "policy"
+    else:
+        # Fallback to regex-based extraction
+        timeframe = _extract_timeframe(full_text, output_bias)
+        entities = _extract_entities(full_text)
+        topic = _extract_topic(user_query, context_text)
+        subtasks = _detect_subtasks(full_text)
     
     brief = {
         "topic": topic,
@@ -440,14 +574,18 @@ def _build_research_brief(conversation_context: List[Dict], user_query: str) -> 
         "timeframe": timeframe,
         "subtasks": subtasks,
         "output_bias": output_bias,
-        "raw_query": user_query
+        "raw_query": user_query,
+        "enhanced_context": enhanced_context,  # Include full enhanced context
+        "conversation_context": conversation_context  # Include conversation for filtering
     }
     
     logger.info("📋 Research Brief extracted", extra={
         "topic": topic[:50],
         "timeframe": timeframe,
         "output_bias": output_bias,
-        "entity_count": len(entities)
+        "entity_count": len(entities),
+        "has_enhanced_context": enhanced_context is not None,
+        "has_conversation": conversation_context is not None and len(conversation_context) > 0
     })
     
     return brief
@@ -993,7 +1131,8 @@ async def analyze_research_query(
                 budget_limit, 
                 domain_filter=domain_filter,
                 classification=classification,
-                publication_name=publication_name
+                publication_name=publication_name,
+                research_brief=brief  # Pass research brief with enhanced_context
             )
             sources = result["sources"]
             

@@ -26,36 +26,89 @@ class AIResearchService:
         # Track whether we've suggested research mode for each user
         self.suggested_research: Dict[str, bool] = {}
     
-    async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None, conversation_context: Optional[List[Dict[str, Any]]] = None, enhanced_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
-        Use Claude to filter search results for query relevance.
+        Use Claude to filter search results for conversation-aware relevance.
         
         Args:
             query: User's research query
             results: List of search results from Tavily with 'title', 'content', 'url'
             publication: Optional specific publication name (e.g., "Wall Street Journal", "WSJ")
+            conversation_context: Optional conversation history to evaluate relevance against
+            enhanced_context: Optional enhanced_context from research brief extraction
         
         Returns:
             Filtered list of relevant results with reasoning
         """
-        print(f"🔎 Claude filtering STARTED - Query: '{query}', Results: {len(results)}, Publication: {publication}")
+        print(f"🔎 Claude filtering STARTED - Query: '{query}', Results: {len(results)}, Publication: {publication}, Has Conversation: {conversation_context is not None}, Has Enhanced Context: {enhanced_context is not None}")
         
         if not results:
             print("⚠️  No results to filter, returning empty list")
             return []
+        
+        # Build conversation context for filtering
+        conversation_summary = ""
+        if conversation_context:
+            # Build summary of last 8-10 messages
+            recent_messages = conversation_context[-10:] if len(conversation_context) > 10 else conversation_context
+            for msg in recent_messages:
+                role = msg.get('sender', msg.get('role', 'user'))
+                content = msg.get('content', '').strip()
+                if content and len(content) > 5:
+                    conversation_summary += f"{role.upper()}: {content}\n"
+        
+        # Build enhanced context summary
+        context_details = ""
+        if enhanced_context:
+            geographic = enhanced_context.get("geographic_scope", "").strip()
+            temporal = enhanced_context.get("temporal_scope", "").strip()
+            aspects = enhanced_context.get("specific_aspects", [])
+            exclusions = enhanced_context.get("exclusions", [])
+            
+            if geographic and geographic.lower() not in ["none", "global"]:
+                context_details += f"\n- Geographic focus: {geographic}"
+            if temporal and temporal.lower() != "none":
+                context_details += f"\n- Time period: {temporal}"
+            if aspects:
+                context_details += f"\n- Specific aspects: {', '.join(aspects[:3])}"
+            if exclusions:
+                context_details += f"\n- EXCLUDE topics: {', '.join(exclusions)}"
         
         # Build evaluation prompt
         publication_context = ""
         if publication:
             publication_context = f"\n\nIMPORTANT: User specifically requested sources from '{publication}'. Heavily prioritize results from this publication and filter out results from other publications unless they are highly relevant to the core query."
         
-        system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results match a user's research query.
+        # Enhanced system prompt with conversation context
+        if conversation_summary or context_details:
+            system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results match what the user discussed in their conversation.
+
+User's Research Query: "{query}"{context_details}
+
+Conversation Context:
+{conversation_summary if conversation_summary else "(No conversation history)"}
+
+Evaluate each result against these factors:
+1. **Conversation Alignment**: Does the source address what the user discussed and cared about in the conversation?
+2. **Geographic/Temporal Match**: If the user specified geographic or time constraints, does the article match?
+3. **Specific Aspects**: Does it cover the specific aspects or angles the user mentioned?
+4. **Exclusions**: If the user mentioned topics to EXCLUDE, reject sources about those topics
+5. **Topic Match**: Does the article genuinely discuss the core topic?
+6. **Publication Focus**: If a specific publication was requested, is this from that publication?
+
+Be VERY strict - only mark results as relevant if they genuinely address what the user discussed in the conversation. Consider the full context of the conversation, not just the query string.{publication_context}
+
+For each result, respond with JSON:
+{{"relevant": true/false, "reason": "brief explanation based on conversation context"}}"""
+        else:
+            # Fallback to query-only filtering (original behavior)
+            system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results match a user's research query.
 
 Consider these factors:
 1. **Topic Match**: Does the article actually discuss the core topic?
 2. **Geographic Scope**: If query mentions a specific country/region, does the article focus on that geography?
 3. **Contextual Relevance**: Does the article address the user's specific question or need?
-4. **Tangential vs Core**: Reject results that are only tangentially related (e.g., international nuclear treaties when user asked about US nuclear power)
+4. **Tangential vs Core**: Reject results that are only tangentially related
 5. **Publication Focus**: If a specific publication was requested, is this from that publication?
 
 Be strict - only mark results as relevant if they genuinely address the user's query. When in doubt, filter it out.
@@ -479,24 +532,33 @@ If needs_sources is true, extract a clear search query from the context."""
         
         current_date = datetime.now().strftime("%B %d, %Y")
         
-        system_prompt = f"""You are an expert research assistant helping users explore and refine their research interests. 
+        system_prompt = f"""You are an expert research guidance assistant helping users refine their research process through thoughtful conversation.
 
 IMPORTANT CONTEXT:
 - Today's date is {current_date}
 - Your knowledge was last updated in April 2024
 - For questions about events after April 2024, acknowledge your knowledge cutoff and suggest using Research mode for current information
 
-Your role is to:
+Your role is to guide users toward precise, well-scoped research:
 
-1. Ask thoughtful follow-up questions to understand their research needs
-2. Suggest related areas of investigation they might not have considered
-3. Help them narrow down broad topics into specific, researchable questions
-4. Provide context about why certain research directions might be valuable
-5. Prepare them for productive deep research by understanding their goals
-6. For current events or recent developments, recommend switching to Research mode which searches live web sources
+1. **Guide Scope Refinement**: Ask clarifying questions to help users narrow or expand their research focus
+   - Geographic scope: "Are you interested in this globally, or focused on a specific region?"
+   - Temporal scope: "Do you want recent developments, or historical context?"
+   - Source preferences: "Would academic studies be helpful, or are you looking for journalism/policy analysis?"
 
-Be curious, engaging, and intellectually stimulating. Help them think deeper about their topic.
-When they ask about current events or seem ready for deep research, suggest they switch to "Research" mode to find specific sources and real-time data."""
+2. **Identify Constraints**: Help users articulate what they DO and DON'T want
+   - "What specific aspects are most important to you?"
+   - "Is there anything you'd like to exclude from your research?"
+
+3. **Emphasize Credibility**: Frame research as finding the most trustworthy sources
+   - "When you're ready to research, I'll help you find the most credible sources on this topic—whether they're free or paywalled"
+   - "Premium sources from major publications and peer-reviewed journals often provide the most authoritative analysis"
+
+4. **Encourage Specificity**: Ask follow-up questions to understand their real information needs
+   - Don't accept vague queries—help them get specific about what they're trying to learn
+
+Be curious but not overbearing. Guide naturally through conversation, not interrogation.
+When they seem ready for deep research or ask about current events, suggest they switch to "Research" mode to get specific, credible sources."""
         
         # Create conversation context for Claude using user-specific history
         user_history = self.user_conversations.get(user_id, [])
