@@ -5,11 +5,12 @@
 
 .sources-panel {
     background: var(--card-background, #f9f9f9);
-    border-left: 1px solid var(--border-color, #e5e5e5);
+    /* Border on right side since panel is on left */
+    border-right: 1px solid var(--border-color, #e5e5e5);
     display: flex;
     flex-direction: column;
     /* Height inherited from flex parent (.app-container with height: 100vh) */
-    overflow: hidden;
+    /* Removed overflow:hidden to allow resize handle visibility and scrolling */
 }
 
 .sources-panel-header {
@@ -106,7 +107,7 @@
 /* Dark mode */
 .dark-mode .sources-panel {
     background: var(--card-background-dark, #1a1a1a);
-    border-left-color: var(--border-color-dark, #333);
+    border-right-color: var(--border-color-dark, #333);
 }
 
 .dark-mode .sources-panel-header {

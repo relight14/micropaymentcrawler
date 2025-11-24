@@ -56,13 +56,11 @@ export class SourcesPanel {
         });
         
         // Listen for authentication state changes
+        // Only show on login - panel naturally hides on logout via state reset
         AppEvents.addEventListener('authStateChanged', (e) => {
             if (e.detail.isAuthenticated && this.container) {
                 this.container.classList.add('visible');
                 console.log('📚 [SourcesPanel] Shown after login');
-            } else if (this.container) {
-                this.container.classList.remove('visible');
-                console.log('📚 [SourcesPanel] Hidden after logout');
             }
         });
         
@@ -177,6 +175,11 @@ export class SourcesPanel {
             
             console.log(`✅ [SourcesPanel] Loaded ${this.sources.length} sources for project ${projectId}`);
             this.render();
+            
+            // Show panel after successful load (fixes visibility on normal project loads)
+            if (this.container) {
+                this.container.classList.add('visible');
+            }
             
         } catch (error) {
             console.error('❌ [SourcesPanel] Error loading sources:', error);
