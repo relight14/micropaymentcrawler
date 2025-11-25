@@ -39,6 +39,7 @@
  */
 
 import { analytics } from '../utils/analytics.js';
+import { SafeRenderer } from '../utils/safe-renderer.js';
 
 export class MessageRenderer {
     
@@ -64,40 +65,32 @@ export class MessageRenderer {
     };
     
     /**
-     * Parse HTML string content into DOM elements
+     * Parse HTML string content into DOM elements (SANITIZED)
      * SINGLE SOURCE OF TRUTH for HTML reconstruction
+     * Uses SafeRenderer to prevent XSS from LLM output or external content
      * @param {string} htmlString - HTML content as string
-     * @returns {HTMLElement|string} - DOM element(s) or original string if not HTML
+     * @returns {HTMLElement|string} - Sanitized DOM element(s) or original string if not HTML
      */
     static parseHtml(htmlString) {
-        // Not a string or doesn't start with HTML, return as-is
-        if (typeof htmlString !== 'string' || !htmlString.trim().startsWith('<')) {
+        // Not a string, return as-is
+        if (typeof htmlString !== 'string') {
             return htmlString;
         }
         
-        try {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = htmlString;
-            
-            // If multiple root elements, wrap them in a container
-            if (tempDiv.children.length > 1) {
-                const wrapper = document.createElement('div');
-                while (tempDiv.firstChild) {
-                    wrapper.appendChild(tempDiv.firstChild);
-                }
-                return wrapper;
-            } else if (tempDiv.firstChild) {
-                // Single element, return it directly
-                return tempDiv.firstChild;
-            }
-            
-            // If no children, return original string
-            return htmlString;
-        } catch (error) {
-            console.error('Error parsing HTML content:', error);
-            // Keep content as original string if parsing fails
+        // Plain text (doesn't start with HTML tag) - return as-is
+        if (!htmlString.trim().startsWith('<')) {
             return htmlString;
         }
+        
+        // Parse and sanitize HTML using SafeRenderer
+        const sanitizedElement = SafeRenderer.parseHtmlSafe(htmlString);
+        
+        if (sanitizedElement) {
+            return sanitizedElement;
+        }
+        
+        // Fallback to original string if parsing fails
+        return htmlString;
     }
     
     /**
@@ -433,6 +426,7 @@ export class MessageRenderer {
     
     /**
      * Format message content (escape HTML, preserve formatting)
+     * Uses SafeRenderer for consistent XSS protection
      * @private
      */
     static _formatContent(content) {
@@ -440,14 +434,8 @@ export class MessageRenderer {
             return '';
         }
         
-        // Basic HTML escaping for security
-        const escaped = content
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        
-        // Preserve line breaks
-        return escaped.replace(/\n/g, '<br>');
+        // Use SafeRenderer for consistent escaping and line break handling
+        return SafeRenderer.formatPlainText(content);
     }
 }
 

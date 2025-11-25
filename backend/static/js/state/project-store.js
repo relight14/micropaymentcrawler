@@ -3,6 +3,8 @@
  * Single source of truth with subscribe/notify pattern
  */
 
+import { logger } from '../utils/logger.js';
+
 export class ProjectStore {
     constructor() {
         this.state = {
@@ -60,7 +62,7 @@ export class ProjectStore {
         const oldState = this.getState();
         this.state = { ...this.state, ...updates };
         
-        console.log('🏪 [ProjectStore] setState called:', {
+        logger.debug('🏪 [ProjectStore] setState called:', {
             updates,
             subscriberCount: this.subscribers.size,
             oldActiveProjectId: oldState.activeProjectId,
@@ -72,14 +74,14 @@ export class ProjectStore {
         let notifiedCount = 0;
         this.subscribers.forEach(callback => {
             try {
-                console.log(`🏪 [ProjectStore] Notifying subscriber ${notifiedCount + 1}/${this.subscribers.size}`);
+                logger.debug(`🏪 [ProjectStore] Notifying subscriber ${notifiedCount + 1}/${this.subscribers.size}`);
                 callback(newState, oldState);
                 notifiedCount++;
             } catch (error) {
-                console.error('Error in state subscriber:', error);
+                logger.error('Error in state subscriber:', error);
             }
         });
-        console.log(`✅ [ProjectStore] Notified ${notifiedCount} subscribers`);
+        logger.debug(`✅ [ProjectStore] Notified ${notifiedCount} subscribers`);
     }
 
     /**

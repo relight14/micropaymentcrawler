@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 /**
  * ProjectListSidebar Component
  * Manages project list display and navigation
@@ -20,7 +21,7 @@ export class ProjectListSidebar extends EventTarget {
         
         // Subscribe to viewport changes to re-render when crossing mobile breakpoint
         this.unsubscribeViewport = viewport.subscribe((isMobile) => {
-            console.log('🔧 [ProjectListSidebar] Viewport changed, isMobile:', isMobile);
+            logger.debug('🔧 [ProjectListSidebar] Viewport changed, isMobile:', isMobile);
             this.render();
         });
     }
@@ -31,17 +32,17 @@ export class ProjectListSidebar extends EventTarget {
      * This just ensures the sidebar renders for non-authenticated users
      */
     async init() {
-        console.log('🔧 [ProjectListSidebar] init() called', {
+        logger.debug('🔧 [ProjectListSidebar] init() called', {
             isAuthenticated: this.authService.isAuthenticated(),
             willRender: !this.authService.isAuthenticated()
         });
         
         if (!this.authService.isAuthenticated()) {
-            console.log('🔧 [ProjectListSidebar] User NOT authenticated - calling render()');
+            logger.debug('🔧 [ProjectListSidebar] User NOT authenticated - calling render()');
             // Render for non-authenticated users (shows mobile login prompt on mobile)
             this.render();
         } else {
-            console.log('🔧 [ProjectListSidebar] User authenticated - skipping render (will load via loadInitialData)');
+            logger.debug('🔧 [ProjectListSidebar] User authenticated - skipping render (will load via loadInitialData)');
         }
     }
 
@@ -322,7 +323,7 @@ export class ProjectListSidebar extends EventTarget {
      * Render the sidebar (works in both dropdown and legacy sidebar)
      */
     render() {
-        console.log('🔧 [ProjectListSidebar] render() called', {
+        logger.debug('🔧 [ProjectListSidebar] render() called', {
             containerId: this.containerId,
             isAuthenticated: this.authService.isAuthenticated(),
             projectCount: this.projects.length,

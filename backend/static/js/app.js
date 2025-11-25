@@ -22,6 +22,7 @@ import { AppEvents, EVENT_TYPES } from './utils/event-bus.js';
 import { analytics } from './utils/analytics.js';
 import { summaryPopover } from './components/summary-popover.js';
 import { projectStore } from './state/project-store.js';
+import { logger } from './utils/logger.js';
 
 // SourceCard and SummaryPopover loaded globally - access them dynamically when needed
 window.summaryPopover = summaryPopover;
@@ -159,17 +160,17 @@ export class ChatResearchApp {
         // are now handled by ProjectsController
         
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_UNLOCKED, (e) => {
-            console.log('📡 AppEvents: Source unlocked', e.detail);
+            logger.debug('📡 AppEvents: Source unlocked', e.detail);
         });
         
         AppEvents.addEventListener(EVENT_TYPES.BUDGET_WARNING, (e) => {
-            console.log('📡 AppEvents: Budget warning', e.detail);
+            logger.debug('📡 AppEvents: Budget warning', e.detail);
             this.toastManager.show(e.detail.warning, 'warning');
         });
         
         // Listen for Build Research Packet event from OutlineBuilder
         AppEvents.addEventListener('buildResearchPacket', async (e) => {
-            console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
+            logger.debug('📡 AppEvents: Build Research Packet triggered', e.detail);
             
             // Get deduplicated sources from outline (same logic as report-builder.js)
             const outlineSnapshot = projectStore.getOutlineSnapshot();
@@ -215,11 +216,11 @@ export class ChatResearchApp {
             const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
             
             if (!userConfirmed) {
-                console.log('🚫 Report generation cancelled by user');
+                logger.debug('🚫 Report generation cancelled by user');
                 return;
             }
             
-            console.log('✅ Purchase confirmed, generating report...');
+            logger.debug('✅ Purchase confirmed, generating report...');
             
             // Trigger report generation via ReportBuilder
             this.reportBuilder.generateReport(query, sources, outlineSnapshot);
@@ -230,12 +231,12 @@ export class ChatResearchApp {
         
         // FIX B: Global listener for SOURCE_SEARCH_TRIGGER - fires search from any entry point
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_SEARCH_TRIGGER, (e) => {
-            console.log('📡 AppEvents: SOURCE_SEARCH_TRIGGER received', e.detail);
+            logger.debug('📡 AppEvents: SOURCE_SEARCH_TRIGGER received', e.detail);
             const query = e.detail?.query || this.appState.getCurrentQuery();
             if (query && query.trim()) {
                 // Guard: Skip if search was already fired from setMode during login flow
                 if (this.pendingSearchFromLogin) {
-                    console.log('⏭️ SOURCE_SEARCH_TRIGGER: Skipping - search already fired from setMode');
+                    logger.debug('⏭️ SOURCE_SEARCH_TRIGGER: Skipping - search already fired from setMode');
                     this.pendingSearchFromLogin = false; // reset flag
                     return;
                 }
@@ -247,13 +248,13 @@ export class ChatResearchApp {
                     this.sendMessage();
                 }
             } else {
-                console.log('⚠️ SOURCE_SEARCH_TRIGGER: No query available to search');
+                logger.debug('⚠️ SOURCE_SEARCH_TRIGGER: No query available to search');
             }
         });
         
         // Register logout callback to update UI when user is logged out
         this.authService.onLogout(() => {
-            console.log('🔐 Logout callback triggered - updating UI');
+            logger.debug('🔐 Logout callback triggered - updating UI');
             this.updateAuthButton();
             this.toastManager.show('Session expired. Please log in again.', 'info');
         });
@@ -279,7 +280,7 @@ export class ChatResearchApp {
             // Setup modal controller callbacks
             this.modalController.setAuthSuccessCallback(async (type) => {
                 try {
-                    console.log('🔐 Auth success callback started:', type);
+                    logger.debug('🔐 Auth success callback started:', type);
                     
                     // Close the auth modal
                     this.modalController.closeAuthModal();
@@ -288,12 +289,12 @@ export class ChatResearchApp {
                     this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');
 
                     // Fetch wallet balance from API
-                    console.log('💰 Fetching wallet balance...');
+                    logger.debug('💰 Fetching wallet balance...');
                     await this.authService.updateWalletBalance();
-                    console.log('💰 Wallet balance updated:', this.authService.getWalletBalance());
+                    logger.debug('💰 Wallet balance updated:', this.authService.getWalletBalance());
                     
                     // Update UI with wallet balance
-                    console.log('🎨 Updating auth button UI...');
+                    logger.debug('🎨 Updating auth button UI...');
                     this.updateAuthButton();
                     
                     // NOTE: Project creation and loading moved to ProjectManager.handleLogin()
@@ -310,11 +311,11 @@ export class ChatResearchApp {
                     // Execute any pending tab state action (e.g., source unlock)
                     const pendingTabAction = this.appState.getPendingAction();
                     if (pendingTabAction) {
-                        console.log('🔄 Executing pending tab action after login:', pendingTabAction);
+                        logger.debug('🔄 Executing pending tab action after login:', pendingTabAction);
                         this.appState.clearPendingAction();
                     }
                     
-                    console.log('✅ Auth success callback completed');
+                    logger.debug('✅ Auth success callback completed');
                 } catch (error) {
                     console.error('❌ Error in auth success callback:', error);
                     // Don't throw - just log and update UI anyway
@@ -413,7 +414,7 @@ export class ChatResearchApp {
             const sidebar = this.projectsController.projectManager?.sidebar;
             if (sidebar) {
                 sidebar.addEventListener('projectCountUpdated', (e) => {
-                    console.log('📊 Project count updated:', e.detail.count);
+                    logger.debug('📊 Project count updated:', e.detail.count);
                     this.projectsDropdown.updateCount(e.detail.count);
                 });
                 
@@ -566,7 +567,7 @@ export class ChatResearchApp {
     }
 
     async triggerSourceSearch(intentQuery = null) {
-        console.log('🔍 User requested source search via button or intent detection');
+        logger.debug('🔍 User requested source search via button or intent detection');
         
         try {
             // Show typing indicator
@@ -671,7 +672,7 @@ export class ChatResearchApp {
                 const userInitials = this.authService.getUserInitials();
                 const walletBalance = this.authService.getWalletBalance();
                 
-                console.log('Updating profile UI:', {
+                logger.debug('Updating profile UI:', {
                     userInfo,
                     initials: userInitials,
                     balance: walletBalance
@@ -679,7 +680,7 @@ export class ChatResearchApp {
                 
                 if (initials) {
                     initials.textContent = userInitials || 'RI';
-                    console.log('Set initials to:', userInitials);
+                    logger.debug('Set initials to:', userInitials);
                 } else {
                     console.warn('⚠️ userInitials element not found');
                 }
@@ -687,7 +688,7 @@ export class ChatResearchApp {
                 if (balance) {
                     const safeBalance = Number(walletBalance) || 0;
                     balance.textContent = `$${safeBalance.toFixed(2)}`;
-                    console.log('Set balance to:', safeBalance);
+                    logger.debug('Set balance to:', safeBalance);
                 } else {
                     console.warn('⚠️ userBalance element not found');
                 }
@@ -715,7 +716,7 @@ export class ChatResearchApp {
         const topUpItem = document.getElementById('topUpItem');
         const logoutItem = document.getElementById('logoutItem');
         
-        console.log('Setting up profile dropdown:', { profileButton, dropdownMenu, topUpItem, logoutItem });
+        logger.debug('Setting up profile dropdown:', { profileButton, dropdownMenu, topUpItem, logoutItem });
         
         if (profileButton && dropdownMenu) {
             // Remove any existing listeners to avoid duplicates
@@ -726,7 +727,7 @@ export class ChatResearchApp {
             newProfileButton.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Profile button clicked, toggling dropdown');
+                logger.debug('Profile button clicked, toggling dropdown');
                 dropdownMenu.classList.toggle('show');
             });
             
@@ -741,7 +742,7 @@ export class ChatResearchApp {
         if (topUpItem) {
             topUpItem.addEventListener('click', (e) => {
                 e.preventDefault();
-                console.log('Top Up clicked');
+                logger.debug('Top Up clicked');
                 dropdownMenu.classList.remove('show'); // Close dropdown
                 this.modalController.showFundingModal(); // Launch funding modal
             });
@@ -750,7 +751,7 @@ export class ChatResearchApp {
         if (logoutItem) {
             logoutItem.addEventListener('click', (e) => {
                 e.preventDefault();
-                console.log('Logout clicked');
+                logger.debug('Logout clicked');
                 this.handleLogout();
             });
         }

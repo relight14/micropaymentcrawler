@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 /**
  * ProjectsController - Encapsulates all project and outline orchestration logic
  * Handles initialization, event wiring, and message persistence
@@ -27,7 +28,7 @@ export class ProjectsController {
      * @param {Function} deps.hideWelcomeCallback - Callback for hiding welcome screen
      */
     async attach(deps) {
-        console.log('📦 ProjectsController: Attaching with dependencies...');
+        logger.debug('📦 ProjectsController: Attaching with dependencies...');
         this.dependencies = deps;
         
         // Set callbacks BEFORE initialization to avoid missing early events
@@ -46,11 +47,11 @@ export class ProjectsController {
         
         // Set up all event listeners
         this.setupEventListeners();
-        console.log('📦 ProjectsController: Event listeners set up');
+        logger.debug('📦 ProjectsController: Event listeners set up');
         
         // Initialize the project manager
         await this.projectManager.init();
-        console.log('📦 ProjectsController: ProjectManager initialized');
+        logger.debug('📦 ProjectsController: ProjectManager initialized');
     }
 
     /**
@@ -61,21 +62,21 @@ export class ProjectsController {
 
         // SOURCE_SELECTED: Update project store when sources are selected
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_SELECTED, (e) => {
-            console.log('📡 AppEvents: Source selected', e.detail);
+            logger.debug('📡 AppEvents: Source selected', e.detail);
             // Update project store with selected sources
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
 
         // SOURCE_DESELECTED: Update project store when sources are deselected
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_DESELECTED, (e) => {
-            console.log('📡 AppEvents: Source deselected', e.detail);
+            logger.debug('📡 AppEvents: Source deselected', e.detail);
             // Update project store with selected sources
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
 
         // SOURCE_SELECTION_CHANGED: Sync appState selections to ProjectStore
         document.addEventListener('sourceSelectionChanged', (e) => {
-            console.log('📡 Source selection changed:', e.detail);
+            logger.debug('📡 Source selection changed:', e.detail);
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
 
@@ -83,7 +84,7 @@ export class ProjectsController {
         AppEvents.addEventListener(EVENT_TYPES.PROJECT_CREATED, async (e) => {
             const preserveConversation = e.detail?.preserveConversation || false;
             
-            console.log('📡 AppEvents: New project created', {
+            logger.debug('📡 AppEvents: New project created', {
                 projectId: e.detail.project.id,
                 projectTitle: e.detail.project.title,
                 preserveConversation
@@ -93,7 +94,7 @@ export class ProjectsController {
             
             if (preserveConversation) {
                 // Login migration flow: preserve in-memory chat and save to new project
-                console.log('💾 Preserving conversation for login migration - saving messages to project');
+                logger.debug('💾 Preserving conversation for login migration - saving messages to project');
                 
                 // Save all in-memory messages to the newly created project
                 const messages = appState.getConversationHistory();
@@ -141,7 +142,7 @@ export class ProjectsController {
         AppEvents.addEventListener(EVENT_TYPES.PROJECT_LOADING_STARTED, (e) => {
             const preserveConversation = e.detail?.preserveConversation || false;
             
-            console.log('⚡ AppEvents: Project loading started', {
+            logger.debug('⚡ AppEvents: Project loading started', {
                 projectId: e.detail.projectId,
                 projectTitle: e.detail.projectTitle,
                 preserveConversation
@@ -187,7 +188,7 @@ export class ProjectsController {
             
             // Skip saving if user is not authenticated
             if (!this.dependencies.authService.isAuthenticated()) {
-                console.log('👤 User not authenticated - message displayed but not persisted');
+                logger.debug('👤 User not authenticated - message displayed but not persisted');
                 return;
             }
             

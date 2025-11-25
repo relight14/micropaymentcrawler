@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 /**
  * SourcesPanel - Dedicated panel for displaying and managing research sources
  * Mirrors OutlineBuilder pattern with clean state management and debounced saves
@@ -35,7 +36,7 @@ export class SourcesPanel {
      * Initialize the sources panel
      */
     init() {
-        console.log('📚 [SourcesPanel] Initializing...');
+        logger.debug('📚 [SourcesPanel] Initializing...');
         
         // Listen for new sources from research results
         window.addEventListener('researchSourcesFound', (e) => {
@@ -48,7 +49,7 @@ export class SourcesPanel {
         });
         
         this.render();
-        console.log('✅ [SourcesPanel] Initialized');
+        logger.debug('✅ [SourcesPanel] Initialized');
     }
     
     /**
@@ -65,7 +66,7 @@ export class SourcesPanel {
         
         // If no project (logout scenario), clear sources
         if (!projectId) {
-            console.log('📚 [SourcesPanel] No projectId, clearing sources');
+            logger.debug('📚 [SourcesPanel] No projectId, clearing sources');
             this.sources = [];
             // Don't write to store - ProjectManager resets store once to prevent loops
             this.render();
@@ -87,7 +88,7 @@ export class SourcesPanel {
         });
         
         if (!this.authService.isAuthenticated() || !projectId) {
-            console.log('❌ [SourcesPanel] Cannot load sources - auth or projectId missing');
+            logger.debug('❌ [SourcesPanel] Cannot load sources - auth or projectId missing');
             return;
         }
         
@@ -158,7 +159,7 @@ export class SourcesPanel {
         if (this.currentProjectId && this.authService.isAuthenticated()) {
             this.debouncedSave();
         } else {
-            console.log('📚 [SourcesPanel] Sources staged in-memory (no active project yet)');
+            logger.debug('📚 [SourcesPanel] Sources staged in-memory (no active project yet)');
         }
         
         // Re-render to show sources in panel
@@ -206,7 +207,7 @@ export class SourcesPanel {
         
         // Gate: Only save when both authenticated AND project is active
         if (!this.authService.isAuthenticated() || !this.currentProjectId) {
-            console.log('📚 [SourcesPanel] Skipping save - no auth or no active project');
+            logger.debug('📚 [SourcesPanel] Skipping save - no auth or no active project');
             return;
         }
         
@@ -225,7 +226,7 @@ export class SourcesPanel {
         if (this.saveTimeout) {
             clearTimeout(this.saveTimeout);
             this.saveTimeout = null;
-            console.log('📚 [SourcesPanel] Cancelled pending save');
+            logger.debug('📚 [SourcesPanel] Cancelled pending save');
         }
     }
     
@@ -241,13 +242,13 @@ export class SourcesPanel {
         });
         
         if (!projectId || !this.authService.isAuthenticated()) {
-            console.log('❌ [SourcesPanel] Cannot save - auth or projectId missing');
+            logger.debug('❌ [SourcesPanel] Cannot save - auth or projectId missing');
             return;
         }
         
         // Guard: Abort if project changed since save was scheduled
         if (this.currentProjectId !== projectId) {
-            console.log('⚠️ [SourcesPanel] Project changed since save scheduled, aborting save');
+            logger.debug('⚠️ [SourcesPanel] Project changed since save scheduled, aborting save');
             return;
         }
         

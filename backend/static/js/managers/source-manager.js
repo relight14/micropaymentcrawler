@@ -1,6 +1,7 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
 import { projectStore } from '../state/project-store.js';
+import { logger } from '../utils/logger.js';
 
 // Budget thresholds for sanity checks
 const BUDGET_THRESHOLDS = {
@@ -26,26 +27,26 @@ export class SourceManager extends EventTarget {
     }
     
     _setupGlobalEventListeners() {
-        console.log('🎯 SourceManager: Setting up global event listeners');
+        logger.debug('🎯 SourceManager: Setting up global event listeners');
         
         document.addEventListener('sourceUnlockRequested', (e) => {
-            console.log('🔓 UNLOCK: Event received in SourceManager!', e.detail);
+            logger.debug('🔓 UNLOCK: Event received in SourceManager!', e.detail);
             this.unlockSource(null, e.detail.source.id, e.detail.source.unlock_price);
         });
         
         document.addEventListener('sourceDownloadRequested', (e) => {
-            console.log('📥 DOWNLOAD: Event received in SourceManager!', e.detail);
+            logger.debug('📥 DOWNLOAD: Event received in SourceManager!', e.detail);
             window.open(e.detail.source.url, '_blank');
         });
         
         document.addEventListener('sourceSummarizeRequested', (e) => {
-            console.log('✨ SUMMARIZE: Event received in SourceManager!', e.detail);
+            logger.debug('✨ SUMMARIZE: Event received in SourceManager!', e.detail);
             this.summarizeSource(e.detail.source, e.detail.price, e.detail.buttonElement);
         });
     }
 
     async unlockSource(button, sourceId, price) {
-        console.log('🔓 UNLOCK: unlockSource() called!', { button, sourceId, price });
+        logger.debug('🔓 UNLOCK: unlockSource() called!', { button, sourceId, price });
         
         let sourceToUpdate = null;
         const researchResults = this.appState.getCurrentResearchData();
@@ -54,7 +55,7 @@ export class SourceManager extends EventTarget {
         }
 
         if (sourceToUpdate?.is_unlocked || this.appState.isPurchased(sourceId)) {
-            console.log('🔓 UNLOCK: Source already unlocked, opening directly');
+            logger.debug('🔓 UNLOCK: Source already unlocked, opening directly');
             if (sourceToUpdate?.url) {
                 // Track source view
                 const domain = new URL(sourceToUpdate.url).hostname;
@@ -66,12 +67,12 @@ export class SourceManager extends EventTarget {
 
         if (this.appState.isEnrichmentPending()) {
             this.toastManager.show('⏳ Pricing is still loading... please wait', 'info', 3000);
-            console.log('🔓 UNLOCK: Blocked - enrichment still pending');
+            logger.debug('🔓 UNLOCK: Blocked - enrichment still pending');
             return;
         }
 
         if (this.isUnlockInProgress) {
-            console.log('🔓 UNLOCK: Already in progress, ignoring duplicate request');
+            logger.debug('🔓 UNLOCK: Already in progress, ignoring duplicate request');
             return;
         }
 
@@ -87,7 +88,7 @@ export class SourceManager extends EventTarget {
         }
         
         try {
-            console.log('🔓 UNLOCK: Fetching fresh pricing from server...');
+            logger.debug('🔓 UNLOCK: Fetching fresh pricing from server...');
             const freshPricing = await this.apiService.getFreshSourcePricing(sourceId);
             
             if (sourceToUpdate) {
@@ -96,7 +97,7 @@ export class SourceManager extends EventTarget {
             }
             
             price = freshPricing.unlock_price;
-            console.log('✅ UNLOCK: Fresh pricing fetched:', freshPricing);
+            logger.debug('✅ UNLOCK: Fresh pricing fetched:', freshPricing);
             
         } catch (error) {
             console.error('❌ UNLOCK: Failed to fetch fresh pricing:', error);
@@ -118,7 +119,7 @@ export class SourceManager extends EventTarget {
         const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
         
         if (!userConfirmed) {
-            console.log('🔓 UNLOCK: User cancelled purchase');
+            logger.debug('🔓 UNLOCK: User cancelled purchase');
             if (button) {
                 button.innerHTML = '🔓 <span>Unlock</span>';
                 button.disabled = false;
@@ -215,12 +216,12 @@ export class SourceManager extends EventTarget {
     }
 
     async summarizeSource(source, price, buttonElement) {
-        console.log('✨ SUMMARIZE: summarizeSource() called!', { source, price });
+        logger.debug('✨ SUMMARIZE: summarizeSource() called!', { source, price });
         
         // Check if already cached
         const cached = this.appState.getCachedSummary(source.id);
         if (cached) {
-            console.log('✨ SUMMARIZE: Using cached summary');
+            logger.debug('✨ SUMMARIZE: Using cached summary');
             this.showSummaryPopover(source, cached.summary, cached.price, cached.summary_type || 'full');
             analytics.trackSummaryViewed(source.id, new URL(source.url).hostname, cached.price, true);
             return;
@@ -250,7 +251,7 @@ export class SourceManager extends EventTarget {
         const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
         
         if (!userConfirmed) {
-            console.log('✨ SUMMARIZE: User cancelled purchase');
+            logger.debug('✨ SUMMARIZE: User cancelled purchase');
             return;
         }
         
@@ -271,7 +272,7 @@ export class SourceManager extends EventTarget {
                 source.license_cost || 0
             );
             
-            console.log('✨ SUMMARIZE: API response:', result);
+            logger.debug('✨ SUMMARIZE: API response:', result);
             
             // Cache the summary with type for transparency
             this.appState.cacheSummary(source.id, result.summary, result.price, result.summary_type);
@@ -374,18 +375,18 @@ export class SourceManager extends EventTarget {
     }
 
     async displayCards(sources) {
-        console.log('🎨 DISPLAY METHOD: displayCards() ENTRY POINT');
-        console.log('🎨 DISPLAY METHOD: Sources parameter received:', sources);
+        logger.debug('🎨 DISPLAY METHOD: displayCards() ENTRY POINT');
+        logger.debug('🎨 DISPLAY METHOD: Sources parameter received:', sources);
         
         if (!sources || sources.length === 0) {
-            console.log('❌ DISPLAY METHOD: Early return - no sources');
+            logger.debug('❌ DISPLAY METHOD: Early return - no sources');
             return null;
         }
         
-        console.log('✅ DISPLAY METHOD: Validation passed, proceeding to create cards');
+        logger.debug('✅ DISPLAY METHOD: Validation passed, proceeding to create cards');
         
         if (!window.SourceCard) {
-            console.log('Waiting for SourceCard to load...');
+            logger.debug('Waiting for SourceCard to load...');
             await new Promise(resolve => {
                 if (window.SourceCard) {
                     resolve();
@@ -437,7 +438,7 @@ export class SourceManager extends EventTarget {
     updateCards(enrichedSources) {
         if (!enrichedSources || enrichedSources.length === 0) return;
         
-        console.log('📊 Updating source cards with enriched data:', enrichedSources.length);
+        logger.debug('📊 Updating source cards with enriched data:', enrichedSources.length);
         
         enrichedSources.forEach(source => {
             const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);

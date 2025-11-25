@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 /**
  * Mobile Bottom Navigation Component
  * Provides tab-based navigation for Projects, Chat, and Outline on mobile devices
@@ -110,7 +111,7 @@ export class MobileNavigation {
     }
 
     switchPanel(panel) {
-        console.log('📱 [MobileNav] switchPanel() called', {
+        logger.debug('📱 [MobileNav] switchPanel() called', {
             fromPanel: this.currentPanel,
             toPanel: panel,
             windowWidth: window.innerWidth
@@ -140,7 +141,7 @@ export class MobileNavigation {
     }
 
     updatePanelVisibility() {
-        console.log('📱 [MobileNav] updatePanelVisibility() called', {
+        logger.debug('📱 [MobileNav] updatePanelVisibility() called', {
             currentPanel: this.currentPanel
         });
         
@@ -150,7 +151,7 @@ export class MobileNavigation {
         const outlineBuilder = document.getElementById('outline-builder');
         const backdrop = document.getElementById('mobile-backdrop');
 
-        console.log('📱 [MobileNav] DOM elements check:', {
+        logger.debug('📱 [MobileNav] DOM elements check:', {
             projectSidebar: !!projectSidebar,
             mainContent: !!mainContent,
             sourcesPanel: !!sourcesPanel,
@@ -171,24 +172,24 @@ export class MobileNavigation {
 
         switch (this.currentPanel) {
             case 'projects':
-                console.log('📱 [MobileNav] Showing Projects panel - adding classes to #project-sidebar');
+                logger.debug('📱 [MobileNav] Showing Projects panel - adding classes to #project-sidebar');
                 projectSidebar.classList.add('visible', 'mobile-active');
                 backdrop.classList.add('visible');
-                console.log('📱 [MobileNav] Classes added:', {
+                logger.debug('📱 [MobileNav] Classes added:', {
                     projectSidebarClasses: projectSidebar.className,
                     backdropClasses: backdrop.className
                 });
                 break;
             case 'chat':
-                console.log('📱 [MobileNav] Showing Chat panel (default)');
+                logger.debug('📱 [MobileNav] Showing Chat panel (default)');
                 break;
             case 'sources':
-                console.log('📱 [MobileNav] Showing Sources panel');
+                logger.debug('📱 [MobileNav] Showing Sources panel');
                 sourcesPanel.classList.add('visible', 'mobile-active');
                 backdrop.classList.add('visible');
                 break;
             case 'outline':
-                console.log('📱 [MobileNav] Showing Outline panel');
+                logger.debug('📱 [MobileNav] Showing Outline panel');
                 outlineBuilder.classList.add('visible', 'mobile-active');
                 backdrop.classList.add('visible');
                 break;
