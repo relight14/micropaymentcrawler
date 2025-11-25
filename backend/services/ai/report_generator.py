@@ -18,6 +18,100 @@ if Config.USE_POSTGRES:
 else:
     from data.db import db
 
+# Tool schema for Anthropic structured outputs
+REPORT_EXTRACTION_TOOL = {
+    "name": "extract_research_data",
+    "description": "Extract structured research data with analysis from sources",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "table_data": {
+                "type": "array",
+                "description": "List of extracted findings organized by topic",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string", "description": "Topic name from the topics list"},
+                        "source": {"type": "string", "description": "Source title"},
+                        "content": {"type": "string", "description": "Direct quote or key concept (1-2 sentences)"},
+                        "takeaway": {"type": "string", "description": "Concise analysis or interpretation (1 sentence)"},
+                        "link": {"type": "string", "description": "Source URL"}
+                    },
+                    "required": ["topic", "source", "content", "takeaway", "link"]
+                }
+            },
+            "summary": {
+                "type": "string",
+                "description": "High-level overview synthesizing key findings (3-4 sentences)"
+            },
+            "conflicts": {
+                "type": "string",
+                "description": "Analysis of where sources agree or contradict (2-3 sentences)"
+            },
+            "research_directions": {
+                "type": "array",
+                "description": "List of 5 specific follow-up research questions",
+                "items": {"type": "string"},
+                "minItems": 5,
+                "maxItems": 5
+            }
+        },
+        "required": ["table_data", "summary", "conflicts", "research_directions"]
+    }
+}
+
+SECTION_EXTRACTION_TOOL = {
+    "name": "extract_section_data",
+    "description": "Extract structured data for a specific section from assigned sources",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "table_data": {
+                "type": "array",
+                "description": "List of extracted findings for this section",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string", "description": "Section topic name"},
+                        "source": {"type": "string", "description": "Source title"},
+                        "content": {"type": "string", "description": "Direct quote or key concept (1-2 sentences)"},
+                        "takeaway": {"type": "string", "description": "Concise analysis or interpretation (1 sentence)"},
+                        "link": {"type": "string", "description": "Source URL"}
+                    },
+                    "required": ["topic", "source", "content", "takeaway", "link"]
+                }
+            }
+        },
+        "required": ["table_data"]
+    }
+}
+
+SYNTHESIS_TOOL = {
+    "name": "generate_synthesis",
+    "description": "Generate summary, conflicts analysis, and research directions from compiled findings",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+                "description": "High-level overview synthesizing key findings (3-4 sentences)"
+            },
+            "conflicts": {
+                "type": "string",
+                "description": "Analysis of where sources agree or contradict (2-3 sentences)"
+            },
+            "research_directions": {
+                "type": "array",
+                "description": "List of 5 specific follow-up research questions",
+                "items": {"type": "string"},
+                "minItems": 5,
+                "maxItems": 5
+            }
+        },
+        "required": ["summary", "conflicts", "research_directions"]
+    }
+}
+
 # <important_code_snippet_instructions>
 # The newest Anthropic model is "claude-sonnet-4-20250514", not "claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022" nor "claude-3-sonnet-20240229". 
 # If the user doesn't specify a model, always prefer using "claude-sonnet-4-20250514" as it is the latest model. However, if the user has already selected "claude-3-7-sonnet-20250219", keep that selection unless they explicitly request a change.
@@ -42,29 +136,11 @@ SELECTED SOURCES (analyze in depth):
 
 Your task: Extract 2-5 relevant quotes or key concepts from EACH source, organize by topics, and provide advanced analysis including conflict detection and research directions.
 
-Output your analysis as a JSON object with this EXACT structure:
-
-{{
-  "table_data": [
-    {{
-      "topic": "Topic name from the topics list above",
-      "source": "Source title (from sources above)",
-      "content": "Direct quote or key concept from the source (1-2 sentences max)",
-      "takeaway": "Your concise analysis or interpretation (1 sentence)",
-      "link": "Source URL"
-    }}
-  ],
-  "summary": "High-level overview paragraph synthesizing the key findings across all sources (3-4 sentences)",
-  "conflicts": "Analysis of where sources agree or contradict each other. Identify patterns of consensus and areas of disagreement (2-3 sentences)",
-  "research_directions": [
-    "Specific follow-up research question based on findings",
-    "Another research direction based on gaps in coverage",
-    "Third research direction exploring contradictions or extensions",
-    "Fourth research direction for practical applications",
-    "Fifth research direction for deeper investigation"
-  ],
-  "citation_metadata": {{}}
-}}
+Use the extract_research_data tool to provide:
+1. **table_data**: Array of findings with topic, source, content (quote), takeaway, and link
+2. **summary**: High-level overview synthesizing key findings (3-4 sentences)
+3. **conflicts**: Analysis of where sources agree or contradict (2-3 sentences)
+4. **research_directions**: Array of exactly 5 specific follow-up research questions
 
 CRITICAL REQUIREMENTS:
 1. **Match topics exactly**: Use ONLY the topic names from the TOPICS list above
@@ -74,9 +150,8 @@ CRITICAL REQUIREMENTS:
 5. **Include all sources**: Every source should contribute entries
 6. **Distribute across topics**: Spread entries across topics based on relevance
 7. **Conflicts analysis**: Identify where sources agree/disagree with specific citations
-8. **Research directions**: Generate 5 specific follow-up questions based on findings
-9. **Valid JSON only**: Output MUST be valid, parseable JSON
-10. **Base everything on actual source content**: No generic or assumed information
+8. **Research directions**: Generate exactly 5 specific follow-up questions based on findings
+9. **Base everything on actual source content**: No generic or assumed information
 
 For conflicts analysis:
 - Identify areas where multiple sources agree (consensus)
@@ -89,8 +164,6 @@ For research_directions:
 - Make them actionable and specific
 - Connect to the evidence analyzed
 - Prioritize high-value follow-up areas
-
-Output only the JSON object, no additional text before or after.
 """
 
 # Section-specific prompt for outline-driven reports (respects user's source assignments)
@@ -107,19 +180,8 @@ CRITICAL: The user has specifically assigned these sources to THIS section. You 
 
 Your task: Extract 2-5 relevant quotes or key concepts from EACH source provided above for the section topic "{topic}".
 
-Output your analysis as a JSON object with this EXACT structure:
-
-{{
-  "table_data": [
-    {{
-      "topic": "{topic}",
-      "source": "Source title (from sources above)",
-      "content": "Direct quote or key concept from the source (1-2 sentences max)",
-      "takeaway": "Your concise analysis or interpretation (1 sentence)",
-      "link": "Source URL"
-    }}
-  ]
-}}
+Use the extract_section_data tool to provide:
+- **table_data**: Array of findings where ALL entries use topic = "{topic}"
 
 CRITICAL REQUIREMENTS:
 1. **Use exact topic**: ALL entries must use topic = "{topic}"
@@ -127,10 +189,7 @@ CRITICAL REQUIREMENTS:
 3. **Direct quotes preferred**: Use actual text from sources when possible
 4. **Concise takeaways**: One sentence interpretation or significance
 5. **Stay focused**: Only extract content relevant to "{topic}"
-6. **Valid JSON only**: Output MUST be valid, parseable JSON
-7. **No redistribution**: Do NOT create entries for other topics - this is section-specific extraction
-
-Output only the JSON object, no additional text before or after.
+6. **No redistribution**: Do NOT create entries for other topics - this is section-specific extraction
 """
 
 
@@ -357,34 +416,32 @@ Query: {query}
 COMPILED FINDINGS:
 {table_summary}
 
-Generate a JSON object with:
-{{
-  "summary": "High-level overview paragraph synthesizing the key findings across all sources (3-4 sentences)",
-  "conflicts": "Analysis of where sources agree or contradict. Identify consensus and disagreements (2-3 sentences)",
-  "research_directions": [
-    "Specific follow-up research question based on findings",
-    "Another research direction based on gaps",
-    "Third research direction exploring contradictions",
-    "Fourth research direction for applications",
-    "Fifth research direction for deeper investigation"
-  ]
-}}
-
-Output only valid JSON.
+Use the generate_synthesis tool to provide:
+1. **summary**: High-level overview synthesizing key findings (3-4 sentences)
+2. **conflicts**: Analysis of where sources agree or contradict (2-3 sentences)
+3. **research_directions**: Array of exactly 5 specific follow-up research questions
 """
         
         try:
             response = self.client.messages.create(
                 model=REPORT_MODEL,
                 max_tokens=1500,
+                tools=[SYNTHESIS_TOOL],
                 messages=[{
                     "role": "user",
                     "content": synthesis_prompt
                 }]
             )
             
-            response_text = self._extract_response_text(response)
-            synthesis_dict = self._parse_json_response(response_text)
+            # Extract structured data from tool use
+            synthesis_dict = {}
+            for content_block in response.content:
+                if content_block.type == "tool_use" and content_block.name == "generate_synthesis":
+                    synthesis_dict = content_block.input
+                    break
+            
+            if not synthesis_dict:
+                raise ValueError("No synthesis data returned from Claude")
             
             logger.info(f"   ✅ Generated AI synthesis: summary={len(synthesis_dict.get('summary', ''))} chars, conflicts={len(synthesis_dict.get('conflicts', ''))} chars, directions={len(synthesis_dict.get('research_directions', []))}")
             
@@ -431,21 +488,24 @@ Output only valid JSON.
         
         logger.info(f"   📄 Extracting section: '{topic}' ({len(section_sources)} sources)")
         
-        # Call Claude for this section
+        # Call Claude for this section with tool use
         try:
             response = self.client.messages.create(
                 model=REPORT_MODEL,
                 max_tokens=2000,
+                tools=[SECTION_EXTRACTION_TOOL],
                 messages=[{
                     "role": "user",
                     "content": prompt
                 }]
             )
             
-            # Parse response
-            response_text = self._extract_response_text(response)
-            section_dict = self._parse_json_response(response_text)
-            table_data = section_dict.get('table_data', [])
+            # Extract structured data from tool use
+            table_data = []
+            for content_block in response.content:
+                if content_block.type == "tool_use" and content_block.name == "extract_section_data":
+                    table_data = content_block.input.get('table_data', [])
+                    break
             
             logger.info(f"      ✅ Extracted {len(table_data)} entries for '{topic}'")
             return table_data
@@ -533,11 +593,12 @@ Output only valid JSON.
             logger.info(f"   - Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
             logger.info(f"   - Model: {REPORT_MODEL}")
             
-            # Call Claude
+            # Call Claude with tool use
             start_time = time.time()
             response = self.client.messages.create(
                 model=REPORT_MODEL,
                 max_tokens=4000,
+                tools=[REPORT_EXTRACTION_TOOL],
                 messages=[{
                     "role": "user",
                     "content": prompt
@@ -560,9 +621,15 @@ Output only valid JSON.
                 logger.info(f"   - Tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
                 logger.info(f"   - Est. cost: ${total_cost:.4f} (input: ${input_cost:.4f}, output: ${output_cost:.4f})")
             
-            # Extract and parse JSON response
-            response_text = self._extract_response_text(response)
-            report_dict = self._parse_json_response(response_text)
+            # Extract structured data from tool use
+            report_dict = {}
+            for content_block in response.content:
+                if content_block.type == "tool_use" and content_block.name == "extract_research_data":
+                    report_dict = content_block.input
+                    break
+            
+            if not report_dict:
+                raise ValueError("No report data returned from Claude")
             
             # Add citation metadata
             table_data = report_dict.get('table_data', [])
