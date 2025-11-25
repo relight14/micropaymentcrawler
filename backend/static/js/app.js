@@ -167,10 +167,6 @@ export class ChatResearchApp {
             this.toastManager.show(e.detail.warning, 'warning');
         });
         
-        AppEvents.addEventListener(EVENT_TYPES.TIER_PURCHASED, (e) => {
-            console.log('📡 AppEvents: Tier purchased', e.detail);
-        });
-        
         // Listen for Build Research Packet event from OutlineBuilder
         AppEvents.addEventListener('buildResearchPacket', (e) => {
             console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
@@ -193,7 +189,7 @@ export class ChatResearchApp {
             
             const sources = Array.from(sourceMap.values());
             const sourceCount = sources.length;
-            const price = sourceCount * 0.05; // $0.05 per source (Pro tier only)
+            const price = sourceCount * 0.05; // $0.05 per source
             const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
             const useSelectedSources = sources.length > 0;
             
@@ -800,9 +796,6 @@ export class ChatResearchApp {
             } else if (action.type === 'mode_switch') {
                 // Switch to the pending mode after login
                 this.setMode(action.mode);
-            } else if (action.type === 'tier_purchase') {
-                // Legacy tier purchase - no longer supported
-                console.warn('⚠️ Tier purchase action no longer supported - all reports are Pro Package');
             }
         } catch (error) {
             console.error('Error executing pending action:', error);

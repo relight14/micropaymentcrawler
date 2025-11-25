@@ -361,7 +361,7 @@ export class APIService {
         }
     }
 
-    async analyzeQueryForTier(query, maxBudget, preferredSourceCount, tierType) {
+    async pollEnrichmentStatus(query, maxBudget, preferredSourceCount) {
         const response = await fetch(`${this.baseURL}/api/research/analyze`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
@@ -374,7 +374,7 @@ export class APIService {
 
         if (!response.ok) {
             this._handle401(response);
-            throw new Error(`Tier analysis failed: ${response.statusText}`);
+            throw new Error(`Enrichment polling failed: ${response.statusText}`);
         }
 
         return await response.json();

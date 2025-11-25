@@ -4,14 +4,6 @@
  */
 export class AppState {
     constructor() {
-        // Configuration constants for maintainability
-        this.TIER_LIMITS = {
-            basic: 3,
-            research: 8, 
-            pro: 15,
-            default: 3
-        };
-        
         // Core state with persistence
         this.currentMode = 'research';
         this.conversationHistory = this._loadFromStorage('conversationHistory', []);
@@ -190,17 +182,6 @@ export class AppState {
     removeSelectedSource(sourceId) {
         this.selectedSources = this.selectedSources.filter(s => s.id !== sourceId);
         this._saveToStorage('selectedSources', this.selectedSources);
-    }
-
-    canAddMoreSources(tierType) {
-        // Guard against invalid tierType with warning
-        if (!tierType || typeof tierType !== 'string') {
-            console.warn('Invalid tierType provided to canAddMoreSources:', tierType);
-            tierType = 'basic'; // Safe fallback
-        }
-        
-        const limit = this.TIER_LIMITS[tierType.toLowerCase()] ?? this.TIER_LIMITS.default;
-        return this.selectedSources.length < limit;
     }
 
     // Dark mode management

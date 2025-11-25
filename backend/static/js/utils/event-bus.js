@@ -6,8 +6,6 @@ export const EVENT_TYPES = {
     SOURCE_SELECTED: 'sourceSelected',
     SOURCE_DESELECTED: 'sourceDeselected',
     BUDGET_WARNING: 'budgetWarning',
-    TIER_PURCHASED: 'tierPurchased',
-    TIER_PURCHASE_ERROR: 'tierPurchaseError',
     REPORT_REQUESTED: 'reportRequested',
     REPORT_STATUS_CHANGED: 'reportStatusChanged',
     

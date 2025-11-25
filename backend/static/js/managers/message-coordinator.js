@@ -536,7 +536,7 @@ export class MessageCoordinator {
             attempts++;
             
             try {
-                const result = await this.apiService.analyzeQueryForTier(query, 10.0, 15);
+                const result = await this.apiService.pollEnrichmentStatus(query, 10.0, 15);
                 
                 if (!result.enrichment_needed || result.enrichment_status === 'complete') {
                     this.sourceManager.updateCards(result.sources);

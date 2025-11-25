@@ -155,7 +155,7 @@ export class ReportBuilder extends EventTarget {
             
             if (reportPacket) {
                 // Track report generation
-                analytics.trackReportGenerate(selectedSources.length, 'pro');
+                analytics.trackReportGenerate(selectedSources.length);
                 
                 // Dispatch success event with report data
                 this.dispatchEvent(new CustomEvent('reportPurchaseCompleted', {

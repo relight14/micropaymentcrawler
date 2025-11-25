@@ -71,10 +71,9 @@ class Analytics {
         });
     }
 
-    trackReportGenerate(sourceCount, tier) {
+    trackReportGenerate(sourceCount) {
         this.track('report_generate', {
             source_count: sourceCount,
-            tier: tier,
             timestamp: new Date().toISOString()
         });
     }
@@ -124,13 +123,6 @@ class Analytics {
         this.track('error', {
             error_type: errorType,
             error_message: errorMessage,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    trackTierSelect(tier) {
-        this.track('tier_select', {
-            tier: tier,
             timestamp: new Date().toISOString()
         });
     }
