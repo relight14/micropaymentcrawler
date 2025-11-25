@@ -899,10 +899,9 @@ async def generate_research_report(
             # Build packet directly with structured report data
             research_packet = ResearchPacket(
                 query=sanitized_query,
-                tier=None,  # Unified tier - no longer used
                 summary=report_data.get('summary', ''),
                 outline=None,  # Table data is now in table_data field
-                insights=report_data.get('research_directions', None),  # Research directions
+                research_directions=report_data.get('research_directions', None),  # Research directions list
                 sources=selected_sources,
                 total_sources=len(selected_sources),
                 citation_metadata=report_data.get('citation_metadata', {}),
@@ -930,10 +929,9 @@ async def generate_research_report(
             # Build packet directly with structured report data
             research_packet = ResearchPacket(
                 query=sanitized_query,
-                tier=None,  # Unified tier - no longer used
                 summary=report_data.get('summary', ''),
                 outline=None,
-                insights=report_data.get('research_directions', None),
+                research_directions=report_data.get('research_directions', None),  # Research directions list
                 sources=generated_sources,
                 total_sources=len(generated_sources),
                 citation_metadata=report_data.get('citation_metadata', {}),

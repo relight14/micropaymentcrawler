@@ -49,7 +49,8 @@ class ResearchPacket(BaseModel):
     total_sources: int  # For UI display
     # Optional fields
     outline: Optional[str] = None
-    insights: Optional[str] = None  # Research directions
+    insights: Optional[str] = None  # Deprecated: Use research_directions instead
+    research_directions: Optional[List[str]] = None  # List of follow-up research questions
     total_cost: Optional[float] = None
     content_id: Optional[str] = None  # LedeWire content identifier
     licensing_summary: Optional[Dict[str, Any]] = None

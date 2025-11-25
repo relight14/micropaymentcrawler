@@ -566,17 +566,24 @@ export class APIService {
         }
     }
     
-    async generateReport(query, tier, selectedSources = null, outlineStructure = null) {
+    async generateReport(query, selectedSources = null, outlineStructure = null) {
         try {
+            console.log(`🔍 [API] generateReport called with:`, {
+                query,
+                selectedSourcesCount: selectedSources?.length || 0,
+                outlineSections: outlineStructure?.sections?.length || 0
+            });
+            
             const requestBody = {
-                query: query,
-                tier: tier
+                query: query
             };
             
             // Include selected sources if provided (full objects, not just IDs)
             if (selectedSources && selectedSources.length > 0) {
                 requestBody.selected_sources = selectedSources;
                 console.log(`📊 Generating report with ${selectedSources.length} selected sources`);
+            } else {
+                console.warn(`⚠️ [API] No selectedSources provided! This will trigger legacy mode.`);
             }
             
             // Include outline structure if provided
