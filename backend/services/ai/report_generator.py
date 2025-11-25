@@ -788,32 +788,6 @@ Use the generate_synthesis tool to provide:
         
         return directions[:5]
     
-    def _parse_json_response(self, response_text: str) -> Dict:
-        """Parse JSON from Claude's response, handling common formatting issues."""
-        try:
-            # Try direct JSON parse
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            # Try to extract JSON from markdown code blocks
-            if '```json' in response_text:
-                start = response_text.find('```json') + 7
-                end = response_text.find('```', start)
-                json_text = response_text[start:end].strip()
-                return json.loads(json_text)
-            elif '```' in response_text:
-                start = response_text.find('```') + 3
-                end = response_text.find('```', start)
-                json_text = response_text[start:end].strip()
-                return json.loads(json_text)
-            else:
-                # Try to find JSON object in text
-                start = response_text.find('{')
-                end = response_text.rfind('}') + 1
-                if start >= 0 and end > start:
-                    json_text = response_text[start:end]
-                    return json.loads(json_text)
-                raise ValueError("Could not extract valid JSON from response")
-    
     def _get_file_content(self, file_id: int) -> Optional[str]:
         """Fetch full content of an uploaded file from database."""
         try:
@@ -873,20 +847,6 @@ CONTENT:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """)
         return "\n".join(formatted)
-    
-    def _extract_response_text(self, response) -> str:
-        """Safely extract text from Anthropic response."""
-        try:
-            if hasattr(response, 'content') and response.content and len(response.content) > 0:
-                content_block = response.content[0]
-                if hasattr(content_block, 'text') and content_block.text:
-                    return content_block.text
-                else:
-                    return str(content_block)
-            else:
-                return str(response)
-        except Exception:
-            return str(response)
     
     def _generate_fallback_report(self, query: str, sources: List[SourceCard]) -> Dict:
         """Generate basic fallback structured report when Claude is unavailable."""
