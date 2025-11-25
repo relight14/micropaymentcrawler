@@ -62,11 +62,6 @@ export class ProjectsController {
         // SOURCE_SELECTED: Update project store when sources are selected
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_SELECTED, (e) => {
             console.log('📡 AppEvents: Source selected', e.detail);
-            // Update report builder when sources are selected
-            if (appState.getMode() === 'report') {
-                const reportBuilderElement = reportBuilder.show();
-                this._addMessage('system', reportBuilderElement);
-            }
             // Update project store with selected sources
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
@@ -74,11 +69,6 @@ export class ProjectsController {
         // SOURCE_DESELECTED: Update project store when sources are deselected
         AppEvents.addEventListener(EVENT_TYPES.SOURCE_DESELECTED, (e) => {
             console.log('📡 AppEvents: Source deselected', e.detail);
-            // Update report builder when sources are deselected
-            if (appState.getMode() === 'report') {
-                const reportBuilderElement = reportBuilder.show();
-                this._addMessage('system', reportBuilderElement);
-            }
             // Update project store with selected sources
             this.projectManager.updateSelectedSources(appState.getSelectedSources());
         });
@@ -131,13 +121,11 @@ export class ProjectsController {
                 // Don't clear chat - messages stay visible
                 // Update UI components without clearing
                 sourceManager.updateSelectionUI();
-                reportBuilder.update();
             } else {
                 // Normal project creation: clear old messages and show welcome
                 appState.clearConversation();
                 uiManager.clearConversationDisplay();
                 sourceManager.updateSelectionUI();
-                reportBuilder.update();
                 
                 // Show welcome message for new project (don't save it)
                 this.isRestoringMessages = true;
@@ -161,11 +149,10 @@ export class ProjectsController {
             
             // Only clear chat for manual project switches, not login flow
             if (!preserveConversation) {
-                const { appState, uiManager, sourceManager, reportBuilder } = this.dependencies;
+                const { appState, uiManager, sourceManager } = this.dependencies;
                 appState.clearConversation();
                 uiManager.clearConversationDisplay(true); // Show loading state
                 sourceManager.updateSelectionUI();
-                reportBuilder.update();
             }
         });
 

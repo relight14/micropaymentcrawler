@@ -503,7 +503,7 @@ export class ProjectManager {
                 messagesContainer.classList.add('restoring');
             }
             
-            // Remove report builder if present (can't restore across mode boundaries)
+            // Remove any stale report builder UI if present (defensive cleanup)
             const reportBuilder = messagesContainer?.querySelector('.report-builder-interface');
             if (reportBuilder) {
                 reportBuilder.remove();

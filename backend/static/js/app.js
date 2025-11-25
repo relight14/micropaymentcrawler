@@ -168,7 +168,7 @@ export class ChatResearchApp {
         });
         
         // Listen for Build Research Packet event from OutlineBuilder
-        AppEvents.addEventListener('buildResearchPacket', (e) => {
+        AppEvents.addEventListener('buildResearchPacket', async (e) => {
             console.log('📡 AppEvents: Build Research Packet triggered', e.detail);
             
             // Get deduplicated sources from outline (same logic as report-builder.js)
@@ -200,9 +200,28 @@ export class ChatResearchApp {
                 return;
             }
             
-            console.log(`💰 Generating report - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
+            console.log(`💰 Report requested - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
             
-            // Trigger report generation directly via ReportBuilder
+            // Show purchase confirmation modal before generating report
+            const purchaseDetails = {
+                tier: 'report',
+                price: price,
+                selectedSources: sources,
+                query: query,
+                titleOverride: 'Generate Research Report',
+                customDescription: `Create a comprehensive research report with ${sourceCount} source${sourceCount !== 1 ? 's' : ''}`
+            };
+            
+            const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
+            
+            if (!userConfirmed) {
+                console.log('🚫 Report generation cancelled by user');
+                return;
+            }
+            
+            console.log('✅ Purchase confirmed, generating report...');
+            
+            // Trigger report generation via ReportBuilder
             this.reportBuilder.generateReport(query, sources, outlineSnapshot);
         });
         
@@ -332,8 +351,7 @@ export class ChatResearchApp {
             this.eventRouter.setHandlers({
                 onSendMessage: () => this.sendMessage(),
                 onClearConversation: () => this.interactionHandler.clearConversation(
-                    (sender, content) => this.addMessage(sender, content),
-                    () => this.reportBuilder.update()
+                    (sender, content) => this.addMessage(sender, content)
                 ),
                 onDarkModeToggle: () => this.interactionHandler.toggleDarkMode(),
                 onAuthButtonClick: () => this.handleAuthButtonClick(),

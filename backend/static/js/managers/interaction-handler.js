@@ -103,7 +103,7 @@ export class InteractionHandler {
 
     }
 
-    async clearConversation(addMessageCallback, reportBuilderUpdateCallback, skipConfirmation = false) {
+    async clearConversation(addMessageCallback, skipConfirmation = false) {
         if (!skipConfirmation && !confirm('Clear the entire conversation? This cannot be undone.')) {
             return;
         }
@@ -113,7 +113,6 @@ export class InteractionHandler {
             this.appState.clearConversation();
             this.uiManager.clearConversationDisplay();
             this.sourceManager.updateSelectionUI();
-            reportBuilderUpdateCallback();
         } catch (error) {
             console.error('Error clearing conversation:', error);
             addMessageCallback('system', 'Failed to clear conversation. Please refresh the page to start fresh.');

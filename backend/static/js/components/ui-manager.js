@@ -19,8 +19,7 @@ export class UIManager {
         // Mode descriptions - configurable
         this.modeDescriptions = options.modeDescriptions || {
             'chat': '💬 Conversational AI mode - Explore topics through natural dialogue',
-            'research': '📚 Sources mode - Find and license authoritative sources',
-            'report': '📊 Report Builder - Create comprehensive research packages'
+            'research': '📚 Sources mode - Find and license authoritative sources'
         };
         
         // Element selectors - configurable for testability
@@ -41,12 +40,11 @@ export class UIManager {
     updateModeDisplay() {
         const chatModeBtn = document.getElementById('chatModeBtn');
         const researchModeBtn = document.getElementById('researchModeBtn');
-        const reportModeBtn = document.getElementById('reportModeBtn');
         const modeDescription = document.getElementById('modeDescription');
 
-        if (chatModeBtn && researchModeBtn && reportModeBtn) {
+        if (chatModeBtn && researchModeBtn) {
             // Reset all buttons
-            [chatModeBtn, researchModeBtn, reportModeBtn].forEach(btn => {
+            [chatModeBtn, researchModeBtn].forEach(btn => {
                 btn.classList.remove('active', 'bg-primary', 'text-primary-foreground');
             });
 
