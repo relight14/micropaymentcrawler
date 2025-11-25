@@ -307,19 +307,10 @@ export class ChatResearchApp {
                         }, 500);
                     }
                     
-                    // Execute any pending tab state action
+                    // Execute any pending tab state action (e.g., source unlock)
                     const pendingTabAction = this.appState.getPendingAction();
                     if (pendingTabAction) {
                         console.log('🔄 Executing pending tab action after login:', pendingTabAction);
-                        
-                        if (pendingTabAction.type === 'mode_switch') {
-                            // Set guard flag to prevent duplicate search from SOURCE_SEARCH_TRIGGER
-                            if (pendingTabAction.mode === 'research') {
-                                this.pendingSearchFromLogin = true;
-                            }
-                            this.setMode(pendingTabAction.mode);
-                        }
-                        
                         this.appState.clearPendingAction();
                     }
                     
@@ -375,8 +366,8 @@ export class ChatResearchApp {
             // Initialize event listeners
             this.eventRouter.initialize();
             
-            // Update UI
-            this.uiManager.updateModeDisplay();
+            // Set initial input placeholder
+            this.uiManager.updateInputPlaceholder();
             
             // Validate token and fetch balance if authenticated
             const isAuthenticated = this.authService.isAuthenticated();
@@ -617,10 +608,6 @@ export class ChatResearchApp {
         }
     }
 
-    setMode(mode) {
-        console.log(`⚠️ setMode called with '${mode}' but mode switching is disabled - everything stays in chat mode`);
-    }
-
     addMessage(sender, content, metadata = null) {
         // Handle live DOM nodes: store serializable content in state, pass live DOM to UI
         let stateContent = content;
@@ -811,9 +798,6 @@ export class ChatResearchApp {
         try {
             if (action.type === 'source_unlock') {
                 await this.sourceManager.unlockSource(action.button, action.sourceId, action.price);
-            } else if (action.type === 'mode_switch') {
-                // Switch to the pending mode after login
-                this.setMode(action.mode);
             }
         } catch (error) {
             console.error('Error executing pending action:', error);

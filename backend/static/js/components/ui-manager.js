@@ -16,12 +16,6 @@ export class UIManager {
             CHARACTER_LIMIT: 2000
         };
         
-        // Mode descriptions - configurable
-        this.modeDescriptions = options.modeDescriptions || {
-            'chat': '💬 Conversational AI mode - Explore topics through natural dialogue',
-            'research': '📚 Sources mode - Find and license authoritative sources'
-        };
-        
         // Element selectors - configurable for testability
         this.selectors = {
             messagesContainer: options.messagesContainer || '#messagesContainer',
@@ -34,32 +28,6 @@ export class UIManager {
         this.messagesContainer = document.querySelector(this.selectors.messagesContainer);
         this.chatInput = document.querySelector(this.selectors.chatInput);
         this.sendButton = document.querySelector(this.selectors.sendButton);
-    }
-
-    // Mode display management
-    updateModeDisplay() {
-        const chatModeBtn = document.getElementById('chatModeBtn');
-        const researchModeBtn = document.getElementById('researchModeBtn');
-        const modeDescription = document.getElementById('modeDescription');
-
-        if (chatModeBtn && researchModeBtn) {
-            // Reset all buttons
-            [chatModeBtn, researchModeBtn].forEach(btn => {
-                btn.classList.remove('active', 'bg-primary', 'text-primary-foreground');
-            });
-
-            // Activate current mode button
-            const currentModeBtn = document.getElementById(`${this.appState.getMode()}ModeBtn`);
-            if (currentModeBtn) {
-                currentModeBtn.classList.add('active', 'bg-primary', 'text-primary-foreground');
-            }
-        }
-
-        if (modeDescription) {
-            modeDescription.textContent = this.modeDescriptions[this.appState.getMode()] || this.modeDescriptions['chat'];
-        }
-
-        this.updateInputPlaceholder();
     }
 
     updateInputPlaceholder() {
