@@ -1,0 +1,225 @@
+Thanks — I ran a repo-wide review in my head from the code paths we went over (frontend JS in backend/static/js, backend Python under backend/app and backend/services, CSS, and the LLM/report code). Below is a focused, prioritized audit with concrete cleanup, simplification, performance and security recommendations, plus small example patches you can drop in. I prioritized critical security & correctness first, then performance and maintainability improvements, and finished with engineering process suggestions.
+
+If you want, I can produce PRs for any subset (I recommend starting with the security fixes + a small set of performance fixes).
+
+High-level findings (summary)
+
+Strengths: reasonable separation of concerns (controllers/managers/components), pydantic request validation, rate limiting on expensive route(s), defensive fallbacks for LLM output.
+Areas to fix (priority order):
+Security: unsafe DOM insertion (innerHTML), token storage/authorization handling, LLM output / HTML from third‑party not sanitized, file upload handling, logging of potentially sensitive info.
+Logic correctness / bugs: event listener duplication and DOM replacement patterns that can leak listeners; some drag/resize handlers and render patterns re-create DOM unnecessarily.
+Performance: prompt / LLM token overhead, repetitive DOM reflows due to innerHTML replaces, heavy synchronous operations in UI thread, missing caching for expensive crawler/LLM calls.
+Maintainability: duplicate helpers across files, inconsistent error handling and logging, few unit tests around heavy logic (report generation, reranker).
+Details, recommendations and concrete changes
+
+A. Critical security issues and fixes (do these first)
+
+InnerHTML and injection risk
+Where: many places (sources-panel.render, projects-controller.handleProjectCreated earlier, outline-builder.render, message rendering code that inserts assistant HTML).
+Problem: inserting strings that may contain HTML (LLM output, source excerpts, uploaded file previews) via innerHTML can lead to XSS.
+Fix:
+Use a sanitizer such as DOMPurify in the browser before inserting any HTML from untrusted sources.
+Prefer creating DOM nodes via createElement/textContent rather than innerHTML for non-HTML content.
+Example (client side, in sources-panel.render and message-renderer):
+Install DOMPurify and use: DOMPurify.sanitize(htmlString, {ALLOWED_TAGS: [...]})
+Or use safeQuery/createElement helper already present to build elements and set textContent.
+Example patch (conceptual snippet for message insertion):
+
+JavaScript
+// current unsafe
+container.innerHTML = someHtmlFromLLM;
+
+// safer:
+import DOMPurify from 'dompurify';
+const sanitized = DOMPurify.sanitize(someHtmlFromLLM, {ALLOWED_TAGS: ['b','i','em','strong','a','p','ul','li']});
+container.innerHTML = sanitized;
+Or, for plain text:
+
+JavaScript
+const el = document.createElement('div');
+el.textContent = someText; // safe
+container.appendChild(el);
+Authorization token handling / storage
+Where: authService and apiService usage across frontend; backend extract_bearer_token, validate_user_token.
+Risks:
+If auth tokens are stored in localStorage they are vulnerable to XSS theft.
+Authorization parsing is okay but ensure tokens are not logged.
+Fixes:
+Prefer storing short-lived access tokens in HttpOnly, Secure cookies set by the backend, then read server-side (safer). If SPA needs tokens in JS, use refresh token flow and ensure anti-XSS protections are in place.
+Audit authService for localStorage usage; if present, consider moving sensitive token storage server-side or add strong sanitization + CSP + SRI.
+Ensure no logs print tokens (search codebase for 'token' logging).
+Backend: validate_token functions are good but ensure you don’t print token values on errors.
+LLM output / generated HTML / parsed JSON security
+Problem: the app displays LLM-generated content and may include HTML or links. Also parse JSON, then display quote text.
+Fix:
+Always sanitize outputs before rendering (DOMPurify).
+When using LLM to produce JSON, validate using strict pydantic schemas and escape any values before injecting into DOM.
+For CSV/exports, ensure CSV content is safe (e.g., prefix dangerous leading characters in fields like '=' or '+' to avoid CSV injection when downloaded and opened in spreadsheet apps).
+CSV safe write example:
+Python
+def csv_safe(value):
+    if isinstance(value, str) and value and value[0] in ('=', '+','-','@','\t'):
+        return "'" + value  # prefix single quote
+    return value
+File uploads / user content handling
+Where: report_generator._get_file_content and file upload storage referenced.
+Risks: large files, malware, uncontrolled content.
+Fix:
+Enforce max file size, type checks, and virus scan (ClamAV or other).
+Store uploaded files outside web root, set secure permissions, and serve via authenticated endpoints only.
+Escape or sanitize preview text from uploaded files shown in UI.
+Logging sensitive data
+Problem: code prints many objects and metadata (wallet balance, user info) in console logs both client and server. Avoid logging PII and secrets.
+Fix:
+Audit logs to avoid tokens, full user objects, and payment details.
+Use structured logging with configurable levels and mask sensitive fields.
+In backend Python, use logger with masking helper for e.g., authorization headers.
+CORS and CSRF
+Check backend CORS config; for authenticated API endpoints use CSRF protection if cookies used for auth.
+Fix:
+If using token auth via Authorization header, CSRF risk is lower but consider adding CORS strict origins and rate limits.
+If moving to HttpOnly cookies, implement CSRF tokens.
+Rate limiting and abuse
+Good: generate-report route already has limiter.limit("5/minute") in some places — expand rate limiting to other expensive endpoints (research analyze, sources fetching, purchase endpoints). Also circuit-breaker for third-party APIs (LLM, crawler).
+Use exponential backoff and short circuit for repeated external errors.
+B. Performance & correctness improvements
+
+Avoid heavy innerHTML full replacements
+Problem: many components set container.innerHTML = ... and then reattach listeners. This triggers layout thrash and removes event listeners.
+Fix:
+Use incremental DOM updates: update only changed parts, reuse nodes, or use a virtual DOM library (React/Vue) for complex UIs.
+At minimum, when rendering lists (sources), clear and append children using DocumentFragment to minimize reflows.
+Example snippet:
+
+JavaScript
+const frag = document.createDocumentFragment();
+items.forEach(item => {
+  const card = createSourceCard(item);
+  frag.appendChild(card);
+});
+list.replaceChildren(frag);
+Prevent duplicate event listeners & memory leaks
+Problem: e.g., sources-panel.render binds click listeners each render without cleanup.
+Fix:
+Use event delegation on a stable parent (e.g., #sources-panel) rather than adding listeners to each button.
+Or remove previous listeners before reattaching (store bound handlers as instance properties and remove them).
+Example:
+JavaScript
+// in constructor
+this._onCollapseClick = () => this.toggleCollapse();
+collapseBtn.removeEventListener('click', this._onCollapseClick);
+collapseBtn.addEventListener('click', this._onCollapseClick);
+Or delegate:
+
+JavaScript
+container.addEventListener('click', (e) => {
+  if (e.target.matches('.collapse-toggle')) { ... }
+});
+Drag/resize handlers — use pointer events and rAF
+Problem: mousemove handlers can fire very frequently; also mixing mousedown/mousemove/pointermove can be inconsistent.
+Fix:
+Use pointerdown/pointermove/pointerup with passive: false only when preventDefault needed. Use requestAnimationFrame to update DOM width for smoother UI.
+Example improvement (pseudo):
+JavaScript
+let isResizing=false;
+let lastX;
+const onPointerMove = (e) => {
+  lastX = e.clientX;
+  if (!isAnimationFrame) {
+     requestAnimationFrame(() => { updateWidth(lastX); isAnimationFrame=false; });
+     isAnimationFrame = true;
+  }
+};
+Virtualize long lists (sources)
+If source lists can be long, virtualize (e.g., windowing) to reduce DOM nodes. Use libraries or simple intersection observer to lazy-render off-screen items.
+Backend caching & batching
+Where: crawler.generate_sources_progressive and LLM calls.
+Fix:
+Cache recent research queries / results for a short TTL (e.g., 5–30 minutes) keyed by brief signature to avoid repeated crawler/LLM calls for same query.
+Use batching for LLM prompts where possible (e.g., re-rank many snippets via one batch embedding call).
+Add an async enrichment pipeline (fast draft vs enriched) to improve responsiveness.
+Use embeddings for similarity and ranking
+Replace simple word overlap with embeddings similarity for quality improvements (but watch cost).
+Cache embeddings per source.
+LLM token & prompt size control
+The report generator builds large prompts (sources_text + evidence). Ensure you:
+Limit text passed (use best evidence sentences only).
+Estimate tokens and chunk/process across rails or streaming.
+Fail gracefully if prompt would exceed token limit.
+SQL and DB performance
+Use indexes on project_id, message timestamps, source ids, etc.
+Use batch inserts for saving many messages/sources.
+Avoid SELECT N+1 patterns.
+C. Maintainability & code cleanup
+
+Consolidate helper utilities
+There are multiple helper files (utils/helpers.js, dom.js). Consolidate overlapping utils (createElement variants) and ensure consistent API. Add JSdoc types.
+Consider moving shared logic to a small front-end utilities module to avoid duplication.
+Standardize error handling & logging
+Many places console.log used; replace with a centralized logger that supports levels and structured metadata. In backend, use logging module with structured JSON output optionally.
+Add types (JS -> TypeScript) or JSDoc
+Consider incremental migration to TypeScript for critical front-end components (SourcesPanel, ReportBuilder, App) to catch type errors and document interfaces. At minimum add JSDoc for complex functions.
+Tests
+Add unit tests for:
+report_generator.generate_report (mock LLM)
+_filter_and_rank_sources (ranking logic)
+sources-panel merging/dedupe logic
+API endpoints (generate-report) with pydantic input validation.
+Remove dead code & commented console debugging before shipping
+There are many console logs and commented plans; keep essential logs but remove or gate verbose debugging under debug flag.
+D. Code-specific spots I inspected & recommended changes (These map to files you and I examined earlier — apply targeted fixes.)
+
+backend/static/js/components/sources-panel.js
+Replace innerHTML use and duplicate listener patterns with build-into-fragment and delegation.
+Use DOMPurify when rendering source excerpts/quote HTML.
+Ensure event listeners added in init() not reattached every render.
+backend/static/js/app.js
+Move heavy async calls out of the critical UI path (e.g., ensureActiveProject awaited in sendMessage can block).
+Ensure pending flags (pendingSearchFromLogin) are documented and cleared robustly to avoid skipping intended flows.
+backend/services/ai/report_generator.py
+We already added stricter JSON schema & evidence pooling in the previous patch. Also:
+Throttle / limit token usage per request.
+Use retry with exponential backoff for LLM calls and circuit-breaker if repeated failures.
+Ensure parsed JSON is validated by pydantic and avoid passing untrusted strings to innerHTML.
+backend/app/api/routes/research.py
+Validate outline_structure early (we added that).
+Ensure file-based and DB-based content retrieval is permission checked and safe.
+backend/static/js/components/outline-builder.js
+Avoid complete container.innerHTML='' to hide for unauthenticated users; rather toggle CSS class 'hidden' to preserve layout and avoid tearing out nodes (listeners, references).
+Keep consistent 'visible' semantics.
+backend/static/js/utils/dom.js & helpers.js
+Consolidate createElement helper variants. Create safeRenderHtml(html, container) that uses DOMPurify and consistent allowed tags.
+E. Performance instrumentation & telemetry
+
+Add counters/timings:
+time to generate report (LLM call time)
+time to fetch sources (crawler)
+frontend: time from click 'Generate' to first draft vs enriched report
+Use these to guide caching/async decisions.
+F. Security hardening checklist (concrete)
+
+ Sanitize ALL HTML rendered from external sources (LLM, remote source excerpts, uploaded files). Add DOMPurify to frontend.
+ Audit authService: prefer HttpOnly Secure cookies or at a minimum protect tokens with CSP and minimize localStorage use.
+ Audit logs for PII and remove/ mask tokens, emails, wallet info.
+ File upload: add size limits, type restrictions, store out of web root, virus scan.
+ Add CSP headers (Content-Security-Policy), X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security.
+ Add SAST and dependency scanning (Bandit for Python, npm audit or Snyk for JS).
+ Ensure CORS is strict and rate-limit expensive endpoints.
+G. Small example fixes you can apply immediately
+
+Sanitize LLM HTML (client)
+Add DOMPurify to frontend bundle, then use it wherever you call innerHTML with LLM output.
+Prevent duplicate event listeners (sources-panel)
+Convert per-button handler to delegated handler on container.
+CSV safety
+Implement CSV field sanitizer before writing.
+H. Suggested roadmap and next steps
+
+Week 0 (immediate): sanitation (DOMPurify), auth token audit, remove obvious console logs exposing PII, add server-side request rate-limits for heavy endpoints.
+Week 1: fix event listener leaks & innerHTML replace patterns (sources-panel, outline builder, message renderer), add caching for crawler calls, add LLM retry/circuit-breaker.
+Week 2: add unit/integration tests for report generation (mock LLM), add telemetry for ranking/CTR, run dependency security scans and patch.
+Week 3+: embed-based similarity re-ranker, worker-based enrichment pipeline for long reports, CSP and cookie changes.
+If you want, I can:
+
+produce concrete patches for the top 3 items (DOMPurify in message rendering/sources-panel, event delegation refactor in sources-panel, CSV injection protection) and open a PR.
+or I can generate a prioritized checklist / small TODO issues to track these tasks with exact file/line references.
