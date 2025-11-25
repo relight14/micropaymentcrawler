@@ -652,7 +652,10 @@ export class ReportBuilder extends EventTarget {
         generateButton.addEventListener('click', async () => {
             const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
             
-            console.log(`💰 Report generation initiated - Price: $${generateButton.dataset.price}`);
+            // Use backend-quoted price from the button (accounts for already-owned sources)
+            const quotedPrice = Number(generateButton.dataset.price) || 0;
+            
+            console.log(`💰 Report generation initiated - Price: $${quotedPrice.toFixed(2)}`);
             
             // Get sources and outline from store
             const { sources } = this._getOutlineSourcesFromStore();
@@ -663,6 +666,25 @@ export class ReportBuilder extends EventTarget {
                 this.toastManager.show('Please add sources to your outline before generating a report.', 'warning');
                 return;
             }
+            
+            // Show purchase confirmation modal with backend-quoted price
+            const purchaseDetails = {
+                tier: 'report',
+                price: quotedPrice,
+                selectedSources: sources,
+                query: query,
+                titleOverride: 'Generate Research Report',
+                customDescription: `Create a comprehensive research report with ${sources.length} source${sources.length !== 1 ? 's' : ''}`
+            };
+            
+            const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
+            
+            if (!userConfirmed) {
+                console.log('🚫 Report generation cancelled by user');
+                return;
+            }
+            
+            console.log('✅ Purchase confirmed, generating report...');
             
             // Trigger report generation
             await this.generateReport(query, sources, outlineStructure);
