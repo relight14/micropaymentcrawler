@@ -345,8 +345,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             # Generate AI report
             report_data = report_generator.generate_report(
                 purchase_request.query, 
-                sources, 
-                purchase_request.tier,
+                sources,
                 outline_structure=purchase_request.outline_structure
             )
             
@@ -404,8 +403,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Generate AI report (with fallback handling built-in)
         report_data = report_generator.generate_report(
             purchase_request.query, 
-            sources, 
-            purchase_request.tier,
+            sources,
             outline_structure=purchase_request.outline_structure
         )
         
