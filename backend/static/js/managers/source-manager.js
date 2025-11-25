@@ -1,7 +1,12 @@
 import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
-import { getBudgetThresholds } from '../config/tier-catalog.js';
 import { projectStore } from '../state/project-store.js';
+
+// Budget thresholds for sanity checks
+const BUDGET_THRESHOLDS = {
+    pro: 10.00,  // High cost warning at $10
+    warningThreshold: 0.75  // Warning at 75% of budget
+};
 
 export class SourceManager extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager, modalController }) {
@@ -462,7 +467,7 @@ export class SourceManager extends EventTarget {
     }
 
     checkBudget(totalCost) {
-        const { pro: proBudget, warningThreshold } = getBudgetThresholds();
+        const { pro: proBudget, warningThreshold } = BUDGET_THRESHOLDS;
         
         // With per-source pricing, budget warnings are less relevant
         // but we keep them for very high totals as a sanity check
