@@ -1,0 +1,241 @@
+ok now i'd like you to do a thorough review of the report generation feature.  the flow that we want is that a user selects sources to add to the outline, then when they click 'generate report' the system builds an overview summary of the topic based exclusively on the selected sources, offers further research guidance about areas of conflict in the source material and interesting avenues of further research, and then summarizes the sources into a downloadable CSV file based exactly on the outline that the user created.  the system should pull relevant quotes and specific supporting data from the sources for each point.  the system needs to follow the user's outline exactly, adding relevant evidence applicable to each section of the outline.  
+
+the issues we're having now is that the summary is not being generated clearly and we are missing the conflicts and research direction segments, and the outline is not being followed exactly when the summary table is generated.  let me know what you think is going wrong and how we can fix the report generation feature to follow the above flow
+20 references
+Copilot said: Thanks — I traced the report generation
+Thanks — I traced the report generation flow and the code paths that touch it, and I can tell you exactly why the report is not following your desired flow and what to change (with concrete, minimal code edits and tests). Below I give:
+
+A concise diagnosis of what's going wrong now (root causes).
+A prioritized list of concrete fixes (short, medium, and longer term).
+Exact code-level guidance and example snippets you can drop into the repo (locations and rationale).
+Tests and rollout guidance so you can validate the behavior.
+Summary of current flow (what I traced)
+
+Frontend collects selected_sources + outline_structure and calls POST /api/research/generate-report via APIService.generateReport (backend/static/js/services/api.js).
+Endpoint generate_research_report (backend/app/api/routes/research.py) converts selected_sources dicts into SourceCard objects and delegates to report_generator.generate_report(...) passing outline_structure if provided.
+ReportGeneratorService (backend/services/ai/report_generator.py) builds prompts, formats sources with _format_sources_for_prompt, calls the LLM (_generate_claude_report or equivalent), then post-processes results. It also has fallback generators for conflicts and research_directions if the LLM omitted them.
+The final ResearchPacket returned contains summary, table_data, conflicts, research_directions only if report_data provided them (or fallback logic ran).
+Why you get the wrong behavior (root causes)
+
+Outline not strictly enforced in the LLM prompt
+
+The prompt templates (PRO_TABLE_PROMPT / RESEARCH_TABLE_PROMPT) are used, but they appear to pass sources and topics without a strict, machine-checked instruction to "follow this outline exactly" and return structured JSON keyed by outline sections. The LLM may therefore produce an overall summary and a table but not adhere to the exact outline shape.
+Evidence/quotes not reliably available in sources used by the LLM
+
+_format_sources_for_prompt likely includes snippets/metadata, but not always full text or targeted quotes for each outline item. If the LLM has only short snippets, it cannot reliably extract quotes or data for each section.
+Conflicts and research_directions rely on the LLM returning them
+
+Although the generator has fallback heuristics, these run only if the LLM response lacks fields OR if the parsing fails. The fallback sometimes produces generic results or is not invoked in all code paths (e.g., errors swallowed, or generate_report uses wrong key names).
+Table generation is not tied to outline sections
+
+The code puts table_data into the ResearchPacket, but the format of table_data may not be keyed by outline sections (it may be just a flat list). The frontend/report builder expects a table aligned with outline sections and therefore gets mismatched results.
+Inconsistent source content enrichment
+
+Some sources are paywalled or have only a short excerpt. The report generator does not always fetch or extract full content nor run offline evidence extraction before LLM prompting; this reduces the LLM's ability to cite supporting quotes/data for specific outline sections.
+Concrete fixes — prioritized
+
+Immediate (high impact, small changes)
+
+Require outline_structure in the generate_report prompt and instruct the LLM to return structured JSON that mirrors the outline exactly. Update prompt templates to include explicit JSON schema and a strict instruction: "Return JSON only. Exactly one key per outline section in the same order. Each section must include: section_title, synthesis (1-3 sentences), supporting_evidence (array of {quote, locator, source_id}), supporting_data (optional key-values)."
+
+Ensure report_generator.generate_report always passes the outline_structure into the LLM prompt (already accepted but double-check call sites and ensure None is not used). Add validation that outline_structure.sections exists and has expected fields before calling the LLM; if missing, return 400 or generate a simple outline locally.
+
+Add server-side evidence extraction helper _extract_evidence_for_section(source, section_title_or_keywords):
+
+For each selected source, run a quick extractor on the stored snippet/full text to find sentences or paragraphs matching section keywords (keyword match, regex, or embeddings). Return a few best quotes per source so the LLM gets high-quality evidence to cite.
+If no full text is available, prefer the snippet or fetch the page (respecting paywall/licensing).
+Validate and strictly parse the LLM JSON output using pydantic models; if fields are missing, run deterministic fallbacks:
+
+conflicts = _analyze_conflicts(sources)
+research_directions = _generate_research_directions(brief, sources)
+table_data = _assemble_table_data_from_outline(outline_structure, extracted_evidence)
+Medium (more work, much better output) 5) Pre-build table_data server-side before prompting: assemble for each outline section a list of candidate evidence entries (quote, source_id, snippet, page) and send that as "evidence pool" to the LLM. This reduces hallucination and forces the model to select and synthesize only from provided evidence.
+
+Use strict JSON schema for LLM output and robust parsing:
+
+Example schema (pydantic) ReportResult with fields:
+exec_summary: str
+conflicts: str
+research_directions: List[str] length 5
+sections: List[ { id, title, synthesis, evidence: [ {source_id, quote, locator, confidence}], supporting_data: {k:v} } ]
+table_data: array exactly matching outline section order and columns for CSV export
+If paywalled sources are present, ensure license/access metadata and quote extraction results are included in evidence_pool. If a license grants access (via RSL/Tollbit/CF), include full extracted quotes.
+
+Longer term (best quality) 8) Use embeddings for evidence selection (semantic retrieval from each source) instead of simple keyword overlap. This drastically improves which sentences are candidate evidence for each outline section.
+
+Pipeline: two-stage flow to keep latency acceptable:
+Stage 1: quick draft report using snippets and ask LLM to produce the overall exec_summary and outline skeleton.
+Stage 2 (async enrichment): fetch full texts, run evidence extraction, re-run the LLM to fill each section with grounded evidence and supporting_data, and patch the report. Notify user when enriched report is ready.
+Concrete code-level suggestions and example snippets
+
+A) Enforce outline in prompt and require JSON output
+
+File: backend/services/ai/report_generator.py — update the prompt templates and _generate_claude_report
+Example JSON-enforcing system prompt (replace PRO_TABLE_PROMPT/RESEARCH_TABLE_PROMPT or add a new template):
+
+Text
+SYSTEM: You are an expert research analyst. The user supplied:
+- outline: an ordered list of sections (title and optional notes).
+- sources: a list of sources with id, title, domain, snippet, paywalled, and evidence_pool (citationable quotes per source).
+
+INSTRUCTION:
+Produce a JSON object with the exact schema below. Return only valid JSON (no commentary).
+
+{
+  "exec_summary": "Concise 3-4 sentence synthesis of the topic based ONLY on the provided sources.",
+  "conflicts": "Short analysis (2-4 sentences) describing agreement/disagreement across the provided sources, citing source ids.",
+  "research_directions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"],
+  "sections": [
+    {
+      "section_id": "section-1",
+      "title": "<exact title from outline>",
+      "synthesis": "1-3 sentence synthesis grounded in the provided evidence for this section",
+      "evidence": [
+         {"source_id": "S123", "quote": "Exact quoted sentence or phrase", "locator": "paragraph 3 / page 2 / timestamp", "note": "short reason why it's relevant"}
+      ],
+      "supporting_data": {
+         "statistic_1": "value and source_id",
+         "table_reference": "..."
+      }
+    },
+    ...
+  ],
+  "table_data": [
+     {"section_id":"section-1","row":[ "source_id", "title", "quote", "url", "domain", "credibility_score" ], ...}
+  ]
+}
+
+Important:
+- Use ONLY the evidence provided in the 'evidence_pool'; do not invent quotes or facts.
+- For each 'evidence' entry use the existing 'quote' string exactly as provided.
+- The 'sections' array must have the same number and order as the provided outline array.
+Implement this in _generate_claude_report by replacing the prompt selection with the above and pass the outline and evidence_pool as formatted strings.
+
+B) Pre-build evidence_pool for each section (server-side helper)
+
+File: backend/services/ai/report_generator.py — add:
+Python
+def _extract_evidence_for_outline(sources: List[SourceCard], outline_structure: Dict) -> Dict[str, List[Dict]]:
+    """
+    For each outline section, return a list of evidence candidates from selected sources.
+    Evidence candidate: { source_id, quote, locator, snippet, score }
+    """
+    evidence_by_section = {}
+    for sec in (outline_structure.get("sections") or []):
+        title = sec.get("title","")
+        keywords = [title] + sec.get("keywords", [])  # let UI allow keywords
+        candidates = []
+        for s in sources:
+            content = s.get("full_text") or s.get("snippet") or s.get("excerpt") or ""
+            if not content:
+                continue
+            # simple heuristic: find sentences containing any keyword
+            sentences = re.split(r'(?<=[.!?])\s+', content)
+            for i, sent in enumerate(sentences):
+                sent_low = sent.lower()
+                match_count = sum(1 for k in keywords if k.lower() in sent_low)
+                if match_count:
+                    candidates.append({
+                       "source_id": s.get("id"),
+                       "quote": sent.strip(),
+                       "locator": f"sentence_{i+1}",
+                       "snippet": sent.strip(),
+                       "score": match_count
+                    })
+        # sort and dedupe by quote text, take top N
+        uniq = {}
+        for c in sorted(candidates, key=lambda x: (-x["score"])):
+            if c["quote"] not in uniq:
+                uniq[c["quote"]] = c
+        evidence_by_section[sec.get("id") or sec.get("title")] = list(uniq.values())[:6]
+    return evidence_by_section
+Call this before prompting and include evidence pool per section in the prompt (format with _format_sources_for_prompt).
+
+C) Ensure report_generator.generate_report wires outline & evidence to LLM
+
+In generate_report, after you have selected_sources:
+Enrich selected_sources: ensure each source has 'full_text' or call crawler/fetcher to get it (paywalled sources: use your licensing broker to fetch full text).
+evidence_by_section = _extract_evidence_for_outline(selected_sources, outline_structure)
+pass both selected_sources and evidence_by_section to LLM prompt (format as JSON string with escapes).
+D) Strict parsing & fallback
+
+After LLM returns text, parse JSON with _parse_json_response (already exists).
+Validate with pydantic model:
+Python
+class ReportSection(BaseModel):
+    section_id: str
+    title: str
+    synthesis: str
+    evidence: List[Dict]  # validate keys
+    supporting_data: Optional[Dict[str, Any]] = None
+
+class ReportResult(BaseModel):
+    exec_summary: str
+    conflicts: Optional[str]
+    research_directions: List[str]
+    sections: List[ReportSection]
+    table_data: List[Dict]
+If parsed.sections length != outline.sections length or any section missing evidence, either:
+Re-prompt the LLM with a targeted instruction to fix that specific section, or
+Fill missing entries using deterministic server fallback (choose top evidence_by_section entries and produce a short synthesis using a small local template).
+E) Guarantee CSV output keyed to outline
+
+Use table_data produced by LLM OR assemble it server-side from validated sections:
+Python
+def _build_csv_from_sections(sections: List[ReportSection]) -> str:
+    """Return CSV string where rows are evidence entries grouped by section."""
+    import csv, io
+    out = io.StringIO()
+    writer = csv.writer(out)
+    # header: section_id, section_title, source_id, source_title, quote, url, domain, credibility_score
+    writer.writerow(["section_id","section_title","source_id","source_title","quote","url","domain","credibility"])
+    for sec in sections:
+        for ev in sec.evidence:
+            src = next((s for s in selected_sources if s['id']==ev['source_id']), {})
+            writer.writerow([sec.section_id, sec.title, ev['source_id'], src.get('title',''), ev['quote'], src.get('url',''), src.get('domain',''), src.get('credibility_score','')])
+    return out.getvalue()
+Attach this CSV to ResearchPacket or expose a download endpoint that returns the CSV.
+
+F) Make conflicts & research_directions deterministic fallback robust
+
+You have fallback generators in report_generator (_generate_conflicts_analysis and _generate_research_directions). Ensure they are always invoked if LLM output is missing or invalid. Also update them to operate on validated sections and table_data so they can produce section-aware directions and conflict points.
+Suggested tests to add
+
+Unit test: generate_research_report with 3 mock selected_sources + a 3-section outline:
+Expect ResearchPacket.sections length == 3
+Each section has at least one evidence entry and synthesis not empty
+conflicts non-empty (or fallback produced)
+research_directions length == 5
+CSV generation returns header + at least one evidence row
+Integration test: run generate_research_report with a paywalled source that has license_details.access_url and assert that full_text is fetched and evidence contains quotes from that source.
+Fuzz test: LLM returns invalid JSON → assert fallback used and response still contains required keys.
+Operational considerations & UX
+
+Latency: extracting full text for many paywalled sources is slow. Use progressive approach:
+First, return a draft report based on snippets (fast).
+Kick off an enrichment job that fetches full text + evidence and patches the report. Notify the user when complete or provide "Refresh enriched report" CTA.
+Traceability: always include source_id and quote locator so users can verify provenance.
+Safety: when paywalled content is licensed for display, ensure you respect licensing terms in UI and do not expose full text where not permitted.
+Where to apply changes (file map)
+
+backend/app/api/routes/research.py
+Ensure outline_structure passed through; call report_generator.generate_report with outline_structure; validate request includes outline when selected_sources present.
+backend/services/ai/report_generator.py
+Implement/augment:
+_extract_evidence_for_outline (new)
+Include evidence_pool in prompt via _format_sources_for_prompt
+Replace or augment prompt templates to require JSON schema and exact outline mapping
+Use pydantic ReportResult for validation
+Call fallback generators when missing or invalid fields
+Provide _build_csv_from_sections and include CSV generation
+backend/static/js/components/report-builder.js
+After receiving reportPacket, ensure displayReport uses packet.sections / table_data exactly, and provide a "Download CSV" button invoking backend/download endpoint or building CSV client-side from packet.table_data.
+Small step-by-step patch plan you can apply now (safe incremental)
+
+Update prompt in report_generator to require JSON with outline sections (small edit).
+Add _extract_evidence_for_outline and call it in generate_report; pass evidence_pool to prompt (moderate edit).
+Add strict JSON parsing & pydantic ReportResult and fallback calls (small-moderate).
+Add CSV builder and expose download endpoint (small).
+Add tests described above (small).
+If you want, I can:
+
