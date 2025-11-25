@@ -185,7 +185,6 @@ def calculate_incremental_pricing(user_id: str, query: str, sources: list, logge
 @limiter.limit("30/minute")
 async def get_pricing_quote(
     request: Request,
-    tier: str,
     query: str,
     outline_structure: str | None = None,  # JSON string
     authorization: str = Header(None, alias="Authorization")
@@ -217,12 +216,11 @@ async def get_pricing_quote(
         # Calculate incremental pricing
         pricing_info = calculate_incremental_pricing(user_id, query, sources, logger)
         
-        logger.info(f"💵 [QUOTE] User {user_id[:8]}... | Query: '{query}' | Tier: {tier}")
+        logger.info(f"💵 [QUOTE] User {user_id[:8]}... | Query: '{query}'")
         logger.info(f"💵 [QUOTE] Price: ${pricing_info['calculated_price']:.2f} ({pricing_info['new_source_count']} new sources)")
         
         return {
             "success": True,
-            "tier": tier,
             "query": query,
             **pricing_info
         }

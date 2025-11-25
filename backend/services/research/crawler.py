@@ -881,8 +881,8 @@ class ContentCrawlerStub:
         """Extract key topics from long query text."""
         import re
         
-        # Remove common research phrases and extract core topics
-        clean_query = re.sub(r'(research query|search terms|based on|comprehensive|analysis|report)', '', query.lower())
+        # Remove overly generic wrappers like "Please research..." but preserve core terms
+        clean_query = re.sub(r'(please research|search for|find information about)', '', query.lower())
         
         # Extract quoted terms and key phrases
         quoted_terms = re.findall(r'"([^"]+)"', query)

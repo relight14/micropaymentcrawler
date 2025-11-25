@@ -93,7 +93,6 @@ class ResearchLedger:
     
     def record_purchase(self, 
                        query: str, 
-                       tier: Optional[str], 
                        price: float, 
                        wallet_id: Optional[str], 
                        transaction_id: str,
@@ -107,12 +106,13 @@ class ResearchLedger:
             # Convert source IDs list to JSON string
             source_ids_json = json.dumps(source_ids) if source_ids else None
             
+            # Note: tier column remains in DB for historical data but always stores "pro"
             cursor.execute("""
                 INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data, source_ids_used, user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 query,
-                tier or "dynamic",
+                "pro",  # All reports are now Pro Package
                 price,
                 wallet_id,
                 transaction_id,
