@@ -491,13 +491,25 @@ Use the generate_synthesis tool to provide:
         try:
             response = self.client.messages.create(
                 model=REPORT_MODEL,
-                max_tokens=2000,
+                max_tokens=4000,
                 tools=[SECTION_EXTRACTION_TOOL],
                 messages=[{
                     "role": "user",
                     "content": prompt
                 }]
             )
+            
+            # DIAGNOSTIC: Log response structure to diagnose empty extractions
+            logger.info(f"      🔍 [DIAG] stop_reason={response.stop_reason}, content_blocks={len(response.content)}")
+            for i, block in enumerate(response.content):
+                if block.type == "text":
+                    text_preview = block.text[:200] if len(block.text) > 200 else block.text
+                    logger.info(f"      🔍 [DIAG] Block {i}: type=text, length={len(block.text)}, preview='{text_preview}'")
+                elif block.type == "tool_use":
+                    entry_count = len(block.input.get('table_data', [])) if block.name == "extract_section_data" else 'N/A'
+                    logger.info(f"      🔍 [DIAG] Block {i}: type=tool_use, name={block.name}, entries={entry_count}")
+                else:
+                    logger.info(f"      🔍 [DIAG] Block {i}: type={block.type}")
             
             # Extract structured data from tool use
             table_data = []
