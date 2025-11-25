@@ -7,7 +7,7 @@ import time
 import logging
 from typing import List, Optional, Dict
 from anthropic import Anthropic
-from schemas.domain import SourceCard, TierType
+from schemas.domain import SourceCard
 from config import Config
 
 logger = logging.getLogger(__name__)

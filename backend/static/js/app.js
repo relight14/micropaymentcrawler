@@ -100,14 +100,14 @@ export class ChatResearchApp {
         
         // Setup ReportBuilder event listeners
         this.reportBuilder.addEventListener('reportGenerated', (e) => {
-            const { reportData, tier, sourceCount } = e.detail;
+            const { reportData, sourceCount } = e.detail;
             const message = this.reportBuilder.displayReport(reportData);
             if (message) {
                 this.addMessage(message.sender, message.content, message.metadata);
                 // Auto-scroll to top of the newly generated report
                 this._scrollToLastMessage();
             }
-            this.toastManager.show(`✅ ${tier === 'research' ? 'Research' : 'Pro'} report generated successfully from your ${sourceCount} selected sources!`, 'success');
+            this.toastManager.show(`✅ Report generated successfully from your ${sourceCount} selected sources!`, 'success');
         });
         
         this.reportBuilder.addEventListener('reportGenerating', (e) => {
@@ -116,7 +116,7 @@ export class ChatResearchApp {
         });
         
         this.reportBuilder.addEventListener('reportError', (e) => {
-            const { error, tier } = e.detail;
+            const { error } = e.detail;
             
             // Remove progressive loading message if it exists
             if (this.currentReportLoadingMessage) {

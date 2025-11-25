@@ -10,7 +10,7 @@ from datetime import datetime
 import anthropic
 from services.licensing.content_licensing import ContentLicenseService
 from services.research.crawler import ContentCrawlerStub
-from schemas.domain import TierType
+# TierType removed - all reports are now Pro Package
 
 class AIResearchService:
     """Unified AI service for conversational and deep research modes"""

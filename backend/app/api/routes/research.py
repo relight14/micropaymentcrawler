@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 from schemas.api import ResearchRequest, DynamicResearchResponse
-from schemas.domain import TierType, ResearchPacket, SourceCard
+from schemas.domain import ResearchPacket, SourceCard
 from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
@@ -48,7 +48,6 @@ conversation_topics: Dict[str, Dict[str, str]] = {}
 class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
     query: str = Field(..., min_length=3, max_length=500, description="Research query between 3-500 characters")
-    tier: Optional[TierType] = None  # DEPRECATED: All reports now use same unified tier
     selected_sources: Optional[List[Dict[str, Any]]] = None  # Full source objects (preferred)
     selected_source_ids: Optional[List[str]] = Field(None, min_length=1)  # DEPRECATED: Use selected_sources instead
     outline_structure: Optional[Dict[str, Any]] = None  # Custom outline structure from project outline builder

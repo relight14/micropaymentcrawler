@@ -1,12 +1,13 @@
 /**
  * ReportBuilder Component
- * Handles report tier selection, generation, and display
+ * Handles report generation and display
  * Uses event-based architecture for loose coupling
  */
 
 import { analytics } from '../utils/analytics.js';
 import { projectStore } from '../state/project-store.js';
-import { TIERS, calculateProPrice, PER_SOURCE_RATE } from '../config/tier-catalog.js';
+
+const PER_SOURCE_RATE = 0.05;
 
 export class ReportBuilder extends EventTarget {
     constructor({ appState, apiService, authService, toastManager, uiManager }) {
@@ -43,7 +44,7 @@ export class ReportBuilder extends EventTarget {
         
         const sources = Array.from(sourceMap.values());
         const count = sources.length;
-        const totalPrice = calculateProPrice(count);
+        const totalPrice = count * PER_SOURCE_RATE;
         
         return { sources, count, totalPrice };
     }
@@ -53,13 +54,12 @@ export class ReportBuilder extends EventTarget {
      * @returns {HTMLElement} The report builder DOM element
      */
     show() {
-        // Render DOM with static pricing first (optimistic render)
         const container = this._generateReportBuilderDOM();
         
         // Attach event listeners after DOM is created
-        setTimeout(() => this._attachTierPurchaseListeners(), 0);
+        setTimeout(() => this._attachGenerateButtonListener(), 0);
         
-        // Fetch dynamic pricing asynchronously and patch DOM when ready
+        // Fetch dynamic pricing asynchronously and update display when ready
         this._fetchAndUpdatePricing();
         
         return container;
@@ -71,7 +71,6 @@ export class ReportBuilder extends EventTarget {
      */
     async _fetchAndUpdatePricing() {
         if (!this.authService.isAuthenticated()) {
-            // User not logged in - pricing already calculated from sources × $0.05
             return;
         }
         
@@ -79,75 +78,37 @@ export class ReportBuilder extends EventTarget {
         const outlineStructure = projectStore.getOutlineSnapshot();
         
         try {
-            // Fetch quote for Pro tier only
-            const proQuote = await this.apiService.getPricingQuote('pro', query, outlineStructure);
+            const quote = await this.apiService.getPricingQuote(query, outlineStructure);
             
-            this.pricingQuotes = { pro: proQuote };
+            console.log('💵 Pricing quote fetched:', quote);
             
-            console.log('💵 Pro pricing quote fetched:', proQuote);
-            
-            // Update Pro tier card with backend quote (may differ from local calculation)
-            this._updateTierCardPricing('pro', proQuote);
+            // Update button with backend quote
+            this._updatePricing(quote);
             
         } catch (error) {
             console.error('Failed to fetch pricing quote:', error);
-            // Fallback: Keep local calculation (sources × $0.05)
-            this.pricingQuotes = {};
         }
     }
     
     /**
-     * Update tier card with dynamic pricing
-     * @param {string} tierId - Tier ID (pro)
+     * Update button with dynamic pricing
      * @param {Object} quote - Pricing quote object
      * @private
      */
-    _updateTierCardPricing(tierId, quote) {
-        const tierCard = document.querySelector(`[data-tier-id="${tierId}"]`);
-        if (!tierCard) return;
+    _updatePricing(quote) {
+        const button = document.querySelector('.generate-report-btn');
+        const detailsElement = document.querySelector('.pricing-details');
         
-        const priceElement = tierCard.querySelector('.tier-price');
-        const detailsElement = tierCard.querySelector('.tier-pricing-details');
-        const buttonElement = tierCard.querySelector('.tier-purchase-btn');
-        
-        if (!priceElement) return;
-        
-        // Check if quote is unavailable (error fallback)
-        if (quote.quote_unavailable) {
-            const price = quote.calculated_price || 0;
-            priceElement.textContent = `$${price.toFixed(2)}`;
-            
-            // Update button text with price
-            if (buttonElement) {
-                buttonElement.textContent = `Generate Pro Report — $${price.toFixed(2)}`;
-                buttonElement.dataset.price = price.toFixed(2);
-            }
-            
-            if (detailsElement) {
-                detailsElement.textContent = 'Quote unavailable — showing list price';
-                detailsElement.style.display = 'block';
-                detailsElement.style.color = '#999';
-            }
-            
-            // Mark tier card with quote unavailable flag
-            tierCard.dataset.quoteUnavailable = 'true';
-            tierCard.dataset.actualPrice = price.toFixed(2);
-            return;
-        }
+        if (!button) return;
         
         const price = quote.calculated_price || 0;
         const newSourceCount = quote.new_source_count || 0;
         const previousSourceCount = quote.previous_source_count || 0;
         const totalSourceCount = newSourceCount + previousSourceCount;
         
-        // Update price display
-        priceElement.textContent = `$${price.toFixed(2)}`;
-        
         // Update button text with price
-        if (buttonElement) {
-            buttonElement.textContent = `Generate Pro Report — $${price.toFixed(2)}`;
-            buttonElement.dataset.price = price.toFixed(2);
-        }
+        button.textContent = `Generate Report — $${price.toFixed(2)}`;
+        button.dataset.price = price.toFixed(2);
         
         // Update header source count with backend's authoritative count
         const progressTitle = document.querySelector('.progress-title');
@@ -155,37 +116,25 @@ export class ReportBuilder extends EventTarget {
             progressTitle.textContent = `${totalSourceCount} Sources Ready`;
         }
         
-        // Update pricing details with full transparency
+        // Update pricing details
         if (detailsElement) {
-            detailsElement.style.color = '#666'; // Reset color for successful quotes
-            
             if (previousSourceCount > 0) {
-                // Incremental purchase - show previous + new sources
                 detailsElement.textContent = `${previousSourceCount} already owned, ${newSourceCount} new at $0.05 each`;
-                detailsElement.style.display = 'block';
             } else if (newSourceCount > 0) {
-                // First purchase
                 detailsElement.textContent = `${newSourceCount} source${newSourceCount !== 1 ? 's' : ''} at $0.05 each`;
-                detailsElement.style.display = 'block';
             } else {
-                // No sources (edge case)
                 detailsElement.textContent = 'No new sources to purchase';
-                detailsElement.style.display = 'block';
             }
         }
-        
-        // Update data attribute for purchase flow
-        tierCard.dataset.actualPrice = price.toFixed(2);
     }
 
     /**
      * Generates a report from selected sources
-     * @param {HTMLButtonElement} button - The purchase button
-     * @param {string} tier - Tier ID (pro)
      * @param {string} query - Research query
      * @param {Array} selectedSources - Selected sources array
+     * @param {Object} outlineStructure - Outline structure from project store
      */
-    async generateReport(button, tier, query, selectedSources) {
+    async generateReport(query, selectedSources, outlineStructure) {
         if (!this.authService.isAuthenticated()) {
             this.dispatchEvent(new CustomEvent('authRequired', {
                 detail: { message: 'Please log in to generate a report.' }
@@ -194,34 +143,24 @@ export class ReportBuilder extends EventTarget {
         }
 
         try {
-            console.log(`📊 Generating ${tier} report with ${selectedSources.length} selected sources`);
+            console.log(`📊 Generating report with ${selectedSources.length} selected sources`);
             
             // Dispatch loading event
             this.dispatchEvent(new CustomEvent('reportGenerating', {
-                detail: { tier, sourceCount: selectedSources.length }
+                detail: { sourceCount: selectedSources.length }
             }));
             
-            // Get outline structure from project store
-            const outlineStructure = projectStore.getOutlineSnapshot();
-            
             // Call API to generate report with full source objects and outline structure
-            const reportPacket = await this.apiService.generateReport(query, tier, selectedSources, outlineStructure);
+            const reportPacket = await this.apiService.generateReport(query, selectedSources, outlineStructure);
             
             if (reportPacket) {
                 // Track report generation
-                analytics.trackReportGenerate(selectedSources.length, tier);
-                
-                // Update button state
-                if (button) {
-                    button.textContent = 'Report Generated';
-                    button.disabled = true;
-                }
+                analytics.trackReportGenerate(selectedSources.length, 'pro');
                 
                 // Dispatch success event with report data
-                this.dispatchEvent(new CustomEvent('reportGenerated', {
+                this.dispatchEvent(new CustomEvent('reportPurchaseCompleted', {
                     detail: {
                         reportData: reportPacket,
-                        tier,
                         sourceCount: selectedSources.length
                     }
                 }));
@@ -231,14 +170,8 @@ export class ReportBuilder extends EventTarget {
             
             // Dispatch error event
             this.dispatchEvent(new CustomEvent('reportError', {
-                detail: { error, tier }
+                detail: { error }
             }));
-            
-            // Reset button state
-            if (button) {
-                button.textContent = 'Generate Pro Report';
-                button.disabled = false;
-            }
         }
     }
 
@@ -309,7 +242,6 @@ export class ReportBuilder extends EventTarget {
             content: container,
             metadata: {
                 type: 'research_report',
-                tier: reportData.tier,
                 query: reportData.query,
                 sources_count: sourceCount,
                 citation_metadata: reportData.citation_metadata || null
@@ -325,7 +257,7 @@ export class ReportBuilder extends EventTarget {
      */
     _displayMarkdownReport(reportData) {
         // Build report header
-        const headerText = `# Research Report: ${reportData.query}\n**${(reportData.tier || 'pro').toUpperCase()} TIER**\n\n`;
+        const headerText = `# Research Report: ${reportData.query}\n\n`;
         
         // Build complete report content
         let reportContent = headerText + reportData.summary;
@@ -350,7 +282,6 @@ export class ReportBuilder extends EventTarget {
             content: reportContent,
             metadata: {
                 type: 'research_report',
-                tier: reportData.tier,
                 query: reportData.query,
                 sources_count: sourceCount,
                 citation_metadata: reportData.citation_metadata || null
@@ -359,7 +290,7 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
-     * Creates report header with title and tier badge
+     * Creates report header with title
      * @private
      */
     _createReportHeader(reportData) {
@@ -370,12 +301,7 @@ export class ReportBuilder extends EventTarget {
         title.className = 'report-title';
         title.textContent = `Research Report: ${reportData.query}`;
         
-        const tierBadge = document.createElement('span');
-        tierBadge.className = `tier-badge tier-${reportData.tier || 'pro'}`;
-        tierBadge.textContent = `${(reportData.tier || 'pro').toUpperCase()} TIER`;
-        
         header.appendChild(title);
-        header.appendChild(tierBadge);
         
         return header;
     }
@@ -651,13 +577,13 @@ export class ReportBuilder extends EventTarget {
     }
 
     /**
-     * Generates the report builder DOM structure
+     * Generates the report builder DOM structure with single Generate Report button
      * @private
      * @returns {HTMLElement}
      */
     _generateReportBuilderDOM() {
         // Get sources from outline (single source of truth)
-        const { sources, count: sourceCount, totalPrice } = this._getOutlineSourcesFromStore();
+        const { count: sourceCount, totalPrice } = this._getOutlineSourcesFromStore();
         
         // Create modal-style takeover container
         const container = document.createElement('div');
@@ -670,7 +596,7 @@ export class ReportBuilder extends EventTarget {
             <div class="progress-checkmark">✅</div>
             <div class="progress-content">
                 <div class="progress-title">${sourceCount} Sources Ready</div>
-                <div class="progress-subtitle">Your Research Package → Report Generation Begins</div>
+                <div class="progress-subtitle">Generate your professional research report</div>
             </div>
         `;
         container.appendChild(progressHeader);
@@ -679,146 +605,67 @@ export class ReportBuilder extends EventTarget {
         const contentArea = document.createElement('div');
         contentArea.className = 'tier-selection-content';
         
-        // Tier cards (Pro tier only)
-        contentArea.appendChild(this._createTierCardsContainer());
+        // Single generate button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'report-button-container';
+        buttonContainer.style.cssText = 'text-align: center; padding: 2rem;';
         
+        const pricingInfo = document.createElement('div');
+        pricingInfo.className = 'pricing-info';
+        pricingInfo.style.cssText = 'margin-bottom: 1.5rem;';
+        
+        const priceDisplay = document.createElement('div');
+        priceDisplay.style.cssText = 'font-size: 2rem; font-weight: 600; color: #2563eb; margin-bottom: 0.5rem;';
+        priceDisplay.textContent = `$${totalPrice.toFixed(2)}`;
+        
+        const pricingDetails = document.createElement('div');
+        pricingDetails.className = 'pricing-details';
+        pricingDetails.style.cssText = 'font-size: 0.9rem; color: #666;';
+        pricingDetails.textContent = `${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${PER_SOURCE_RATE.toFixed(2)} each`;
+        
+        pricingInfo.appendChild(priceDisplay);
+        pricingInfo.appendChild(pricingDetails);
+        
+        const generateButton = document.createElement('button');
+        generateButton.className = 'generate-report-btn';
+        generateButton.style.cssText = 'padding: 1rem 2rem; font-size: 1.1rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;';
+        generateButton.textContent = `Generate Report — $${totalPrice.toFixed(2)}`;
+        generateButton.dataset.price = totalPrice.toFixed(2);
+        
+        buttonContainer.appendChild(pricingInfo);
+        buttonContainer.appendChild(generateButton);
+        
+        contentArea.appendChild(buttonContainer);
         container.appendChild(contentArea);
         
         return container;
     }
 
     /**
-     * Creates header section
+     * Attaches event listener to generate report button
      * @private
      */
-    _createHeader() {
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'tier-cards-header';
+    _attachGenerateButtonListener() {
+        const generateButton = document.querySelector('.generate-report-btn');
+        if (!generateButton) return;
         
-        const headerTitle = document.createElement('h3');
-        headerTitle.textContent = 'Your Research Package';
-        
-        headerDiv.appendChild(headerTitle);
-        
-        return headerDiv;
-    }
-
-    /**
-     * Creates tier cards container with asymmetric layout
-     * @private
-     */
-    _createTierCardsContainer() {
-        const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'tier-cards-asymmetric';
-        
-        // Create tier card (Pro tier only)
-        TIERS.forEach(tier => {
-            cardsContainer.appendChild(this._createTierCard(tier));
-        });
-        
-        return cardsContainer;
-    }
-
-    /**
-     * Creates individual tier card with new asymmetric design
-     * @private
-     */
-    _createTierCard(tier) {
-        // Calculate dynamic pricing based on outline sources (single source of truth)
-        const { count: sourceCount, totalPrice: calculatedPrice } = this._getOutlineSourcesFromStore();
-        
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'tier-card tier-card-pro'; // Only Pro tier now
-        cardDiv.dataset.tier = tier.id;
-        cardDiv.dataset.tierId = tier.id; // For DOM querying in price updates
-        cardDiv.dataset.actualPrice = calculatedPrice.toFixed(2);
-        
-        const badgeHTML = tier.badge ? `<div class="tier-badge">${tier.badge}</div>` : '';
-        const microcopyHTML = tier.microcopy ? `<div class="tier-microcopy">${tier.microcopy}</div>` : '';
-        
-        // Dynamic pricing labels
-        const priceLabel = `$${calculatedPrice.toFixed(2)}`;
-        const buttonText = `Generate Pro Report — $${calculatedPrice.toFixed(2)}`;
-        const pricingDetails = `${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${PER_SOURCE_RATE.toFixed(2)} each`;
-        
-        cardDiv.innerHTML = `
-            ${badgeHTML}
-            <div class="tier-icon">${tier.icon}</div>
-            <h4 class="tier-title-new">${tier.title}</h4>
-            <div class="tier-price tier-price-new">${priceLabel}</div>
-            <div class="tier-pricing-details" style="display: block; font-size: 0.8rem; color: #666; margin-top: 4px;">${pricingDetails}</div>
-            <div class="tier-subtitle">${tier.subtitle}</div>
-            <ul class="tier-features-compact">
-                ${tier.features.map(feature => `<li>✓ ${feature}</li>`).join('')}
-            </ul>
-            <button class="tier-purchase-btn tier-btn-primary" data-tier="${tier.id}" data-price="${calculatedPrice.toFixed(2)}">
-                ${buttonText}
-            </button>
-            ${microcopyHTML}
-        `;
-        
-        return cardDiv;
-    }
-
-    /**
-     * Creates security footer
-     * @private
-     */
-    _createSecurityFooter() {
-        const footer = document.createElement('div');
-        footer.className = 'tier-security-footer';
-        footer.innerHTML = `
-            <span class="security-icon">🔒</span>
-            <span class="security-text">Secure checkout</span>
-        `;
-        return footer;
-    }
-
-    /**
-     * Creates note section (legacy, no longer used)
-     * @private
-     */
-    _createNote() {
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'tier-cards-note';
-        noteDiv.textContent = '💡 Report generation will begin only after purchase confirmation.';
-        return noteDiv;
-    }
-
-    /**
-     * Attaches event listeners to purchase buttons
-     * @private
-     */
-    _attachTierPurchaseListeners() {
-        const purchaseButtons = document.querySelectorAll('.tier-purchase-btn');
-        purchaseButtons.forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const tier = e.target.dataset.tier;
-                const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
-                
-                // Read actual price from tier card (dynamic pricing) or fall back to static
-                const tierCard = e.target.closest('[data-tier-id]');
-                const actualPrice = tierCard?.dataset.actualPrice;
-                const quoteUnavailable = tierCard?.dataset.quoteUnavailable === 'true';
-                const price = actualPrice ? parseFloat(actualPrice) : parseFloat(e.target.dataset.price);
-                
-                console.log(`💰 Purchase initiated - Tier: ${tier}, Price: $${price.toFixed(2)} ${actualPrice ? '(dynamic)' : '(static fallback)'}, Quote unavailable: ${quoteUnavailable}`);
-                
-                // Get sources from outline (single source of truth)
-                const { sources: outlineSources } = this._getOutlineSourcesFromStore();
-                const useSelectedSources = outlineSources && outlineSources.length > 0;
-                
-                this.dispatchEvent(new CustomEvent('tierPurchase', {
-                    detail: { 
-                        tier, 
-                        price, 
-                        query,
-                        button: e.target,
-                        useSelectedSources,
-                        quoteUnavailable
-                    }
-                }));
-            });
+        generateButton.addEventListener('click', async () => {
+            const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+            
+            console.log(`💰 Report generation initiated - Price: $${generateButton.dataset.price}`);
+            
+            // Get sources and outline from store
+            const { sources } = this._getOutlineSourcesFromStore();
+            const outlineStructure = projectStore.getOutlineSnapshot();
+            
+            if (!sources || sources.length === 0) {
+                console.warn('⚠️ No sources available for report generation');
+                this.toastManager.show('Please add sources to your outline before generating a report.', 'warning');
+                return;
+            }
+            
+            // Trigger report generation
+            await this.generateReport(query, sources, outlineStructure);
         });
     }
 
