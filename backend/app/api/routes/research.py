@@ -48,7 +48,7 @@ conversation_topics: Dict[str, Dict[str, str]] = {}
 class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
     query: str = Field(..., min_length=3, max_length=500, description="Research query between 3-500 characters")
-    tier: TierType
+    tier: Optional[TierType] = None  # DEPRECATED: All reports now use same unified tier
     selected_sources: Optional[List[Dict[str, Any]]] = None  # Full source objects (preferred)
     selected_source_ids: Optional[List[str]] = Field(None, min_length=1)  # DEPRECATED: Use selected_sources instead
     outline_structure: Optional[Dict[str, Any]] = None  # Custom outline structure from project outline builder
@@ -893,36 +893,30 @@ async def generate_research_report(
             # Generate AI report with selected sources
             report_data = report_generator.generate_report(
                 sanitized_query, 
-                selected_sources, 
-                report_request.tier,
+                selected_sources,
                 outline_structure=report_request.outline_structure
             )
             
             # Build packet directly with structured report data
             research_packet = ResearchPacket(
                 query=sanitized_query,
-                tier=report_request.tier,
+                tier=None,  # Unified tier - no longer used
                 summary=report_data.get('summary', ''),
                 outline=None,  # Table data is now in table_data field
-                insights=report_data.get('research_directions', None),  # Pro tier research directions
+                insights=report_data.get('research_directions', None),  # Research directions
                 sources=selected_sources,
                 total_sources=len(selected_sources),
                 citation_metadata=report_data.get('citation_metadata', {}),
                 table_data=report_data.get('table_data', []),  # New structured table data
-                conflicts=report_data.get('conflicts', None)  # Pro tier conflicts
+                conflicts=report_data.get('conflicts', None)  # Conflicts analysis
             )
             
         else:
             # No sources selected - generate sources and report (legacy behavior)
             print(f"📊 Generating report without selected sources (legacy mode)")
             
-            # Generate sources based on tier
-            tier_source_limits = {
-                TierType.BASIC: 10,
-                TierType.RESEARCH: 20,
-                TierType.PRO: 40
-            }
-            max_sources = tier_source_limits.get(report_request.tier, 15)
+            # Generate sources with fixed limit (unified tier)
+            max_sources = 20
             
             # Generate sources
             generated_sources = await crawler.generate_sources(sanitized_query, max_sources)
@@ -931,14 +925,13 @@ async def generate_research_report(
             report_data = report_generator.generate_report(
                 sanitized_query,
                 generated_sources,
-                report_request.tier,
                 outline_structure=report_request.outline_structure
             )
             
             # Build packet directly with structured report data
             research_packet = ResearchPacket(
                 query=sanitized_query,
-                tier=report_request.tier,
+                tier=None,  # Unified tier - no longer used
                 summary=report_data.get('summary', ''),
                 outline=None,
                 insights=report_data.get('research_directions', None),

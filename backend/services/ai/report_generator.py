@@ -29,97 +29,8 @@ REPORT_MODEL = os.environ.get('REPORT_MODEL', 'claude-sonnet-4-20250514')
 
 CACHE_TTL_SECONDS = 600  # 10 minutes
 
-RESEARCH_TABLE_PROMPT = """You are a professional research analyst extracting structured data from sources.
-
-Query: {query}
-
-TOPICS (extract quotes/concepts organized by these topics):
-{topics}
-
-SELECTED SOURCES (analyze these specific sources):
-{sources}
-
-Your task: Extract 2-5 relevant quotes or key concepts from EACH source and organize them by the topics listed above.
-
-Output your analysis as a JSON object with this EXACT structure:
-
-{{
-  "table_data": [
-    {{
-      "topic": "Topic name from the topics list above",
-      "source": "Source title (from sources above)",
-      "content": "Direct quote or key concept from the source (1-2 sentences max)",
-      "takeaway": "Your concise analysis or interpretation (1 sentence)",
-      "link": "Source URL"
-    }}
-  ],
-  "summary": "High-level overview paragraph synthesizing the key findings across all sources (3-4 sentences)",
-  "citation_metadata": {{}}
-}}
-
-CRITICAL REQUIREMENTS:
-1. **Match topics exactly**: Use ONLY the topic names from the TOPICS list above
-2. **Extract 2-5 items per source**: Scan each source for relevant quotes/concepts
-3. **Direct quotes preferred**: Use actual text from sources when possible
-4. **Concise takeaways**: One sentence interpretation or significance
-5. **Include all sources**: Every source should contribute at least 1-2 entries
-6. **Distribute across topics**: Spread entries across the different topics based on relevance
-7. **Valid JSON only**: Output MUST be valid, parseable JSON
-8. **Base everything on actual source content**: No generic or assumed information
-
-Example table_data entry (DO NOT copy this, extract from YOUR sources):
-{{
-  "topic": "Energy Infrastructure",
-  "source": "Global Energy Report 2024",
-  "content": "Grid modernization spending increased 40% over 2020 levels, with $2.3T committed through 2030.",
-  "takeaway": "Massive capital deployment indicates industry-wide transformation.",
-  "link": "https://example.com/report"
-}}
-
-Output only the JSON object, no additional text before or after.
-"""
-
-# Section-specific prompt for outline-driven reports (respects user's source assignments)
-SECTION_EXTRACTION_PROMPT = """You are a professional research analyst extracting structured data for a specific section of a research report.
-
-Query: {query}
-
-SECTION TOPIC: {topic}
-
-SOURCES ASSIGNED TO THIS SECTION (extract from ONLY these sources):
-{sources}
-
-CRITICAL: The user has specifically assigned these sources to THIS section. You must extract content from ALL of these sources for this topic ONLY. Do NOT redistribute sources to other topics.
-
-Your task: Extract 2-5 relevant quotes or key concepts from EACH source provided above for the section topic "{topic}".
-
-Output your analysis as a JSON object with this EXACT structure:
-
-{{
-  "table_data": [
-    {{
-      "topic": "{topic}",
-      "source": "Source title (from sources above)",
-      "content": "Direct quote or key concept from the source (1-2 sentences max)",
-      "takeaway": "Your concise analysis or interpretation (1 sentence)",
-      "link": "Source URL"
-    }}
-  ]
-}}
-
-CRITICAL REQUIREMENTS:
-1. **Use exact topic**: ALL entries must use topic = "{topic}"
-2. **Extract from ALL sources**: Every source listed above must contribute 2-5 entries
-3. **Direct quotes preferred**: Use actual text from sources when possible
-4. **Concise takeaways**: One sentence interpretation or significance
-5. **Stay focused**: Only extract content relevant to "{topic}"
-6. **Valid JSON only**: Output MUST be valid, parseable JSON
-7. **No redistribution**: Do NOT create entries for other topics - this is section-specific extraction
-
-Output only the JSON object, no additional text before or after.
-"""
-
-PRO_TABLE_PROMPT = """You are a professional research analyst extracting structured data with advanced cross-source analysis.
+# Unified prompt for all reports - always includes summary, conflicts, and research directions
+UNIFIED_TABLE_PROMPT = """You are a professional research analyst extracting structured data with advanced cross-source analysis.
 
 Query: {query}
 
@@ -162,7 +73,7 @@ CRITICAL REQUIREMENTS:
 4. **Concise takeaways**: One sentence interpretation or significance
 5. **Include all sources**: Every source should contribute entries
 6. **Distribute across topics**: Spread entries across topics based on relevance
-7. **Conflicts analysis**: Identify where sources agree/disagree (Pro tier feature)
+7. **Conflicts analysis**: Identify where sources agree/disagree with specific citations
 8. **Research directions**: Generate 5 specific follow-up questions based on findings
 9. **Valid JSON only**: Output MUST be valid, parseable JSON
 10. **Base everything on actual source content**: No generic or assumed information
@@ -178,6 +89,46 @@ For research_directions:
 - Make them actionable and specific
 - Connect to the evidence analyzed
 - Prioritize high-value follow-up areas
+
+Output only the JSON object, no additional text before or after.
+"""
+
+# Section-specific prompt for outline-driven reports (respects user's source assignments)
+SECTION_EXTRACTION_PROMPT = """You are a professional research analyst extracting structured data for a specific section of a research report.
+
+Query: {query}
+
+SECTION TOPIC: {topic}
+
+SOURCES ASSIGNED TO THIS SECTION (extract from ONLY these sources):
+{sources}
+
+CRITICAL: The user has specifically assigned these sources to THIS section. You must extract content from ALL of these sources for this topic ONLY. Do NOT redistribute sources to other topics.
+
+Your task: Extract 2-5 relevant quotes or key concepts from EACH source provided above for the section topic "{topic}".
+
+Output your analysis as a JSON object with this EXACT structure:
+
+{{
+  "table_data": [
+    {{
+      "topic": "{topic}",
+      "source": "Source title (from sources above)",
+      "content": "Direct quote or key concept from the source (1-2 sentences max)",
+      "takeaway": "Your concise analysis or interpretation (1 sentence)",
+      "link": "Source URL"
+    }}
+  ]
+}}
+
+CRITICAL REQUIREMENTS:
+1. **Use exact topic**: ALL entries must use topic = "{topic}"
+2. **Extract from ALL sources**: Every source listed above must contribute 2-5 entries
+3. **Direct quotes preferred**: Use actual text from sources when possible
+4. **Concise takeaways**: One sentence interpretation or significance
+5. **Stay focused**: Only extract content relevant to "{topic}"
+6. **Valid JSON only**: Output MUST be valid, parseable JSON
+7. **No redistribution**: Do NOT create entries for other topics - this is section-specific extraction
 
 Output only the JSON object, no additional text before or after.
 """
@@ -268,14 +219,13 @@ class ReportGeneratorService:
         
         return citation_metadata
     
-    def generate_report(self, query: str, sources: List[SourceCard], tier: TierType, outline_structure: Optional[Dict] = None) -> Dict:
+    def generate_report(self, query: str, sources: List[SourceCard], outline_structure: Optional[Dict] = None) -> Dict:
         """
         Generate a structured table-based research report using Claude.
         
         Args:
             query: Research query
             sources: List of source cards with content
-            tier: Tier type (RESEARCH or PRO)
             outline_structure: Optional custom outline structure with topics
             
         Returns:
@@ -283,32 +233,32 @@ class ReportGeneratorService:
             {
                 "table_data": List[{topic, source, content, takeaway, link}],
                 "summary": str,
-                "conflicts": str (Pro only),
-                "research_directions": List[str] (Pro only),
+                "conflicts": str,
+                "research_directions": List[str],
                 "citation_metadata": Dict (backward compatibility)
             }
         """
         # Check cache first
-        cache_key = self._get_cache_key(query, tier, sources, outline_structure)
+        cache_key = self._get_cache_key(query, sources, outline_structure)
         cached_report = self._get_cached_report(cache_key)
         if cached_report:
-            logger.info(f"Returning cached report for tier {tier.value} with {len(sources)} sources")
+            logger.info(f"Returning cached report with {len(sources)} sources")
             return cached_report
         
         # Generate new report
         if not self.enabled or not sources:
-            return self._generate_fallback_report(query, sources, tier)
+            return self._generate_fallback_report(query, sources)
         
         try:
-            report_dict = self._generate_claude_report(query, sources, tier, outline_structure)
+            report_dict = self._generate_claude_report(query, sources, outline_structure)
             self._cache_report(cache_key, report_dict)
             return report_dict
         except Exception as e:
             logger.error(f"Report generation failed, using fallback: {e}")
-            return self._generate_fallback_report(query, sources, tier)
+            return self._generate_fallback_report(query, sources)
     
-    def _get_cache_key(self, query: str, tier: TierType, sources: Optional[List[SourceCard]] = None, outline_structure: Optional[Dict] = None) -> str:
-        """Generate cache key from query, tier, sources, and outline structure."""
+    def _get_cache_key(self, query: str, sources: Optional[List[SourceCard]] = None, outline_structure: Optional[Dict] = None) -> str:
+        """Generate cache key from query, sources, and outline structure."""
         import hashlib
         
         # Normalize query
@@ -327,7 +277,7 @@ class ReportGeneratorService:
             topics = [s.get('title', '') for s in outline_structure['sections']]
             outline_hash = hashlib.md5('|'.join(topics).encode()).hexdigest()[:8]
         
-        return f"report_v2:{tier.value}:{query_hash}:{source_hash}:{outline_hash}"
+        return f"report_v3:{query_hash}:{source_hash}:{outline_hash}"
     
     def _get_cached_report(self, cache_key: str) -> Optional[Dict]:
         """Retrieve report dict from cache if valid."""
@@ -380,6 +330,89 @@ class ReportGeneratorService:
         logger.info(f"⚠️ [REPORT] No outline structure - using {len(default_topics)} generic topics")
         return default_topics
     
+    def _generate_synthesis_from_table_data(self, query: str, table_data: List[Dict], sources: List[SourceCard]) -> Dict:
+        """Generate summary, conflicts, and research_directions from compiled table data (for outline mode)."""
+        if not self.client or not table_data:
+            # Fallback if no Claude or no table data
+            return {
+                'summary': self._generate_simple_summary(query, table_data, sources),
+                'conflicts': self._generate_conflicts_analysis(sources, table_data),
+                'research_directions': self._generate_research_directions(query, sources, table_data)
+            }
+        
+        # Format table data for prompt
+        topics = list(set(entry.get('topic', '') for entry in table_data if entry.get('topic')))
+        table_summary = f"Analyzed {len(sources)} sources across {len(topics)} topics:\n"
+        
+        for topic in topics:
+            topic_entries = [e for e in table_data if e.get('topic') == topic]
+            table_summary += f"\n{topic} ({len(topic_entries)} findings):\n"
+            for entry in topic_entries[:3]:  # Show first 3 per topic as examples
+                table_summary += f"  - {entry.get('content', '')[:100]}...\n"
+        
+        synthesis_prompt = f"""Based on the following research findings, generate a synthesis report.
+
+Query: {query}
+
+COMPILED FINDINGS:
+{table_summary}
+
+Generate a JSON object with:
+{{
+  "summary": "High-level overview paragraph synthesizing the key findings across all sources (3-4 sentences)",
+  "conflicts": "Analysis of where sources agree or contradict. Identify consensus and disagreements (2-3 sentences)",
+  "research_directions": [
+    "Specific follow-up research question based on findings",
+    "Another research direction based on gaps",
+    "Third research direction exploring contradictions",
+    "Fourth research direction for applications",
+    "Fifth research direction for deeper investigation"
+  ]
+}}
+
+Output only valid JSON.
+"""
+        
+        try:
+            response = self.client.messages.create(
+                model=REPORT_MODEL,
+                max_tokens=1500,
+                messages=[{
+                    "role": "user",
+                    "content": synthesis_prompt
+                }]
+            )
+            
+            response_text = self._extract_response_text(response)
+            synthesis_dict = self._parse_json_response(response_text)
+            
+            logger.info(f"   ✅ Generated AI synthesis: summary={len(synthesis_dict.get('summary', ''))} chars, conflicts={len(synthesis_dict.get('conflicts', ''))} chars, directions={len(synthesis_dict.get('research_directions', []))}")
+            
+            return synthesis_dict
+            
+        except Exception as e:
+            logger.error(f"   ❌ Failed to generate synthesis, using fallback: {e}")
+            return {
+                'summary': self._generate_simple_summary(query, table_data, sources),
+                'conflicts': self._generate_conflicts_analysis(sources, table_data),
+                'research_directions': self._generate_research_directions(query, sources, table_data)
+            }
+    
+    def _generate_simple_summary(self, query: str, table_data: List[Dict], sources: List[SourceCard]) -> str:
+        """Generate a simple fallback summary from table data."""
+        topics = list(set(entry.get('topic', '') for entry in table_data if entry.get('topic')))
+        
+        if len(topics) > 2:
+            topic_list = ', '.join(topics[:3])
+            summary = f"This research analyzes {len(sources)} sources on '{query}', covering {topic_list} and related areas. "
+        else:
+            summary = f"This research examines {len(sources)} sources related to '{query}'. "
+        
+        summary += f"The analysis includes {len(table_data)} key findings organized across {len(topics)} topic areas, "
+        summary += "providing a comprehensive view of current evidence and expert perspectives."
+        
+        return summary
+    
     def _generate_section_data(self, query: str, topic: str, section_sources: List[SourceCard]) -> List[Dict]:
         """Generate table data for a single outline section with its assigned sources."""
         if not section_sources:
@@ -421,7 +454,7 @@ class ReportGeneratorService:
             logger.error(f"      ❌ Failed to extract section '{topic}': {e}")
             return []
     
-    def _generate_claude_report(self, query: str, sources: List[SourceCard], tier: TierType, outline_structure: Optional[Dict] = None) -> Dict:
+    def _generate_claude_report(self, query: str, sources: List[SourceCard], outline_structure: Optional[Dict] = None) -> Dict:
         """Generate structured report using Claude API with JSON output."""
         if not self.client:
             raise ValueError("Anthropic client not initialized")
@@ -457,11 +490,17 @@ class ReportGeneratorService:
             
             logger.info(f"✅ [OUTLINE MODE] Completed all sections: {len(all_table_data)} total entries")
             
-            # Build report structure
+            # Build initial report structure with table_data
             report_dict = {
-                'table_data': all_table_data,
-                'summary': f"This research report analyzes {len(sources)} sources across {total_sections} key topics related to '{query}'."
+                'table_data': all_table_data
             }
+            
+            # Generate AI summary, conflicts, and research_directions from compiled table data
+            logger.info("🤖 [OUTLINE MODE] Generating synthesis from compiled table data...")
+            synthesis = self._generate_synthesis_from_table_data(query, all_table_data, sources)
+            report_dict['summary'] = synthesis.get('summary', f"Analysis of {len(sources)} sources across {total_sections} topics related to '{query}'.")
+            report_dict['conflicts'] = synthesis.get('conflicts', '')
+            report_dict['research_directions'] = synthesis.get('research_directions', [])
             
             # Add citation metadata
             citation_metadata = self._extract_citation_metadata(all_table_data, sources)
@@ -478,24 +517,17 @@ class ReportGeneratorService:
             # Format sources for prompt
             sources_text = self._format_sources_for_prompt(sources)
             
-            # Select prompt based on tier
-            if tier == TierType.PRO:
-                prompt = PRO_TABLE_PROMPT.format(
-                    query=query,
-                    topics=topics_text,
-                    sources=sources_text
-                )
-            else:
-                prompt = RESEARCH_TABLE_PROMPT.format(
-                    query=query,
-                    topics=topics_text,
-                    sources=sources_text
-                )
+            # Use unified prompt that always includes summary, conflicts, and research_directions
+            prompt = UNIFIED_TABLE_PROMPT.format(
+                query=query,
+                topics=topics_text,
+                sources=sources_text
+            )
             
             # Log context size
             prompt_length = len(prompt)
             estimated_tokens = prompt_length // 4
-            logger.info(f"Generating {tier.value} structured report:")
+            logger.info(f"Generating structured report:")
             logger.info(f"   - Sources: {len(sources)}")
             logger.info(f"   - Topics: {len(topics)}")
             logger.info(f"   - Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
@@ -505,7 +537,7 @@ class ReportGeneratorService:
             start_time = time.time()
             response = self.client.messages.create(
                 model=REPORT_MODEL,
-                max_tokens=4000 if tier == TierType.PRO else 2500,
+                max_tokens=4000,
                 messages=[{
                     "role": "user",
                     "content": prompt
@@ -540,84 +572,82 @@ class ReportGeneratorService:
             # Validate structure
             if not report_dict.get('table_data'):
                 logger.warning("No table_data in response, using fallback")
-                return self._generate_fallback_report(query, sources, tier)
+                return self._generate_fallback_report(query, sources)
             
             logger.info(f"   - Generated {len(report_dict['table_data'])} table entries")
         
-        # PRO TIER: Validate and generate missing advanced sections
-        if tier == TierType.PRO:
-            # Debug logging - show what Claude actually returned
-            logger.info("🔍 [PRO VALIDATION] Checking Claude's response for advanced fields:")
-            logger.info(f"   📋 Keys in response: {list(report_dict.keys())}")
+        # Validate and generate missing advanced sections (always enabled now)
+        logger.info("🔍 [VALIDATION] Checking Claude's response for required fields:")
+        logger.info(f"   📋 Keys in response: {list(report_dict.keys())}")
+        
+        conflicts_value = report_dict.get('conflicts')
+        logger.info(f"   🔎 'conflicts' field: exists={conflicts_value is not None}, type={type(conflicts_value).__name__ if conflicts_value else 'None'}, length={len(str(conflicts_value)) if conflicts_value else 0}")
+        if conflicts_value:
+            preview = str(conflicts_value)[:100]
+            logger.info(f"   📄 conflicts preview: {preview}...")
+        
+        research_dirs = report_dict.get('research_directions')
+        logger.info(f"   🔎 'research_directions' field: exists={research_dirs is not None}, type={type(research_dirs).__name__ if research_dirs else 'None'}, count={len(research_dirs) if isinstance(research_dirs, list) else 'N/A'}")
+        if research_dirs and isinstance(research_dirs, list):
+            logger.info(f"   📝 research_directions items: {research_dirs}")
+        
+        table_data = report_dict.get('table_data', [])
+        
+        # Check for conflicts field
+        if not report_dict.get('conflicts'):
+            logger.warning("⚠️  'conflicts' field missing from report, generating fallback")
+            report_dict['conflicts'] = self._generate_conflicts_analysis(sources, table_data)
+            logger.info(f"   ✅ Generated fallback conflicts analysis ({len(report_dict['conflicts'])} chars)")
+        
+        # Check for research_directions field
+        if not report_dict.get('research_directions') or not isinstance(report_dict.get('research_directions'), list):
+            logger.warning("⚠️  'research_directions' field missing from report, generating fallback")
+            report_dict['research_directions'] = self._generate_research_directions(query, sources, table_data)
+            logger.info(f"   ✅ Generated {len(report_dict['research_directions'])} research directions")
+        elif len(report_dict['research_directions']) < 5:
+            current_count = len(report_dict['research_directions'])
+            logger.warning(f"⚠️  Only {current_count} research directions provided, padding to 5")
             
-            conflicts_value = report_dict.get('conflicts')
-            logger.info(f"   🔎 'conflicts' field: exists={conflicts_value is not None}, type={type(conflicts_value).__name__ if conflicts_value else 'None'}, length={len(str(conflicts_value)) if conflicts_value else 0}")
-            if conflicts_value:
-                preview = str(conflicts_value)[:100]
-                logger.info(f"   📄 conflicts preview: {preview}...")
+            current_directions = list(report_dict['research_directions'])
+            all_fallback_directions = self._generate_research_directions(query, sources, table_data)
             
-            research_dirs = report_dict.get('research_directions')
-            logger.info(f"   🔎 'research_directions' field: exists={research_dirs is not None}, type={type(research_dirs).__name__ if research_dirs else 'None'}, count={len(research_dirs) if isinstance(research_dirs, list) else 'N/A'}")
-            if research_dirs and isinstance(research_dirs, list):
-                logger.info(f"   📝 research_directions items: {research_dirs}")
+            # Create a large pool of diverse generic questions for padding
+            generic_pool = [
+                f"What are the potential future implications of the findings on '{query}'?",
+                f"How do regional or sector-specific variations affect the conclusions about '{query}'?",
+                f"What metrics or indicators should be monitored to track developments in this area?",
+                f"What lessons from historical precedents or case studies apply to '{query}'?",
+                f"What policy or strategic recommendations emerge from this research synthesis?",
+                f"How might technological or regulatory changes impact the landscape of '{query}'?",
+                f"What are the economic or societal costs and benefits related to '{query}'?",
+                f"Which emerging research methods could provide new insights into '{query}'?",
+                f"What cross-disciplinary perspectives would enrich the understanding of '{query}'?",
+                f"How do the findings on '{query}' compare to international or comparative benchmarks?"
+            ]
             
-            table_data = report_dict.get('table_data', [])
+            # Add from fallback first (contextual), then generic pool
+            candidate_pool = all_fallback_directions + generic_pool
             
-            # Check for conflicts field
-            if not report_dict.get('conflicts'):
-                logger.warning("⚠️  'conflicts' field missing from Pro report, generating fallback")
-                report_dict['conflicts'] = self._generate_conflicts_analysis(sources, table_data)
-                logger.info(f"   ✅ Generated fallback conflicts analysis ({len(report_dict['conflicts'])} chars)")
+            # Keep adding until we have exactly 5 unique directions
+            for candidate in candidate_pool:
+                if candidate not in current_directions:
+                    current_directions.append(candidate)
+                    if len(current_directions) >= 5:
+                        break
             
-            # Check for research_directions field
-            if not report_dict.get('research_directions') or not isinstance(report_dict.get('research_directions'), list):
-                logger.warning("⚠️  'research_directions' field missing from Pro report, generating fallback")
-                report_dict['research_directions'] = self._generate_research_directions(query, sources, table_data)
-                logger.info(f"   ✅ Generated {len(report_dict['research_directions'])} research directions")
-            elif len(report_dict['research_directions']) < 5:
-                current_count = len(report_dict['research_directions'])
-                logger.warning(f"⚠️  Only {current_count} research directions provided, padding to 5")
-                
-                current_directions = list(report_dict['research_directions'])
-                all_fallback_directions = self._generate_research_directions(query, sources, table_data)
-                
-                # Create a large pool of diverse generic questions for padding
-                generic_pool = [
-                    f"What are the potential future implications of the findings on '{query}'?",
-                    f"How do regional or sector-specific variations affect the conclusions about '{query}'?",
-                    f"What metrics or indicators should be monitored to track developments in this area?",
-                    f"What lessons from historical precedents or case studies apply to '{query}'?",
-                    f"What policy or strategic recommendations emerge from this research synthesis?",
-                    f"How might technological or regulatory changes impact the landscape of '{query}'?",
-                    f"What are the economic or societal costs and benefits related to '{query}'?",
-                    f"Which emerging research methods could provide new insights into '{query}'?",
-                    f"What cross-disciplinary perspectives would enrich the understanding of '{query}'?",
-                    f"How do the findings on '{query}' compare to international or comparative benchmarks?"
-                ]
-                
-                # Add from fallback first (contextual), then generic pool
-                candidate_pool = all_fallback_directions + generic_pool
-                
-                # Keep adding until we have exactly 5 unique directions
-                for candidate in candidate_pool:
-                    if candidate not in current_directions:
-                        current_directions.append(candidate)
-                        if len(current_directions) >= 5:
-                            break
-                
-                # Final guarantee - if still <5 (should never happen), synthesize simple ones
-                while len(current_directions) < 5:
-                    current_directions.append(f"What are the broader implications and future outlook for '{query}'? (Question {len(current_directions) + 1})")
-                
-                report_dict['research_directions'] = current_directions[:5]
-                final_count = len(report_dict['research_directions'])
-                
-                # Explicit validation - fail loud if we didn't achieve 5
-                if final_count != 5:
-                    logger.error(f"❌ CRITICAL: Failed to generate exactly 5 research directions (got {final_count})")
-                    raise ValueError(f"Pro report must have exactly 5 research directions, got {final_count}")
-                
-                logger.info(f"   ✅ Padded research directions to {final_count}")
+            # Final guarantee - if still <5 (should never happen), synthesize simple ones
+            while len(current_directions) < 5:
+                current_directions.append(f"What are the broader implications and future outlook for '{query}'? (Question {len(current_directions) + 1})")
+            
+            report_dict['research_directions'] = current_directions[:5]
+            final_count = len(report_dict['research_directions'])
+            
+            # Explicit validation - fail loud if we didn't achieve 5
+            if final_count != 5:
+                logger.error(f"❌ CRITICAL: Failed to generate exactly 5 research directions (got {final_count})")
+                raise ValueError(f"Report must have exactly 5 research directions, got {final_count}")
+            
+            logger.info(f"   ✅ Padded research directions to {final_count}")
         
         return report_dict
     
@@ -791,7 +821,7 @@ CONTENT:
         except Exception:
             return str(response)
     
-    def _generate_fallback_report(self, query: str, sources: List[SourceCard], tier: TierType) -> Dict:
+    def _generate_fallback_report(self, query: str, sources: List[SourceCard]) -> Dict:
         """Generate basic fallback structured report when Claude is unavailable."""
         source_count = len(sources)
         
@@ -809,18 +839,15 @@ CONTENT:
         report_dict = {
             "table_data": table_data,
             "summary": f"This report analyzes {source_count} sources related to '{query}'. AI-generated analysis is temporarily unavailable, but source content remains fully accessible for review.",
-            "citation_metadata": {}
-        }
-        
-        # Add Pro tier fields
-        if tier == TierType.PRO:
-            report_dict["conflicts"] = "Advanced conflict analysis temporarily unavailable."
-            report_dict["research_directions"] = [
+            "citation_metadata": {},
+            "conflicts": "Advanced conflict analysis temporarily unavailable.",
+            "research_directions": [
                 "Review individual sources for detailed insights",
                 "Compare findings across multiple sources",
                 "Identify key themes and patterns",
                 "Explore contradictions or gaps",
                 "Follow up on specific claims with additional research"
             ]
+        }
         
         return report_dict
