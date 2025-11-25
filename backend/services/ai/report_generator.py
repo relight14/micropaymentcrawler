@@ -3,7 +3,6 @@ AI Report Generation Service for tiered research reports using Claude.
 Generates structured table data instead of narrative prose.
 """
 import os
-import json
 import time
 import logging
 from typing import List, Optional, Dict
