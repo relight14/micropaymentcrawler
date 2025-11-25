@@ -175,19 +175,19 @@ SECTION TOPIC: {topic}
 SOURCES ASSIGNED TO THIS SECTION (extract from ONLY these sources):
 {sources}
 
-CRITICAL: The user has specifically assigned these sources to THIS section. You must extract content from ALL of these sources for this topic ONLY. Do NOT redistribute sources to other topics.
+CRITICAL: The user has specifically assigned these sources to THIS section. Extract the most valuable insights from these sources for this topic. Do NOT redistribute sources to other topics.
 
-Your task: Extract 2-5 relevant quotes or key concepts from EACH source provided above for the section topic "{topic}".
+Your task: For each source, extract its most significant contribution to "{topic}". Prioritize depth and insight quality over quantity. Include additional entries from a source only when they offer distinctly different perspectives or evidence.
 
 Use the extract_section_data tool to provide:
 - **table_data**: Array of findings where ALL entries use topic = "{topic}"
 
 CRITICAL REQUIREMENTS:
 1. **Use exact topic**: ALL entries must use topic = "{topic}"
-2. **Extract from ALL sources**: Every source listed above must contribute 2-5 entries
+2. **Quality over quantity**: Extract each source's most impactful findings - typically 1-3 key insights per source
 3. **Direct quotes preferred**: Use actual text from sources when possible
 4. **Concise takeaways**: One sentence interpretation or significance
-5. **Stay focused**: Only extract content relevant to "{topic}"
+5. **Stay focused**: Only extract content directly relevant to "{topic}"
 6. **No redistribution**: Do NOT create entries for other topics - this is section-specific extraction
 """
 
