@@ -428,9 +428,8 @@ export class APIService {
         }, 'Article summarization failed');
     }
 
-    async getPricingQuote(tierId, query, outlineStructure = null) {
+    async getPricingQuote(query, outlineStructure = null) {
         const params = new URLSearchParams({
-            tier: tierId,
             query: query
         });
         
@@ -455,7 +454,7 @@ export class APIService {
             return {
                 success: false,
                 quote_unavailable: true,
-                calculated_price: tierId === 'research' ? 0.35 : 0.65,
+                calculated_price: 0.50,  // Fallback estimate
                 new_source_count: null,
                 previous_source_count: null,
                 total_source_count: null
@@ -463,11 +462,11 @@ export class APIService {
         }
     }
 
-    async purchaseTier(tierId, price, query = "Research Query", selectedSources = null, outlineStructure = null) {
+    async generateReport(query, selectedSources = null, outlineStructure = null) {
         // Generate stable idempotency key for this purchase attempt
         const userId = this.authService.getUserId();
         const sourceIds = selectedSources ? selectedSources.map(s => s.id).sort().join(',') : '';
-        const idempotencySignature = `${userId}:${query}:${tierId}:${price}:${sourceIds}`;
+        const idempotencySignature = `${userId}:${query}:${sourceIds}`;
         
         // Simple hash function for client-side idempotency key
         let hash = 0;
@@ -476,11 +475,10 @@ export class APIService {
             hash = ((hash << 5) - hash) + char;
             hash = hash & hash; // Convert to 32bit integer
         }
-        const idempotencyKey = `purchase_${userId}_${Math.abs(hash).toString(16)}`;
+        const idempotencyKey = `report_${userId}_${Math.abs(hash).toString(16)}`;
         
         const requestBody = {
             query,
-            tier: tierId,
             idempotency_key: idempotencyKey
         };
         
@@ -492,14 +490,20 @@ export class APIService {
         // Include outline structure if provided
         if (outlineStructure && outlineStructure.sections && outlineStructure.sections.length > 0) {
             requestBody.outline_structure = outlineStructure;
-            console.log(`📋 Using custom outline with ${outlineStructure.sections.length} sections for purchase`);
+            console.log(`📋 Using custom outline with ${outlineStructure.sections.length} sections for report generation`);
         }
         
         return await this._fetchWithRetry(`${this.baseURL}/api/purchase`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
             body: JSON.stringify(requestBody)
-        }, 'Tier purchase failed');
+        }, 'Report generation failed');
+    }
+    
+    // Legacy alias for backward compatibility
+    async purchaseTier(tierId, price, query = "Research Query", selectedSources = null, outlineStructure = null) {
+        console.warn('⚠️ purchaseTier() is deprecated - use generateReport() instead');
+        return this.generateReport(query, selectedSources, outlineStructure);
     }
     
     // Retry logic with exponential backoff

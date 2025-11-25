@@ -13,7 +13,6 @@ import { ToastManager } from './app/toast-manager.js';
 import { ModalController } from './app/modal-controller.js';
 import { EventRouter } from './app/event-router.js';
 import { SourceManager } from './managers/source-manager.js';
-import { TierManager } from './managers/tier-manager.js';
 import { MessageCoordinator } from './managers/message-coordinator.js';
 import { InteractionHandler } from './managers/interaction-handler.js';
 import { ProjectsController } from './controllers/projects-controller.js';
@@ -67,16 +66,6 @@ export class ChatResearchApp {
             modalController: this.modalController
         });
         
-        this.tierManager = new TierManager({
-            appState: this.appState,
-            apiService: this.apiService,
-            authService: this.authService,
-            toastManager: this.toastManager,
-            uiManager: this.uiManager,
-            reportBuilder: this.reportBuilder,
-            messageCoordinator: null  // Will be set after MessageCoordinator is created
-        });
-        
         this.messageCoordinator = new MessageCoordinator({
             appState: this.appState,
             apiService: this.apiService,
@@ -85,9 +74,6 @@ export class ChatResearchApp {
             toastManager: this.toastManager,
             sourceManager: this.sourceManager
         });
-        
-        // Update TierManager's messageCoordinator reference
-        this.tierManager.messageCoordinator = this.messageCoordinator;
         
         this.interactionHandler = new InteractionHandler({
             appState: this.appState,
@@ -145,18 +131,8 @@ export class ChatResearchApp {
             this.addMessage('system', e.detail.message);
         });
         
-        this.reportBuilder.addEventListener('tierPurchase', (e) => {
-            const { tier, price, query, button, useSelectedSources, quoteUnavailable } = e.detail;
-            this.tierManager.purchaseTier(button, tier, price, query, useSelectedSources, quoteUnavailable);
-        });
-        
-        // Setup TierManager event listeners
-        this.tierManager.addEventListener('authRequired', (e) => {
-            this.addMessage('system', e.detail.message);
-        });
-        
-        this.tierManager.addEventListener('purchaseCompleted', (e) => {
-            const { reportData, tier, sourceCount } = e.detail;
+        this.reportBuilder.addEventListener('reportPurchaseCompleted', (e) => {
+            const { reportData, sourceCount } = e.detail;
             
             // Remove progressive loading message if it exists
             if (this.currentReportLoadingMessage) {
@@ -176,10 +152,6 @@ export class ChatResearchApp {
             if (message) {
                 this._scrollToSecondLastMessage();
             }
-        });
-        
-        this.tierManager.addEventListener('purchaseError', (e) => {
-            this.addMessage('system', e.detail.message);
         });
         
         // Setup centralized AppEvents bus listeners for cross-component coordination
@@ -232,11 +204,10 @@ export class ChatResearchApp {
                 return;
             }
             
-            console.log(`💰 Launching purchase modal - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
+            console.log(`💰 Generating report - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
             
-            // Call tierManager.purchaseTier() directly with Pro tier
-            // Note: Passing null for button bypasses some UI state handling
-            this.tierManager.purchaseTier(null, 'pro', price, query, useSelectedSources, false);
+            // Trigger report generation directly via ReportBuilder
+            this.reportBuilder.generateReport(query, sources, outlineSnapshot);
         });
         
         // Guard to prevent duplicate search triggers during login flow
@@ -826,11 +797,12 @@ export class ChatResearchApp {
         try {
             if (action.type === 'source_unlock') {
                 await this.sourceManager.unlockSource(action.button, action.sourceId, action.price);
-            } else if (action.type === 'tier_purchase') {
-                await this.tierManager.purchaseTier(action.button, action.tierId, action.price);
             } else if (action.type === 'mode_switch') {
                 // Switch to the pending mode after login
                 this.setMode(action.mode);
+            } else if (action.type === 'tier_purchase') {
+                // Legacy tier purchase - no longer supported
+                console.warn('⚠️ Tier purchase action no longer supported - all reports are Pro Package');
             }
         } catch (error) {
             console.error('Error executing pending action:', error);
