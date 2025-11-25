@@ -2,13 +2,6 @@
 
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
-from enum import Enum
-
-
-class TierType(str, Enum):
-    BASIC = "basic"
-    RESEARCH = "research"
-    PRO = "pro"
 
 
 class SourceCard(BaseModel):
@@ -55,13 +48,12 @@ class ResearchPacket(BaseModel):
     sources: List[SourceCard]
     total_sources: int  # For UI display
     # Optional fields
-    tier: Optional[TierType] = None  # Support for dynamic packages
     outline: Optional[str] = None
-    insights: Optional[str] = None  # Research directions for Pro tier
+    insights: Optional[str] = None  # Research directions
     total_cost: Optional[float] = None
     content_id: Optional[str] = None  # LedeWire content identifier
     licensing_summary: Optional[Dict[str, Any]] = None
     created_at: Optional[str] = None
     citation_metadata: Optional[Dict[int, Dict[str, Any]]] = None  # Maps citation [N] to source metadata for inline purchase badges
     table_data: Optional[List[Dict[str, Any]]] = None  # Structured table data: [{topic, source, content, takeaway, link}]
-    conflicts: Optional[str] = None  # Agreement/conflict analysis for Pro tier
+    conflicts: Optional[str] = None  # Agreement/conflict analysis

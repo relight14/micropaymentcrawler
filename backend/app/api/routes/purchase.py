@@ -9,7 +9,7 @@ import json
 import base64
 
 from schemas.api import PurchaseRequest, PurchaseResponse
-from schemas.domain import TierType, ResearchPacket
+from schemas.domain import ResearchPacket
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
@@ -237,14 +237,14 @@ async def get_pricing_quote(
 @router.post("", response_model=PurchaseResponse)
 @limiter.limit("10/minute")
 async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
-    """Process a research purchase request using LedeWire API with server-enforced licensing costs."""
+    """Generate research report with incremental pricing based on new sources."""
     # Extract user_id at function start for exception handler access
     user_id = None
     try:
         # Log the incoming query value for debugging
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"🔍 [PURCHASE] Received research query: '{purchase_request.query}' | Tier: {purchase_request.tier}")
+        logger.info(f"🔍 [PURCHASE] Received research query: '{purchase_request.query}'")
         
         # Extract and validate Bearer token
         access_token = extract_bearer_token(authorization)
@@ -259,7 +259,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         # Generate stable idempotency key including source IDs (allows iterative purchases)
         import hashlib
         if not purchase_request.idempotency_key:
-            request_signature = f"{user_id}:{purchase_request.query}:{purchase_request.tier.value}:{source_ids_str}"
+            request_signature = f"{user_id}:{purchase_request.query}:{source_ids_str}"
             purchase_request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
         
         # Check idempotency status
@@ -306,99 +306,27 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 headers={"Retry-After": "2"}
             )
         
-        # Extract sources from outline structure first (needed for pricing calculation)
+        # Extract sources from outline structure (outline is single source of truth)
         sources = extract_sources_from_outline(purchase_request.outline_structure or {})
         
         if not sources:
-            # No sources in outline - will be handled per-tier below
-            pass
+            # No sources in outline - this shouldn't happen in normal flow
+            logger.warning(f"⚠️ [PURCHASE] No sources in outline - generating default set")
+            sources = await crawler.generate_sources(purchase_request.query, 40)
         
         # Calculate incremental pricing using shared function
         pricing_info = calculate_incremental_pricing(user_id, purchase_request.query, sources, logger)
         calculated_price = pricing_info["calculated_price"]
         new_source_count = pricing_info["new_source_count"]
         
-        # Tier configurations - now just for max_sources limits
-        tier_configs = {
-            TierType.BASIC: {"max_sources": 10},
-            TierType.RESEARCH: {"max_sources": 20}, 
-            TierType.PRO: {"max_sources": 40}
-        }
-        
-        config = tier_configs[purchase_request.tier]
-        
-        # Handle FREE TIER (no new sources)
-        if calculated_price == 0.00:
-            if not sources:
-                # No sources in outline - generate fresh
-                sources = await crawler.generate_sources(purchase_request.query, config["max_sources"])
-            
-            # Log outline structure before report generation
-            if purchase_request.outline_structure:
-                sections = purchase_request.outline_structure.get('sections', [])
-                logger.info(f"📋 [PURCHASE] Outline structure received: {len(sections)} sections")
-                for i, section in enumerate(sections, 1):
-                    logger.info(f"   Section {i}: '{section.get('title', 'NO TITLE')}' ({len(section.get('sources', []))} sources)")
-            else:
-                logger.info(f"⚠️ [PURCHASE] No outline_structure provided - will use generic topics")
-            
-            # Generate AI report
-            report_data = report_generator.generate_report(
-                purchase_request.query, 
-                sources,
-                outline_structure=purchase_request.outline_structure
-            )
-            
-            # Build packet directly
-            packet = ResearchPacket(
-                query=purchase_request.query,
-                tier=purchase_request.tier,
-                summary=report_data.get("summary", ""),
-                outline=None,
-                insights=None,
-                sources=sources,
-                total_sources=len(sources),
-                citation_metadata=report_data.get("citation_metadata"),
-                table_data=report_data.get("table_data")
-            )
-            
-            free_transaction_id = f"free_{uuid.uuid4().hex[:12]}"
-            purchase_id = ledger.record_purchase(
-                query=purchase_request.query,
-                tier=purchase_request.tier,
-                price=0.00,
-                wallet_id=None,
-                transaction_id=free_transaction_id,
-                packet=packet,
-                source_ids=[s.id for s in sources],
-                user_id=user_id
-            )
-            
-            response_data = PurchaseResponse(
-                success=True,
-                message="Free research unlocked! Enjoy your Basic tier research.",
-                packet=packet.model_dump(),
-                wallet_deduction=0.0
-            )
-            
-            ledger.store_idempotency(user_id, purchase_request.idempotency_key, "purchase", response_data.model_dump(), "completed")
-            return response_data
-        
-        # PAID TIERS: Continue with payment processing
-        max_sources = config["max_sources"]
-        
-        if not sources:
-            # No sources in outline - generate fresh
-            sources = await crawler.generate_sources(purchase_request.query, max_sources)
-        
-        # Log outline structure before report generation (PAID TIER)
+        # Log outline structure before report generation
         if purchase_request.outline_structure:
             sections = purchase_request.outline_structure.get('sections', [])
-            logger.info(f"📋 [PURCHASE PAID] Outline structure received: {len(sections)} sections")
+            logger.info(f"📋 [PURCHASE] Outline structure received: {len(sections)} sections")
             for i, section in enumerate(sections, 1):
                 logger.info(f"   Section {i}: '{section.get('title', 'NO TITLE')}' ({len(section.get('sources', []))} sources)")
         else:
-            logger.info(f"⚠️ [PURCHASE PAID] No outline_structure provided - will use generic topics")
+            logger.info(f"⚠️ [PURCHASE] No outline_structure provided - will use generic topics")
         
         # Generate AI report (with fallback handling built-in)
         report_data = report_generator.generate_report(
@@ -407,10 +335,9 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             outline_structure=purchase_request.outline_structure
         )
         
-        # Build packet directly with AI-generated report
+        # Build packet with AI-generated report
         packet = ResearchPacket(
             query=purchase_request.query,
-            tier=purchase_request.tier,
             summary=report_data.get("summary", ""),
             outline=None,
             insights=None,
@@ -420,37 +347,44 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             table_data=report_data.get("table_data")
         )
         
-        # Selective Mock: Check if payments should be mocked
-        import os
-        if os.getenv("LEDEWIRE_MOCK_PAYMENTS") == "true":
-            # MOCK MODE: Skip real payment, generate fake transaction
-            transaction_id = f"mock_txn_{uuid.uuid4().hex[:12]}"
-            wallet_id = None  # No real wallet involved in mock
-            
+        # Handle payment - free if no new sources, otherwise process payment
+        if calculated_price == 0.00:
+            # Free report (all sources already purchased)
+            transaction_id = f"free_{uuid.uuid4().hex[:12]}"
+            wallet_id = None
+            message = "Report generated! All sources previously purchased."
         else:
-            # REAL MODE: Process actual LedeWire payment
-            content_id = packet.content_id or f"research_{uuid.uuid4().hex[:8]}"
-            payment_result = ledewire.create_purchase(
-                access_token=access_token,
-                content_id=content_id,
-                price_cents=int(calculated_price * 100),
-                idempotency_key=purchase_request.idempotency_key
-            )
+            # Process payment for new sources
+            import os
+            if os.getenv("LEDEWIRE_MOCK_PAYMENTS") == "true":
+                # MOCK MODE: Skip real payment, generate fake transaction
+                transaction_id = f"mock_txn_{uuid.uuid4().hex[:12]}"
+                wallet_id = None
+            else:
+                # REAL MODE: Process actual LedeWire payment
+                content_id = packet.content_id or f"research_{uuid.uuid4().hex[:8]}"
+                payment_result = ledewire.create_purchase(
+                    access_token=access_token,
+                    content_id=content_id,
+                    price_cents=int(calculated_price * 100),
+                    idempotency_key=purchase_request.idempotency_key
+                )
+                
+                if "error" in payment_result:
+                    error_msg = ledewire.handle_api_error(payment_result)
+                    if "insufficient" in error_msg.lower():
+                        raise HTTPException(status_code=402, detail=f"Insufficient funds: {error_msg}")
+                    else:
+                        raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
+                
+                transaction_id = payment_result.get("transaction_id") or f"fallback_txn_{uuid.uuid4().hex[:12]}"
+                wallet_id = payment_result.get("wallet_id")
             
-            if "error" in payment_result:
-                error_msg = ledewire.handle_api_error(payment_result)
-                if "insufficient" in error_msg.lower():
-                    raise HTTPException(status_code=402, detail=f"Insufficient funds: {error_msg}")
-                else:
-                    raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
-            
-            transaction_id = payment_result.get("transaction_id") or f"fallback_txn_{uuid.uuid4().hex[:12]}"
-            wallet_id = payment_result.get("wallet_id")
+            message = f"Report generated! ${calculated_price:.2f} for {new_source_count} new source(s)."
         
-        # Record successful purchase (both mock and real paths)
+        # Record purchase
         purchase_id = ledger.record_purchase(
             query=purchase_request.query,
-            tier=purchase_request.tier,
             price=calculated_price,
             wallet_id=wallet_id,
             transaction_id=transaction_id,
@@ -461,7 +395,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         
         response_data = PurchaseResponse(
             success=True,
-            message=f"Research purchased successfully! ${calculated_price:.2f} for {new_source_count} new source(s).",
+            message=message,
             packet=packet.model_dump(),
             wallet_deduction=calculated_price
         )

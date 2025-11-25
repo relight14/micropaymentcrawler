@@ -3,7 +3,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Dict, Any, Optional, List
 from enum import Enum
-from schemas.domain import TierType
 
 
 # Authentication schemas
@@ -72,7 +71,6 @@ class DynamicResearchResponse(BaseModel):
 # Purchase schemas
 class PurchaseRequest(BaseModel):
     query: str
-    tier: TierType
     selected_sources: Optional[List[Dict[str, Any]]] = None  # Full source objects (preferred)
     selected_source_ids: Optional[List[str]] = None  # DEPRECATED: Use selected_sources instead
     budget_limit_dollars: Optional[float] = None  # Total budget for research
