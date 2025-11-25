@@ -22,6 +22,11 @@ The project provides dynamic research services with **simplified Pro Package-onl
 ## System Design Choices
 Data storage uses PostgreSQL for production and SQLite for development. A `ContentCrawlerStub` simulates crawling and pricing for testing. The architecture is API-first, with all pricing decisions handled by the backend. Production readiness includes comprehensive security (CORS, configuration validation), cost controls (per-user budgets, global caps), reliability (error handling, logging), scalability (PostgreSQL, rate limiting), and operational considerations. The frontend is the source of truth for source selection.
 
+## Security Implementations
+- **SafeRenderer utility** (`backend/static/js/utils/safe-renderer.js`): XSS protection for all content from LLM, backend, and crawlers. Features HTML escaping, sanitization with tag/attribute whitelists, and hardened URL validation that blocks javascript:/data:/vbscript: schemes including whitespace/control-character bypass attempts and entity-encoded payloads.
+- **MessageRenderer integration**: All HTML content rendered via `parseHtml()` is sanitized through SafeRenderer before DOM insertion.
+- **Logger utility** (`backend/static/js/utils/logger.js`): Debug logging gated behind `DEBUG_MODE` flag to keep production console clean; warnings and errors still visible.
+
 # External Dependencies
 
 - **FastAPI**: Python web framework.
