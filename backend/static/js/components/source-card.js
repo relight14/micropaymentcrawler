@@ -187,7 +187,7 @@ class SourceCard {
     }
     
     /**
-     * Create single-line metadata: domain • CREDIBILITY • LICENSE • ★ rating
+     * Create single-line metadata: domain • LICENSE • ★ rating
      */
     _createMetadataLine(source) {
         const meta = document.createElement('div');
@@ -201,13 +201,7 @@ class SourceCard {
             parts.push(`<span class="meta-domain">${domain}</span>`);
         }
         
-        // NEW: Credibility badge showing domain authority
-        const credibilityBadge = this._getCredibilityBadge(source);
-        if (credibilityBadge) {
-            parts.push(`<span class="meta-credibility ${credibilityBadge.className}" title="${credibilityBadge.tooltip}">${credibilityBadge.text}</span>`);
-        }
-        
-        // License badge text
+        // License badge showing licensing protocol (FREE, TOLLBIT, RSL, CLOUDFLARE)
         const licenseBadge = this._getLicenseText(source);
         parts.push(`<span class="meta-license ${licenseBadge.className}" data-license-type="${licenseBadge.className}">${licenseBadge.text}</span>`);
         
@@ -250,92 +244,32 @@ class SourceCard {
     }
     
     /**
-     * Get credibility badge showing domain authority level
-     * Prioritizes domain tier and source type for credibility signaling
-     */
-    _getCredibilityBadge(source) {
-        // Determine domain tier (1 = premium, 2 = reputable, 3 = standard, 4 = questionable)
-        const domainTier = source.domain_tier || this._inferDomainTier(source);
-        
-        // Check for academic or government sources
-        const domain = this._extractDomain(source);
-        const isAcademic = domain && (domain.endsWith('.edu') || domain.includes('scholar') || domain.includes('academic'));
-        const isGovernment = domain && (domain.endsWith('.gov') || domain.includes('government'));
-        
-        // Check if it's a premium licensed source
-        const isPremium = (source.unlock_price > 0 || source.licensing_protocol);
-        
-        // Determine badge based on credibility signals
-        if (isAcademic) {
-            return {
-                text: 'ACADEMIC',
-                className: 'credibility-academic',
-                tooltip: 'Peer-reviewed or academic source'
-            };
-        } else if (isGovernment) {
-            return {
-                text: 'GOVERNMENT',
-                className: 'credibility-government',
-                tooltip: 'Official government source'
-            };
-        } else if (domainTier === 1 || domainTier === '1') {
-            return {
-                text: 'PREMIUM',
-                className: 'credibility-premium',
-                tooltip: 'Premium publication - High editorial standards'
-            };
-        } else if (domainTier === 2 || domainTier === '2') {
-            return {
-                text: 'VERIFIED',
-                className: 'credibility-verified',
-                tooltip: 'Reputable publication - Established credibility'
-            };
-        }
-        
-        // No credibility badge for lower-tier sources
-        return null;
-    }
-    
-    /**
-     * Infer domain tier from URL patterns (fallback if backend doesn't provide)
-     */
-    _inferDomainTier(source) {
-        const domain = this._extractDomain(source).toLowerCase();
-        
-        // Tier 1: Premium publications
-        const tier1Domains = [
-            'wsj.com', 'nytimes.com', 'ft.com', 'economist.com', 'washingtonpost.com',
-            'bloomberg.com', 'reuters.com', 'nature.com', 'science.org', 'thelancet.com'
-        ];
-        
-        // Tier 2: Reputable publications
-        const tier2Domains = [
-            'theguardian.com', 'bbc.com', 'cnn.com', 'npr.org', 'apnews.com',
-            'forbes.com', 'time.com', 'newsweek.com', 'atlantic.com', 'newyorker.com'
-        ];
-        
-        if (tier1Domains.some(d => domain.includes(d))) return 1;
-        if (tier2Domains.some(d => domain.includes(d))) return 2;
-        
-        return 3; // Standard tier by default
-    }
-    
-    /**
      * Get license text for compact display
+     * Shows which licensing protocol is available for accessing this source
+     * 
+     * Protocol badges (TOLLBIT, RSL, CLOUDFLARE) indicate paywalled content is accessible
+     * through these licensing systems, highlighting the app's ability to access
+     * high-quality information behind paywalls.
+     * 
+     * Priority: Protocol badges > Free > Checking
      */
     _getLicenseText(source) {
         const protocol = source.licensing_protocol;
         const cost = source.unlock_price || source.licensing_cost || 0;
         
-        if (protocol && protocol.toLowerCase() === 'tollbit' && cost > 0) {
+        // Show protocol badge when licensing system is detected (Tollbit, RSL, Cloudflare)
+        // This highlights paywalled content that's accessible through licensed protocols
+        if (protocol && protocol.toLowerCase() === 'tollbit') {
             return { text: 'TOLLBIT', className: 'license-paid' };
         } else if (protocol && protocol.toLowerCase() === 'rsl') {
             return { text: 'RSL', className: 'license-demo' };
         } else if (protocol && protocol.toLowerCase() === 'cloudflare') {
             return { text: 'CLOUDFLARE', className: 'license-demo' };
         } else if (cost === 0) {
+            // No protocol detected and free - show FREE badge
             return { text: 'FREE', className: 'license-free' };
         } else {
+            // Cost > 0 but no protocol detected yet - still checking
             return { text: 'CHECKING...', className: 'license-loading' };
         }
     }
