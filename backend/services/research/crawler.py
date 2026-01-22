@@ -79,7 +79,7 @@ class ContentCrawlerStub:
         # Async HTTP client for non-blocking requests
         self._http_client = None
         
-        # Simplified domain authority weights - use broader categories instead of 100+ hardcoded domains
+        # Simplified domain authority weights - use broader categories instead of many hardcoded domains
         # The DomainClassifier provides more detailed tier classification
         self.domain_weights = {
             # Academic/research patterns - high authority for scholarly work
@@ -92,8 +92,13 @@ class ContentCrawlerStub:
             'nytimes.com': 0.6, 'wsj.com': 0.6, 'economist.com': 0.6, 'ft.com': 0.6,
             'reuters.com': 0.5, 'apnews.com': 0.5, 'bloomberg.com': 0.5,
             'theguardian.com': 0.5, 'bbc.com': 0.5,
-            # Default for unknown domains: 0.0 (rely on DomainClassifier tier boost instead)
         }
+        
+        # Ranking weights for composite scoring
+        # These can be adjusted to tune the balance between relevance, authority, and recency
+        self.RELEVANCE_WEIGHT = 0.50  # Primary signal for matching conversation context
+        self.AUTHORITY_WEIGHT = 0.30  # Secondary signal for source credibility
+        self.MAX_RECENCY_WEIGHT = 0.20  # Maximum weight for time-sensitive queries
     
     def _calculate_recency_score(self, published_date: Optional[str], timeframe: str = "T1") -> float:
         """Calculate recency score based on publication date and temporal bucket."""
@@ -123,7 +128,10 @@ class ContentCrawlerStub:
             return 0.5
     
     def _get_domain_authority(self, domain: str) -> float:
-        """Get authority weight for domain."""
+        """
+        Get authority weight for domain.
+        Returns 0.0 for unknown domains (rely on DomainClassifier tier boost instead).
+        """
         # Normalize domain by removing www. prefix for consistent matching
         normalized_domain = domain.lower().removeprefix('www.')
         
@@ -136,7 +144,7 @@ class ContentCrawlerStub:
             if pattern.startswith('.') and normalized_domain.endswith(pattern):
                 return weight
         
-        return 0.0  # Unknown domain
+        return 0.0  # Unknown domain - let DomainClassifier tier boost handle it
     
     def _rerank_with_recency(self, sources: List[SourceCard], classification: Optional[Dict[str, Any]] = None) -> List[SourceCard]:
         """Rerank sources using recency, relevance, domain tier, and licensing based on classification."""
@@ -175,12 +183,10 @@ class ContentCrawlerStub:
             
             # Weighted combination (must sum to 1.0)
             # RELEVANCE-FIRST REBALANCING: Prioritize actual topic match over domain authority
-            # Relevance (semantic):    0.50 - Primary signal for matching conversation context
-            # Authority (credibility): 0.30 - Important but secondary to relevance
-            # Recency (temporal):      0.20 - Configurable based on query type
-            topicality_weight = 0.50  # Increased from 0.35 - prioritize conversation relevance
-            authority_weight = 0.30  # Reduced from 0.50 - de-emphasize domain prestige
-            recency_weight = min(recency_weight, 0.20)  # Allow more weight for time-sensitive queries
+            # Use class constants for easier tuning
+            topicality_weight = self.RELEVANCE_WEIGHT
+            authority_weight = self.AUTHORITY_WEIGHT
+            recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)  # Allow more weight for time-sensitive queries
             
             # Normalize if needed (safety check)
             total_weight = recency_weight + topicality_weight + authority_weight
@@ -201,7 +207,7 @@ class ContentCrawlerStub:
         
         # Log relevance-first ranking results (top 3 sources)
         if sources:
-            print(f"🏆 Relevance-First Ranking (Relevance=0.50, Authority=0.30, Recency=0.20):")
+            print(f"🏆 Relevance-First Ranking (Relevance={self.RELEVANCE_WEIGHT:.2f}, Authority={self.AUTHORITY_WEIGHT:.2f}, Recency={self.MAX_RECENCY_WEIGHT:.2f}):")
             for i, src in enumerate(sources[:3]):
                 domain = src.url.split('/')[2] if src.url else 'unknown'
                 print(f"   {i+1}. {domain} - Score: {getattr(src, 'composite_score', 0.0):.3f}")
