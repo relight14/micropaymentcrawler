@@ -5,6 +5,8 @@ Generates structured table data instead of narrative prose.
 import os
 import time
 import logging
+import concurrent.futures
+from functools import partial
 from typing import List, Optional, Dict
 from anthropic import Anthropic
 from schemas.domain import SourceCard
@@ -542,9 +544,6 @@ Use the generate_synthesis tool to provide:
             total_sections = len(outline_structure['sections'])
             
             # Prepare section tasks for parallel execution
-            import concurrent.futures
-            from functools import partial
-            
             def process_section(section, idx, total):
                 topic = section.get('title', f'Section {idx}')
                 source_ids = section.get('sources', [])
@@ -565,18 +564,26 @@ Use the generate_synthesis tool to provide:
             
             # Process sections in parallel (max 3 concurrent to avoid rate limits)
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                section_tasks = [
-                    executor.submit(process_section, section, idx, total_sections)
+                # Submit all section tasks
+                future_to_section = {
+                    executor.submit(process_section, section, idx, total_sections): idx
                     for idx, section in enumerate(outline_structure['sections'], 1)
-                ]
+                }
                 
-                # Gather results in order
-                for future in concurrent.futures.as_completed(section_tasks):
+                # Collect results in order by section index
+                section_results = {}
+                for future in concurrent.futures.as_completed(future_to_section):
+                    section_idx = future_to_section[future]
                     try:
                         section_data = future.result()
-                        all_table_data.extend(section_data)
+                        section_results[section_idx] = section_data
                     except Exception as e:
-                        logger.error(f"Section processing failed: {e}")
+                        logger.error(f"Section {section_idx} processing failed: {e}")
+                        section_results[section_idx] = []
+                
+                # Append results in original section order
+                for idx in sorted(section_results.keys()):
+                    all_table_data.extend(section_results[idx])
             
             logger.info(f"✅ [OUTLINE MODE] Completed all sections: {len(all_table_data)} total entries")
             

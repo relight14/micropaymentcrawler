@@ -5,6 +5,7 @@ Integrates Anthropic Claude for both conversational and deep research modes.
 import os
 import json
 import re
+import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import anthropic
@@ -510,8 +511,6 @@ If needs_sources is true, extract a clear search query from the context."""
         
     def _cleanup_old_users(self):
         """Remove inactive users to prevent memory bloat"""
-        import time
-        
         # Only cleanup if we have too many users
         if len(self.user_conversations) <= self.MAX_ACTIVE_USERS:
             return
@@ -540,8 +539,6 @@ If needs_sources is true, extract a clear search query from the context."""
         """
         Main chat interface supporting both conversational and deep research modes
         """
-        import time
-        
         # Update last access time and cleanup old users
         self.user_last_access[user_id] = time.time()
         self._cleanup_old_users()
