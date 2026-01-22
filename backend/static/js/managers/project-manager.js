@@ -30,6 +30,7 @@ export class ProjectManager {
         this.pendingReload = false; // Flag to queue a retry if load is requested during active load
         this.hasMigratedLoginChat = false; // One-shot flag to prevent duplicate login migration
         this._autoCreateLock = false; // Mutex guard to prevent concurrent auto-create calls
+        this._loadingProjectId = null; // Track which project is currently being loaded to prevent race conditions
     }
 
     /**
@@ -497,6 +498,9 @@ export class ProjectManager {
             
             logger.info(`📨 [ProjectManager] Loading messages for project ${projectId}...`);
             
+            // Track which project we're loading to detect stale responses
+            this._loadingProjectId = projectId;
+            
             // Set restoring flag and add overlay CSS (dims without clearing)
             this._isRestoring = true;
             if (messagesContainer) {
@@ -513,7 +517,20 @@ export class ProjectManager {
             const response = await this.apiService.getProjectMessages(projectId);
             const messages = response.messages || [];
             
-            logger.info(`📬 [ProjectManager] Fetched ${messages.length} messages`);
+            // CRITICAL: Guard against stale API responses during rapid project switching
+            // If user switched to a different project while API call was in flight, ignore this response
+            if (this._loadingProjectId !== projectId) {
+                logger.warn(`⚠️  [ProjectManager] Ignoring stale response for project ${projectId} (now loading ${this._loadingProjectId})`);
+                return;
+            }
+            
+            // Double-check against active project ID in store as final safety check
+            if (projectStore.state.activeProjectId !== projectId) {
+                logger.warn(`⚠️  [ProjectManager] Active project changed during load (expected ${projectId}, now ${projectStore.state.activeProjectId}). Aborting.`);
+                return;
+            }
+            
+            logger.info(`📬 [ProjectManager] Fetched ${messages.length} messages for project ${projectId}`);
             
             if (messages.length === 0) {
                 // Clear and show welcome message for empty project
@@ -580,6 +597,7 @@ export class ProjectManager {
         } finally {
             // Always cleanup restore state, even on errors
             this._isRestoring = false;
+            this._loadingProjectId = null;  // Clear tracking variable
             if (messagesContainer) {
                 messagesContainer.classList.remove('restoring');
             }

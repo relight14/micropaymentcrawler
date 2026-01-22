@@ -122,14 +122,16 @@ export class AppState {
         this.selectedSources = [];
         this.currentResearchData = null;
         this.pendingAction = null;
+        this.currentQuery = '';  // Clear current query to prevent leakage
         
         // Generate new conversation ID for fresh start
         this.conversationId = this._generateConversationId();
         
-        // Clear persisted state
+        // Clear persisted state - ensure ALL conversation data is cleared from sessionStorage
         this._saveToStorage('conversationHistory', []);
         this._saveToStorage('selectedSources', []);
         this._saveToStorage('conversationId', this.conversationId);
+        this._saveToStorage('currentResearchData', null);  // Explicitly clear research data
     }
 
     getConversationHistory() {
