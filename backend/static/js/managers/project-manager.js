@@ -453,9 +453,11 @@ export class ProjectManager {
         // FIX: Clear currentQuery first to prevent spillage from previous project
         // Then sync new project's research query to AppState if available
         if (this.appState) {
-            this.appState.setCurrentQuery(''); // Clear first
+            // Always clear first to prevent spillage (using '' for consistency with clearConversation)
+            const newQuery = projectData.research_query || '';
+            this.appState.setCurrentQuery(newQuery);
+            
             if (projectData.research_query) {
-                this.appState.setCurrentQuery(projectData.research_query);
                 logger.info(`✅ [ProjectManager] Restored research query: "${projectData.research_query}"`);
             } else {
                 logger.info(`ℹ️  [ProjectManager] Project has no saved research query`);
