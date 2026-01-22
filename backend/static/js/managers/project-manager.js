@@ -521,16 +521,14 @@ export class ProjectManager {
             // If user switched to a different project while API call was in flight, ignore this response
             if (this._loadingProjectId !== projectId) {
                 logger.warn(`⚠️  [ProjectManager] Ignoring stale response for project ${projectId} (now loading ${this._loadingProjectId})`);
-                this._loadingProjectId = null;  // Clear tracking to prevent blocking subsequent loads
-                this._isRestoring = false;  // Release restore lock
+                this._cleanupLoadingState();
                 return;
             }
             
             // Double-check against active project ID in store as final safety check
             if (projectStore.state.activeProjectId !== projectId) {
                 logger.warn(`⚠️  [ProjectManager] Active project changed during load (expected ${projectId}, now ${projectStore.state.activeProjectId}). Aborting.`);
-                this._loadingProjectId = null;  // Clear tracking to prevent blocking subsequent loads
-                this._isRestoring = false;  // Release restore lock
+                this._cleanupLoadingState();
                 return;
             }
             
@@ -606,6 +604,15 @@ export class ProjectManager {
                 messagesContainer.classList.remove('restoring');
             }
         }
+    }
+
+    /**
+     * Clean up message loading state - used when aborting stale loads
+     * @private
+     */
+    _cleanupLoadingState() {
+        this._loadingProjectId = null;
+        this._isRestoring = false;
     }
 
     /**
