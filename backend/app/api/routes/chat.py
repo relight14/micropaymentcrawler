@@ -3,6 +3,8 @@
 from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
+import time
+import requests
 
 from services.ai.conversational import AIResearchService
 from integrations.ledewire import LedeWireAPI
@@ -13,6 +15,12 @@ router = APIRouter()
 # Initialize services
 ai_service = AIResearchService()
 ledewire = LedeWireAPI()
+
+# Token validation cache with TTL (5 minutes)
+_token_cache: Dict[str, tuple[Any, float]] = {}
+_TOKEN_CACHE_TTL = 300  # 5 minutes
+_last_cache_cleanup = time.time()
+_CACHE_CLEANUP_INTERVAL = 60  # Clean up every minute
 
 
 class ChatRequest(BaseModel):
@@ -36,6 +44,27 @@ class ChatResponse(BaseModel):
     source_confidence: float = 0.0
 
 
+def _cleanup_token_cache():
+    """Periodically clean up expired token cache entries"""
+    global _last_cache_cleanup
+    current_time = time.time()
+    
+    # Only cleanup if interval has passed
+    if current_time - _last_cache_cleanup < _CACHE_CLEANUP_INTERVAL:
+        return
+    
+    # Remove expired entries
+    expired_keys = [
+        token for token, (_, timestamp) in _token_cache.items()
+        if current_time - timestamp >= _TOKEN_CACHE_TTL
+    ]
+    
+    for token in expired_keys:
+        del _token_cache[token]
+    
+    _last_cache_cleanup = current_time
+
+
 def extract_bearer_token(authorization: str) -> str:
     """Extract and validate Bearer token from Authorization header."""
     if not authorization:
@@ -52,8 +81,20 @@ def extract_bearer_token(authorization: str) -> str:
     return access_token
 
 
-def validate_user_token(access_token: str):
-    """Validate JWT token with LedeWire API."""
+def validate_user_token(access_token: str, use_cache: bool = True):
+    """Validate JWT token with LedeWire API (with caching for performance)."""
+    # Periodic cleanup
+    _cleanup_token_cache()
+    
+    # Check cache first if enabled
+    if use_cache and access_token in _token_cache:
+        cached_result, cached_time = _token_cache[access_token]
+        if time.time() - cached_time < _TOKEN_CACHE_TTL:
+            return cached_result
+        else:
+            # Cache expired, remove it
+            del _token_cache[access_token]
+    
     try:
         balance_result = ledewire.get_wallet_balance(access_token)
         
@@ -61,12 +102,22 @@ def validate_user_token(access_token: str):
             error_message = ledewire.handle_api_error(balance_result)
             raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
         
+        # Cache successful validation
+        if use_cache:
+            _token_cache[access_token] = (balance_result, time.time())
+            # Limit cache size to prevent memory bloat
+            if len(_token_cache) > 10000:
+                # Remove oldest 10% of entries
+                sorted_by_time = sorted(_token_cache.items(), key=lambda x: x[1][1])
+                for token, _ in sorted_by_time[:1000]:
+                    if token in _token_cache:
+                        del _token_cache[token]
+        
         return balance_result
         
     except HTTPException:
         raise
     except Exception as e:
-        import requests
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
             if e.response.status_code == 401:
                 raise HTTPException(status_code=401, detail="Invalid or expired token")

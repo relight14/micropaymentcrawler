@@ -64,6 +64,8 @@ class ContentCrawlerStub:
         # Simple in-memory cache with TTL (5 minutes)
         self._cache = {}
         self._cache_ttl = 300  # 5 minutes
+        self._last_cache_cleanup = time.time()
+        self._cache_cleanup_interval = 60  # Clean up every minute
         
         # Content quality factors that influence pricing
         self.quality_factors = {
@@ -234,8 +236,33 @@ class ContentCrawlerStub:
         """Check if cached result is still valid"""
         return time.time() - timestamp < self._cache_ttl
     
+    def _cleanup_expired_cache(self):
+        """Periodically clean up expired cache entries to prevent memory bloat"""
+        current_time = time.time()
+        
+        # Only cleanup if interval has passed
+        if current_time - self._last_cache_cleanup < self._cache_cleanup_interval:
+            return
+        
+        # Remove expired entries
+        expired_keys = [
+            key for key, (_, timestamp) in self._cache.items()
+            if not self._is_cache_valid(timestamp)
+        ]
+        
+        for key in expired_keys:
+            del self._cache[key]
+        
+        if expired_keys:
+            print(f"🧹 Cleaned up {len(expired_keys)} expired cache entries")
+        
+        self._last_cache_cleanup = current_time
+    
     def _get_from_cache(self, cache_key: str) -> Optional[List[SourceCard]]:
         """Retrieve results from cache if valid"""
+        # Periodic cleanup
+        self._cleanup_expired_cache()
+        
         if cache_key in self._cache:
             cached_data, timestamp = self._cache[cache_key]
             if self._is_cache_valid(timestamp):
