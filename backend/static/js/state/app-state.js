@@ -132,6 +132,9 @@ export class AppState {
         this._saveToStorage('selectedSources', []);
         this._saveToStorage('conversationId', this.conversationId);
         this._saveToStorage('currentResearchData', null);  // Explicitly clear research data
+        
+        // Clean up any pending actions that might leak context between projects
+        sessionStorage.removeItem('pendingSourceSearch');
     }
 
     getConversationHistory() {
