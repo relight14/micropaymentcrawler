@@ -89,37 +89,52 @@ class AIResearchService:
         
         # Enhanced system prompt with conversation context
         if conversation_summary or context_details:
-            system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results match what the user discussed in their conversation.
+            system_prompt = f"""You are a research relevance expert. Your PRIMARY job is to ensure search results directly match what the user discussed in their conversation.
 
 User's Research Query: "{query}"{context_details}
 
 Conversation Context:
 {conversation_summary if conversation_summary else "(No conversation history)"}
 
-Evaluate each result against these factors:
-1. **Conversation Alignment**: Does the source address what the user discussed and cared about in the conversation?
-2. **Geographic/Temporal Match**: If the user specified geographic or time constraints, does the article match?
-3. **Specific Aspects**: Does it cover the specific aspects or angles the user mentioned?
-4. **Exclusions**: If the user mentioned topics to EXCLUDE, reject sources about those topics
-5. **Topic Match**: Does the article genuinely discuss the core topic?
-6. **Publication Focus**: If a specific publication was requested, is this from that publication?
+CRITICAL: Evaluate each result with MAXIMUM STRICTNESS against the conversation context:
 
-Be VERY strict - only mark results as relevant if they genuinely address what the user discussed in the conversation. Consider the full context of the conversation, not just the query string.{publication_context}
+1. **Conversation Alignment** (MOST IMPORTANT): Does this source directly address what the user discussed, asked about, or cared about in the conversation? If it's only tangentially related, mark as NOT relevant.
+
+2. **Geographic/Temporal Match**: If the user specified geographic or time constraints in conversation, strictly enforce them. Sources that don't match = NOT relevant.
+
+3. **Specific Aspects**: If the user asked about specific aspects/angles in the conversation, sources that don't cover those = NOT relevant.
+
+4. **Exclusions** (HARD FILTER): If the user mentioned topics to EXCLUDE in conversation, immediately mark sources about those topics as NOT relevant.
+
+5. **Topic Match**: Does the article genuinely discuss the EXACT core topic from conversation? General/overview articles about broader topics = NOT relevant unless conversation was general.
+
+6. **Publication Focus**: If a specific publication was requested, strictly filter to ONLY that publication.
+
+7. **Dead/Low-Quality Links**: If the title/summary suggests the page might be a 404, redirect, social media post, or low-quality content, mark as NOT relevant.
+
+DEFAULT TO NOT RELEVANT: When in doubt, mark as NOT relevant. It's better to show 5 highly relevant sources than 20 mediocre ones.{publication_context}
 
 For each result, respond with JSON:
 {{"relevant": true/false, "reason": "brief explanation based on conversation context"}}"""
         else:
-            # Fallback to query-only filtering (original behavior)
-            system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results match a user's research query.
+            # Fallback to query-only filtering with stricter default
+            system_prompt = f"""You are a research relevance expert. Your job is to evaluate whether search results PRECISELY match a user's research query.
 
-Consider these factors:
-1. **Topic Match**: Does the article actually discuss the core topic?
-2. **Geographic Scope**: If query mentions a specific country/region, does the article focus on that geography?
-3. **Contextual Relevance**: Does the article address the user's specific question or need?
-4. **Tangential vs Core**: Reject results that are only tangentially related
-5. **Publication Focus**: If a specific publication was requested, is this from that publication?
+Consider these factors with MAXIMUM STRICTNESS:
 
-Be strict - only mark results as relevant if they genuinely address the user's query. When in doubt, filter it out.
+1. **Topic Match**: Does the article DIRECTLY discuss the core topic? General overviews or tangential mentions = NOT relevant.
+
+2. **Geographic Scope**: If query mentions a specific country/region, strictly filter to sources focused on that geography.
+
+3. **Contextual Relevance**: Does the article directly answer or address the user's specific question/need? If not, NOT relevant.
+
+4. **Tangential vs Core**: Immediately reject results that are only tangentially related or mention the topic in passing.
+
+5. **Publication Focus**: If a specific publication was requested, strictly filter to ONLY that publication.
+
+6. **Dead/Low-Quality Links**: If the title/summary suggests the page might be a 404, redirect, social media post, or low-quality content, mark as NOT relevant.
+
+DEFAULT TO NOT RELEVANT: When in doubt, mark as NOT relevant. It's better to show fewer highly relevant sources than many mediocre ones.
 
 User Query: "{query}"{publication_context}
 
