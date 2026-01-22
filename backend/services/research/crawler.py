@@ -162,6 +162,23 @@ class ContentCrawlerStub:
         recency_weight = classification.get("recency_weight", 0.3)
         temporal_bucket = classification.get("temporal_bucket", "T1")
         
+        # Determine actual weights (before normalization, for logging)
+        topicality_weight = self.RELEVANCE_WEIGHT
+        authority_weight = self.AUTHORITY_WEIGHT
+        actual_recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)
+        
+        # Normalize weights to sum to 1.0
+        total_weight = actual_recency_weight + topicality_weight + authority_weight
+        if total_weight > 0:
+            normalized_recency = actual_recency_weight / total_weight
+            normalized_topicality = topicality_weight / total_weight
+            normalized_authority = authority_weight / total_weight
+        else:
+            # Fallback if total is 0 (shouldn't happen)
+            normalized_recency = 0.0
+            normalized_topicality = 1.0
+            normalized_authority = 0.0
+        
         # Calculate composite scores
         for source in sources:
             relevance = source.relevance_score or 0.5
@@ -187,25 +204,12 @@ class ContentCrawlerStub:
             # Sources should rank by how well they match the conversation context,
             # not whether they're paid or free
             
-            # Weighted combination (normalized to sum to 1.0)
-            # RELEVANCE-FIRST REBALANCING: Prioritize actual topic match over domain authority
-            # Note: These constants represent ideal weights, but actual recency_weight comes from
-            # classification and is capped at MAX_RECENCY_WEIGHT. All weights are normalized below
-            # to ensure they sum to 1.0 before being used in the composite score calculation.
-            topicality_weight = self.RELEVANCE_WEIGHT
-            authority_weight = self.AUTHORITY_WEIGHT
-            recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)  # Cap recency based on query type
-            
-            # Normalize weights to sum to 1.0 (safety check and adjustment)
-            total_weight = recency_weight + topicality_weight + authority_weight
-            if total_weight > 0:
-                composite_score = (
-                    (recency_weight / total_weight) * recency +
-                    (topicality_weight / total_weight) * relevance +
-                    (authority_weight / total_weight) * authority
-                )
-            else:
-                composite_score = relevance  # Fallback to relevance only
+            # Use normalized weights for composite score
+            composite_score = (
+                normalized_recency * recency +
+                normalized_topicality * relevance +
+                normalized_authority * authority
+            )
             
             # Store composite score for sorting
             source.composite_score = composite_score
@@ -213,11 +217,9 @@ class ContentCrawlerStub:
         # Sort by composite score
         sources.sort(key=lambda x: getattr(x, 'composite_score', 0.0), reverse=True)
         
-        # Log relevance-first ranking results (top 3 sources)
+        # Log relevance-first ranking results (top 3 sources) with actual normalized weights
         if sources:
-            # Calculate actual weights used (after normalization)
-            actual_recency = min(recency_weight, self.MAX_RECENCY_WEIGHT) if classification else 0
-            print(f"🏆 Relevance-First Ranking (Relevance={self.RELEVANCE_WEIGHT:.2f}, Authority={self.AUTHORITY_WEIGHT:.2f}, Recency={actual_recency:.2f}):")
+            print(f"🏆 Relevance-First Ranking (Relevance={normalized_topicality:.2f}, Authority={normalized_authority:.2f}, Recency={normalized_recency:.2f}):")
             for i, src in enumerate(sources[:3]):
                 domain = src.url.split('/')[2] if src.url else 'unknown'
                 print(f"   {i+1}. {domain} - Score: {getattr(src, 'composite_score', 0.0):.3f}")
