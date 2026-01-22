@@ -598,21 +598,23 @@ export class ProjectManager {
             this.toastManager.show('Failed to load project messages', 'error');
         } finally {
             // Always cleanup restore state, even on errors
-            this._isRestoring = false;
-            this._loadingProjectId = null;  // Clear tracking variable
-            if (messagesContainer) {
-                messagesContainer.classList.remove('restoring');
-            }
+            this._cleanupLoadingState(messagesContainer);
         }
     }
 
     /**
-     * Clean up message loading state - used when aborting stale loads
+     * Clean up message loading state - used when aborting stale loads or after completion
      * @private
+     * @param {HTMLElement} messagesContainer - Optional messages container for CSS cleanup
      */
-    _cleanupLoadingState() {
+    _cleanupLoadingState(messagesContainer = null) {
         this._loadingProjectId = null;
         this._isRestoring = false;
+        
+        // Remove loading CSS class if container provided
+        if (messagesContainer) {
+            messagesContainer.classList.remove('restoring');
+        }
     }
 
     /**
