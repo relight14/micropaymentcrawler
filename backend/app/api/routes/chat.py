@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import time
+import requests
 
 from services.ai.conversational import AIResearchService
 from integrations.ledewire import LedeWireAPI
@@ -117,7 +118,6 @@ def validate_user_token(access_token: str, use_cache: bool = True):
     except HTTPException:
         raise
     except Exception as e:
-        import requests
         if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
             if e.response.status_code == 401:
                 raise HTTPException(status_code=401, detail="Invalid or expired token")

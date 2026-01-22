@@ -6,7 +6,6 @@ import os
 import time
 import logging
 import concurrent.futures
-from functools import partial
 from typing import List, Optional, Dict
 from anthropic import Anthropic
 from schemas.domain import SourceCard
