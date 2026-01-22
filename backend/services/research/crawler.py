@@ -163,20 +163,20 @@ class ContentCrawlerStub:
         temporal_bucket = classification.get("temporal_bucket", "T1")
         
         # Determine actual weights (before normalization, for logging)
-        topicality_weight = self.RELEVANCE_WEIGHT
+        relevance_weight = self.RELEVANCE_WEIGHT
         authority_weight = self.AUTHORITY_WEIGHT
         actual_recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)
         
         # Normalize weights to sum to 1.0
-        total_weight = actual_recency_weight + topicality_weight + authority_weight
+        total_weight = actual_recency_weight + relevance_weight + authority_weight
         if total_weight > 0:
             normalized_recency = actual_recency_weight / total_weight
-            normalized_topicality = topicality_weight / total_weight
+            normalized_relevance = relevance_weight / total_weight
             normalized_authority = authority_weight / total_weight
         else:
             # Fallback if total is 0 (shouldn't happen)
             normalized_recency = 0.0
-            normalized_topicality = 1.0
+            normalized_relevance = 1.0
             normalized_authority = 0.0
         
         # Calculate composite scores
@@ -207,7 +207,7 @@ class ContentCrawlerStub:
             # Use normalized weights for composite score
             composite_score = (
                 normalized_recency * recency +
-                normalized_topicality * relevance +
+                normalized_relevance * relevance +
                 normalized_authority * authority
             )
             
@@ -219,7 +219,7 @@ class ContentCrawlerStub:
         
         # Log relevance-first ranking results (top 3 sources) with actual normalized weights
         if sources:
-            print(f"🏆 Relevance-First Ranking (Relevance={normalized_topicality:.2f}, Authority={normalized_authority:.2f}, Recency={normalized_recency:.2f}):")
+            print(f"🏆 Relevance-First Ranking (Relevance={normalized_relevance:.2f}, Authority={normalized_authority:.2f}, Recency={normalized_recency:.2f}):")
             for i, src in enumerate(sources[:3]):
                 domain = src.url.split('/')[2] if src.url else 'unknown'
                 print(f"   {i+1}. {domain} - Score: {getattr(src, 'composite_score', 0.0):.3f}")
