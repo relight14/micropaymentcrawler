@@ -265,6 +265,15 @@ class SourceCard {
             return { text: 'RSL', className: 'license-demo' };
         } else if (protocol && protocol.toLowerCase() === 'cloudflare') {
             return { text: 'CLOUDFLARE', className: 'license-demo' };
+        } else if (this._shouldShowTollbitDemo(source)) {
+            // Premium publication - show Tollbit potential even without confirmed pricing
+            return { text: 'TOLLBIT', className: 'license-demo' };
+        } else if (this._shouldShowRSLDemo(source)) {
+            // Academic/research domain - show RSL potential
+            return { text: 'RSL', className: 'license-demo' };
+        } else if (this._shouldShowCloudflareDemo(source)) {
+            // Major publisher - show Cloudflare potential
+            return { text: 'CLOUDFLARE', className: 'license-demo' };
         } else if (cost === 0) {
             // No protocol detected and free - show FREE badge
             return { text: 'FREE', className: 'license-free' };
@@ -560,15 +569,20 @@ class SourceCard {
             badge.classList.add('license-paid');
             badge.textContent = `⚡ TOLLBIT $${Number(cost || 0).toFixed(2)}`;
             
-        } else if (protocol && protocol.toLowerCase() === 'rsl' || this._shouldShowRSLDemo(source)) {
+        } else if ((protocol && protocol.toLowerCase() === 'rsl') || this._shouldShowRSLDemo(source)) {
             // RSL demo badge for platform potential
             badge.classList.add('license-demo');
             badge.textContent = '🔒 RSL Coming Soon';
             
-        } else if (protocol && protocol.toLowerCase() === 'cloudflare' || this._shouldShowCloudflareDemo(source)) {
+        } else if ((protocol && protocol.toLowerCase() === 'cloudflare') || this._shouldShowCloudflareDemo(source)) {
             // Cloudflare demo badge for platform potential
             badge.classList.add('license-demo');
             badge.textContent = '☁️ Cloudflare Coming Soon';
+            
+        } else if (this._shouldShowTollbitDemo(source)) {
+            // Premium publication without confirmed Tollbit pricing yet - show potential
+            badge.classList.add('license-demo');
+            badge.textContent = '⚡ TOLLBIT Coming Soon';
             
         } else if (cost === 0) {
             // Free discovery content (only show if enrichment is complete)
@@ -600,7 +614,27 @@ class SourceCard {
     _shouldShowCloudflareDemo(source) {
         // Show Cloudflare demo for major publisher domains  
         const domain = source.domain || '';
-        return /\b(nytimes|wsj|economist|reuters)\b/i.test(domain);
+        return /\b(economist|reuters|ft\.com|financialtimes)\b/i.test(domain);
+    }
+    
+    /**
+     * Determine if source should show Tollbit demo badge
+     * For major paywalled publications that likely have or will have Tollbit support
+     */
+    _shouldShowTollbitDemo(source) {
+        const domain = (source.domain || '').toLowerCase();
+        const url = (source.url || '').toLowerCase();
+        
+        // Check if it's a known premium publication
+        const premiumPublications = [
+            'wsj.com', 'wall street journal', 'nytimes.com', 'newyorktimes.com',
+            'washingtonpost.com', 'wapo.', 'forbes.com', 'bloomberg.com',
+            'businessinsider.com', 'theatlantic.com', 'wired.com', 'theinformation.com'
+        ];
+        
+        return premiumPublications.some(pub => 
+            domain.includes(pub) || url.includes(pub)
+        );
     }
 
 

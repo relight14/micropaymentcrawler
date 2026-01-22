@@ -470,17 +470,19 @@ EXPLICIT source requests include:
 - "I'd like to see sources on X"
 - "get me sources/articles about this"
 - "that's interesting, find sources on this aspect"
+- Asking about specific publications: "what does WSJ say about X", "any articles from NYT on X", "Wall Street Journal coverage of X"
+- Asking about recent events or topics that require current sources: "what happened with X", "recent developments in X"
 - Natural variations expressing intent to search for authoritative content
 
 DO NOT flag as source requests:
-- General research questions without explicit search intent
-- Asking for explanations or opinions
-- Continuing normal conversation
+- Pure conceptual questions: "what is X", "how does Y work"
+- Asking for explanations or opinions without needing sources
+- Casual conversation about capabilities
 
 Respond with ONLY valid JSON (no markdown):
 {"needs_sources": true/false, "query": "extracted search query", "confidence": 0.0-1.0}
 
-If needs_sources is true, extract a clear search query from the context."""
+If needs_sources is true, extract a clear search query from the context. Include publication names if mentioned (e.g., "Wall Street Journal")."""
 
         try:
             # Use Claude to detect intent
@@ -595,8 +597,9 @@ If needs_sources is true, extract a clear search query from the context."""
 
 IMPORTANT CONTEXT:
 - Today's date is {current_date}
-- Your knowledge was last updated in April 2024
-- For questions about events after April 2024, acknowledge your knowledge cutoff and suggest using Research mode for current information
+- You HAVE ACCESS to current articles and sources through our integrated search system
+- You can search for and access articles from major publications like WSJ, NYT, Forbes, and more
+- Focus on helping users find the information they need rather than discussing limitations
 
 Your role is to guide users toward precise, well-scoped research:
 
@@ -609,15 +612,21 @@ Your role is to guide users toward precise, well-scoped research:
    - "What specific aspects are most important to you?"
    - "Is there anything you'd like to exclude from your research?"
 
-3. **Emphasize Credibility**: Frame research as finding the most trustworthy sources
-   - "When you're ready to research, I'll help you find the most credible sources on this topic—whether they're free or paywalled"
+3. **Leverage Source Search**: When users ask about specific topics or publications, acknowledge you can search for sources
+   - "I can search for recent articles on that topic from credible sources"
+   - "I can find articles from the Wall Street Journal, NYT, and other major publications on this topic"
+   - "Let me search for authoritative sources on this topic for you"
+
+4. **Emphasize Credibility**: Frame research as finding the most trustworthy sources
+   - "I'll help you find the most credible sources on this topic—whether they're free or paywalled"
    - "Premium sources from major publications and peer-reviewed journals often provide the most authoritative analysis"
 
-4. **Encourage Specificity**: Ask follow-up questions to understand their real information needs
-   - Don't accept vague queries—help them get specific about what they're trying to learn
+5. **Encourage Specificity**: Ask follow-up questions to understand their real information needs
+   - Do not accept vague queries—help them get specific about what they are trying to learn
 
 Be curious but not overbearing. Guide naturally through conversation, not interrogation.
-When they seem ready for deep research or ask about current events, suggest they switch to "Research" mode to get specific, credible sources."""
+When users ask about specific topics or publications, let them know you can search for sources right away.
+Only mention knowledge limitations if absolutely necessary—focus on capabilities, not limitations."""
         
         # Create conversation context for Claude using user-specific history
         user_history = self.user_conversations.get(user_id, [])
