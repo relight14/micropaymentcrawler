@@ -482,7 +482,7 @@ DO NOT flag as source requests:
 Respond with ONLY valid JSON (no markdown):
 {"needs_sources": true/false, "query": "extracted search query", "confidence": 0.0-1.0}
 
-If needs_sources is true, extract a clear search query from the context. Include publication names if mentioned (e.g., "Wall Street Journal").
+If needs_sources is true, extract a clear search query from the context. Include publication names if mentioned (e.g., "Wall Street Journal")."""
 
         try:
             # Use Claude to detect intent
@@ -623,7 +623,7 @@ Your role is to guide users toward precise, well-scoped research:
    - "Premium sources from major publications and peer-reviewed journals often provide the most authoritative analysis"
 
 5. **Encourage Specificity**: Ask follow-up questions to understand their real information needs
-   - Don't accept vague queries—help them get specific about what they're trying to learn
+   - Do not accept vague queries—help them get specific about what they are trying to learn
 
 Be curious but not overbearing. Guide naturally through conversation, not interrogation.
 When users ask about specific topics or publications, let them know you can search for sources right away."""
