@@ -187,14 +187,16 @@ class ContentCrawlerStub:
             # Sources should rank by how well they match the conversation context,
             # not whether they're paid or free
             
-            # Weighted combination (must sum to 1.0)
+            # Weighted combination (normalized to sum to 1.0)
             # RELEVANCE-FIRST REBALANCING: Prioritize actual topic match over domain authority
-            # Use class constants for easier tuning
+            # Note: These constants represent ideal weights, but actual recency_weight comes from
+            # classification and is capped at MAX_RECENCY_WEIGHT. All weights are normalized below
+            # to ensure they sum to 1.0 before being used in the composite score calculation.
             topicality_weight = self.RELEVANCE_WEIGHT
             authority_weight = self.AUTHORITY_WEIGHT
-            recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)  # Allow more weight for time-sensitive queries
+            recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)  # Cap recency based on query type
             
-            # Normalize if needed (safety check)
+            # Normalize weights to sum to 1.0 (safety check and adjustment)
             total_weight = recency_weight + topicality_weight + authority_weight
             if total_weight > 0:
                 composite_score = (
@@ -213,7 +215,9 @@ class ContentCrawlerStub:
         
         # Log relevance-first ranking results (top 3 sources)
         if sources:
-            print(f"🏆 Relevance-First Ranking (Relevance={self.RELEVANCE_WEIGHT:.2f}, Authority={self.AUTHORITY_WEIGHT:.2f}, Recency={self.MAX_RECENCY_WEIGHT:.2f}):")
+            # Calculate actual weights used (after normalization)
+            actual_recency = min(recency_weight, self.MAX_RECENCY_WEIGHT) if classification else 0
+            print(f"🏆 Relevance-First Ranking (Relevance={self.RELEVANCE_WEIGHT:.2f}, Authority={self.AUTHORITY_WEIGHT:.2f}, Recency={actual_recency:.2f}):")
             for i, src in enumerate(sources[:3]):
                 domain = src.url.split('/')[2] if src.url else 'unknown'
                 print(f"   {i+1}. {domain} - Score: {getattr(src, 'composite_score', 0.0):.3f}")
@@ -612,7 +616,7 @@ class ContentCrawlerStub:
                 
                 # Generate relevance score immediately for star ratings
                 base_score = max(0.2, 1.0 - (i * 0.08))  # Position decay
-                random_factor = random.uniform(-self.RANDOM_VARIANCE_RANGE, self.RANDOM_VARIANCE_RANGE)  # Minimal variety
+                random_factor = random.uniform(-self.RANDOM_VARIANCE_RANGE, self.RANDOM_VARIANCE_RANGE)
                 query_bonus = 0.2 if query.lower() in title.lower() else 0.0  # Query matching
                 # Removed domain bonus - let DomainClassifier tier handle this instead
                 credibility_penalty = self._get_credibility_penalty(url)  # Downrank social media/Wikipedia
