@@ -244,36 +244,15 @@ class SourceCard {
     }
     
     /**
-     * Infer domain tier from URL patterns (fallback if backend doesn't provide)
-     */
-    _inferDomainTier(source) {
-        const domain = this._extractDomain(source).toLowerCase();
-        
-        // Tier 1: Premium publications
-        const tier1Domains = [
-            'wsj.com', 'nytimes.com', 'ft.com', 'economist.com', 'washingtonpost.com',
-            'bloomberg.com', 'reuters.com', 'nature.com', 'science.org', 'thelancet.com'
-        ];
-        
-        // Tier 2: Reputable publications
-        const tier2Domains = [
-            'theguardian.com', 'bbc.com', 'cnn.com', 'npr.org', 'apnews.com',
-            'forbes.com', 'time.com', 'newsweek.com', 'atlantic.com', 'newyorker.com'
-        ];
-        
-        if (tier1Domains.some(d => domain.includes(d))) return 1;
-        if (tier2Domains.some(d => domain.includes(d))) return 2;
-        
-        return 3; // Standard tier by default
-    }
-    
-    /**
      * Get license text for compact display
+     * Shows which licensing protocol is available for this source
+     * Priority: Tollbit > RSL > Cloudflare > Free > Checking
      */
     _getLicenseText(source) {
         const protocol = source.licensing_protocol;
         const cost = source.unlock_price || source.licensing_cost || 0;
         
+        // Show protocol badge if detected (highlighting paid content licensing systems)
         if (protocol && protocol.toLowerCase() === 'tollbit') {
             return { text: 'TOLLBIT', className: 'license-paid' };
         } else if (protocol && protocol.toLowerCase() === 'rsl') {
