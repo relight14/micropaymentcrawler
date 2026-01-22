@@ -452,8 +452,9 @@ export class ProjectManager {
         
         // FIX: Sync project's research query to AppState to prevent spillage from previous project
         // Use empty string if project has no query (matches AppState initialization behavior)
+        // Using ?? (nullish coalescing) to only fallback on null/undefined, not empty string
         if (this.appState) {
-            const newQuery = projectData.research_query || '';
+            const newQuery = projectData.research_query ?? '';
             this.appState.setCurrentQuery(newQuery);
             
             if (projectData.research_query) {
