@@ -604,17 +604,19 @@ export class ProjectManager {
 
     /**
      * Clean up message loading state - used when aborting stale loads or after completion
+     * Handles all cleanup needed when message loading stops, whether successful or not
      * @private
-     * @param {HTMLElement} messagesContainer - Optional messages container for CSS cleanup
+     * @param {HTMLElement|null} messagesContainer - Messages container element for CSS cleanup.
+     *                                               Pass the container to remove 'restoring' class.
+     *                                               Pass null when cleaning up from early returns
+     *                                               where container access isn't needed.
      */
     _cleanupLoadingState(messagesContainer = null) {
         this._loadingProjectId = null;
         this._isRestoring = false;
         
-        // Remove loading CSS class if container provided
-        if (messagesContainer) {
-            messagesContainer.classList.remove('restoring');
-        }
+        // Remove loading CSS class if container provided (optional chaining for safety)
+        messagesContainer?.classList?.remove('restoring');
     }
 
     /**
