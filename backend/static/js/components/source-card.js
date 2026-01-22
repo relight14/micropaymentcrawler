@@ -245,14 +245,20 @@ class SourceCard {
     
     /**
      * Get license text for compact display
-     * Shows which licensing protocol is available for this source
-     * Priority: Tollbit > RSL > Cloudflare > Free > Checking
+     * Shows which licensing protocol is available for accessing this source
+     * 
+     * Protocol badges (TOLLBIT, RSL, CLOUDFLARE) indicate paywalled content is accessible
+     * through these licensing systems, highlighting the app's ability to access
+     * high-quality information behind paywalls.
+     * 
+     * Priority: Protocol badges > Free > Checking
      */
     _getLicenseText(source) {
         const protocol = source.licensing_protocol;
         const cost = source.unlock_price || source.licensing_cost || 0;
         
-        // Show protocol badge if detected (highlighting paid content licensing systems)
+        // Show protocol badge when licensing system is detected (Tollbit, RSL, Cloudflare)
+        // This highlights paywalled content that's accessible through licensed protocols
         if (protocol && protocol.toLowerCase() === 'tollbit') {
             return { text: 'TOLLBIT', className: 'license-paid' };
         } else if (protocol && protocol.toLowerCase() === 'rsl') {
@@ -260,8 +266,10 @@ class SourceCard {
         } else if (protocol && protocol.toLowerCase() === 'cloudflare') {
             return { text: 'CLOUDFLARE', className: 'license-demo' };
         } else if (cost === 0) {
+            // No protocol detected and free - show FREE badge
             return { text: 'FREE', className: 'license-free' };
         } else {
+            // Cost > 0 but no protocol detected yet - still checking
             return { text: 'CHECKING...', className: 'license-loading' };
         }
     }
