@@ -96,9 +96,15 @@ class ContentCrawlerStub:
         
         # Ranking weights for composite scoring
         # These can be adjusted to tune the balance between relevance, authority, and recency
+        # Note: The actual weights are normalized at runtime, so MAX_RECENCY_WEIGHT serves as a ceiling
+        # for dynamic recency weighting based on query type (e.g., news vs. historical research)
         self.RELEVANCE_WEIGHT = 0.50  # Primary signal for matching conversation context
         self.AUTHORITY_WEIGHT = 0.30  # Secondary signal for source credibility
-        self.MAX_RECENCY_WEIGHT = 0.20  # Maximum weight for time-sensitive queries
+        self.MAX_RECENCY_WEIGHT = 0.20  # Maximum weight for time-sensitive queries (actual weight is min(requested, 0.20))
+        
+        # Domain tier boosts and scoring parameters
+        self.PREMIUM_TIER_BOOST = 0.20  # Boost for premium domains (.edu, major publishers)
+        self.RANDOM_VARIANCE_RANGE = 0.05  # Random factor range for score variety (±5%)
     
     def _calculate_recency_score(self, published_date: Optional[str], timeframe: str = "T1") -> float:
         """Calculate recency score based on publication date and temporal bucket."""
@@ -170,7 +176,7 @@ class ContentCrawlerStub:
             # Enhanced authority with domain tier classification
             domain_tier = DomainClassifier.get_domain_tier(source.url)
             tier_boost = {
-                "premium": 0.20,  # Moderate boost for .edu, major publishers (reduced from 0.35)
+                "premium": self.PREMIUM_TIER_BOOST,  # Moderate boost for .edu, major publishers
                 "standard": 0.0,  # No boost
                 "blocked": -0.5   # Should never happen (filtered by Tavily), but penalize if present
             }.get(domain_tier, 0.0)
@@ -606,7 +612,7 @@ class ContentCrawlerStub:
                 
                 # Generate relevance score immediately for star ratings
                 base_score = max(0.2, 1.0 - (i * 0.08))  # Position decay
-                random_factor = random.uniform(-0.05, 0.05)  # Minimal variety (reduced from ±0.15)
+                random_factor = random.uniform(-self.RANDOM_VARIANCE_RANGE, self.RANDOM_VARIANCE_RANGE)  # Minimal variety
                 query_bonus = 0.2 if query.lower() in title.lower() else 0.0  # Query matching
                 # Removed domain bonus - let DomainClassifier tier handle this instead
                 credibility_penalty = self._get_credibility_penalty(url)  # Downrank social media/Wikipedia
