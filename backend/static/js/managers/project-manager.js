@@ -615,8 +615,8 @@ export class ProjectManager {
         this._loadingProjectId = null;
         this._isRestoring = false;
         
-        // Remove loading CSS class if container provided (optional chaining for safety)
-        messagesContainer?.classList?.remove('restoring');
+        // Remove loading CSS class if container provided
+        messagesContainer?.classList.remove('restoring');
     }
 
     /**
