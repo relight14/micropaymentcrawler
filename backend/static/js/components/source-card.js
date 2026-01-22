@@ -569,12 +569,12 @@ class SourceCard {
             badge.classList.add('license-paid');
             badge.textContent = `⚡ TOLLBIT $${Number(cost || 0).toFixed(2)}`;
             
-        } else if (protocol && protocol.toLowerCase() === 'rsl' || this._shouldShowRSLDemo(source)) {
+        } else if ((protocol && protocol.toLowerCase() === 'rsl') || this._shouldShowRSLDemo(source)) {
             // RSL demo badge for platform potential
             badge.classList.add('license-demo');
             badge.textContent = '🔒 RSL Coming Soon';
             
-        } else if (protocol && protocol.toLowerCase() === 'cloudflare' || this._shouldShowCloudflareDemo(source)) {
+        } else if ((protocol && protocol.toLowerCase() === 'cloudflare') || this._shouldShowCloudflareDemo(source)) {
             // Cloudflare demo badge for platform potential
             badge.classList.add('license-demo');
             badge.textContent = '☁️ Cloudflare Coming Soon';
