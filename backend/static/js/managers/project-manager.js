@@ -450,10 +450,9 @@ export class ProjectManager {
         projectStore.setActiveProject(projectData.id, projectData.title, projectData.research_query);
         projectStore.setOutline(projectData.outline);
         
-        // FIX: Clear currentQuery first to prevent spillage from previous project
-        // Then sync new project's research query to AppState if available
+        // FIX: Sync project's research query to AppState to prevent spillage from previous project
+        // Use empty string if project has no query (matches AppState initialization behavior)
         if (this.appState) {
-            // Always clear first to prevent spillage (using '' for consistency with clearConversation)
             const newQuery = projectData.research_query || '';
             this.appState.setCurrentQuery(newQuery);
             
