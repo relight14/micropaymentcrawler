@@ -30,6 +30,7 @@ export class ProjectManager {
         this.pendingReload = false; // Flag to queue a retry if load is requested during active load
         this.hasMigratedLoginChat = false; // One-shot flag to prevent duplicate login migration
         this._autoCreateLock = false; // Mutex guard to prevent concurrent auto-create calls
+        this._loadingProjectId = null; // Track which project is currently being loaded to prevent race conditions
     }
 
     /**
@@ -497,6 +498,9 @@ export class ProjectManager {
             
             logger.info(`📨 [ProjectManager] Loading messages for project ${projectId}...`);
             
+            // Track which project we're loading to detect stale responses
+            this._loadingProjectId = projectId;
+            
             // Set restoring flag and add overlay CSS (dims without clearing)
             this._isRestoring = true;
             if (messagesContainer) {
@@ -513,7 +517,22 @@ export class ProjectManager {
             const response = await this.apiService.getProjectMessages(projectId);
             const messages = response.messages || [];
             
-            logger.info(`📬 [ProjectManager] Fetched ${messages.length} messages`);
+            // CRITICAL: Guard against stale API responses during rapid project switching
+            // If user switched to a different project while API call was in flight, ignore this response
+            if (this._loadingProjectId !== projectId) {
+                logger.warn(`⚠️  [ProjectManager] Ignoring stale response for project ${projectId} (now loading ${this._loadingProjectId})`);
+                this._cleanupLoadingState();
+                return;
+            }
+            
+            // Double-check against active project ID in store as final safety check
+            if (projectStore.state.activeProjectId !== projectId) {
+                logger.warn(`⚠️  [ProjectManager] Active project changed during load (expected ${projectId}, now ${projectStore.state.activeProjectId}). Aborting.`);
+                this._cleanupLoadingState();
+                return;
+            }
+            
+            logger.info(`📬 [ProjectManager] Fetched ${messages.length} messages for project ${projectId}`);
             
             if (messages.length === 0) {
                 // Clear and show welcome message for empty project
@@ -579,11 +598,25 @@ export class ProjectManager {
             this.toastManager.show('Failed to load project messages', 'error');
         } finally {
             // Always cleanup restore state, even on errors
-            this._isRestoring = false;
-            if (messagesContainer) {
-                messagesContainer.classList.remove('restoring');
-            }
+            this._cleanupLoadingState(messagesContainer);
         }
+    }
+
+    /**
+     * Clean up message loading state - used when aborting stale loads or after completion
+     * Handles all cleanup needed when message loading stops, whether successful or not
+     * @private
+     * @param {HTMLElement|null} messagesContainer - Messages container element for CSS cleanup.
+     *                                               Pass the container to remove 'restoring' class.
+     *                                               Pass null when cleaning up from early returns
+     *                                               where container access isn't needed.
+     */
+    _cleanupLoadingState(messagesContainer = null) {
+        this._loadingProjectId = null;
+        this._isRestoring = false;
+        
+        // Remove loading CSS class if container provided
+        messagesContainer?.classList.remove('restoring');
     }
 
     /**
