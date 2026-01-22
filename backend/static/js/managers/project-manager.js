@@ -450,12 +450,18 @@ export class ProjectManager {
         projectStore.setActiveProject(projectData.id, projectData.title, projectData.research_query);
         projectStore.setOutline(projectData.outline);
         
-        // Sync research query to AppState if available
-        if (projectData.research_query && this.appState) {
-            this.appState.setCurrentQuery(projectData.research_query);
-            logger.info(`✅ [ProjectManager] Restored research query: "${projectData.research_query}"`);
-        } else if (!projectData.research_query) {
-            logger.info(`ℹ️  [ProjectManager] Project has no saved research query`);
+        // FIX: Sync project's research query to AppState to prevent spillage from previous project
+        // Use empty string if project has no query (matches AppState initialization behavior)
+        // Using ?? (nullish coalescing) to only fallback on null/undefined, not empty string
+        if (this.appState) {
+            const newQuery = projectData.research_query ?? '';
+            this.appState.setCurrentQuery(newQuery);
+            
+            if (projectData.research_query) {
+                logger.info(`✅ [ProjectManager] Restored research query: "${projectData.research_query}"`);
+            } else {
+                logger.info(`ℹ️  [ProjectManager] Project has no saved research query`);
+            }
         }
         
         // Update outline builder and sources panel

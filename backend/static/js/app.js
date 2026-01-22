@@ -191,7 +191,9 @@ export class ChatResearchApp {
             const sources = Array.from(sourceMap.values());
             const sourceCount = sources.length;
             const price = sourceCount * 0.05; // $0.05 per source
-            const query = this.appState.getCurrentQuery() || projectStore.getResearchQuery() || "Research Query";
+            // FIX: Prioritize project-specific research query over global currentQuery
+            // to prevent title spillage when switching between projects
+            const query = projectStore.getResearchQuery() || this.appState.getCurrentQuery() || "Research Query";
             const useSelectedSources = sources.length > 0;
             
             // Validate we have sources before launching modal
