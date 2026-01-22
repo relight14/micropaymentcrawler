@@ -537,11 +537,15 @@ Use the generate_synthesis tool to provide:
             # Build source lookup by ID
             source_lookup = {source.id: source for source in sources}
             
-            # Process each section with its assigned sources
+            # Process sections in parallel for better performance
             all_table_data = []
             total_sections = len(outline_structure['sections'])
             
-            for idx, section in enumerate(outline_structure['sections'], 1):
+            # Prepare section tasks for parallel execution
+            import concurrent.futures
+            from functools import partial
+            
+            def process_section(section, idx, total):
                 topic = section.get('title', f'Section {idx}')
                 source_ids = section.get('sources', [])
                 
@@ -553,11 +557,26 @@ Use the generate_synthesis tool to provide:
                     if src_id in source_lookup:
                         section_sources.append(source_lookup[src_id])
                 
-                logger.info(f"   Section {idx}/{total_sections}: '{topic}' - {len(section_sources)} assigned sources")
+                logger.info(f"   Section {idx}/{total}: '{topic}' - {len(section_sources)} assigned sources")
                 
                 # Extract data for this section
                 section_data = self._generate_section_data(query, topic, section_sources)
-                all_table_data.extend(section_data)
+                return section_data
+            
+            # Process sections in parallel (max 3 concurrent to avoid rate limits)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                section_tasks = [
+                    executor.submit(process_section, section, idx, total_sections)
+                    for idx, section in enumerate(outline_structure['sections'], 1)
+                ]
+                
+                # Gather results in order
+                for future in concurrent.futures.as_completed(section_tasks):
+                    try:
+                        section_data = future.result()
+                        all_table_data.extend(section_data)
+                    except Exception as e:
+                        logger.error(f"Section processing failed: {e}")
             
             logger.info(f"✅ [OUTLINE MODE] Completed all sections: {len(all_table_data)} total entries")
             

@@ -15,6 +15,11 @@ from services.research.crawler import ContentCrawlerStub
 class AIResearchService:
     """Unified AI service for conversational and deep research modes"""
     
+    # Maximum number of messages to keep per user (prevents memory bloat)
+    MAX_CONVERSATION_HISTORY = 50
+    # Maximum number of active users to track
+    MAX_ACTIVE_USERS = 1000
+    
     def __init__(self):
         self.client = anthropic.Anthropic(
             api_key=os.environ.get('ANTHROPIC_API_KEY')
@@ -25,6 +30,8 @@ class AIResearchService:
         self.user_conversations: Dict[str, List[Dict[str, Any]]] = {}
         # Track whether we've suggested research mode for each user
         self.suggested_research: Dict[str, bool] = {}
+        # Track last access time for each user (for cleanup)
+        self.user_last_access: Dict[str, float] = {}
     
     async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None, conversation_context: Optional[List[Dict[str, Any]]] = None, enhanced_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
@@ -501,10 +508,44 @@ If needs_sources is true, extract a clear search query from the context."""
             # Default to no intent detected
             return {"needs_sources": False, "query": user_message, "confidence": 0.0}
         
+    def _cleanup_old_users(self):
+        """Remove inactive users to prevent memory bloat"""
+        import time
+        
+        # Only cleanup if we have too many users
+        if len(self.user_conversations) <= self.MAX_ACTIVE_USERS:
+            return
+        
+        current_time = time.time()
+        # Remove users inactive for more than 1 hour
+        inactive_threshold = 3600  # 1 hour in seconds
+        
+        users_to_remove = [
+            user_id for user_id, last_access in self.user_last_access.items()
+            if current_time - last_access > inactive_threshold
+        ]
+        
+        for user_id in users_to_remove:
+            if user_id in self.user_conversations:
+                del self.user_conversations[user_id]
+            if user_id in self.suggested_research:
+                del self.suggested_research[user_id]
+            if user_id in self.user_last_access:
+                del self.user_last_access[user_id]
+        
+        if users_to_remove:
+            print(f"🧹 Cleaned up {len(users_to_remove)} inactive users")
+    
     async def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
         Main chat interface supporting both conversational and deep research modes
         """
+        import time
+        
+        # Update last access time and cleanup old users
+        self.user_last_access[user_id] = time.time()
+        self._cleanup_old_users()
+        
         # Initialize user conversation if not exists
         if user_id not in self.user_conversations:
             self.user_conversations[user_id] = []
@@ -516,6 +557,12 @@ If needs_sources is true, extract a clear search query from the context."""
             "timestamp": datetime.now().isoformat(),
             "mode": mode
         })
+        
+        # Trim conversation history to prevent unbounded growth
+        if len(self.user_conversations[user_id]) > self.MAX_CONVERSATION_HISTORY:
+            # Keep only the most recent messages
+            self.user_conversations[user_id] = self.user_conversations[user_id][-self.MAX_CONVERSATION_HISTORY:]
+            print(f"📝 Trimmed conversation history for {user_id} to {self.MAX_CONVERSATION_HISTORY} messages")
         
         if mode == "chat" or mode == "conversational":
             # Detect if user is explicitly requesting sources

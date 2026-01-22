@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
+import time
 
 from services.ai.conversational import AIResearchService
 from integrations.ledewire import LedeWireAPI
@@ -13,6 +14,10 @@ router = APIRouter()
 # Initialize services
 ai_service = AIResearchService()
 ledewire = LedeWireAPI()
+
+# Token validation cache with TTL (5 minutes)
+_token_cache: Dict[str, tuple[Any, float]] = {}
+_TOKEN_CACHE_TTL = 300  # 5 minutes
 
 
 class ChatRequest(BaseModel):
@@ -52,14 +57,27 @@ def extract_bearer_token(authorization: str) -> str:
     return access_token
 
 
-def validate_user_token(access_token: str):
-    """Validate JWT token with LedeWire API."""
+def validate_user_token(access_token: str, use_cache: bool = True):
+    """Validate JWT token with LedeWire API (with caching for performance)."""
+    # Check cache first if enabled
+    if use_cache and access_token in _token_cache:
+        cached_result, cached_time = _token_cache[access_token]
+        if time.time() - cached_time < _TOKEN_CACHE_TTL:
+            return cached_result
+        else:
+            # Cache expired, remove it
+            del _token_cache[access_token]
+    
     try:
         balance_result = ledewire.get_wallet_balance(access_token)
         
         if "error" in balance_result:
             error_message = ledewire.handle_api_error(balance_result)
             raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
+        
+        # Cache successful validation
+        if use_cache:
+            _token_cache[access_token] = (balance_result, time.time())
         
         return balance_result
         
