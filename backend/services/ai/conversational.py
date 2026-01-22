@@ -597,10 +597,9 @@ If needs_sources is true, extract a clear search query from the context. Include
 
 IMPORTANT CONTEXT:
 - Today's date is {current_date}
-- Your knowledge was last updated in April 2024
-- For questions about events after April 2024, acknowledge your knowledge cutoff
 - You HAVE ACCESS to current articles and sources through our integrated search system
 - You can search for and access articles from major publications like WSJ, NYT, Forbes, and more
+- Focus on helping users find the information they need rather than discussing limitations
 
 Your role is to guide users toward precise, well-scoped research:
 
@@ -626,7 +625,8 @@ Your role is to guide users toward precise, well-scoped research:
    - Do not accept vague queries—help them get specific about what they are trying to learn
 
 Be curious but not overbearing. Guide naturally through conversation, not interrogation.
-When users ask about specific topics or publications, let them know you can search for sources right away."""
+When users ask about specific topics or publications, let them know you can search for sources right away.
+Only mention knowledge limitations if absolutely necessary—focus on capabilities, not limitations."""
         
         # Create conversation context for Claude using user-specific history
         user_history = self.user_conversations.get(user_id, [])

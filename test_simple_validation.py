@@ -130,8 +130,11 @@ print("   " + "=" * 60)
 system_prompt_check = """
 - You HAVE ACCESS to current articles and sources through our integrated search system
 - You can search for and access articles from major publications like WSJ, NYT, Forbes, and more
+- Focus on helping users find the information they need rather than discussing limitations
 
 3. **Leverage Source Search**: When users ask about specific topics or publications
+
+Only mention knowledge limitations if absolutely necessary—focus on capabilities, not limitations.
 """
 
 print("   Checking for source search acknowledgment...")
@@ -148,6 +151,14 @@ if "WSJ" in system_prompt_check and "NYT" in system_prompt_check:
     passed += 1
 else:
     print("   ❌ FAIL - System prompt doesn't mention publications")
+    failed += 1
+
+print("   Checking that knowledge cutoff is de-emphasized...")
+if "focus on capabilities, not limitations" in system_prompt_check.lower():
+    print("   ✅ PASS - System prompt de-emphasizes limitations")
+    passed += 1
+else:
+    print("   ❌ FAIL - System prompt doesn't de-emphasize limitations")
     failed += 1
 
 # Final summary
