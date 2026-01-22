@@ -79,25 +79,32 @@ class ContentCrawlerStub:
         # Async HTTP client for non-blocking requests
         self._http_client = None
         
-        # Domain authority weights for ranking
+        # Simplified domain authority weights - use broader categories instead of many hardcoded domains
+        # The DomainClassifier provides more detailed tier classification
         self.domain_weights = {
-            # Premium tier - exceptional quality + licensed sources (0.85 - BOOSTED)
-            'economist.com': 0.85, 'time.com': 0.85,
-            'nytimes.com': 0.85, 'wsj.com': 0.85, 'ft.com': 0.85,
-            'theatlantic.com': 0.85, 'foreignaffairs.com': 0.85, 'foreignpolicy.com': 0.85,
-            'hbr.org': 0.85,
-            # Premium academic/archives (0.85 - BOOSTED)
-            'arxiv.org': 0.85, 'nature.com': 0.85, 'science.org': 0.85, 'jstor.org': 0.85,
-            # News wire services (0.6)
-            'reuters.com': 0.6, 'apnews.com': 0.6, 'bloomberg.com': 0.6,
-            # Academic institutions (0.5)
-            '.edu': 0.5, 'nber.org': 0.5,
-            # Major news outlets (0.45)
-            'theguardian.com': 0.45, 'bbc.com': 0.45,
-            # Policy/think tanks (0.4)
-            'brookings.edu': 0.4, 'carnegieendowment.org': 0.4,
-            'csis.org': 0.4, 'mei.edu': 0.4
+            # Academic/research patterns - high authority for scholarly work
+            '.edu': 0.6,
+            '.ac.uk': 0.6,
+            '.gov': 0.6,
+            # Major academic publishers
+            'arxiv.org': 0.7, 'nature.com': 0.7, 'science.org': 0.7, 'jstor.org': 0.7,
+            # Major established news/analysis - moderate authority
+            'nytimes.com': 0.6, 'wsj.com': 0.6, 'economist.com': 0.6, 'ft.com': 0.6,
+            'reuters.com': 0.5, 'apnews.com': 0.5, 'bloomberg.com': 0.5,
+            'theguardian.com': 0.5, 'bbc.com': 0.5,
         }
+        
+        # Ranking weights for composite scoring
+        # These can be adjusted to tune the balance between relevance, authority, and recency
+        # Note: The actual weights are normalized at runtime, so MAX_RECENCY_WEIGHT serves as a ceiling
+        # for dynamic recency weighting based on query type (e.g., news vs. historical research)
+        self.RELEVANCE_WEIGHT = 0.50  # Primary signal for matching conversation context
+        self.AUTHORITY_WEIGHT = 0.30  # Secondary signal for source credibility
+        self.MAX_RECENCY_WEIGHT = 0.20  # Maximum weight for time-sensitive queries (actual weight is min(requested, 0.20))
+        
+        # Domain tier boosts and scoring parameters
+        self.PREMIUM_TIER_BOOST = 0.20  # Boost for premium domains (.edu, major publishers)
+        self.RANDOM_VARIANCE_RANGE = 0.05  # Random factor range for score variety (±5%)
     
     def _calculate_recency_score(self, published_date: Optional[str], timeframe: str = "T1") -> float:
         """Calculate recency score based on publication date and temporal bucket."""
@@ -127,7 +134,10 @@ class ContentCrawlerStub:
             return 0.5
     
     def _get_domain_authority(self, domain: str) -> float:
-        """Get authority weight for domain."""
+        """
+        Get authority weight for domain.
+        Returns 0.0 for unknown domains (rely on DomainClassifier tier boost instead).
+        """
         # Normalize domain by removing www. prefix for consistent matching
         normalized_domain = domain.lower().removeprefix('www.')
         
@@ -140,7 +150,7 @@ class ContentCrawlerStub:
             if pattern.startswith('.') and normalized_domain.endswith(pattern):
                 return weight
         
-        return 0.0  # Unknown domain
+        return 0.0  # Unknown domain - let DomainClassifier tier boost handle it
     
     def _rerank_with_recency(self, sources: List[SourceCard], classification: Optional[Dict[str, Any]] = None) -> List[SourceCard]:
         """Rerank sources using recency, relevance, domain tier, and licensing based on classification."""
@@ -151,6 +161,23 @@ class ContentCrawlerStub:
         
         recency_weight = classification.get("recency_weight", 0.3)
         temporal_bucket = classification.get("temporal_bucket", "T1")
+        
+        # Determine actual weights (before normalization, for logging)
+        relevance_weight = self.RELEVANCE_WEIGHT
+        authority_weight = self.AUTHORITY_WEIGHT
+        actual_recency_weight = min(recency_weight, self.MAX_RECENCY_WEIGHT)
+        
+        # Normalize weights to sum to 1.0
+        total_weight = actual_recency_weight + relevance_weight + authority_weight
+        if total_weight > 0:
+            normalized_recency = actual_recency_weight / total_weight
+            normalized_relevance = relevance_weight / total_weight
+            normalized_authority = authority_weight / total_weight
+        else:
+            # Fallback if total is 0 (shouldn't happen)
+            normalized_recency = 0.0
+            normalized_relevance = 1.0
+            normalized_authority = 0.0
         
         # Calculate composite scores
         for source in sources:
@@ -166,42 +193,23 @@ class ContentCrawlerStub:
             # Enhanced authority with domain tier classification
             domain_tier = DomainClassifier.get_domain_tier(source.url)
             tier_boost = {
-                "premium": 0.35,  # Significant boost for .edu, major publishers
+                "premium": self.PREMIUM_TIER_BOOST,  # Moderate boost for .edu, major publishers
                 "standard": 0.0,  # No boost
                 "blocked": -0.5   # Should never happen (filtered by Tavily), but penalize if present
             }.get(domain_tier, 0.0)
             
             authority = min(1.0, base_authority + tier_boost)
             
-            # LICENSING BOOST: Prioritize paid sources from premium domains
-            is_paid_source = (source.unlock_price and source.unlock_price > 0 and 
-                            source.licensing_protocol and source.licensing_protocol.upper() != 'FREE')
+            # REMOVED: Licensing boost - prioritize relevance over payment status
+            # Sources should rank by how well they match the conversation context,
+            # not whether they're paid or free
             
-            # Premium domain + licensing = top priority
-            if is_paid_source and domain_tier == "premium":
-                authority = min(1.0, authority * 1.4)  # Extra boost for premium + licensed
-            elif is_paid_source:
-                authority = min(1.0, authority * 1.2)  # Boost for any licensed source
-            
-            # Weighted combination (must sum to 1.0)
-            # CREDIBILITY-FIRST REBALANCING: Prioritize domain authority over recency
-            # Authority (credibility): 0.50 - Primary signal for trustworthy sources
-            # Relevance (semantic):    0.35 - Important but secondary
-            # Recency (temporal):      0.15 - Least important unless explicitly requested
-            authority_weight = 0.50  # Doubled from previous ~0.25
-            topicality_weight = 0.35  # Up from 0.28
-            recency_weight = min(recency_weight, 0.15)  # Cap at 0.15 (down from 0.3)
-            
-            # Normalize if needed (safety check)
-            total_weight = recency_weight + topicality_weight + authority_weight
-            if total_weight > 0:
-                composite_score = (
-                    (recency_weight / total_weight) * recency +
-                    (topicality_weight / total_weight) * relevance +
-                    (authority_weight / total_weight) * authority
-                )
-            else:
-                composite_score = relevance  # Fallback to relevance only
+            # Use normalized weights for composite score
+            composite_score = (
+                normalized_recency * recency +
+                normalized_relevance * relevance +
+                normalized_authority * authority
+            )
             
             # Store composite score for sorting
             source.composite_score = composite_score
@@ -209,9 +217,9 @@ class ContentCrawlerStub:
         # Sort by composite score
         sources.sort(key=lambda x: getattr(x, 'composite_score', 0.0), reverse=True)
         
-        # Log credibility-first ranking results (top 3 sources)
+        # Log relevance-first ranking results (top 3 sources) with actual normalized weights
         if sources:
-            print(f"🏆 Credibility-First Ranking (Authority=0.50, Relevance=0.35, Recency=0.15):")
+            print(f"🏆 Relevance-First Ranking (Relevance={normalized_relevance:.2f}, Authority={normalized_authority:.2f}, Recency={normalized_recency:.2f}):")
             for i, src in enumerate(sources[:3]):
                 domain = src.url.split('/')[2] if src.url else 'unknown'
                 print(f"   {i+1}. {domain} - Score: {getattr(src, 'composite_score', 0.0):.3f}")
@@ -610,11 +618,11 @@ class ContentCrawlerStub:
                 
                 # Generate relevance score immediately for star ratings
                 base_score = max(0.2, 1.0 - (i * 0.08))  # Position decay
-                random_factor = random.uniform(-0.15, 0.15)  # Variety
+                random_factor = random.uniform(-self.RANDOM_VARIANCE_RANGE, self.RANDOM_VARIANCE_RANGE)
                 query_bonus = 0.2 if query.lower() in title.lower() else 0.0  # Query matching
-                domain_bonus = 0.15 if any(term in domain for term in ['edu', 'gov', 'research']) else 0.0  # Authority
+                # Removed domain bonus - let DomainClassifier tier handle this instead
                 credibility_penalty = self._get_credibility_penalty(url)  # Downrank social media/Wikipedia
-                relevance_score = max(0.2, min(1.0, base_score + query_bonus + domain_bonus + credibility_penalty + random_factor))
+                relevance_score = max(0.2, min(1.0, base_score + query_bonus + credibility_penalty + random_factor))
                 
                 # Classify source type based on domain
                 source_type = self._classify_source_type(domain, url)
