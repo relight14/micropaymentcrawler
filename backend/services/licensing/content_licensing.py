@@ -596,13 +596,22 @@ class CloudflareProtocolHandler(ProtocolHandler):
         )
 
 class ContentLicenseService:
-    """Unified service for multi-protocol content licensing"""
+    """
+    Unified service for multi-protocol content licensing
+    
+    Checks licensing protocols in priority order:
+    1. Cloudflare - Major news publishers (WSJ, NYTimes, etc.)
+    2. Tollbit - AI licensing marketplace (Forbes, TIME, etc.)
+    3. RSL - Open standard (academic, research content)
+    """
     
     def __init__(self):
+        # Protocol order matters - first match wins
+        # Cloudflare checked first for major publishers
         self.protocols = {
-            'rsl': RSLProtocolHandler(),
+            'cloudflare': CloudflareProtocolHandler(),
             'tollbit': TollbitProtocolHandler(),
-            'cloudflare': CloudflareProtocolHandler()
+            'rsl': RSLProtocolHandler()
         }
         self._cache = {}
     
