@@ -646,17 +646,16 @@ class SourceCard {
     /**
      * Determine if source should show Tollbit demo badge
      * Tollbit is a content licensing marketplace for AI companies
-     * Confirmed partners: Forbes, TIME, AP News, USA Today, Newsweek, HuffPost
+     * Confirmed partners: Forbes, AP News, USA Today, Newsweek, HuffPost
      * See: https://www.tollbit.com/
      */
     _shouldShowTollbitDemo(source) {
         const domain = (source.domain || '').toLowerCase();
         const url = (source.url || '').toLowerCase();
         
-        // Known Tollbit partner publications
+        // Known Tollbit partner publications (excluding overlaps with Cloudflare)
         const tollbitPublications = [
             'forbes.com',                    // Forbes
-            'time.com',                      // TIME Magazine
             'apnews.com', 'ap.org',         // Associated Press
             'usatoday.com',                  // USA Today
             'newsweek.com',                  // Newsweek

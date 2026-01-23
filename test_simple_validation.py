@@ -34,7 +34,7 @@ def should_show_tollbit_demo(source):
     url = (source.get('url') or '').lower()
     
     tollbit_publications = [
-        'forbes.com', 'time.com',
+        'forbes.com',
         'apnews.com', 'ap.org',
         'usatoday.com', 'newsweek.com',
         'huffpost.com', 'huffingtonpost.com',
