@@ -12,30 +12,72 @@ print("=" * 70)
 print("\n1️⃣  Testing Badge Display Logic")
 print("   " + "=" * 60)
 
+def should_show_cloudflare_demo(source):
+    """Check if source should show Cloudflare demo badge"""
+    domain = (source.get('domain') or '').lower()
+    url = (source.get('url') or '').lower()
+    
+    cloudflare_publishers = [
+        'wsj.com', 'wall street journal',
+        'nytimes.com', 'newyorktimes.com',
+        'economist.com', 'reuters.com',
+        'ft.com', 'financialtimes.com',
+        'condenast.com', 'wired.com',
+        'theatlantic.com', 'fortune.com', 'time.com'
+    ]
+    
+    return any(pub in domain or pub in url for pub in cloudflare_publishers)
+
 def should_show_tollbit_demo(source):
     """Check if source should show Tollbit demo badge"""
     domain = (source.get('domain') or '').lower()
     url = (source.get('url') or '').lower()
     
-    premium_publications = [
-        'wsj.com', 'wall street journal', 'nytimes.com', 'newyorktimes.com',
-        'washingtonpost.com', 'wapo.', 'forbes.com', 'bloomberg.com',
-        'businessinsider.com', 'theatlantic.com', 'wired.com', 'theinformation.com'
+    tollbit_publications = [
+        'forbes.com', 'time.com',
+        'apnews.com', 'ap.org',
+        'usatoday.com', 'newsweek.com',
+        'huffpost.com', 'huffingtonpost.com',
+        'washingtonpost.com', 'wapo.',
+        'bloomberg.com', 'businessinsider.com',
+        'theinformation.com'
     ]
     
-    return any(pub in domain or pub in url for pub in premium_publications)
+    return any(pub in domain or pub in url for pub in tollbit_publications)
+
+def should_show_rsl_demo(source):
+    """Check if source should show RSL demo badge"""
+    domain = (source.get('domain') or '').lower()
+    url = (source.get('url') or '').lower()
+    
+    return (domain.endswith('.edu') or 
+            any(keyword in domain or keyword in url for keyword in 
+                ['research', 'journal', 'academic', 'scholar', 'arxiv', 'pubmed', 'ncbi', 'ieee']))
 
 def get_badge(source):
-    """Simulate badge detection logic"""
+    """Simulate badge detection logic matching source-card.js"""
     protocol = source.get('licensing_protocol')
     cost = source.get('unlock_price', 0) or source.get('licensing_cost', 0) or 0
     
-    if protocol and protocol.lower() == 'tollbit' and cost > 0:
-        return 'TOLLBIT (confirmed)'
+    # Show protocol badge when licensing system is detected
+    if protocol:
+        protocol_lower = protocol.lower()
+        if protocol_lower == 'tollbit':
+            return 'TOLLBIT'
+        elif protocol_lower == 'rsl':
+            return 'RSL'
+        elif protocol_lower == 'cloudflare':
+            return 'CLOUDFLARE'
+    
+    # Demo badges based on domain
+    if should_show_cloudflare_demo(source):
+        return 'CLOUDFLARE Coming Soon'
     elif should_show_tollbit_demo(source):
         return 'TOLLBIT Coming Soon'
+    elif should_show_rsl_demo(source):
+        return 'RSL Coming Soon'
     elif cost == 0:
-        return 'FREE DISCOVERY'
+        return 'FREE'
     else:
         return 'CHECKING...'
 
@@ -46,8 +88,16 @@ test_sources = [
         "url": "https://wsj.com/articles/greenland-coverage",
         "licensing_protocol": None,
         "unlock_price": 0,
-        "expected": "TOLLBIT Coming Soon",
-        "description": "WSJ article without Tollbit pricing"
+        "expected": "CLOUDFLARE Coming Soon",
+        "description": "WSJ article without Cloudflare pricing (should show Cloudflare badge)"
+    },
+    {
+        "domain": "nytimes.com",
+        "url": "https://nytimes.com/article",
+        "licensing_protocol": None,
+        "unlock_price": 0,
+        "expected": "CLOUDFLARE Coming Soon",
+        "description": "NYTimes article (should show Cloudflare badge)"
     },
     {
         "domain": "forbes.com",
@@ -55,31 +105,47 @@ test_sources = [
         "licensing_protocol": None,
         "unlock_price": 0,
         "expected": "TOLLBIT Coming Soon",
-        "description": "Forbes source without pricing"
+        "description": "Forbes source without pricing (should show Tollbit badge)"
     },
     {
         "domain": "medium.com",
         "url": "https://medium.com/article",
         "licensing_protocol": None,
         "unlock_price": 0,
-        "expected": "FREE DISCOVERY",
+        "expected": "FREE",
         "description": "Medium free source"
     },
     {
         "domain": "wsj.com",
         "url": "https://wsj.com/article2",
-        "licensing_protocol": "TOLLBIT",
-        "unlock_price": 0.15,
-        "expected": "TOLLBIT (confirmed)",
-        "description": "WSJ with confirmed Tollbit pricing"
+        "licensing_protocol": "CLOUDFLARE",
+        "unlock_price": 0.25,
+        "expected": "CLOUDFLARE",
+        "description": "WSJ with confirmed Cloudflare pricing"
     },
     {
-        "domain": "nytimes.com",
-        "url": "https://nytimes.com/article",
+        "domain": "forbes.com",
+        "url": "https://forbes.com/tech-article",
+        "licensing_protocol": "TOLLBIT",
+        "unlock_price": 0.15,
+        "expected": "TOLLBIT",
+        "description": "Forbes with confirmed Tollbit pricing"
+    },
+    {
+        "domain": "mit.edu",
+        "url": "https://news.mit.edu/research-paper",
         "licensing_protocol": None,
         "unlock_price": 0,
-        "expected": "TOLLBIT Coming Soon",
-        "description": "NYT article"
+        "expected": "RSL Coming Soon",
+        "description": "MIT academic source (should show RSL badge)"
+    },
+    {
+        "domain": "economist.com",
+        "url": "https://economist.com/article",
+        "licensing_protocol": None,
+        "unlock_price": 0,
+        "expected": "CLOUDFLARE Coming Soon",
+        "description": "The Economist (should show Cloudflare badge)"
     }
 ]
 
