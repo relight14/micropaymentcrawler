@@ -600,39 +600,73 @@ class SourceCard {
     
     /**
      * Determine if source should show RSL demo badge
+     * RSL (Really Simple Licensing) is used by academic/research institutions
+     * See: https://rslstandard.org/rsl
      */
     _shouldShowRSLDemo(source) {
         // Show RSL demo for academic/research domains
-        const domain = source.domain || '';
-        return domain.endsWith('.edu') || domain.endsWith('.edu/') ||
-               /\b(research|journal|academic)\b/i.test(domain);
+        const domain = (source.domain || '').toLowerCase();
+        const url = (source.url || '').toLowerCase();
+        
+        // Academic institutions and research publishers
+        return domain.endsWith('.edu') || 
+               domain.endsWith('.edu/') ||
+               /\b(research|journal|academic|scholar|arxiv|pubmed|ncbi|ieee)\b/i.test(domain) ||
+               /\b(research|journal|academic|scholar|arxiv|pubmed|ncbi|ieee)\b/i.test(url);
     }
     
     /**
      * Determine if source should show Cloudflare demo badge  
+     * Cloudflare Pay-per-Crawl is used by major news publishers
+     * See: https://blog.cloudflare.com/introducing-pay-per-crawl/
      */
     _shouldShowCloudflareDemo(source) {
         // Show Cloudflare demo for major publisher domains  
-        const domain = source.domain || '';
-        return /\b(economist|reuters|ft\.com|financialtimes)\b/i.test(domain);
+        const domain = (source.domain || '').toLowerCase();
+        const url = (source.url || '').toLowerCase();
+        
+        // Known Cloudflare Pay-per-Crawl publishers and likely adopters
+        const cloudflarePublishers = [
+            'wsj.com', 'wall street journal',           // WSJ - News Corp property
+            'nytimes.com', 'newyorktimes.com',          // New York Times
+            'economist.com',                             // The Economist
+            'reuters.com',                               // Reuters
+            'ft.com', 'financialtimes.com',             // Financial Times
+            'condenast.com', 'wired.com',               // Condé Nast properties
+            'theatlantic.com',                           // The Atlantic
+            'fortune.com',                               // Fortune
+            'time.com'                                   // Time Magazine
+        ];
+        
+        return cloudflarePublishers.some(pub => 
+            domain.includes(pub) || url.includes(pub)
+        );
     }
     
     /**
      * Determine if source should show Tollbit demo badge
-     * For major paywalled publications that likely have or will have Tollbit support
+     * Tollbit is a content licensing marketplace for AI companies
+     * Confirmed partners: Forbes, AP News, USA Today, Newsweek, HuffPost
+     * See: https://www.tollbit.com/
      */
     _shouldShowTollbitDemo(source) {
         const domain = (source.domain || '').toLowerCase();
         const url = (source.url || '').toLowerCase();
         
-        // Check if it's a known premium publication
-        const premiumPublications = [
-            'wsj.com', 'wall street journal', 'nytimes.com', 'newyorktimes.com',
-            'washingtonpost.com', 'wapo.', 'forbes.com', 'bloomberg.com',
-            'businessinsider.com', 'theatlantic.com', 'wired.com', 'theinformation.com'
+        // Known Tollbit partner publications (excluding overlaps with Cloudflare)
+        const tollbitPublications = [
+            'forbes.com',                    // Forbes
+            'apnews.com', 'ap.org',         // Associated Press
+            'usatoday.com',                  // USA Today
+            'newsweek.com',                  // Newsweek
+            'huffpost.com', 'huffingtonpost.com',  // HuffPost
+            'washingtonpost.com', 'wapo.',   // Washington Post
+            'bloomberg.com',                 // Bloomberg
+            'businessinsider.com',           // Business Insider
+            'theinformation.com'             // The Information
         ];
         
-        return premiumPublications.some(pub => 
+        return tollbitPublications.some(pub => 
             domain.includes(pub) || url.includes(pub)
         );
     }
