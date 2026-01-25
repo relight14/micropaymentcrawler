@@ -305,6 +305,55 @@ class TollbitProtocolHandler(ProtocolHandler):
             
         return None
     
+    async def fetch_content(self, url: str, license_token: LicenseToken) -> Optional[Dict[str, Any]]:
+        """
+        Fetch full article content using Tollbit Content API
+        
+        Returns structured content with:
+        - header: Navigation and breadcrumbs
+        - body: Complete article in markdown format
+        - footer: Related links and terms
+        - metadata: Author, date, description, images
+        - rate: Pricing information
+        
+        Docs: https://docs.tollbit.com/content/
+        """
+        if not self.api_key or not license_token.token:
+            logger.warning("Cannot fetch content: missing API key or token")
+            return None
+        
+        try:
+            # Content API endpoint
+            content_endpoint = f"https://gateway.tollbit.com/dev/v2/content/{url}"
+            
+            headers = {
+                'Tollbit-Token': license_token.token,
+                'User-Agent': self.agent_name,
+                'Tollbit-Accept-Content': 'text/markdown'  # Request markdown format
+            }
+            
+            if self.agent_id:
+                headers['X-Tollbit-AgentId'] = self.agent_id
+            
+            client = await self._get_client()
+            response = await client.get(
+                content_endpoint,
+                headers=headers,
+                timeout=15.0
+            )
+            
+            if response.status_code == 200:
+                content_data = response.json()
+                logger.info(f"Successfully fetched full article content from Tollbit: {url}")
+                return content_data
+            else:
+                logger.warning(f"Tollbit content fetch failed: {response.status_code} - {response.text[:200]}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Tollbit content fetch error for {url}: {e}")
+            return None
+    
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _check_pricing(self, target_url: str) -> Optional[Dict]:
         """Check real Tollbit pricing using official API endpoint with retry logic"""
@@ -658,6 +707,55 @@ class ContentLicenseService:
             return await handler.request_license(source_url, license_type)
         except Exception as e:
             logger.error(f"License request failed: {e}")
+            return None
+    
+    async def fetch_licensed_content(self, source_url: str, license_type: str = "ai-include") -> Optional[Dict[str, Any]]:
+        """
+        Complete workflow: discover licensing, request license, fetch full content
+        
+        Returns:
+        - Full article content (protocol-dependent format)
+        - None if licensing not available or fetch failed
+        
+        Example usage:
+            content = await service.fetch_licensed_content("https://forbes.com/article", "ai-include")
+            if content:
+                article_text = content.get('body')  # Tollbit returns markdown body
+        """
+        try:
+            # Step 1: Discover licensing
+            license_info = await self.discover_licensing(source_url)
+            if not license_info:
+                logger.info(f"No licensing protocol found for {source_url}")
+                return None
+            
+            # Step 2: Request license token
+            license_token = await self.request_license(license_info, license_type)
+            if not license_token:
+                logger.warning(f"Failed to obtain license token for {source_url}")
+                return None
+            
+            # Step 3: Fetch content using protocol-specific handler
+            handler = license_info['handler']
+            
+            # Check if handler supports content fetching
+            if hasattr(handler, 'fetch_content'):
+                content = await handler.fetch_content(source_url, license_token)
+                if content:
+                    logger.info(f"Successfully fetched licensed content from {source_url}")
+                    return {
+                        'content': content,
+                        'protocol': license_info['protocol'],
+                        'cost': license_token.cost,
+                        'currency': license_token.currency,
+                        'source_url': source_url
+                    }
+            else:
+                logger.warning(f"Handler for {license_info['protocol']} does not support content fetching yet")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch licensed content for {source_url}: {e}")
             return None
     
     def get_license_summary(self, sources: List[Dict]) -> Dict[str, Any]:
