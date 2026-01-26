@@ -97,3 +97,26 @@ class SourceUnlockResponse(BaseModel):
     unlocked_content: str
     remaining_balance_cents: int
     wallet_deduction: float
+
+
+# Checkout state schemas
+class CheckoutStateRequest(BaseModel):
+    price_cents: int
+    content_id: Optional[str] = None
+
+
+class CheckoutStateResponse(BaseModel):
+    next_required_action: str  # 'authenticate', 'fund_wallet', 'purchase', 'none'
+    is_authenticated: bool
+    balance_cents: int
+    required_amount_cents: int
+    shortfall_cents: int  # How much more is needed (0 if sufficient)
+    already_purchased: bool
+    message: str
+
+
+# Payment status schemas
+class PaymentStatusResponse(BaseModel):
+    status: str  # 'pending', 'completed', 'failed', 'not_found'
+    balance_cents: Optional[int] = None
+    message: str

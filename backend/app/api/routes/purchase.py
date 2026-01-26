@@ -8,7 +8,7 @@ import time
 import json
 import base64
 
-from schemas.api import PurchaseRequest, PurchaseResponse
+from schemas.api import PurchaseRequest, PurchaseResponse, CheckoutStateRequest, CheckoutStateResponse
 from schemas.domain import ResearchPacket
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
@@ -179,6 +179,111 @@ def calculate_incremental_pricing(user_id: str, query: str, sources: list, logge
         "previous_source_count": previous_count,
         "total_source_count": len(current_source_ids)
     }
+
+
+@router.post("/checkout-state", response_model=CheckoutStateResponse)
+@limiter.limit("30/minute")
+async def get_checkout_state(
+    request: Request,
+    checkout_request: CheckoutStateRequest,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """
+    Check pre-purchase state to determine next required action.
+    Returns: authenticate | fund_wallet | purchase | none
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Check authentication
+    is_authenticated = False
+    balance_cents = 0
+    already_purchased = False
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        # Not authenticated
+        return CheckoutStateResponse(
+            next_required_action="authenticate",
+            is_authenticated=False,
+            balance_cents=0,
+            required_amount_cents=checkout_request.price_cents,
+            shortfall_cents=checkout_request.price_cents,
+            already_purchased=False,
+            message="Please log in to continue with your purchase"
+        )
+    
+    try:
+        access_token = extract_bearer_token(authorization)
+        
+        # Validate token and get balance
+        balance_result = ledewire.get_wallet_balance(access_token)
+        
+        if "error" in balance_result:
+            # Token invalid or expired
+            return CheckoutStateResponse(
+                next_required_action="authenticate",
+                is_authenticated=False,
+                balance_cents=0,
+                required_amount_cents=checkout_request.price_cents,
+                shortfall_cents=checkout_request.price_cents,
+                already_purchased=False,
+                message="Your session has expired. Please log in again."
+            )
+        
+        is_authenticated = True
+        balance_cents = balance_result.get("balance_cents") or balance_result.get("balance", 0)
+        
+        # Check if content already purchased (if content_id provided)
+        if checkout_request.content_id:
+            try:
+                verify_result = ledewire.verify_purchase(access_token, checkout_request.content_id)
+                already_purchased = verify_result.get("purchased", False)
+            except Exception as e:
+                logger.debug(f"Purchase verification failed (content may not exist yet): {e}")
+                already_purchased = False
+        
+        # If already purchased, no action needed
+        if already_purchased:
+            return CheckoutStateResponse(
+                next_required_action="none",
+                is_authenticated=True,
+                balance_cents=balance_cents,
+                required_amount_cents=0,
+                shortfall_cents=0,
+                already_purchased=True,
+                message="You already have access to this content"
+            )
+        
+        # Check if sufficient funds
+        shortfall = max(0, checkout_request.price_cents - balance_cents)
+        
+        if shortfall > 0:
+            return CheckoutStateResponse(
+                next_required_action="fund_wallet",
+                is_authenticated=True,
+                balance_cents=balance_cents,
+                required_amount_cents=checkout_request.price_cents,
+                shortfall_cents=shortfall,
+                already_purchased=False,
+                message=f"Please add ${shortfall / 100:.2f} to your wallet to complete this purchase"
+            )
+        
+        # Ready to purchase
+        return CheckoutStateResponse(
+            next_required_action="purchase",
+            is_authenticated=True,
+            balance_cents=balance_cents,
+            required_amount_cents=checkout_request.price_cents,
+            shortfall_cents=0,
+            already_purchased=False,
+            message="Ready to complete purchase"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Checkout state error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check checkout state")
 
 
 @router.get("/quote")

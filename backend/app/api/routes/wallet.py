@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Header
 import requests
 
 from integrations.ledewire import LedeWireAPI
-from schemas.api import PaymentSessionRequest, PaymentSessionResponse
+from schemas.api import PaymentSessionRequest, PaymentSessionResponse, PaymentStatusResponse
 
 router = APIRouter()
 
@@ -63,4 +63,56 @@ async def create_payment_session(
         raise HTTPException(status_code=503, detail="Payment service temporarily unavailable")
     except Exception as e:
         print(f"Payment session error: {e}")
+        raise HTTPException(status_code=500, detail="Payment service error")
+
+
+@router.get("/payment-status/{session_id}", response_model=PaymentStatusResponse)
+async def get_payment_status(
+    session_id: str,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """Poll for payment completion status after Stripe payment"""
+    try:
+        access_token = extract_bearer_token(authorization)
+        
+        # Call LedeWire to check payment status
+        status_result = ledewire.get_payment_status(
+            access_token=access_token,
+            session_id=session_id
+        )
+        
+        if "error" in status_result:
+            error_message = ledewire.handle_api_error(status_result)
+            return PaymentStatusResponse(
+                status="failed",
+                balance_cents=None,
+                message=f"Payment status check failed: {error_message}"
+            )
+        
+        status = status_result.get("status", "pending")
+        balance_cents = status_result.get("balance_cents")
+        
+        # Map status to user-friendly messages
+        status_messages = {
+            "pending": "Payment is being processed...",
+            "completed": "Payment successful! Your wallet has been funded.",
+            "failed": "Payment failed. Please try again.",
+            "not_found": "Payment session not found."
+        }
+        
+        return PaymentStatusResponse(
+            status=status,
+            balance_cents=balance_cents,
+            message=status_messages.get(status, "Unknown payment status")
+        )
+        
+    except HTTPException:
+        raise
+    except requests.exceptions.HTTPError as e:
+        if "Invalid or expired token" in str(e):
+            raise HTTPException(status_code=401, detail="Authentication expired")
+        print(f"Payment status error: {e}")
+        raise HTTPException(status_code=503, detail="Payment service temporarily unavailable")
+    except Exception as e:
+        print(f"Payment status error: {e}")
         raise HTTPException(status_code=500, detail="Payment service error")

@@ -401,6 +401,33 @@ class LedeWireAPI:
             else:
                 raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
 
+    # Payment Status Methods
+    
+    def get_payment_status(self, access_token: str, session_id: str) -> Dict[str, Any]:
+        """
+        GET /v1/wallet/payment-status/{session_id}
+        Poll for payment completion after Stripe payment.
+        Returns status: 'pending', 'completed', 'failed'
+        """
+        try:
+            response = self.session.get(
+                f"{self.api_base}/wallet/payment-status/{session_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code == 401:
+                    raise requests.HTTPError("Invalid or expired token", response=e.response)
+                elif e.response.status_code == 404:
+                    return {"status": "not_found", "message": "Payment session not found"}
+                else:
+                    raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+            else:
+                raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+
     # Error Handling
     
     def handle_api_error(self, response: Dict[str, Any]) -> str:

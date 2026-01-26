@@ -27,6 +27,31 @@ Data storage uses PostgreSQL for production and SQLite for development. A `Conte
 - **MessageRenderer integration**: All HTML content rendered via `parseHtml()` is sanitized through SafeRenderer before DOM insertion.
 - **Logger utility** (`backend/static/js/utils/logger.js`): Debug logging gated behind `DEBUG_MODE` flag to keep production console clean; warnings and errors still visible.
 
+## LedeWire Wallet Integration
+The application integrates with LedeWire for all payment processing, including Stripe. This app does not directly integrate with payment providers - all payment flows go through LedeWire APIs.
+
+**Pre-Purchase Checkout State Verification:**
+- `POST /api/purchase/checkout-state` - Checks authentication, wallet balance, and purchase status
+- Returns `next_required_action`: authenticate | fund_wallet | purchase | none
+- Includes `shortfall_cents` for insufficient balance scenarios
+- Supports `content_id` for already-purchased detection
+
+**Wallet Funding Flow:**
+- Stripe Elements integration via LedeWire's `POST /v1/wallet/payment-session`
+- Payment status polling: `GET /api/wallet/payment-status/{session_id}` - 15 attempts at 2-second intervals
+- Dynamic funding modal with recommended amounts (rounded up to nearest $5)
+
+**LedeWire API Endpoints Used:**
+- `POST /v1/purchases` - Create purchase with idempotency
+- `GET /v1/purchase/verify?content_id=X` - Check if already purchased
+- `GET /v1/wallet/payment-status/{session_id}` - Poll for payment completion
+- `POST /v1/wallet/payment-session` - Create Stripe session
+- `GET /v1/wallet/balance` - Get current balance
+
+**Implementation Files:**
+- Backend: `backend/integrations/ledewire.py`, `backend/app/api/routes/purchase.py`, `backend/app/api/routes/wallet.py`
+- Frontend: `backend/static/js/services/api.js`, `backend/static/js/app/modal-controller.js`
+
 # External Dependencies
 
 - **FastAPI**: Python web framework.

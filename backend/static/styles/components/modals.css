@@ -270,6 +270,40 @@
     color: #1a1a1a;
 }
 
+.funding-amount-btn.recommended {
+    background: #e8f5e9;
+    border-color: #4caf50;
+    position: relative;
+}
+
+.funding-amount-btn.recommended:hover {
+    background: #c8e6c9;
+    border-color: #43a047;
+}
+
+.recommended-badge {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #2e7d32;
+    background: #a5d6a7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.funding-suggestion {
+    background: #fff3e0;
+    color: #e65100;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+    border: 1px solid #ffe0b2;
+}
+
 /* Profile Dropdown Styles */
 .auth-container {
     position: relative;

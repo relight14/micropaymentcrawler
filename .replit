@@ -35,66 +35,6 @@ waitForPort = 5000
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 34539
-externalPort = 9000
-
-[[ports]]
-localPort = 38873
-externalPort = 4200
-
-[[ports]]
-localPort = 38977
-externalPort = 8000
-
-[[ports]]
-localPort = 39867
-externalPort = 5173
-
-[[ports]]
-localPort = 39969
-externalPort = 3003
-
-[[ports]]
-localPort = 40673
-externalPort = 6800
-
-[[ports]]
-localPort = 41573
-externalPort = 8099
-
-[[ports]]
-localPort = 42479
-externalPort = 5000
-
-[[ports]]
-localPort = 43261
-externalPort = 3000
-
-[[ports]]
-localPort = 43279
-externalPort = 6000
-
-[[ports]]
-localPort = 43627
-externalPort = 8080
-
-[[ports]]
-localPort = 44073
-externalPort = 8081
-
-[[ports]]
-localPort = 44543
-externalPort = 3002
-
-[[ports]]
-localPort = 46571
-externalPort = 8008
-
-[[ports]]
-localPort = 46819
-externalPort = 3001
-
 [deployment]
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000"]

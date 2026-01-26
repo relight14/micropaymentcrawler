@@ -47,7 +47,8 @@ export class ChatResearchApp {
             this.authService, 
             this.appState, 
             this.toastManager, 
-            this.baseURL
+            this.baseURL,
+            this.apiService  // Pass apiService for payment status polling
         );
         this.eventRouter = new EventRouter();
         
@@ -208,14 +209,49 @@ export class ChatResearchApp {
             
             console.log(`💰 Report requested - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
             
-            // Show purchase confirmation modal before generating report
+            // Pre-purchase verification: Check checkout state before showing purchase modal
+            const priceCents = Math.round(price * 100);
+            let checkoutState;
+            
+            try {
+                checkoutState = await this.apiService.checkCheckoutState(priceCents);
+                logger.debug('📋 Checkout state:', checkoutState);
+            } catch (checkoutError) {
+                console.error('❌ Failed to check checkout state:', checkoutError);
+                this.toastManager.show('Unable to verify purchase status. Please try again.', 'error');
+                return;
+            }
+            
+            // Handle checkout state actions
+            if (checkoutState.next_required_action === 'authenticate') {
+                logger.debug('🔐 Authentication required - showing auth modal');
+                this.modalController.showAuthModal();
+                return;
+            }
+            
+            if (checkoutState.next_required_action === 'fund_wallet') {
+                logger.debug(`💳 Insufficient funds - need $${(checkoutState.shortfall_cents / 100).toFixed(2)} more`);
+                // Show funding modal with suggested minimum amount
+                this.modalController.showFundingModal(checkoutState.shortfall_cents);
+                this.toastManager.show(checkoutState.message, 'warning');
+                return;
+            }
+            
+            if (checkoutState.next_required_action === 'none' && checkoutState.already_purchased) {
+                logger.debug('✅ Content already purchased');
+                this.toastManager.show('You already have access to this content!', 'info');
+                return;
+            }
+            
+            // Ready to purchase - show purchase confirmation modal
             const purchaseDetails = {
                 tier: 'report',
                 price: price,
                 selectedSources: sources,
                 query: query,
                 titleOverride: 'Generate Research Report',
-                customDescription: `Create a comprehensive research report with ${sourceCount} source${sourceCount !== 1 ? 's' : ''}`
+                customDescription: `Create a comprehensive research report with ${sourceCount} source${sourceCount !== 1 ? 's' : ''}`,
+                walletBalance: (checkoutState.balance_cents || 0) / 100  // Pass current balance for display
             };
             
             const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);

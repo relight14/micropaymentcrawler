@@ -12,7 +12,7 @@ export class APIService {
         // Configurable polling parameters (browser-safe, future: move to window.CONFIG)
         this.config = {
             POLL_INTERVAL_MS: window.CONFIG?.POLL_INTERVAL_MS || 2000,
-            MAX_POLL_ATTEMPTS: window.CONFIG?.MAX_POLL_ATTEMPTS || 10,
+            MAX_POLL_ATTEMPTS: window.CONFIG?.MAX_POLL_ATTEMPTS || 15,
             RETRY_ATTEMPTS: window.CONFIG?.API_RETRY_ATTEMPTS || 3,
             RETRY_BASE_DELAY: window.CONFIG?.API_RETRY_BASE_DELAY || 1000
         };
@@ -426,6 +426,76 @@ export class APIService {
                 idempotency_key: idempotencyKey
             })
         }, 'Article summarization failed');
+    }
+
+    async checkCheckoutState(priceCents, contentId = null) {
+        try {
+            const response = await fetch(`${this.baseURL}/api/purchase/checkout-state`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({
+                    price_cents: priceCents,
+                    content_id: contentId
+                })
+            });
+
+            if (!response.ok) {
+                // Don't trigger logout for checkout state check - just return auth required
+                if (response.status === 401) {
+                    return {
+                        next_required_action: 'authenticate',
+                        is_authenticated: false,
+                        balance_cents: 0,
+                        required_amount_cents: priceCents,
+                        shortfall_cents: priceCents,
+                        already_purchased: false,
+                        message: 'Please log in to continue'
+                    };
+                }
+                throw new Error(`Checkout state check failed: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error checking checkout state:', error);
+            // Rethrow the error so caller can handle it appropriately
+            throw error;
+        }
+    }
+
+    async pollPaymentStatus(sessionId, maxAttempts = 30, intervalMs = 2000) {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const response = await fetch(`${this.baseURL}/api/wallet/payment-status/${sessionId}`, {
+                    method: 'GET',
+                    headers: this.getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        return { status: 'failed', message: 'Authentication expired' };
+                    }
+                    throw new Error(`Payment status check failed: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log(`📡 Payment status poll ${attempt}: ${result.status}`);
+
+                if (result.status === 'completed') {
+                    return result;
+                } else if (result.status === 'failed') {
+                    return result;
+                }
+
+                // Still pending - wait and retry
+                await new Promise(resolve => setTimeout(resolve, intervalMs));
+            } catch (error) {
+                console.error(`Payment status poll ${attempt} error:`, error);
+                await new Promise(resolve => setTimeout(resolve, intervalMs));
+            }
+        }
+
+        return { status: 'timeout', message: 'Payment verification timed out' };
     }
 
     async getPricingQuote(query, outlineStructure = null) {

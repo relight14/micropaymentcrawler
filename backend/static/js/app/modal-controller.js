@@ -3,16 +3,27 @@
  * Extracted from app.js to reduce bloat and improve maintainability
  */
 export class ModalController {
-    constructor(authService, appState, toastManager, baseURL) {
+    constructor(authService, appState, toastManager, baseURL, apiService = null) {
         this.authService = authService;
         this.appState = appState;
         this.toastManager = toastManager;
         this.baseURL = baseURL || window.location.origin;
+        this.apiService = apiService;
         
         // Callback references
         this.onAuthSuccess = null;
         this.onAuthToggle = null;
         this.onFundingSuccess = null;
+        
+        // Track current payment session for polling
+        this.currentPaymentSessionId = null;
+    }
+
+    /**
+     * Set API service reference (for payment status polling)
+     */
+    setApiService(apiService) {
+        this.apiService = apiService;
     }
 
     /**
@@ -220,13 +231,47 @@ export class ModalController {
 
     /**
      * Show funding modal
+     * @param {number} suggestedAmountCents - Optional minimum suggested amount in cents
      */
-    async showFundingModal() {
+    async showFundingModal(suggestedAmountCents = null) {
         // Remove any existing funding modal
         const existingModal = document.getElementById('fundingModal');
         if (existingModal) {
             existingModal.remove();
         }
+
+        // Calculate suggested amount (round up to nearest $5)
+        let suggestedDisplay = '';
+        let customAmountCents = null;
+        if (suggestedAmountCents && suggestedAmountCents > 0) {
+            // Round up to nearest $5 (500 cents)
+            customAmountCents = Math.ceil(suggestedAmountCents / 500) * 500;
+            if (customAmountCents < 500) customAmountCents = 500; // Minimum $5
+            suggestedDisplay = `<p class="funding-suggestion">You need at least $${(suggestedAmountCents / 100).toFixed(2)} more for this purchase</p>`;
+        }
+
+        // Build amount buttons - always show $5, $10, $20, highlight suggested amount
+        const amounts = [
+            { cents: 500, display: '$5' },
+            { cents: 1000, display: '$10' },
+            { cents: 2000, display: '$20' }
+        ];
+        
+        // Add custom amount if it doesn't match existing buttons
+        if (customAmountCents && !amounts.some(a => a.cents === customAmountCents)) {
+            amounts.unshift({ cents: customAmountCents, display: `$${(customAmountCents / 100).toFixed(0)}`, recommended: true });
+        } else if (customAmountCents) {
+            // Mark existing amount as recommended
+            const match = amounts.find(a => a.cents === customAmountCents);
+            if (match) match.recommended = true;
+        }
+        
+        const amountButtonsHTML = amounts.map(a => `
+            <button class="funding-amount-btn ${a.recommended ? 'recommended' : ''}" data-amount="${a.cents}">
+                <span class="amount">${a.display}</span>
+                ${a.recommended ? '<span class="recommended-badge">Recommended</span>' : ''}
+            </button>
+        `).join('');
 
         const modalHTML = `
             <div id="fundingModal" class="modal-overlay">
@@ -235,19 +280,12 @@ export class ModalController {
                         <img src="/static/clearcite-logo.png" alt="Clearcite" class="auth-modal-logo">
                         <h2>Add Funds to Your Wallet</h2>
                         <p>Choose an amount to add to your wallet</p>
+                        ${suggestedDisplay}
                         <button class="modal-close" onclick="document.getElementById('fundingModal').remove()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: #999; cursor: pointer;">×</button>
                     </div>
                     <div class="auth-modal-content">
                         <div class="funding-amounts">
-                            <button class="funding-amount-btn" data-amount="500">
-                                <span class="amount">$5</span>
-                            </button>
-                            <button class="funding-amount-btn" data-amount="1000">
-                                <span class="amount">$10</span>
-                            </button>
-                            <button class="funding-amount-btn" data-amount="2000">
-                                <span class="amount">$20</span>
-                            </button>
+                            ${amountButtonsHTML}
                         </div>
                         <div id="stripePaymentElement" style="display: none; margin-top: 1.5rem;"></div>
                         <button id="stripeSubmitBtn" class="auth-btn" style="display: none; margin-top: 1rem;">
@@ -314,7 +352,10 @@ export class ModalController {
                 throw new Error('Failed to create payment session');
             }
 
-            const { client_secret, public_key } = await response.json();
+            const { client_secret, public_key, session_id } = await response.json();
+            
+            // Store session_id for payment status polling
+            this.currentPaymentSessionId = session_id;
 
             // Initialize Stripe with public key from LedeWire
             const stripe = Stripe(public_key);
@@ -337,7 +378,7 @@ export class ModalController {
                 submitBtn.textContent = 'Processing...';
                 statusEl.textContent = 'Processing payment...';
 
-                const { error } = await stripe.confirmPayment({
+                const { error, paymentIntent } = await stripe.confirmPayment({
                     elements,
                     confirmParams: {
                         return_url: window.location.href
@@ -350,18 +391,10 @@ export class ModalController {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Complete Payment';
                 } else {
-                    statusEl.textContent = '✅ Payment successful! Updating balance...';
+                    statusEl.textContent = '✅ Payment confirmed! Verifying with wallet...';
                     
-                    // Trigger success callback
-                    if (this.onFundingSuccess) {
-                        await this.onFundingSuccess();
-                    }
-
-                    // Close modal after success
-                    setTimeout(() => {
-                        document.getElementById('fundingModal')?.remove();
-                        this.toastManager.show('💰 Wallet funded successfully!', 'success', 3000);
-                    }, 1500);
+                    // Poll for payment status confirmation from LedeWire
+                    await this._pollAndConfirmPayment(statusEl, submitBtn);
                 }
             };
 
@@ -369,6 +402,67 @@ export class ModalController {
             console.error('Payment session error:', error);
             statusEl.textContent = 'Failed to initialize payment. Please try again.';
         }
+    }
+
+    /**
+     * Poll LedeWire for payment completion and update UI
+     */
+    async _pollAndConfirmPayment(statusEl, submitBtn) {
+        if (!this.currentPaymentSessionId) {
+            console.warn('No payment session ID available for polling');
+            await this._handlePaymentSuccess(statusEl);
+            return;
+        }
+
+        statusEl.textContent = 'Verifying payment with wallet service...';
+
+        // Use APIService polling if available, otherwise direct fetch
+        if (this.apiService && this.apiService.pollPaymentStatus) {
+            try {
+                const result = await this.apiService.pollPaymentStatus(this.currentPaymentSessionId, 15, 2000);
+                
+                if (result.status === 'completed') {
+                    console.log('✅ Payment verified by LedeWire');
+                    await this._handlePaymentSuccess(statusEl, result.balance_cents);
+                } else if (result.status === 'failed') {
+                    statusEl.textContent = `Payment verification failed: ${result.message}`;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Try Again';
+                } else if (result.status === 'timeout') {
+                    // Stripe confirmed but LedeWire polling timed out - assume success
+                    console.log('⚠️ LedeWire polling timed out, but Stripe confirmed - treating as success');
+                    await this._handlePaymentSuccess(statusEl);
+                }
+            } catch (pollError) {
+                console.error('Payment polling error:', pollError);
+                // Stripe already confirmed, so treat as success
+                await this._handlePaymentSuccess(statusEl);
+            }
+        } else {
+            // No API service - just confirm success based on Stripe response
+            await this._handlePaymentSuccess(statusEl);
+        }
+    }
+
+    /**
+     * Handle successful payment completion
+     */
+    async _handlePaymentSuccess(statusEl, newBalanceCents = null) {
+        statusEl.textContent = '✅ Payment successful! Updating balance...';
+        
+        // Trigger success callback
+        if (this.onFundingSuccess) {
+            await this.onFundingSuccess(newBalanceCents);
+        }
+
+        // Close modal after success
+        setTimeout(() => {
+            document.getElementById('fundingModal')?.remove();
+            this.toastManager.show('Wallet funded successfully!', 'success', 3000);
+        }, 1500);
+        
+        // Clear session ID
+        this.currentPaymentSessionId = null;
     }
 
     /**
