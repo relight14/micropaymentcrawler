@@ -260,6 +260,8 @@ export class ProjectManager {
                         
                         // Restore messages to appState conversation history
                         // This preserves the context that was lost during login
+                        const DUPLICATE_MESSAGE_THRESHOLD_MS = 1000; // Time window for duplicate detection
+                        
                         conversationSnapshot.forEach(msg => {
                             // Only restore if not already present (avoid duplicates)
                             const existingMsgs = this.appState.getConversationHistory();
@@ -267,7 +269,7 @@ export class ProjectManager {
                                 existing.id === msg.id || 
                                 (existing.sender === msg.sender && 
                                  existing.content === msg.content &&
-                                 Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 1000)
+                                 Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < DUPLICATE_MESSAGE_THRESHOLD_MS)
                             );
                             
                             if (!isDuplicate) {

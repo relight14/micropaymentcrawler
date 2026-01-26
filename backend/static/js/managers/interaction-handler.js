@@ -8,6 +8,21 @@ export class InteractionHandler {
         this.sourceManager = sourceManager;
     }
 
+    /**
+     * Store pending source search in sessionStorage
+     * Centralizes the logic for storing search context before login
+     * @param {string} query - The search query
+     * @param {string} mode - The search mode (usually 'research')
+     */
+    storePendingSourceSearch(query, mode = 'research') {
+        const conversationHistory = this.appState.getConversationHistory();
+        sessionStorage.setItem('pendingSourceSearch', JSON.stringify({
+            query,
+            mode,
+            conversationSnapshot: conversationHistory
+        }));
+    }
+
     handleCitationClick(sourceId, price) {
         const researchData = this.appState.getCurrentResearchData();
         if (!researchData || !researchData.sources) {
@@ -48,14 +63,7 @@ export class InteractionHandler {
             
             // IMPROVEMENT: Store full conversation history along with the query
             // This ensures we don't lose context when the user logs in
-            const conversationHistory = this.appState.getConversationHistory();
-            
-            // Store pending action for post-login processing
-            sessionStorage.setItem('pendingSourceSearch', JSON.stringify({
-                query: queryText,
-                mode: 'research',
-                conversationSnapshot: conversationHistory  // Preserve full conversation
-            }));
+            this.storePendingSourceSearch(queryText, 'research');
             
             // Show auth modal
             this.modalController.showAuthModal();

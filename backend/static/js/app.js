@@ -497,14 +497,9 @@ export class ChatResearchApp {
                         if (loginButton) {
                             loginButton.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                // Store that user wants to search for sources
-                                const conversationHistory = this.appState.getConversationHistory();
-                                const currentQuery = this.appState.getCurrentQuery();
-                                sessionStorage.setItem('pendingSourceSearch', JSON.stringify({
-                                    query: currentQuery || 'Find sources on this topic',
-                                    mode: 'research',
-                                    conversationSnapshot: conversationHistory
-                                }));
+                                // Use shared method from interactionHandler to store pending search
+                                const currentQuery = this.appState.getCurrentQuery() || 'Find sources on this topic';
+                                this.interactionHandler.storePendingSourceSearch(currentQuery, 'research');
                                 this.modalController.showAuthModal();
                             });
                         }
@@ -603,10 +598,8 @@ export class ChatResearchApp {
                 if (messageElement) {
                     messageElement.remove();
                 }
-                // Also remove from conversation history to keep it clean
-                this.appState.conversationHistory = this.appState.conversationHistory.filter(
-                    msg => msg.id !== searchingMessage.id
-                );
+                // Use appState method to maintain encapsulation
+                this.appState.removeMessage(searchingMessage.id);
             }
             
             // Handle research data (send sources to SourcesPanel)

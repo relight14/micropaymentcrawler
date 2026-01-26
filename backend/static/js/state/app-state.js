@@ -137,6 +137,12 @@ export class AppState {
         sessionStorage.removeItem('pendingSourceSearch');
     }
 
+    removeMessage(messageId) {
+        // Remove message from conversation history by ID
+        this.conversationHistory = this.conversationHistory.filter(msg => msg.id !== messageId);
+        this._saveToStorage('conversationHistory', this.conversationHistory);
+    }
+
     getConversationHistory() {
         return [...this.conversationHistory]; // Return copy
     }
