@@ -47,9 +47,33 @@ The application integrates with LedeWire for all payment processing, including S
 - `GET /v1/wallet/payment-status/{session_id}` - Poll for payment completion
 - `POST /v1/wallet/payment-session` - Create Stripe session
 - `GET /v1/wallet/balance` - Get current balance
+- `POST /v1/auth/login/api-key` - Seller authentication (Clearcite as seller)
+- `POST /v1/seller/content` - Register research reports as purchasable content
+
+**Content Registration Flow (Clearcite as Seller):**
+Clearcite acts as the seller, registering AI-generated research reports with LedeWire before users (buyers) can purchase them.
+
+1. User generates a research report
+2. Backend authenticates as seller using `LEDEWIRE_SELLER_API_KEY` and `LEDEWIRE_SELLER_API_SECRET`
+3. Seller JWT is cached for 1 hour with auto-refresh
+4. Research report is registered via `POST /v1/seller/content` with:
+   - `content_type`: "markdown"
+   - `visibility`: "private" (reports) or "public" (individual sources - future)
+   - `content_body`: Base64-encoded stub/reference (not full content)
+   - `price_cents`: Calculated price
+5. Returned `content_id` is cached locally (24 hours) to avoid duplicate registrations
+6. Cache key includes query + source_ids + price_cents for correct pricing
+7. Purchase is completed via `POST /v1/purchases` with the registered `content_id`
+
+**Content ID Caching:**
+- Table: `content_id_cache` in ledger database
+- Cache key: SHA256(query + sorted_source_ids + price_cents)
+- Expiry: 24 hours
+- Ensures same report with same price reuses existing content_id
 
 **Implementation Files:**
 - Backend: `backend/integrations/ledewire.py`, `backend/app/api/routes/purchase.py`, `backend/app/api/routes/wallet.py`
+- Content ID Cache: `backend/data/ledger_repository.py`
 - Frontend: `backend/static/js/services/api.js`, `backend/static/js/app/modal-controller.js`
 
 # External Dependencies

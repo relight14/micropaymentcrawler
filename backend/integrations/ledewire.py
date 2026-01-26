@@ -25,6 +25,9 @@ class LedeWireAPI:
     """
     LedeWire API wrapper - Production implementation with real HTTP calls.
     Uses secured environment variables for authentication with SSL fixes.
+    
+    Supports both buyer authentication (email/password) and seller authentication
+    (API key/secret) for content registration.
     """
     
     def __init__(self, api_key: Optional[str] = None):
@@ -32,6 +35,14 @@ class LedeWireAPI:
         self.api_key = api_key or os.getenv("LEDEWIRE_API_KEY")
         self.api_secret = os.getenv("LEDEWIRE_API_SECRET")
         self.api_base = "https://api-staging.ledewire.com/v1"
+        
+        # Seller credentials for content registration (Clearcite is the seller)
+        self.seller_api_key = os.getenv("LEDEWIRE_SELLER_API_KEY")
+        self.seller_api_secret = os.getenv("LEDEWIRE_SELLER_API_SECRET")
+        
+        # Cached seller JWT token with expiration
+        self._seller_token: Optional[str] = None
+        self._seller_token_expires: Optional[datetime] = None
         
         # Note: API key/secret only required for API key authentication endpoint
         # Email/password auth and other buyer flows work without API credentials
@@ -423,6 +434,153 @@ class LedeWireAPI:
                     raise requests.HTTPError("Invalid or expired token", response=e.response)
                 elif e.response.status_code == 404:
                     return {"status": "not_found", "message": "Payment session not found"}
+                else:
+                    raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
+            else:
+                raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+
+    # Seller Authentication & Content Registration
+    
+    def authenticate_as_seller(self) -> str:
+        """
+        Authenticate as seller using API key/secret.
+        Returns cached JWT token if still valid, otherwise re-authenticates.
+        
+        The seller token is used to register content with LedeWire.
+        Clearcite is the seller, users are buyers.
+        """
+        # Check if we have a valid cached token (with 5 min buffer)
+        if self._seller_token and self._seller_token_expires:
+            buffer_time = timedelta(minutes=5)
+            if datetime.utcnow() + buffer_time < self._seller_token_expires:
+                logger.debug("Using cached seller token")
+                return self._seller_token
+        
+        # Need to authenticate
+        if not self.seller_api_key or not self.seller_api_secret:
+            raise ValueError("Seller API credentials not configured (LEDEWIRE_SELLER_API_KEY, LEDEWIRE_SELLER_API_SECRET)")
+        
+        try:
+            logger.info("Authenticating as seller with LedeWire API")
+            
+            result = self.login_api_key(self.seller_api_key, self.seller_api_secret)
+            
+            # Extract token from response
+            access_token = result.get("access_token") or result.get("token")
+            if not access_token:
+                raise ValueError(f"No access token in seller auth response: {result}")
+            
+            # Cache the token with 1 hour expiration (conservative default)
+            # If the API returns expires_in, use that instead
+            expires_in = result.get("expires_in", 3600)  # Default 1 hour
+            self._seller_token = access_token
+            self._seller_token_expires = datetime.utcnow() + timedelta(seconds=expires_in)
+            
+            logger.info(f"Seller authenticated successfully, token expires in {expires_in}s")
+            return self._seller_token
+            
+        except requests.RequestException as e:
+            logger.error(f"Seller authentication failed: {e}")
+            raise
+    
+    def register_content(
+        self,
+        title: str,
+        content_body: str,
+        price_cents: int,
+        visibility: str = "private",
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        POST /v1/seller/content
+        Register new content with LedeWire as the seller.
+        
+        Args:
+            title: Content title
+            content_body: Full content as markdown (will be base64 encoded)
+            price_cents: Price in cents
+            visibility: "public" or "private" (default private for reports)
+            metadata: Optional metadata dict (author, sources, etc.)
+        
+        Returns:
+            Content response with 'id' (content_id to use for purchases)
+        """
+        import base64
+        
+        # Get seller token (will authenticate if needed)
+        seller_token = self.authenticate_as_seller()
+        
+        # Base64 encode the content body (LedeWire requirement)
+        content_body_b64 = base64.b64encode(content_body.encode('utf-8')).decode('utf-8')
+        
+        # Build request payload
+        request_data = {
+            "content_type": "markdown",
+            "title": title,
+            "content_body": content_body_b64,
+            "price_cents": price_cents,
+            "visibility": visibility
+        }
+        
+        if metadata:
+            request_data["metadata"] = metadata
+        
+        try:
+            logger.info(f"Registering content: '{title}' (${price_cents/100:.2f}, {visibility})")
+            
+            response = self.session.post(
+                f"{self.api_base}/seller/content",
+                headers={"Authorization": f"Bearer {seller_token}"},
+                json=request_data,
+                timeout=15
+            )
+            
+            logger.info(f"Content registration response: {response.status_code}")
+            
+            if response.status_code == 201:
+                result = response.json()
+                content_id = result.get("id")
+                logger.info(f"Content registered successfully: content_id={content_id}")
+                return result
+            else:
+                response.raise_for_status()
+                return response.json()
+                
+        except requests.RequestException as e:
+            logger.error(f"Content registration failed: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response: {e.response.status_code} - {e.response.text}")
+                if e.response.status_code == 400:
+                    raise requests.HTTPError(f"Invalid content data: {e.response.text}", response=e.response)
+                elif e.response.status_code == 401:
+                    # Clear cached token and retry once
+                    self._seller_token = None
+                    self._seller_token_expires = None
+                    raise requests.HTTPError("Seller authentication expired", response=e.response)
+                else:
+                    raise requests.HTTPError(f"Content registration failed: {e.response.status_code}", response=e.response)
+            else:
+                raise requests.HTTPError(f"LedeWire service unavailable: {str(e)}")
+    
+    def get_seller_content(self, content_id: str) -> Dict[str, Any]:
+        """
+        GET /v1/seller/content/{id}
+        Get content by ID as seller.
+        """
+        seller_token = self.authenticate_as_seller()
+        
+        try:
+            response = self.session.get(
+                f"{self.api_base}/seller/content/{content_id}",
+                headers={"Authorization": f"Bearer {seller_token}"},
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code == 404:
+                    return {"error": "Content not found"}
                 else:
                     raise requests.HTTPError(f"LedeWire service error: {e.response.status_code}", response=e.response)
             else:

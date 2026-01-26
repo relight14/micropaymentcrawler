@@ -89,6 +89,20 @@ class ResearchLedger:
                 # Column already exists
                 pass
             
+            # Table for caching LedeWire content_id mappings
+            # Prevents duplicate content registration for the same report
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS content_id_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cache_key TEXT NOT NULL UNIQUE,
+                    content_id TEXT NOT NULL,
+                    price_cents INTEGER NOT NULL,
+                    visibility TEXT NOT NULL DEFAULT 'private',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    expires_at DATETIME
+                )
+            """)
+            
             conn.commit()
     
     def record_purchase(self, 
@@ -346,3 +360,66 @@ class ResearchLedger:
                     "timestamp": result[3]
                 }
             return None
+    
+    # Content ID Caching (LedeWire content registration)
+    
+    def get_cached_content_id(self, cache_key: str) -> Optional[Dict]:
+        """
+        Get cached LedeWire content_id for a report.
+        Cache key is typically: hash(query + source_ids)
+        
+        Returns dict with content_id, price_cents, visibility if found.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT content_id, price_cents, visibility, created_at, expires_at
+                FROM content_id_cache
+                WHERE cache_key = ?
+                AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+            """, (cache_key,))
+            
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "content_id": result[0],
+                    "price_cents": result[1],
+                    "visibility": result[2],
+                    "created_at": result[3],
+                    "expires_at": result[4]
+                }
+            return None
+    
+    def store_content_id(self, cache_key: str, content_id: str, price_cents: int, visibility: str = "private", expires_hours: int = 24) -> None:
+        """
+        Cache a LedeWire content_id for future lookups.
+        Avoids duplicate content registration for the same report.
+        
+        Args:
+            cache_key: Unique key for this content (hash of query + source_ids)
+            content_id: LedeWire content ID returned from registration
+            price_cents: Price in cents
+            visibility: "public" or "private"
+            expires_hours: Hours until cache expires (default 24)
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO content_id_cache
+                (cache_key, content_id, price_cents, visibility, expires_at)
+                VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' hours'))
+            """, (cache_key, content_id, price_cents, visibility, expires_hours))
+            conn.commit()
+    
+    def generate_content_cache_key(self, query: str, source_ids: List[str], price_cents: int) -> str:
+        """
+        Generate a consistent cache key for content based on query, sources, and price.
+        This ensures the same report (same query + same sources + same price) reuses the same content_id.
+        
+        Including price_cents ensures that if pricing changes (e.g., new sources added
+        or different pricing rules), a new content_id will be registered with the correct price.
+        """
+        import hashlib
+        source_ids_str = ",".join(sorted(source_ids))
+        key_input = f"{query.strip().lower()}:{source_ids_str}:{price_cents}"
+        return hashlib.sha256(key_input.encode()).hexdigest()[:32]
