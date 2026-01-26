@@ -136,7 +136,7 @@ export class ChatResearchApp {
             this.addMessage('system', e.detail.message);
         });
         
-        this.reportBuilder.addEventListener('reportPurchaseCompleted', (e) => {
+        this.reportBuilder.addEventListener('reportPurchaseCompleted', async (e) => {
             const { reportData, sourceCount } = e.detail;
             
             // Remove progressive loading message if it exists
@@ -156,6 +156,19 @@ export class ChatResearchApp {
             // Auto-scroll to the report (second-to-last message now)
             if (message) {
                 this._scrollToSecondLastMessage();
+            }
+            
+            // Refresh wallet balance after purchase
+            if (this.authService.isAuthenticated()) {
+                try {
+                    await this.authService.updateWalletBalance();
+                    const balance = this.authService.getWalletBalance();
+                    this.uiManager.updateWalletDisplay(balance);
+                    this.updateAuthButton();
+                    console.log('💰 Wallet balance refreshed after report purchase:', balance);
+                } catch (error) {
+                    console.error('Failed to refresh wallet balance after purchase:', error);
+                }
             }
         });
         
@@ -372,11 +385,26 @@ export class ChatResearchApp {
                 this.toggleAuthMode();
             });
 
-            this.modalController.setFundingSuccessCallback(async () => {
-                // Refresh wallet balance
-                await this.authService.updateWalletBalance();
-                if (this.authService.isAuthenticated()) {
-                    this.uiManager.updateWalletDisplay(this.authService.getWalletBalance());
+            this.modalController.setFundingSuccessCallback(async (newBalanceCents) => {
+                console.log('💰 Funding success callback triggered');
+                try {
+                    // Refresh wallet balance from server
+                    await this.authService.updateWalletBalance();
+                    const balance = this.authService.getWalletBalance();
+                    console.log('💰 Updated wallet balance:', balance);
+                    
+                    // Update UI with new balance
+                    if (this.authService.isAuthenticated()) {
+                        this.uiManager.updateWalletDisplay(balance);
+                        this.updateAuthButton();  // Also refresh the auth button which shows balance
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to refresh wallet balance:', error);
+                    // If API call failed but we have balance from polling, use that
+                    if (newBalanceCents !== null && newBalanceCents !== undefined) {
+                        const fallbackBalance = newBalanceCents / 100;
+                        this.uiManager.updateWalletDisplay(fallbackBalance);
+                    }
                 }
             });
 
