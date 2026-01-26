@@ -384,3 +384,118 @@
     color: var(--text-primary);
     font-weight: var(--font-weight-medium);
 }
+
+/* ========================================
+   CHAT ACTION PROMPTS
+   ======================================== */
+
+/* Anonymous Chat Prompt - Logged-out state */
+.anonymous-chat-prompt {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.08) 0%, rgba(74, 144, 226, 0.03) 100%);
+    border: 1.5px solid rgba(74, 144, 226, 0.2);
+    border-radius: 0.75rem;
+    text-align: center;
+}
+
+.anonymous-chat-prompt .prompt-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.anonymous-chat-prompt .prompt-text {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.anonymous-chat-prompt .prompt-text strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.anonymous-chat-prompt .prompt-subtext {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+.login-button-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--primary-gradient, linear-gradient(135deg, #4A90E2 0%, #357ABD 100%));
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+}
+
+.login-button-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
+}
+
+.login-button-primary:active {
+    transform: translateY(0);
+}
+
+/* Find Sources Prompt - Authenticated state */
+.find-sources-prompt {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+}
+
+.find-sources-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary-gradient, linear-gradient(135deg, #4A90E2 0%, #357ABD 100%));
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+}
+
+.find-sources-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
+}
+
+.find-sources-button:active {
+    transform: translateY(0);
+}
+
+.find-sources-button .icon {
+    font-size: 1.125rem;
+}
+
+/* Dark Mode Adjustments */
+.dark .anonymous-chat-prompt {
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.15) 0%, rgba(74, 144, 226, 0.05) 100%);
+    border-color: rgba(74, 144, 226, 0.3);
+}
+
+.dark .anonymous-chat-prompt .prompt-text {
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.dark .anonymous-chat-prompt .prompt-subtext {
+    color: rgba(255, 255, 255, 0.7);
+}

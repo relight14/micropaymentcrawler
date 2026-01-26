@@ -46,10 +46,15 @@ export class InteractionHandler {
                 }
             }
             
+            // IMPROVEMENT: Store full conversation history along with the query
+            // This ensures we don't lose context when the user logs in
+            const conversationHistory = this.appState.getConversationHistory();
+            
             // Store pending action for post-login processing
             sessionStorage.setItem('pendingSourceSearch', JSON.stringify({
                 query: queryText,
-                mode: 'research'
+                mode: 'research',
+                conversationSnapshot: conversationHistory  // Preserve full conversation
             }));
             
             // Show auth modal

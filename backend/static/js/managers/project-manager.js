@@ -247,11 +247,37 @@ export class ProjectManager {
         const pendingSearch = sessionStorage.getItem('pendingSourceSearch');
         if (pendingSearch) {
             try {
-                const { query, mode } = JSON.parse(pendingSearch);
+                const { query, mode, conversationSnapshot } = JSON.parse(pendingSearch);
                 sessionStorage.removeItem('pendingSourceSearch'); // Clear immediately
                 
                 if (query && query.trim()) {
                     logger.info('🔍 Processing pending source search after login:', query);
+                    
+                    // IMPROVEMENT: Restore conversation history if available
+                    // This ensures the AI has full context when performing the source search
+                    if (conversationSnapshot && Array.isArray(conversationSnapshot) && conversationSnapshot.length > 0) {
+                        logger.info(`📝 Restoring ${conversationSnapshot.length} conversation messages for context`);
+                        
+                        // Restore messages to appState conversation history
+                        // This preserves the context that was lost during login
+                        conversationSnapshot.forEach(msg => {
+                            // Only restore if not already present (avoid duplicates)
+                            const existingMsgs = this.appState.getConversationHistory();
+                            const isDuplicate = existingMsgs.some(existing => 
+                                existing.id === msg.id || 
+                                (existing.sender === msg.sender && 
+                                 existing.content === msg.content &&
+                                 Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 1000)
+                            );
+                            
+                            if (!isDuplicate) {
+                                this.appState.conversationHistory.push(msg);
+                            }
+                        });
+                        
+                        // Save the restored conversation to sessionStorage
+                        this.appState._saveToStorage('conversationHistory', this.appState.conversationHistory);
+                    }
                     
                     // Switch to research mode if needed
                     if (mode === 'research' && this.appState.getMode() !== 'research') {
