@@ -119,6 +119,22 @@ export class UIManager {
         
         return messageDiv;
     }
+
+    /**
+     * Remove a message from the chat display by message ID
+     * @param {string} messageId - The ID of the message to remove
+     */
+    removeMessageFromChat(messageId) {
+        if (!this.messagesContainer) {
+            console.error(`❌ UI MANAGER: No messagesContainer found!`);
+            return;
+        }
+
+        const messageElement = this.messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.remove();
+        }
+    }
     
     _recreateSourceCardsMessage(messageDiv, message) {
         // Recreate source cards with live event listeners from stored metadata

@@ -27,6 +27,9 @@ import { logger } from './utils/logger.js';
 // SourceCard and SummaryPopover loaded globally - access them dynamically when needed
 window.summaryPopover = summaryPopover;
 
+// Constants
+const DEFAULT_SOURCE_SEARCH_QUERY = 'Find sources on this topic';
+
 export class ChatResearchApp {
     constructor() {
         // Initialize base URL for API calls
@@ -475,15 +478,20 @@ export class ChatResearchApp {
                 const lastMsg = document.querySelector('#messagesContainer .message:last-child .message__body');
                 if (lastMsg) {
                     if (!isAuthenticated) {
-                        // Anonymous users: encourage login to access sources
+                        // IMPROVEMENT: More actionable logged-out prompt
+                        // Clearly communicate that source search will preserve conversation context
                         const loginPrompt = document.createElement('div');
                         loginPrompt.className = 'anonymous-chat-prompt';
                         loginPrompt.innerHTML = `
-                            <p class="prompt-text">
-                                Want to search for authoritative sources? 
-                                <button id="promptLoginButton" class="login-button">Log in</button> 
-                                to find sources on this topic.
-                            </p>
+                            <div class="prompt-content">
+                                <p class="prompt-text">
+                                    <strong>💡 Ready to find authoritative sources?</strong><br>
+                                    <button id="promptLoginButton" class="login-button-primary">Log in to Search Sources</button>
+                                </p>
+                                <p class="prompt-subtext">
+                                    Your conversation will be saved so I can find the most relevant sources for your research.
+                                </p>
+                            </div>
                         `;
                         lastMsg.appendChild(loginPrompt);
                         
@@ -492,6 +500,9 @@ export class ChatResearchApp {
                         if (loginButton) {
                             loginButton.addEventListener('click', (e) => {
                                 e.preventDefault();
+                                // Use shared method from interactionHandler to store pending search
+                                const currentQuery = this.appState.getCurrentQuery() || DEFAULT_SOURCE_SEARCH_QUERY;
+                                this.interactionHandler.storePendingSourceSearch(currentQuery, 'research');
                                 this.modalController.showAuthModal();
                             });
                         }
@@ -572,19 +583,23 @@ export class ChatResearchApp {
         logger.debug('🔍 User requested source search via button or intent detection');
         
         try {
-            // Show typing indicator
-            this.uiManager.showTypingIndicator();
-            
             // Get conversation context and current query
             const conversationContext = this.appState.getConversationHistory();
             // Use intent query if provided, otherwise fall back to current query
-            const currentQuery = intentQuery || this.appState.getCurrentQuery() || 'Find sources on this topic';
+            const currentQuery = intentQuery || this.appState.getCurrentQuery() || DEFAULT_SOURCE_SEARCH_QUERY;
+            
+            // IMPROVEMENT: Show clear "searching" status message instead of generic typing indicator
+            // This gives users clear feedback and prevents confusion
+            const searchingMessage = this.addMessage('assistant', `🔍 Searching for authoritative sources on "${currentQuery}"...`);
             
             // Call research endpoint with full conversation context
             const response = await this.apiService.analyzeResearchQuery(currentQuery, conversationContext);
             
-            // Hide typing indicator
-            this.uiManager.hideTypingIndicator();
+            // Remove the "searching" message now that we have results
+            if (searchingMessage && searchingMessage.id) {
+                this.uiManager.removeMessageFromChat(searchingMessage.id);
+                this.appState.removeMessage(searchingMessage.id);
+            }
             
             // Handle research data (send sources to SourcesPanel)
             if (response.research_data) {
@@ -599,15 +614,15 @@ export class ChatResearchApp {
                         this.sourcesPanel.handleNewSources(response.research_data.sources);
                     }
                     
-                    // Add simple confirmation message to chat
-                    this.addMessage('assistant', `Found ${sourceCount} sources. Check the Sources panel to review and select sources for your research.`);
+                    // IMPROVEMENT: Add clear completion message that doesn't prompt for follow-ups
+                    // This signals to the user that the search is complete and they should review sources
+                    this.addMessage('assistant', `✅ Found ${sourceCount} sources. Review them in the Sources panel and select the ones you want to include in your research.`);
                 }
             }
             
         } catch (error) {
             console.error('❌ Error triggering source search:', error);
-            this.uiManager.hideTypingIndicator();
-            this.addMessage('system', `Sorry, I couldn't search for sources: ${error.message}`);
+            this.addMessage('system', `Sorry, I couldn't search for sources: ${error.message}. Please try again.`);
         }
     }
 

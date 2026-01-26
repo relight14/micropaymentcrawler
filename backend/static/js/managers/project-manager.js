@@ -10,6 +10,9 @@ import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
 
+// Constants for message deduplication and restoration
+const DUPLICATE_MESSAGE_THRESHOLD_MS = 1000; // Time window (ms) for detecting duplicate messages
+
 export class ProjectManager {
     constructor({ apiService, authService, toastManager, messageCoordinator, appState, sourcesPanel }) {
         this.apiService = apiService;
@@ -247,11 +250,20 @@ export class ProjectManager {
         const pendingSearch = sessionStorage.getItem('pendingSourceSearch');
         if (pendingSearch) {
             try {
-                const { query, mode } = JSON.parse(pendingSearch);
+                const { query, mode, conversationSnapshot } = JSON.parse(pendingSearch);
                 sessionStorage.removeItem('pendingSourceSearch'); // Clear immediately
                 
                 if (query && query.trim()) {
                     logger.info('🔍 Processing pending source search after login:', query);
+                    
+                    // IMPROVEMENT: Restore conversation history if available
+                    // This ensures the AI has full context when performing the source search
+                    if (conversationSnapshot && Array.isArray(conversationSnapshot) && conversationSnapshot.length > 0) {
+                        logger.info(`📝 Restoring ${conversationSnapshot.length} conversation messages for context`);
+                        
+                        // Use proper appState method to restore messages with deduplication
+                        this.appState.restoreMessages(conversationSnapshot, DUPLICATE_MESSAGE_THRESHOLD_MS);
+                    }
                     
                     // Switch to research mode if needed
                     if (mode === 'research' && this.appState.getMode() !== 'research') {

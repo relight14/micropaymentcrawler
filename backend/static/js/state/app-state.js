@@ -137,6 +137,45 @@ export class AppState {
         sessionStorage.removeItem('pendingSourceSearch');
     }
 
+    removeMessage(messageId) {
+        // Remove message from conversation history by ID
+        this.conversationHistory = this.conversationHistory.filter(msg => msg.id !== messageId);
+        this._saveToStorage('conversationHistory', this.conversationHistory);
+    }
+
+    /**
+     * Restore messages from a snapshot (e.g., after login)
+     * Preserves original message IDs and timestamps for proper deduplication
+     * @param {Array} messages - Array of message objects to restore
+     * @param {number} duplicateThresholdMs - Time window for duplicate detection
+     */
+    restoreMessages(messages, duplicateThresholdMs = 1000) {
+        if (!Array.isArray(messages) || messages.length === 0) {
+            return;
+        }
+
+        messages.forEach(msg => {
+            // Get fresh state on each iteration to detect newly added messages
+            const isDuplicate = this.conversationHistory.some(existing => 
+                existing.id === msg.id || 
+                (existing.sender === msg.sender && 
+                 existing.content === msg.content &&
+                 Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < duplicateThresholdMs)
+            );
+            
+            if (!isDuplicate) {
+                // Preserve original message with its ID and timestamp
+                this.conversationHistory.push({
+                    ...msg,
+                    timestamp: new Date(msg.timestamp) // Ensure proper Date object
+                });
+            }
+        });
+
+        // Save once after all messages are restored
+        this._saveToStorage('conversationHistory', this.conversationHistory);
+    }
+
     getConversationHistory() {
         return [...this.conversationHistory]; // Return copy
     }
