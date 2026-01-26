@@ -100,6 +100,7 @@ export class MessageRenderer {
      */
     static createMessageElement(message) {
         const {
+            id,
             sender,
             content,
             timestamp,
@@ -113,6 +114,11 @@ export class MessageRenderer {
         // Create message container with BEM classes
         const messageDiv = document.createElement('div');
         messageDiv.className = this._buildMessageClasses(senderType, variant);
+        
+        // Set message ID as data attribute for later reference
+        if (id) {
+            messageDiv.setAttribute('data-message-id', id);
+        }
         
         // Create message structure
         const avatar = this._createAvatar(senderType, variant);

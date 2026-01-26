@@ -261,26 +261,8 @@ export class ProjectManager {
                     if (conversationSnapshot && Array.isArray(conversationSnapshot) && conversationSnapshot.length > 0) {
                         logger.info(`📝 Restoring ${conversationSnapshot.length} conversation messages for context`);
                         
-                        // Restore messages to appState conversation history
-                        // This preserves the context that was lost during login
-                        const existingMsgs = this.appState.getConversationHistory(); // Get once, outside loop
-                        
-                        conversationSnapshot.forEach(msg => {
-                            // Only restore if not already present (avoid duplicates)
-                            const isDuplicate = existingMsgs.some(existing => 
-                                existing.id === msg.id || 
-                                (existing.sender === msg.sender && 
-                                 existing.content === msg.content &&
-                                 Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < DUPLICATE_MESSAGE_THRESHOLD_MS)
-                            );
-                            
-                            if (!isDuplicate) {
-                                this.appState.conversationHistory.push(msg);
-                            }
-                        });
-                        
-                        // Save the restored conversation to sessionStorage
-                        this.appState._saveToStorage('conversationHistory', this.appState.conversationHistory);
+                        // Use proper appState method to restore messages with deduplication
+                        this.appState.restoreMessages(conversationSnapshot, DUPLICATE_MESSAGE_THRESHOLD_MS);
                     }
                     
                     // Switch to research mode if needed
