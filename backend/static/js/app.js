@@ -27,6 +27,9 @@ import { logger } from './utils/logger.js';
 // SourceCard and SummaryPopover loaded globally - access them dynamically when needed
 window.summaryPopover = summaryPopover;
 
+// Constants
+const DEFAULT_SOURCE_SEARCH_QUERY = 'Find sources on this topic';
+
 export class ChatResearchApp {
     constructor() {
         // Initialize base URL for API calls
@@ -498,7 +501,7 @@ export class ChatResearchApp {
                             loginButton.addEventListener('click', (e) => {
                                 e.preventDefault();
                                 // Use shared method from interactionHandler to store pending search
-                                const currentQuery = this.appState.getCurrentQuery() || 'Find sources on this topic';
+                                const currentQuery = this.appState.getCurrentQuery() || DEFAULT_SOURCE_SEARCH_QUERY;
                                 this.interactionHandler.storePendingSourceSearch(currentQuery, 'research');
                                 this.modalController.showAuthModal();
                             });
@@ -583,7 +586,7 @@ export class ChatResearchApp {
             // Get conversation context and current query
             const conversationContext = this.appState.getConversationHistory();
             // Use intent query if provided, otherwise fall back to current query
-            const currentQuery = intentQuery || this.appState.getCurrentQuery() || 'Find sources on this topic';
+            const currentQuery = intentQuery || this.appState.getCurrentQuery() || DEFAULT_SOURCE_SEARCH_QUERY;
             
             // IMPROVEMENT: Show clear "searching" status message instead of generic typing indicator
             // This gives users clear feedback and prevents confusion
@@ -594,11 +597,7 @@ export class ChatResearchApp {
             
             // Remove the "searching" message now that we have results
             if (searchingMessage && searchingMessage.id) {
-                const messageElement = document.querySelector(`[data-message-id="${searchingMessage.id}"]`);
-                if (messageElement) {
-                    messageElement.remove();
-                }
-                // Use appState method to maintain encapsulation
+                this.uiManager.removeMessageFromChat(searchingMessage.id);
                 this.appState.removeMessage(searchingMessage.id);
             }
             

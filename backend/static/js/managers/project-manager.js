@@ -10,6 +10,9 @@ import { AppEvents, EVENT_TYPES } from '../utils/event-bus.js';
 import { analytics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
 
+// Constants for message deduplication and restoration
+const DUPLICATE_MESSAGE_THRESHOLD_MS = 1000; // Time window (ms) for detecting duplicate messages
+
 export class ProjectManager {
     constructor({ apiService, authService, toastManager, messageCoordinator, appState, sourcesPanel }) {
         this.apiService = apiService;
@@ -260,11 +263,10 @@ export class ProjectManager {
                         
                         // Restore messages to appState conversation history
                         // This preserves the context that was lost during login
-                        const DUPLICATE_MESSAGE_THRESHOLD_MS = 1000; // Time window for duplicate detection
+                        const existingMsgs = this.appState.getConversationHistory(); // Get once, outside loop
                         
                         conversationSnapshot.forEach(msg => {
                             // Only restore if not already present (avoid duplicates)
-                            const existingMsgs = this.appState.getConversationHistory();
                             const isDuplicate = existingMsgs.some(existing => 
                                 existing.id === msg.id || 
                                 (existing.sender === msg.sender && 
