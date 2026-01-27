@@ -474,8 +474,53 @@ class ResearchLedger:
         Generate a consistent cache key for content based on query, sources, and price.
         This ensures the same report (same query + same sources + same price) reuses the same content_id.
         
-        Including price_cents ensures that if pricing changes (e.g., new sources added
-        or different pricing rules), a new content_id will be registered with the correct price.
+        CONTENT IDENTIFICATION METHOD:
+        ===============================
+        We identify identical content using a deterministic hash of:
+        
+        1. QUERY TEXT (normalized)
+           - The research query/question (e.g., "AI trends in 2024")
+           - Normalized: trimmed whitespace and lowercased
+           - Example: "AI Trends  " → "ai trends"
+        
+        2. SOURCE IDS (sorted)
+           - List of source identifiers used in the report
+           - Each source has a unique ID (e.g., "src_abc123", "src_def456")
+           - Sources represent the articles/URLs analyzed
+           - Sorted to ensure consistent ordering
+           - Example: ["src_003", "src_001", "src_002"] → "src_001,src_002,src_003"
+        
+        3. PRICE (in cents)
+           - The price of the content
+           - Included so price changes create new content registrations
+           - Example: 500 (represents $5.00)
+        
+        WHY THIS WORKS:
+        ===============
+        - Same query + same sources + same price = IDENTICAL content
+        - Different sources = DIFFERENT content (even if same query)
+        - Same sources but different price = DIFFERENT content registration
+        - Source order doesn't matter (we sort them)
+        
+        EXAMPLES:
+        =========
+        Request 1: query="AI trends", sources=["src_001", "src_002"], price=500
+        Request 2: query="AI trends", sources=["src_001", "src_002"], price=500
+        → SAME cache_key → Reuse content_id ✅
+        
+        Request 3: query="AI trends", sources=["src_001", "src_003"], price=500
+        → DIFFERENT cache_key → New content_id (different sources)
+        
+        Request 4: query="Blockchain trends", sources=["src_001", "src_002"], price=500
+        → DIFFERENT cache_key → New content_id (different query)
+        
+        Args:
+            query: The research query/question
+            source_ids: List of source IDs (article identifiers) used in the report
+            price_cents: Price in cents
+        
+        Returns:
+            32-character hash string (first 32 chars of SHA256 hash)
         """
         import hashlib
         source_ids_str = ",".join(sorted(source_ids))
