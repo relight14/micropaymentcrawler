@@ -76,6 +76,7 @@ class PurchaseRequest(BaseModel):
     budget_limit_dollars: Optional[float] = None  # Total budget for research
     idempotency_key: Optional[str] = None
     outline_structure: Optional[Dict[str, Any]] = None  # Custom outline structure from project outline builder
+    content_id: Optional[str] = None  # Content ID from register-content endpoint
 
 
 class PurchaseResponse(BaseModel):
@@ -97,6 +98,19 @@ class SourceUnlockResponse(BaseModel):
     unlocked_content: str
     remaining_balance_cents: int
     wallet_deduction: float
+
+
+# Content registration schemas
+class RegisterContentRequest(BaseModel):
+    query: str
+    outline_structure: Optional[Dict[str, Any]] = None
+
+
+class RegisterContentResponse(BaseModel):
+    success: bool
+    content_id: str
+    price_cents: int
+    message: str
 
 
 # Checkout state schemas

@@ -58,18 +58,34 @@ export class PurchaseConfirmationModal {
      * @param {Function} onConfirm - Callback after successful purchase
      */
     async showReportConfirmation(query, sources, outlineStructure, onConfirm) {
-        // Get pricing quote from API
-        const quoteResult = await this._getPricingQuote(query, outlineStructure);
+        // Step 1: Register content with LedeWire to get content_id
+        let contentId = null;
+        let priceCents = 0;
         
-        if (!quoteResult.success) {
-            this.toastManager.show('Failed to calculate pricing', 'error', 3000);
+        try {
+            const registrationResult = await this.apiService.registerContent(query, outlineStructure);
+            
+            if (!registrationResult.success) {
+                this.toastManager.show('Failed to register content', 'error', 3000);
+                return;
+            }
+            
+            contentId = registrationResult.content_id;
+            priceCents = registrationResult.price_cents;
+            
+            console.log(`📝 Content registered: content_id=${contentId}, price=${priceCents} cents`);
+        } catch (error) {
+            console.error('Content registration failed:', error);
+            this.toastManager.show('Failed to prepare purchase', 'error', 3000);
             return;
         }
-
-        const totalCost = quoteResult.calculated_price;
-        const priceCents = Math.round(totalCost * 100);
-        const newSourceCount = quoteResult.new_source_count;
-        const previousSourceCount = quoteResult.previous_source_count;
+        
+        // Step 2: Get pricing quote for display (optional, since we have price from registration)
+        const quoteResult = await this._getPricingQuote(query, outlineStructure);
+        
+        const totalCost = priceCents / 100;
+        const newSourceCount = quoteResult.success ? quoteResult.new_source_count : sources.length;
+        const previousSourceCount = quoteResult.success ? quoteResult.previous_source_count : 0;
 
         this.currentPurchase = {
             type: 'report',
@@ -77,7 +93,8 @@ export class PurchaseConfirmationModal {
             sources: sources,
             outlineStructure: outlineStructure,
             priceCents: priceCents,
-            newSourceCount: newSourceCount
+            newSourceCount: newSourceCount,
+            contentId: contentId  // Store content_id for later use
         };
         this.onConfirmCallback = onConfirm;
 
@@ -107,7 +124,7 @@ export class PurchaseConfirmationModal {
             itemList: itemList,
             totalCost: totalCost,
             priceCents: priceCents,
-            contentId: null, // Will be registered during purchase
+            contentId: contentId,  // Pass content_id to checkout-state
             actionLabel: 'Generate Report'
         });
     }
@@ -352,11 +369,12 @@ export class PurchaseConfirmationModal {
                     this.currentPurchase.source.license_cost || 0
                 );
             } else if (this.currentPurchase.type === 'report') {
-                // Call generate report API
+                // Call generate report API with content_id
                 result = await this.apiService.generateReport(
                     this.currentPurchase.query,
                     this.currentPurchase.sources,
-                    this.currentPurchase.outlineStructure
+                    this.currentPurchase.outlineStructure,
+                    this.currentPurchase.contentId  // Pass content_id from registration
                 );
             } else if (this.currentPurchase.type === 'full_access') {
                 // Call full access API (to be implemented)
