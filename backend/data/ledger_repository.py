@@ -89,14 +89,6 @@ class ResearchLedger:
                 # Column already exists
                 pass
             
-            # Add content_id column to track LedeWire content IDs in purchases
-            # This enables proper content_id reuse across purchases
-            try:
-                cursor.execute("ALTER TABLE purchases ADD COLUMN content_id TEXT")
-            except sqlite3.OperationalError:
-                # Column already exists
-                pass
-            
             # Table for caching LedeWire content_id mappings
             # Prevents duplicate content registration for the same report
             cursor.execute("""
@@ -120,8 +112,7 @@ class ResearchLedger:
                        transaction_id: str,
                        packet: ResearchPacket,
                        source_ids: Optional[List[str]] = None,
-                       user_id: Optional[str] = None,
-                       content_id: Optional[str] = None) -> int:
+                       user_id: Optional[str] = None) -> int:
         """Record a successful purchase and research packet delivery."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -131,8 +122,8 @@ class ResearchLedger:
             
             # Note: tier column remains in DB for historical data but always stores "pro"
             cursor.execute("""
-                INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data, source_ids_used, user_id, content_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data, source_ids_used, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 query,
                 "pro",  # All reports are now Pro Package
@@ -141,48 +132,10 @@ class ResearchLedger:
                 transaction_id,
                 json.dumps(packet.model_dump()),
                 source_ids_json,
-                user_id,
-                content_id
+                user_id
             ))
             
             return cursor.lastrowid or 0
-    
-    def get_content_id_from_purchases(self, cache_key: str) -> Optional[str]:
-        """
-        Get content_id from previous purchases by cache_key.
-        This ensures we reuse the same content_id for identical content,
-        enabling proper "already purchased" detection.
-        
-        Returns content_id if found in any previous purchase, None otherwise.
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # First, try to get from content_id_cache (faster lookup)
-            cursor.execute("""
-                SELECT content_id FROM content_id_cache
-                WHERE cache_key = ?
-                LIMIT 1
-            """, (cache_key,))
-            
-            result = cursor.fetchone()
-            if result:
-                return result[0]
-            
-            # If not in cache, check if we have it in any purchase
-            # This handles cases where cache expired but purchase exists
-            cursor.execute("""
-                SELECT DISTINCT p.content_id
-                FROM purchases p
-                JOIN content_id_cache c ON p.content_id = c.content_id
-                WHERE c.cache_key = ?
-                AND p.content_id IS NOT NULL
-                ORDER BY p.timestamp DESC
-                LIMIT 1
-            """, (cache_key,))
-            
-            result = cursor.fetchone()
-            return result[0] if result else None
     
     def get_previous_purchase_sources(self, user_id: str, query: str) -> Optional[List[str]]:
         """
@@ -437,9 +390,9 @@ class ResearchLedger:
                 }
             return None
     
-    def store_content_id(self, cache_key: str, content_id: str, price_cents: int, visibility: str = "private", expires_hours: Optional[int] = None) -> None:
+    def store_content_id(self, cache_key: str, content_id: str, price_cents: int, visibility: str = "private", expires_hours: int = 24) -> None:
         """
-        Store a LedeWire content_id for future lookups.
+        Cache a LedeWire content_id for future lookups.
         Avoids duplicate content registration for the same report.
         
         Args:
@@ -447,26 +400,15 @@ class ResearchLedger:
             content_id: LedeWire content ID returned from registration
             price_cents: Price in cents
             visibility: "public" or "private"
-            expires_hours: Hours until cache expires (None = never expires, used for purchases)
+            expires_hours: Hours until cache expires (default 24)
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
-            if expires_hours is None:
-                # Never expires - used for purchase tracking
-                cursor.execute("""
-                    INSERT OR REPLACE INTO content_id_cache
-                    (cache_key, content_id, price_cents, visibility, expires_at)
-                    VALUES (?, ?, ?, ?, NULL)
-                """, (cache_key, content_id, price_cents, visibility))
-            else:
-                # Expires after specified hours - used for temporary caching
-                cursor.execute("""
-                    INSERT OR REPLACE INTO content_id_cache
-                    (cache_key, content_id, price_cents, visibility, expires_at)
-                    VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' hours'))
-                """, (cache_key, content_id, price_cents, visibility, expires_hours))
-            
+            cursor.execute("""
+                INSERT OR REPLACE INTO content_id_cache
+                (cache_key, content_id, price_cents, visibility, expires_at)
+                VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' hours'))
+            """, (cache_key, content_id, price_cents, visibility, expires_hours))
             conn.commit()
     
     def generate_content_cache_key(self, query: str, source_ids: List[str], price_cents: int) -> str:
@@ -474,53 +416,8 @@ class ResearchLedger:
         Generate a consistent cache key for content based on query, sources, and price.
         This ensures the same report (same query + same sources + same price) reuses the same content_id.
         
-        CONTENT IDENTIFICATION METHOD:
-        ===============================
-        We identify identical content using a deterministic hash of:
-        
-        1. QUERY TEXT (normalized)
-           - The research query/question (e.g., "AI trends in 2024")
-           - Normalized: trimmed whitespace and lowercased
-           - Example: "AI Trends  " → "ai trends"
-        
-        2. SOURCE IDS (sorted)
-           - List of source identifiers used in the report
-           - Each source has a unique ID (e.g., "src_abc123", "src_def456")
-           - Sources represent the articles/URLs analyzed
-           - Sorted to ensure consistent ordering
-           - Example: ["src_003", "src_001", "src_002"] → "src_001,src_002,src_003"
-        
-        3. PRICE (in cents)
-           - The price of the content
-           - Included so price changes create new content registrations
-           - Example: 500 (represents $5.00)
-        
-        WHY THIS WORKS:
-        ===============
-        - Same query + same sources + same price = IDENTICAL content
-        - Different sources = DIFFERENT content (even if same query)
-        - Same sources but different price = DIFFERENT content registration
-        - Source order doesn't matter (we sort them)
-        
-        EXAMPLES:
-        =========
-        Request 1: query="AI trends", sources=["src_001", "src_002"], price=500
-        Request 2: query="AI trends", sources=["src_001", "src_002"], price=500
-        → SAME cache_key → Reuse content_id ✅
-        
-        Request 3: query="AI trends", sources=["src_001", "src_003"], price=500
-        → DIFFERENT cache_key → New content_id (different sources)
-        
-        Request 4: query="Blockchain trends", sources=["src_001", "src_002"], price=500
-        → DIFFERENT cache_key → New content_id (different query)
-        
-        Args:
-            query: The research query/question
-            source_ids: List of source IDs (article identifiers) used in the report
-            price_cents: Price in cents
-        
-        Returns:
-            32-character hash string (first 32 chars of SHA256 hash)
+        Including price_cents ensures that if pricing changes (e.g., new sources added
+        or different pricing rules), a new content_id will be registered with the correct price.
         """
         import hashlib
         source_ids_str = ",".join(sorted(source_ids))
