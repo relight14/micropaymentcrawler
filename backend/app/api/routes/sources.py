@@ -379,6 +379,201 @@ Summary:"""
         raise HTTPException(status_code=500, detail=f"Summarization failed: {str(e)}")
 
 
+class FullAccessRequest(BaseModel):
+    source_id: str
+    url: str
+    purchase_price: Optional[float] = None
+    idempotency_key: Optional[str] = None
+
+
+class FullAccessResponse(BaseModel):
+    source_id: str
+    content: str
+    price_cents: int
+    price: float
+    transaction_id: str
+
+
+@router.post("/full-access", response_model=FullAccessResponse)
+@limiter.limit("20/minute")
+async def get_full_access(
+    request: Request,
+    full_access_request: FullAccessRequest,
+    authorization: str = Header(None, alias="Authorization")
+):
+    """
+    Get full article access for human reading.
+    
+    This endpoint:
+    1. Validates authentication and funds
+    2. Scrapes the full article content
+    3. Registers content with LedeWire
+    4. Processes payment
+    5. Returns full article HTML/markdown
+    """
+    user_id = None
+    try:
+        # Extract and validate Bearer token
+        access_token = extract_bearer_token(authorization)
+        validate_user_token(access_token)
+        user_id = extract_user_id_from_token(access_token)
+        
+        # Generate stable idempotency key if not provided
+        if not full_access_request.idempotency_key:
+            request_signature = f"{user_id}:fullaccess:{full_access_request.source_id}:{full_access_request.url}"
+            full_access_request.idempotency_key = hashlib.sha256(request_signature.encode()).hexdigest()[:24]
+        
+        # Check idempotency status
+        idem_status = ledger.get_idempotency_status(user_id, full_access_request.idempotency_key, "full_access")
+        
+        if idem_status:
+            if idem_status["status"] == "completed":
+                # Return cached response (idempotent 200)
+                return FullAccessResponse(**idem_status["response_data"])
+            
+            elif idem_status["status"] == "processing":
+                # Wait inline with short polling
+                max_wait_seconds = 15
+                poll_interval = 0.5
+                attempts = int(max_wait_seconds / poll_interval)
+                
+                for attempt in range(attempts):
+                    time.sleep(poll_interval)
+                    updated_status = ledger.get_idempotency_status(user_id, full_access_request.idempotency_key, "full_access")
+                    
+                    if updated_status and updated_status["status"] == "completed":
+                        return FullAccessResponse(**updated_status["response_data"])
+                
+                # Still processing after max wait - return 202
+                return JSONResponse(
+                    status_code=202,
+                    content={"status": "processing", "message": "Article is being fetched. Please try again in a moment."},
+                    headers={"Retry-After": "2"}
+                )
+            
+            elif idem_status["status"] == "failed":
+                # Retry failed request
+                pass
+        
+        # Mark as processing
+        ledger.set_idempotency_status(
+            user_id=user_id,
+            idempotency_key=full_access_request.idempotency_key,
+            operation_type="full_access",
+            status="processing",
+            response_data={}
+        )
+        
+        # Calculate price
+        price = full_access_request.purchase_price or 0.25
+        price_cents = int(price * 100)
+        
+        # Scrape full article content
+        try:
+            logger.info(f"Fetching full article: {full_access_request.url}")
+            article_content = await scrape_article_content(full_access_request.url)
+            logger.info(f"Successfully fetched full article content")
+        except HTTPException as e:
+            if e.status_code == 403:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Article is behind a paywall and cannot be accessed directly. Please purchase through the publisher."
+                )
+            else:
+                raise
+        
+        # Register content with LedeWire (for payment tracking)
+        import os
+        if os.getenv("LEDEWIRE_MOCK_PAYMENTS") != "true":
+            try:
+                # Register the article with LedeWire
+                content_title = f"Full Access: {full_access_request.url}"
+                content_stub = f"Full article access for: {full_access_request.url}"
+                
+                registration_result = ledewire.register_content(
+                    title=content_title,
+                    content_body=content_stub,
+                    price_cents=price_cents,
+                    visibility="private",
+                    metadata={
+                        "source_id": full_access_request.source_id,
+                        "url": full_access_request.url,
+                        "access_type": "full_article"
+                    }
+                )
+                
+                content_id = registration_result.get("id")
+                if not content_id:
+                    logger.error(f"Content registration returned no ID: {registration_result}")
+                    raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
+                
+                # Process payment
+                payment_result = ledewire.create_purchase(
+                    access_token=access_token,
+                    content_id=content_id,
+                    price_cents=price_cents,
+                    idempotency_key=full_access_request.idempotency_key
+                )
+                
+                if "error" in payment_result:
+                    error_msg = ledewire.handle_api_error(payment_result)
+                    raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
+                
+                transaction_id = payment_result.get("id") or payment_result.get("transaction_id") or f"fullaccess_{hashlib.sha256(full_access_request.idempotency_key.encode()).hexdigest()[:12]}"
+                
+            except Exception as e:
+                logger.error(f"Payment processing failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
+        else:
+            # Mock mode - generate fake transaction
+            transaction_id = f"mock_fullaccess_{hashlib.sha256(full_access_request.idempotency_key.encode()).hexdigest()[:12]}"
+        
+        # Build response
+        response_data = {
+            "source_id": full_access_request.source_id,
+            "content": article_content,
+            "price_cents": price_cents,
+            "price": price,
+            "transaction_id": transaction_id
+        }
+        
+        # Mark as completed
+        ledger.set_idempotency_status(
+            user_id=user_id,
+            idempotency_key=full_access_request.idempotency_key,
+            operation_type="full_access",
+            status="completed",
+            response_data=response_data
+        )
+        
+        logger.info(f"Full access granted for source {full_access_request.source_id}")
+        return FullAccessResponse(**response_data)
+        
+    except HTTPException as http_exc:
+        # Clean up idempotency status before re-raising
+        logger.error(f"HTTP error during full access: {http_exc.status_code} - {http_exc.detail}")
+        if user_id and full_access_request.idempotency_key:
+            ledger.set_idempotency_status(
+                user_id=user_id,
+                idempotency_key=full_access_request.idempotency_key,
+                operation_type="full_access",
+                status="failed",
+                response_data={"error": http_exc.detail}
+            )
+        raise
+    except Exception as e:
+        logger.error(f"Full access failed: {str(e)}")
+        if user_id and full_access_request.idempotency_key:
+            ledger.set_idempotency_status(
+                user_id=user_id,
+                idempotency_key=full_access_request.idempotency_key,
+                operation_type="full_access",
+                status="failed",
+                response_data={"error": str(e)}
+            )
+        raise HTTPException(status_code=500, detail=f"Full access failed: {str(e)}")
+
+
 @router.get("/stats")
 async def get_system_stats():
     """Get system statistics for debugging and monitoring"""
