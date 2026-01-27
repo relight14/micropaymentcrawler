@@ -317,7 +317,9 @@ export class SourceManager extends EventTarget {
     showSummaryPopover(source, summary, price, summaryType = 'full') {
         // Dynamically import and show the popover
         if (window.summaryPopover) {
-            const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
+            // Escape source ID to handle potential special characters in CSS selectors
+            const escapedId = CSS.escape(source.id);
+            const sourceCard = document.querySelector(`[data-source-id="${escapedId}"]`);
             window.summaryPopover.show({
                 anchorElement: sourceCard,
                 summary: summary,
@@ -441,7 +443,9 @@ export class SourceManager extends EventTarget {
         logger.debug('📊 Updating source cards with enriched data:', enrichedSources.length);
         
         enrichedSources.forEach(source => {
-            const sourceCard = document.querySelector(`[data-source-id="${source.id}"]`);
+            // Escape source ID to handle potential special characters in CSS selectors
+            const escapedId = CSS.escape(source.id);
+            const sourceCard = document.querySelector(`[data-source-id="${escapedId}"]`);
             if (!sourceCard) return;
             
             const excerptEl = sourceCard.querySelector('.source-excerpt');
