@@ -130,7 +130,9 @@ export class UIManager {
             return;
         }
 
-        const messageElement = this.messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
+        // Escape the messageId to handle special characters in CSS selectors
+        const escapedMessageId = CSS.escape(messageId);
+        const messageElement = this.messagesContainer.querySelector(`[data-message-id="${escapedMessageId}"]`);
         if (messageElement) {
             messageElement.remove();
         }

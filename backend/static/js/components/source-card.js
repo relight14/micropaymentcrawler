@@ -354,7 +354,9 @@ class SourceCard {
             return;
         }
         
-        const cardElement = document.querySelector(`[data-source-id="${enrichedSource.id}"]`);
+        // Escape source ID to handle potential special characters in CSS selectors
+        const escapedId = CSS.escape(enrichedSource.id);
+        const cardElement = document.querySelector(`[data-source-id="${escapedId}"]`);
         if (!cardElement) {
             console.log(`⚠️ Card not found for source ID: ${enrichedSource.id}`);
             return;
@@ -964,7 +966,9 @@ class SourceCard {
         }
         
         // Use passed cardElement or fallback to query (for backwards compatibility)
-        const sourceCard = cardElement || document.querySelector(`[data-source-id="${source.id}"]`);
+        // Escape source ID to handle potential special characters in CSS selectors
+        const escapedId = CSS.escape(source.id);
+        const sourceCard = cardElement || document.querySelector(`[data-source-id="${escapedId}"]`);
         
         if (isSelected) {
             if (sourceCard) {
