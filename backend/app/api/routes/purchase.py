@@ -196,6 +196,10 @@ async def get_checkout_state(
     import logging
     logger = logging.getLogger(__name__)
     
+    logger.info(f"🔍 [CHECKOUT-STATE] Starting checkout state check")
+    logger.info(f"🔍 [CHECKOUT-STATE] Request: price_cents={checkout_request.price_cents}, content_id={checkout_request.content_id}")
+    logger.info(f"🔍 [CHECKOUT-STATE] Has authorization header: {authorization is not None and authorization.startswith('Bearer ')}")
+    
     # Check authentication
     is_authenticated = False
     balance_cents = 0
@@ -203,6 +207,7 @@ async def get_checkout_state(
     
     if not authorization or not authorization.startswith("Bearer "):
         # Not authenticated
+        logger.info(f"🔍 [CHECKOUT-STATE] Result: NOT AUTHENTICATED - next_action=authenticate")
         return CheckoutStateResponse(
             next_required_action="authenticate",
             is_authenticated=False,
@@ -221,6 +226,7 @@ async def get_checkout_state(
         
         if "error" in balance_result:
             # Token invalid or expired
+            logger.info(f"🔍 [CHECKOUT-STATE] Result: TOKEN INVALID - balance_result={balance_result}")
             return CheckoutStateResponse(
                 next_required_action="authenticate",
                 is_authenticated=False,
@@ -233,6 +239,7 @@ async def get_checkout_state(
         
         is_authenticated = True
         balance_cents = balance_result.get("balance_cents") or balance_result.get("balance", 0)
+        logger.info(f"🔍 [CHECKOUT-STATE] User authenticated, balance_cents={balance_cents}")
         
         # Check if content already purchased (if content_id provided)
         if checkout_request.content_id:
@@ -245,6 +252,7 @@ async def get_checkout_state(
         
         # If already purchased, no action needed
         if already_purchased:
+            logger.info(f"🔍 [CHECKOUT-STATE] Result: ALREADY PURCHASED - next_action=none")
             return CheckoutStateResponse(
                 next_required_action="none",
                 is_authenticated=True,
@@ -259,6 +267,7 @@ async def get_checkout_state(
         shortfall = max(0, checkout_request.price_cents - balance_cents)
         
         if shortfall > 0:
+            logger.info(f"🔍 [CHECKOUT-STATE] Result: INSUFFICIENT FUNDS - balance={balance_cents}, required={checkout_request.price_cents}, shortfall={shortfall}")
             return CheckoutStateResponse(
                 next_required_action="fund_wallet",
                 is_authenticated=True,
@@ -270,6 +279,7 @@ async def get_checkout_state(
             )
         
         # Ready to purchase
+        logger.info(f"🔍 [CHECKOUT-STATE] Result: READY TO PURCHASE - balance={balance_cents}, required={checkout_request.price_cents}")
         return CheckoutStateResponse(
             next_required_action="purchase",
             is_authenticated=True,
@@ -468,20 +478,25 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 content_id = f"mock_content_{uuid.uuid4().hex[:8]}"
             else:
                 # REAL MODE: Register content with LedeWire first, then process purchase
+                logger.info(f"💳 [PURCHASE] Starting REAL MODE purchase flow")
+                logger.info(f"💳 [PURCHASE] User: {user_id[:20]}..., Price: ${calculated_price:.2f}, Sources: {len(sources)}")
                 
                 # Step 1: Check cache for existing content_id (avoid duplicate registration)
                 source_ids_list = [s.id for s in sources]
                 price_cents = int(calculated_price * 100)
                 cache_key = ledger.generate_content_cache_key(purchase_request.query, source_ids_list, price_cents)
+                logger.info(f"💳 [PURCHASE] Step 1: Checking content_id cache (key={cache_key[:40]}...)")
                 cached = ledger.get_cached_content_id(cache_key)
                 
                 if cached:
                     # Use cached content_id
                     content_id = cached["content_id"]
-                    logger.info(f"📝 [PURCHASE] Using cached content_id={content_id}")
+                    logger.info(f"💳 [PURCHASE] Step 1 Result: CACHE HIT - content_id={content_id}")
                 else:
                     # Step 2: Register the research report as content in LedeWire
                     # Clearcite is the seller, we register the report before user can purchase
+                    logger.info(f"💳 [PURCHASE] Step 1 Result: CACHE MISS - need to register content")
+                    logger.info(f"💳 [PURCHASE] Step 2: Registering content with LedeWire as seller")
                     try:
                         # Build content stub for LedeWire (reference only, not full content)
                         report_title = f"Research Report: {purchase_request.query[:100]}"
@@ -495,6 +510,8 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                             "source_ids": source_ids_list[:10]  # First 10 source IDs
                         }
                         
+                        logger.info(f"💳 [PURCHASE] Step 2: Calling ledewire.register_content(title='{report_title[:50]}...', price_cents={price_cents})")
+                        
                         # Register with LedeWire (visibility: private for research reports)
                         registration_result = ledewire.register_content(
                             title=report_title,
@@ -504,9 +521,11 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                             metadata=content_metadata
                         )
                         
+                        logger.info(f"💳 [PURCHASE] Step 2 Result: registration_result={registration_result}")
+                        
                         content_id = registration_result.get("id")
                         if not content_id:
-                            logger.error(f"Content registration returned no ID: {registration_result}")
+                            logger.error(f"💳 [PURCHASE] Step 2 FAILED: Content registration returned no ID: {registration_result}")
                             raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
                         
                         # Cache the content_id for future lookups (24 hour expiry)
@@ -518,13 +537,16 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                             expires_hours=24
                         )
                         
-                        logger.info(f"📝 [PURCHASE] Content registered and cached: content_id={content_id}")
+                        logger.info(f"💳 [PURCHASE] Step 2 SUCCESS: content_id={content_id} registered and cached")
                         
                     except Exception as e:
-                        logger.error(f"Content registration failed: {e}")
+                        logger.error(f"💳 [PURCHASE] Step 2 EXCEPTION: {type(e).__name__}: {e}")
                         raise HTTPException(status_code=500, detail=f"Failed to register content: {str(e)}")
                 
                 # Step 3: Process the purchase with the registered content_id
+                logger.info(f"💳 [PURCHASE] Step 3: Creating purchase with LedeWire")
+                logger.info(f"💳 [PURCHASE] Step 3: content_id={content_id}, price_cents={price_cents}, idempotency_key={purchase_request.idempotency_key}")
+                
                 payment_result = ledewire.create_purchase(
                     access_token=access_token,
                     content_id=content_id,
@@ -532,8 +554,11 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                     idempotency_key=purchase_request.idempotency_key
                 )
                 
+                logger.info(f"💳 [PURCHASE] Step 3 Result: payment_result={payment_result}")
+                
                 if "error" in payment_result:
                     error_msg = ledewire.handle_api_error(payment_result)
+                    logger.error(f"💳 [PURCHASE] Step 3 FAILED: error={error_msg}")
                     if "insufficient" in error_msg.lower():
                         raise HTTPException(status_code=402, detail=f"Insufficient funds: {error_msg}")
                     else:
@@ -542,7 +567,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 transaction_id = payment_result.get("id") or payment_result.get("transaction_id") or f"fallback_txn_{uuid.uuid4().hex[:12]}"
                 wallet_id = payment_result.get("wallet_id")
                 
-                logger.info(f"💳 [PURCHASE] Payment completed: transaction_id={transaction_id}")
+                logger.info(f"💳 [PURCHASE] Step 3 SUCCESS: transaction_id={transaction_id}, wallet_id={wallet_id}")
             
             message = f"Report generated! ${calculated_price:.2f} for {new_source_count} new source(s)."
         

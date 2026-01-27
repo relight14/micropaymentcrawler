@@ -449,25 +449,38 @@ class LedeWireAPI:
         The seller token is used to register content with LedeWire.
         Clearcite is the seller, users are buyers.
         """
+        logger.info("🔐 [SELLER-AUTH] Checking seller authentication status")
+        
         # Check if we have a valid cached token (with 5 min buffer)
         if self._seller_token and self._seller_token_expires:
             buffer_time = timedelta(minutes=5)
             if datetime.utcnow() + buffer_time < self._seller_token_expires:
-                logger.debug("Using cached seller token")
+                remaining = (self._seller_token_expires - datetime.utcnow()).total_seconds()
+                logger.info(f"🔐 [SELLER-AUTH] Using cached seller token (expires in {remaining:.0f}s)")
                 return self._seller_token
+            else:
+                logger.info(f"🔐 [SELLER-AUTH] Cached token expired or expiring soon, re-authenticating")
+        else:
+            logger.info(f"🔐 [SELLER-AUTH] No cached token, authenticating fresh")
         
         # Need to authenticate
         if not self.seller_api_key or not self.seller_api_secret:
+            logger.error("🔐 [SELLER-AUTH] FAILED: Seller API credentials not configured")
             raise ValueError("Seller API credentials not configured (LEDEWIRE_SELLER_API_KEY, LEDEWIRE_SELLER_API_SECRET)")
         
+        logger.info(f"🔐 [SELLER-AUTH] Credentials found: key={self.seller_api_key[:8]}..., secret={'*' * 8}")
+        
         try:
-            logger.info("Authenticating as seller with LedeWire API")
+            logger.info(f"🔐 [SELLER-AUTH] Calling POST /v1/auth/login/api-key")
             
             result = self.login_api_key(self.seller_api_key, self.seller_api_secret)
+            
+            logger.info(f"🔐 [SELLER-AUTH] Response received: keys={list(result.keys())}")
             
             # Extract token from response
             access_token = result.get("access_token") or result.get("token")
             if not access_token:
+                logger.error(f"🔐 [SELLER-AUTH] FAILED: No access token in response: {result}")
                 raise ValueError(f"No access token in seller auth response: {result}")
             
             # Cache the token with 1 hour expiration (conservative default)
@@ -476,11 +489,11 @@ class LedeWireAPI:
             self._seller_token = access_token
             self._seller_token_expires = datetime.utcnow() + timedelta(seconds=expires_in)
             
-            logger.info(f"Seller authenticated successfully, token expires in {expires_in}s")
+            logger.info(f"🔐 [SELLER-AUTH] SUCCESS: Seller authenticated, token expires in {expires_in}s")
             return self._seller_token
             
         except requests.RequestException as e:
-            logger.error(f"Seller authentication failed: {e}")
+            logger.error(f"🔐 [SELLER-AUTH] EXCEPTION: {type(e).__name__}: {e}")
             raise
     
     def register_content(
@@ -507,11 +520,16 @@ class LedeWireAPI:
         """
         import base64
         
+        logger.info(f"📝 [REGISTER-CONTENT] Starting content registration")
+        logger.info(f"📝 [REGISTER-CONTENT] title='{title[:60]}...', price_cents={price_cents}, visibility={visibility}")
+        
         # Get seller token (will authenticate if needed)
         seller_token = self.authenticate_as_seller()
+        logger.info(f"📝 [REGISTER-CONTENT] Got seller token: {seller_token[:20]}...")
         
         # Base64 encode the content body (LedeWire requirement)
         content_body_b64 = base64.b64encode(content_body.encode('utf-8')).decode('utf-8')
+        logger.info(f"📝 [REGISTER-CONTENT] Content body encoded (length={len(content_body_b64)})")
         
         # Build request payload
         request_data = {
@@ -524,9 +542,11 @@ class LedeWireAPI:
         
         if metadata:
             request_data["metadata"] = metadata
+            logger.info(f"📝 [REGISTER-CONTENT] Metadata included: keys={list(metadata.keys())}")
         
         try:
-            logger.info(f"Registering content: '{title}' (${price_cents/100:.2f}, {visibility})")
+            logger.info(f"📝 [REGISTER-CONTENT] Calling POST {self.api_base}/seller/content")
+            logger.info(f"📝 [REGISTER-CONTENT] Request data: content_type=markdown, title='{title[:40]}...', price_cents={price_cents}, visibility={visibility}")
             
             response = self.session.post(
                 f"{self.api_base}/seller/content",
@@ -535,21 +555,29 @@ class LedeWireAPI:
                 timeout=15
             )
             
-            logger.info(f"Content registration response: {response.status_code}")
+            logger.info(f"📝 [REGISTER-CONTENT] Response status: {response.status_code}")
+            logger.info(f"📝 [REGISTER-CONTENT] Response headers: {dict(response.headers)}")
+            
+            try:
+                response_body = response.json()
+                logger.info(f"📝 [REGISTER-CONTENT] Response body: {response_body}")
+            except:
+                logger.info(f"📝 [REGISTER-CONTENT] Response text: {response.text[:500]}")
+                response_body = {}
             
             if response.status_code == 201:
-                result = response.json()
-                content_id = result.get("id")
-                logger.info(f"Content registered successfully: content_id={content_id}")
-                return result
+                content_id = response_body.get("id")
+                logger.info(f"📝 [REGISTER-CONTENT] SUCCESS: content_id={content_id}")
+                return response_body
             else:
+                logger.error(f"📝 [REGISTER-CONTENT] FAILED: status={response.status_code}")
                 response.raise_for_status()
-                return response.json()
+                return response_body
                 
         except requests.RequestException as e:
-            logger.error(f"Content registration failed: {e}")
+            logger.error(f"📝 [REGISTER-CONTENT] EXCEPTION: {type(e).__name__}: {e}")
             if hasattr(e, 'response') and e.response is not None:
-                logger.error(f"Response: {e.response.status_code} - {e.response.text}")
+                logger.error(f"📝 [REGISTER-CONTENT] Error response: {e.response.status_code} - {e.response.text}")
                 if e.response.status_code == 400:
                     raise requests.HTTPError(f"Invalid content data: {e.response.text}", response=e.response)
                 elif e.response.status_code == 401:
