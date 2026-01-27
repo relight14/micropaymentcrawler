@@ -248,16 +248,29 @@ To test the new flow:
 ### Known Limitations
 
 - The fallback to inline registration adds latency if frontend doesn't provide content_id
-- Content registration caching is 24 hours - may need adjustment based on usage patterns
-- Mock mode generates random content_ids - consider using deterministic IDs for testing
+- ~~Content registration caching is 24 hours - may need adjustment based on usage patterns~~ **FIXED**: Content IDs now stored permanently
+- Mock mode ~~generates random content_ids~~ **FIXED**: Now uses deterministic IDs based on content hash
+
+## Content ID Reuse Solution
+
+**Problem Identified:** Cache expiry could cause duplicate registrations with new content_ids, breaking "already purchased" detection.
+
+**Solution Implemented:**
+1. Content IDs stored permanently (no expiration) in database
+2. New method `get_content_id_from_purchases()` checks if content ever registered
+3. Register-content endpoint reuses existing content_ids from previous purchases
+4. Every purchase records its content_id for future lookups
+
+**Result:** Same content always gets same content_id, forever. See `CONTENT_ID_REUSE_SOLUTION.md` for details.
 
 ## Related Files
 
 - `backend/app/api/routes/purchase.py` - Main purchase logic
 - `backend/schemas/api.py` - Request/response schemas
 - `backend/static/js/services/api.js` - Frontend API service
-- `backend/static/js/components/purchase-confirmation-modal.js` - Purchase modal UI
-- `attached_assets/ledewire_1758117324971.yml` - LedeWire API specification
+- `PURCHASE_FLOW_FIX.md` - Implementation documentation
+- `PURCHASE_FLOW_DIAGRAM.md` - Visual flow diagram
+- `CONTENT_ID_REUSE_SOLUTION.md` - Detailed explanation of content ID reuse mechanism
 
 ## References
 
