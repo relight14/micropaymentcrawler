@@ -106,6 +106,9 @@ class SourceCard {
             } else if (action === 'summarize') {
                 e.preventDefault();
                 this._handleSummarize(sourceId, actionBtn);
+            } else if (action === 'full_access') {
+                e.preventDefault();
+                this._handleFullAccess(sourceId, actionBtn);
             } else if (action === 'dismiss') {
                 e.preventDefault();
                 this._handleDismiss(sourceId, sourceCard);
@@ -770,9 +773,13 @@ class SourceCard {
             rightSide.appendChild(viewBtn);
         }
 
-        // Summarize button (replaces unlock button for quick article summaries)
+        // Summarize button (for AI summary access)
         const summarizeBtn = this._createSummarizeButton(source);
         rightSide.appendChild(summarizeBtn);
+
+        // Full Access button (for human reader access)
+        const fullAccessBtn = this._createFullAccessButton(source);
+        rightSide.appendChild(fullAccessBtn);
 
         actions.appendChild(leftSide);
         actions.appendChild(rightSide);
@@ -1105,6 +1112,30 @@ class SourceCard {
     }
 
     /**
+     * Create full access button
+     */
+    _createFullAccessButton(source) {
+        const button = document.createElement('button');
+        button.className = 'full-access-btn';
+        button.setAttribute('data-action', 'full_access');
+        
+        // Use purchase_price if available, otherwise fall back to unlock_price or default
+        const price = source.purchase_price || source.unlock_price || 0.25;
+        
+        const icon = document.createElement('span');
+        icon.textContent = '📖';
+        
+        const text = document.createElement('span');
+        text.textContent = `Full Access $${price.toFixed(2)}`;
+        
+        button.appendChild(icon);
+        button.appendChild(text);
+        button.setAttribute('title', 'Get full article access for human reading');
+        
+        return button;
+    }
+
+    /**
      * Create unlock/download action button with fresh state
      */
     _createActionButton(source) {
@@ -1259,6 +1290,47 @@ class SourceCard {
             console.log('✨ SUMMARIZE: Event dispatched successfully');
         } catch (error) {
             console.error('✨ SUMMARIZE: ERROR in _handleSummarize:', error);
+        }
+    }
+
+    /**
+     * Handle full access request
+     */
+    async _handleFullAccess(sourceId, buttonElement) {
+        console.log('📖 FULL ACCESS: Button clicked! SourceID:', sourceId);
+        
+        // Lookup source from appState
+        const researchData = this.appState?.getCurrentResearchData();
+        if (!researchData || !researchData.sources) {
+            console.error('📖 FULL ACCESS: No research data available');
+            return;
+        }
+        
+        const source = researchData.sources.find(s => s.id === sourceId);
+        if (!source) {
+            console.error('📖 FULL ACCESS: Source not found for ID:', sourceId);
+            return;
+        }
+        
+        console.log('📖 FULL ACCESS: Source found:', source.title);
+        
+        try {
+            // Calculate price
+            const price = source.purchase_price || source.unlock_price || 0.25;
+            
+            // Dispatch event for app to handle
+            const event = new CustomEvent('sourceFullAccessRequested', {
+                detail: { 
+                    source, 
+                    price,
+                    buttonElement // Pass button for potential loading state
+                }
+            });
+            console.log('📖 FULL ACCESS: Dispatching event with detail:', event.detail);
+            document.dispatchEvent(event);
+            console.log('📖 FULL ACCESS: Event dispatched successfully');
+        } catch (error) {
+            console.error('📖 FULL ACCESS: ERROR in _handleFullAccess:', error);
         }
     }
 
