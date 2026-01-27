@@ -428,6 +428,23 @@ export class APIService {
         }, 'Article summarization failed');
     }
 
+    async getFullAccess(sourceId, url, purchasePrice) {
+        // Generate idempotency key for full access purchase
+        const userId = this.authService.getUserId();
+        const idempotencyKey = generateIdempotencyKey(userId, `fullaccess_${sourceId}`);
+        
+        return await this._fetchWithRetry(`${this.baseURL}/api/sources/full-access`, {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({
+                source_id: sourceId,
+                url: url,
+                purchase_price: purchasePrice,
+                idempotency_key: idempotencyKey
+            })
+        }, 'Full article access failed');
+    }
+
     async checkCheckoutState(priceCents, contentId = null) {
         try {
             const response = await fetch(`${this.baseURL}/api/purchase/checkout-state`, {

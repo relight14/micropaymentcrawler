@@ -11,6 +11,7 @@ import { ReportBuilder } from './components/report-builder.js';
 import { OnboardingModal } from './components/onboarding-modal.js';
 import { ToastManager } from './app/toast-manager.js';
 import { ModalController } from './app/modal-controller.js';
+import { PurchaseConfirmationModal } from './components/purchase-confirmation-modal.js';
 import { EventRouter } from './app/event-router.js';
 import { SourceManager } from './managers/source-manager.js';
 import { MessageCoordinator } from './managers/message-coordinator.js';
@@ -49,6 +50,12 @@ export class ChatResearchApp {
             this.toastManager, 
             this.baseURL,
             this.apiService  // Pass apiService for payment status polling
+        );
+        this.purchaseModal = new PurchaseConfirmationModal(
+            this.authService,
+            this.apiService,
+            this.modalController,
+            this.toastManager
         );
         this.eventRouter = new EventRouter();
         
@@ -185,6 +192,59 @@ export class ChatResearchApp {
             this.toastManager.show(e.detail.warning, 'warning');
         });
         
+        // Listen for Summarize event from SourceCard
+        document.addEventListener('sourceSummarizeRequested', async (e) => {
+            logger.debug('📡 Source summarize requested', e.detail);
+            const { source, price, buttonElement } = e.detail;
+            
+            // Show purchase confirmation modal
+            await this.purchaseModal.showSummarizeConfirmation(source, async (result) => {
+                // On success, show summary
+                if (result.summary) {
+                    this.addMessage('assistant', result.summary, { 
+                        sourceId: source.id,
+                        sourceTitle: source.title 
+                    });
+                    this._scrollToLastMessage();
+                }
+                
+                // Refresh wallet balance
+                if (this.authService.isAuthenticated()) {
+                    await this.authService.updateWalletBalance();
+                    const balance = this.authService.getWalletBalance();
+                    this.uiManager.updateWalletDisplay(balance);
+                    this.updateAuthButton();
+                }
+            });
+        });
+        
+        // Listen for Full Access event from SourceCard
+        document.addEventListener('sourceFullAccessRequested', async (e) => {
+            logger.debug('📡 Source full access requested', e.detail);
+            const { source, price, buttonElement } = e.detail;
+            
+            // Show purchase confirmation modal
+            await this.purchaseModal.showFullAccessConfirmation(source, async (result) => {
+                // On success, show article content
+                if (result.content) {
+                    this.addMessage('assistant', result.content, { 
+                        sourceId: source.id,
+                        sourceTitle: source.title,
+                        isFullArticle: true
+                    });
+                    this._scrollToLastMessage();
+                }
+                
+                // Refresh wallet balance
+                if (this.authService.isAuthenticated()) {
+                    await this.authService.updateWalletBalance();
+                    const balance = this.authService.getWalletBalance();
+                    this.uiManager.updateWalletDisplay(balance);
+                    this.updateAuthButton();
+                }
+            });
+        });
+        
         // Listen for Build Research Packet event from OutlineBuilder
         AppEvents.addEventListener('buildResearchPacket', async (e) => {
             logger.debug('📡 AppEvents: Build Research Packet triggered', e.detail);
@@ -207,7 +267,6 @@ export class ChatResearchApp {
             
             const sources = Array.from(sourceMap.values());
             const sourceCount = sources.length;
-            const price = sourceCount * 0.05; // $0.05 per source
             // FIX: Prioritize project-specific research query over global currentQuery
             // to prevent title spillage when switching between projects
             const query = projectStore.getResearchQuery() || this.appState.getCurrentQuery() || "Research Query";
@@ -220,64 +279,43 @@ export class ChatResearchApp {
                 return;
             }
             
-            console.log(`💰 Report requested - ${sourceCount} source${sourceCount !== 1 ? 's' : ''} at $${price.toFixed(2)}`);
+            console.log(`💰 Report requested - ${sourceCount} source${sourceCount !== 1 ? 's' : ''}`);
             
-            // Pre-purchase verification: Check checkout state before showing purchase modal
-            const priceCents = Math.round(price * 100);
-            let checkoutState;
-            
-            try {
-                checkoutState = await this.apiService.checkCheckoutState(priceCents);
-                logger.debug('📋 Checkout state:', checkoutState);
-            } catch (checkoutError) {
-                console.error('❌ Failed to check checkout state:', checkoutError);
-                this.toastManager.show('Unable to verify purchase status. Please try again.', 'error');
-                return;
-            }
-            
-            // Handle checkout state actions
-            if (checkoutState.next_required_action === 'authenticate') {
-                logger.debug('🔐 Authentication required - showing auth modal');
-                this.modalController.showAuthModal();
-                return;
-            }
-            
-            if (checkoutState.next_required_action === 'fund_wallet') {
-                logger.debug(`💳 Insufficient funds - need $${(checkoutState.shortfall_cents / 100).toFixed(2)} more`);
-                // Show funding modal with suggested minimum amount
-                this.modalController.showFundingModal(checkoutState.shortfall_cents);
-                this.toastManager.show(checkoutState.message, 'warning');
-                return;
-            }
-            
-            if (checkoutState.next_required_action === 'none' && checkoutState.already_purchased) {
-                logger.debug('✅ Content already purchased');
-                this.toastManager.show('You already have access to this content!', 'info');
-                return;
-            }
-            
-            // Ready to purchase - show purchase confirmation modal
-            const purchaseDetails = {
-                tier: 'report',
-                price: price,
-                selectedSources: sources,
-                query: query,
-                titleOverride: 'Generate Research Report',
-                customDescription: `Create a comprehensive research report with ${sourceCount} source${sourceCount !== 1 ? 's' : ''}`,
-                walletBalance: (checkoutState.balance_cents || 0) / 100  // Pass current balance for display
-            };
-            
-            const userConfirmed = await this.uiManager.showPurchaseConfirmationModal(purchaseDetails);
-            
-            if (!userConfirmed) {
-                logger.debug('🚫 Report generation cancelled by user');
-                return;
-            }
-            
-            logger.debug('✅ Purchase confirmed, generating report...');
-            
-            // Trigger report generation via ReportBuilder
-            this.reportBuilder.generateReport(query, sources, outlineSnapshot);
+            // Show purchase confirmation modal with pricing quote
+            await this.purchaseModal.showReportConfirmation(query, sources, outlineSnapshot, async (result) => {
+                // Remove progressive loading message if it exists
+                if (this.currentReportLoadingMessage) {
+                    this.messageCoordinator.removeLoading(this.currentReportLoadingMessage);
+                    this.currentReportLoadingMessage = null;
+                }
+                
+                // Display the report
+                const message = this.reportBuilder.displayReport(result);
+                if (message) {
+                    this.addMessage(message.sender, message.content, message.metadata);
+                }
+                
+                // Add success message BEFORE scrolling
+                this.addMessage('system', '✅ AI research report generated successfully!');
+                
+                // Auto-scroll to the report
+                if (message) {
+                    this._scrollToSecondLastMessage();
+                }
+                
+                // Refresh wallet balance after purchase
+                if (this.authService.isAuthenticated()) {
+                    try {
+                        await this.authService.updateWalletBalance();
+                        const balance = this.authService.getWalletBalance();
+                        this.uiManager.updateWalletDisplay(balance);
+                        this.updateAuthButton();
+                        console.log('💰 Wallet balance refreshed after report purchase:', balance);
+                    } catch (error) {
+                        console.error('Failed to refresh wallet balance after purchase:', error);
+                    }
+                }
+            });
         });
         
         // Guard to prevent duplicate search triggers during login flow
