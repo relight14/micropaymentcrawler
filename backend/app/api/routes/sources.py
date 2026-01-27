@@ -252,7 +252,7 @@ async def summarize_source(
             response_data={}
         )
         
-        # Calculate price (for display purposes - mock purchase)
+        # Calculate price for summarization
         price_cents = calculate_summary_price(summarize_request.license_cost)
         
         # Try to scrape full article, fallback to excerpt if paywalled
@@ -483,50 +483,45 @@ async def get_full_access(
                 raise
         
         # Register content with LedeWire (for payment tracking)
-        import os
-        if os.getenv("LEDEWIRE_MOCK_PAYMENTS") != "true":
-            try:
-                # Register the article with LedeWire
-                content_title = f"Full Access: {full_access_request.url}"
-                content_stub = f"Full article access for: {full_access_request.url}"
-                
-                registration_result = ledewire.register_content(
-                    title=content_title,
-                    content_body=content_stub,
-                    price_cents=price_cents,
-                    visibility="private",
-                    metadata={
-                        "source_id": full_access_request.source_id,
-                        "url": full_access_request.url,
-                        "access_type": "full_article"
-                    }
-                )
-                
-                content_id = registration_result.get("id")
-                if not content_id:
-                    logger.error(f"Content registration returned no ID: {registration_result}")
-                    raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
-                
-                # Process payment
-                payment_result = ledewire.create_purchase(
-                    access_token=access_token,
-                    content_id=content_id,
-                    price_cents=price_cents,
-                    idempotency_key=full_access_request.idempotency_key
-                )
-                
-                if "error" in payment_result:
-                    error_msg = ledewire.handle_api_error(payment_result)
-                    raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
-                
-                transaction_id = payment_result.get("id") or payment_result.get("transaction_id") or f"fullaccess_{hashlib.sha256(full_access_request.idempotency_key.encode()).hexdigest()[:12]}"
-                
-            except Exception as e:
-                logger.error(f"Payment processing failed: {e}")
-                raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
-        else:
-            # Mock mode - generate fake transaction
-            transaction_id = f"mock_fullaccess_{hashlib.sha256(full_access_request.idempotency_key.encode()).hexdigest()[:12]}"
+        try:
+            # Register the article with LedeWire
+            content_title = f"Full Access: {full_access_request.url}"
+            content_stub = f"Full article access for: {full_access_request.url}"
+            
+            registration_result = ledewire.register_content(
+                title=content_title,
+                content_body=content_stub,
+                price_cents=price_cents,
+                visibility="private",
+                metadata={
+                    "source_id": full_access_request.source_id,
+                    "url": full_access_request.url,
+                    "access_type": "full_article"
+                }
+            )
+            
+            content_id = registration_result.get("id")
+            if not content_id:
+                logger.error(f"Content registration returned no ID: {registration_result}")
+                raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
+            
+            # Process payment
+            payment_result = ledewire.create_purchase(
+                access_token=access_token,
+                content_id=content_id,
+                price_cents=price_cents,
+                idempotency_key=full_access_request.idempotency_key
+            )
+            
+            if "error" in payment_result:
+                error_msg = ledewire.handle_api_error(payment_result)
+                raise HTTPException(status_code=402, detail=f"Payment failed: {error_msg}")
+            
+            transaction_id = payment_result.get("id") or payment_result.get("transaction_id") or f"fullaccess_{hashlib.sha256(full_access_request.idempotency_key.encode()).hexdigest()[:12]}"
+            
+        except Exception as e:
+            logger.error(f"Payment processing failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Payment processing failed: {str(e)}")
         
         # Build response
         response_data = {
