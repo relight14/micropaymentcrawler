@@ -289,8 +289,9 @@ export class ChatResearchApp {
                     this.currentReportLoadingMessage = null;
                 }
                 
-                // Display the report
-                const message = this.reportBuilder.displayReport(result);
+                // Display the report - extract packet from purchase response
+                const reportData = result.packet || result;
+                const message = this.reportBuilder.displayReport(reportData);
                 if (message) {
                     this.addMessage(message.sender, message.content, message.metadata);
                 }
