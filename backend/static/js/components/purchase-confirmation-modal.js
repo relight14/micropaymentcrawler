@@ -76,16 +76,27 @@ export class PurchaseConfirmationModal {
             console.log(`📝 Content registered: content_id=${contentId}, price=${priceCents} cents`);
         } catch (error) {
             console.error('Content registration failed:', error);
-            this.toastManager.show('Failed to prepare purchase', 'error', 3000);
+            // Provide more specific error message to user
+            const errorMessage = error.message || 'Unable to prepare purchase';
+            this.toastManager.show(`Registration failed: ${errorMessage}. Please try again.`, 'error', 5000);
             return;
         }
         
-        // Step 2: Get pricing quote for display (optional, since we have price from registration)
+        // Step 2: Get pricing quote for display
         const quoteResult = await this._getPricingQuote(query, outlineStructure);
         
         const totalCost = priceCents / 100;
-        const newSourceCount = quoteResult.success ? quoteResult.new_source_count : sources.length;
-        const previousSourceCount = quoteResult.success ? quoteResult.previous_source_count : 0;
+        // Use quote results if available, otherwise use conservative estimates
+        let newSourceCount = sources.length;
+        let previousSourceCount = 0;
+        
+        if (quoteResult.success) {
+            newSourceCount = quoteResult.new_source_count;
+            previousSourceCount = quoteResult.previous_source_count;
+        } else {
+            // Quote failed - show warning and use all sources as "new" estimate
+            console.warn('⚠️ Pricing quote failed, displaying conservative estimate');
+        }
 
         this.currentPurchase = {
             type: 'report',

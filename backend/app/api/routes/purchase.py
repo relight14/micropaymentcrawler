@@ -592,8 +592,10 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 
                 if not content_id:
                     # Fallback: If frontend didn't call register-content, we need to do it here
-                    # This maintains backwards compatibility but is not the recommended flow
-                    logger.warning("⚠️ [PURCHASE] No content_id provided - registering content inline (deprecated flow)")
+                    # DEPRECATED: This maintains backwards compatibility but is not the recommended flow
+                    # TODO: Remove this fallback in v2.0 - all clients should call register-content first
+                    logger.warning("⚠️ [PURCHASE] No content_id provided - using deprecated inline registration flow. "
+                                 "Frontend should call POST /api/purchase/register-content before purchase.")
                     
                     source_ids_list = [s.id for s in sources]
                     price_cents = int(calculated_price * 100)
