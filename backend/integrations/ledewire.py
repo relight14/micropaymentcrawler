@@ -501,7 +501,7 @@ class LedeWireAPI:
         title: str,
         content_body: str,
         price_cents: int,
-        visibility: str = "private",
+        visibility: str = "unlisted",
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
@@ -512,7 +512,7 @@ class LedeWireAPI:
             title: Content title
             content_body: Full content as markdown (will be base64 encoded)
             price_cents: Price in cents
-            visibility: "public" or "private" (default private for reports)
+            visibility: "public" or "unlisted" (default unlisted for reports)
             metadata: Optional metadata dict (author, sources, etc.)
         
         Returns:

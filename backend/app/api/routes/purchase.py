@@ -512,12 +512,12 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                         
                         logger.info(f"💳 [PURCHASE] Step 2: Calling ledewire.register_content(title='{report_title[:50]}...', price_cents={price_cents})")
                         
-                        # Register with LedeWire (visibility: private for research reports)
+                        # Register with LedeWire (visibility: unlisted for research reports)
                         registration_result = ledewire.register_content(
                             title=report_title,
                             content_body=content_stub,
                             price_cents=price_cents,
-                            visibility="private",
+                            visibility="unlisted",
                             metadata=content_metadata
                         )
                         
@@ -533,7 +533,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                             cache_key=cache_key,
                             content_id=content_id,
                             price_cents=price_cents,
-                            visibility="private",
+                            visibility="unlisted",
                             expires_hours=24
                         )
                         
