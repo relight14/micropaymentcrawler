@@ -549,37 +549,7 @@ export class APIService {
         }
     }
 
-    /**
-     * Register content with LedeWire to get content_id.
-     * This must be called BEFORE checkout-state to enable proper purchase verification.
-     * 
-     * @param {string} query - Research query
-     * @param {Object} outlineStructure - Outline structure with sources
-     * @returns {Promise<{success: boolean, content_id: string, price_cents: number}>}
-     */
-    async registerContent(query, outlineStructure) {
-        try {
-            const response = await this._fetchWithRetry(
-                `${this.baseURL}/api/purchase/register-content`,
-                {
-                    method: 'POST',
-                    headers: this.getAuthHeaders(),
-                    body: JSON.stringify({
-                        query: query,
-                        outline_structure: outlineStructure
-                    })
-                },
-                'Failed to register content'
-            );
-            
-            return response;
-        } catch (error) {
-            console.error('Error registering content:', error);
-            throw error;
-        }
-    }
-
-    async generateReport(query, selectedSources = null, outlineStructure = null, contentId = null) {
+    async generateReport(query, selectedSources = null, outlineStructure = null) {
         // Generate stable idempotency key for this purchase attempt
         const userId = this.authService.getUserId();
         const sourceIds = selectedSources ? selectedSources.map(s => s.id).sort().join(',') : '';
@@ -598,11 +568,6 @@ export class APIService {
             query,
             idempotency_key: idempotencyKey
         };
-        
-        // Include content_id if provided (from register-content endpoint)
-        if (contentId) {
-            requestBody.content_id = contentId;
-        }
         
         // Include full source objects if provided (frontend is source of truth)
         if (selectedSources && selectedSources.length > 0) {

@@ -9,11 +9,7 @@ import time
 import json
 import base64
 
-from schemas.api import (
-    PurchaseRequest, PurchaseResponse, 
-    CheckoutStateRequest, CheckoutStateResponse,
-    RegisterContentRequest, RegisterContentResponse
-)
+from schemas.api import PurchaseRequest, PurchaseResponse, CheckoutStateRequest, CheckoutStateResponse
 from schemas.domain import ResearchPacket
 from services.ai.report_generator import ReportGeneratorService
 from data.ledger_repository import ResearchLedger
@@ -342,151 +338,6 @@ async def get_pricing_quote(
         raise HTTPException(status_code=500, detail=f"Failed to calculate pricing quote: {str(e)}")
 
 
-@router.post("/register-content", response_model=RegisterContentResponse)
-@limiter.limit("30/minute")
-async def register_content(
-    request: Request,
-    content_request: RegisterContentRequest,
-    authorization: str = Header(None, alias="Authorization")
-):
-    """
-    Register content with LedeWire before purchase.
-    This endpoint should be called BEFORE checkout-state to get a content_id.
-    
-    Flow:
-    1. Frontend calls this to register content and get content_id
-    2. Frontend calls checkout-state with the content_id
-    3. Frontend calls purchase endpoint with the content_id
-    """
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    try:
-        # Extract and validate Bearer token
-        access_token = extract_bearer_token(authorization)
-        validate_user_token(access_token)
-        user_id = extract_user_id_from_token(access_token)
-        
-        # Extract sources from outline structure
-        outline = content_request.outline_structure or {}
-        sources = extract_sources_from_outline(outline)
-        
-        if not sources:
-            raise HTTPException(status_code=400, detail="No sources provided in outline structure")
-        
-        # Calculate pricing
-        pricing_info = calculate_incremental_pricing(user_id, content_request.query, sources, logger)
-        calculated_price = pricing_info["calculated_price"]
-        price_cents = int(calculated_price * 100)
-        
-        logger.info(f"📝 [REGISTER] Registering content for query: '{content_request.query}'")
-        logger.info(f"📝 [REGISTER] Price: ${calculated_price:.2f} ({pricing_info['new_source_count']} new sources)")
-        
-        # Check if running in mock mode
-        import os
-        if os.getenv("LEDEWIRE_MOCK_PAYMENTS") == "true":
-            # MOCK MODE: Return fake content_id (deterministic for same content)
-            source_ids_list = [s.id for s in sources]
-            cache_key = ledger.generate_content_cache_key(content_request.query, source_ids_list, price_cents)
-            
-            # Check if we already have a mock content_id for this cache_key
-            existing_content_id = ledger.get_content_id_from_purchases(cache_key)
-            if existing_content_id:
-                content_id = existing_content_id
-                logger.info(f"📝 [REGISTER] Mock mode - reusing existing content_id={content_id}")
-            else:
-                # Generate deterministic mock content_id from cache_key
-                content_id = f"mock_{cache_key[:12]}"
-                logger.info(f"📝 [REGISTER] Mock mode - new content_id={content_id}")
-                
-                # Store it so we can reuse it
-                ledger.store_content_id(
-                    cache_key=cache_key,
-                    content_id=content_id,
-                    price_cents=price_cents,
-                    visibility="private",
-                    expires_hours=None  # Never expires for purchase tracking
-                )
-        else:
-            # REAL MODE: Register content with LedeWire
-            
-            # Step 1: Generate cache key for this content
-            source_ids_list = [s.id for s in sources]
-            cache_key = ledger.generate_content_cache_key(content_request.query, source_ids_list, price_cents)
-            
-            # Step 2: Check if this exact content was ever purchased/registered before
-            existing_content_id = ledger.get_content_id_from_purchases(cache_key)
-            
-            if existing_content_id:
-                # Reuse existing content_id from previous purchase/registration
-                content_id = existing_content_id
-                logger.info(f"📝 [REGISTER] Reusing existing content_id={content_id} (prevents duplicate registration)")
-            else:
-                # Step 3: Check short-term cache (for registrations that haven't been purchased yet)
-                cached = ledger.get_cached_content_id(cache_key)
-                
-                if cached:
-                    # Use temporarily cached content_id
-                    content_id = cached["content_id"]
-                    logger.info(f"📝 [REGISTER] Using temporarily cached content_id={content_id}")
-                else:
-                    # Step 4: Register new content with LedeWire (first time seeing this content)
-                    try:
-                        # Build content stub for LedeWire (reference only, not full content)
-                        report_title = f"Research Report: {content_request.query[:100]}"
-                        content_stub = f"# {report_title}\n\nResearch report with {len(sources)} sources.\n\nGenerated by Clearcite."
-                        
-                        # Build metadata
-                        content_metadata = {
-                            "query": content_request.query,
-                            "source_count": len(sources),
-                            "generated_at": datetime.now().isoformat(),
-                            "source_ids": source_ids_list[:10]  # First 10 source IDs
-                        }
-                        
-                        # Register with LedeWire (visibility: private for research reports)
-                        registration_result = ledewire.register_content(
-                            title=report_title,
-                            content_body=content_stub,
-                            price_cents=price_cents,
-                            visibility="private",
-                            metadata=content_metadata
-                        )
-                        
-                        content_id = registration_result.get("id")
-                        if not content_id:
-                            logger.error(f"Content registration returned no ID: {registration_result}")
-                            raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
-                        
-                        # Store content_id permanently (never expires) for purchase tracking
-                        ledger.store_content_id(
-                            cache_key=cache_key,
-                            content_id=content_id,
-                            price_cents=price_cents,
-                            visibility="private",
-                            expires_hours=None  # Never expires - ensures content_id reuse forever
-                        )
-                        
-                        logger.info(f"📝 [REGISTER] Content registered with permanent mapping: content_id={content_id}")
-                        
-                    except Exception as e:
-                        logger.error(f"Content registration failed: {e}")
-                        raise HTTPException(status_code=500, detail=f"Failed to register content: {str(e)}")
-        
-        return RegisterContentResponse(
-            success=True,
-            content_id=content_id,
-            price_cents=price_cents,
-            message="Content registered successfully"
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error registering content: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to register content: {str(e)}")
-
-
 @router.post("", response_model=PurchaseResponse)
 @limiter.limit("10/minute")
 async def purchase_research(request: Request, purchase_request: PurchaseRequest, authorization: str = Header(None, alias="Authorization")):
@@ -614,67 +465,66 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
                 # MOCK MODE: Skip real payment, generate fake transaction
                 transaction_id = f"mock_txn_{uuid.uuid4().hex[:12]}"
                 wallet_id = None
-                content_id = purchase_request.content_id or f"mock_content_{uuid.uuid4().hex[:8]}"
+                content_id = f"mock_content_{uuid.uuid4().hex[:8]}"
             else:
-                # REAL MODE: Use the content_id from register-content endpoint
-                content_id = purchase_request.content_id
+                # REAL MODE: Register content with LedeWire first, then process purchase
                 
-                if not content_id:
-                    # Fallback: If frontend didn't call register-content, we need to do it here
-                    # DEPRECATED: This maintains backwards compatibility but is not the recommended flow
-                    # TODO: Remove this fallback in v2.0 - all clients should call register-content first
-                    logger.warning("⚠️ [PURCHASE] No content_id provided - using deprecated inline registration flow. "
-                                 "Frontend should call POST /api/purchase/register-content before purchase.")
-                    
-                    source_ids_list = [s.id for s in sources]
-                    price_cents = int(calculated_price * 100)
-                    cache_key = ledger.generate_content_cache_key(purchase_request.query, source_ids_list, price_cents)
-                    cached = ledger.get_cached_content_id(cache_key)
-                    
-                    if cached:
-                        content_id = cached["content_id"]
-                        logger.info(f"📝 [PURCHASE] Using cached content_id={content_id}")
-                    else:
-                        try:
-                            report_title = f"Research Report: {purchase_request.query[:100]}"
-                            content_stub = f"# {report_title}\n\nResearch report with {len(sources)} sources.\n\nGenerated by Clearcite."
-                            
-                            content_metadata = {
-                                "query": purchase_request.query,
-                                "source_count": len(sources),
-                                "generated_at": datetime.now().isoformat(),
-                                "source_ids": source_ids_list[:10]
-                            }
-                            
-                            registration_result = ledewire.register_content(
-                                title=report_title,
-                                content_body=content_stub,
-                                price_cents=price_cents,
-                                visibility="private",
-                                metadata=content_metadata
-                            )
-                            
-                            content_id = registration_result.get("id")
-                            if not content_id:
-                                logger.error(f"Content registration returned no ID: {registration_result}")
-                                raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
-                            
-                            ledger.store_content_id(
-                                cache_key=cache_key,
-                                content_id=content_id,
-                                price_cents=price_cents,
-                                visibility="private",
-                                expires_hours=None  # Never expires for purchase tracking
-                            )
-                            
-                            logger.info(f"📝 [PURCHASE] Content registered and cached: content_id={content_id}")
-                            
-                        except Exception as e:
-                            logger.error(f"Content registration failed: {e}")
-                            raise HTTPException(status_code=500, detail=f"Failed to register content: {str(e)}")
-                
-                # Process the purchase with the content_id (either provided or fallback registered)
+                # Step 1: Check cache for existing content_id (avoid duplicate registration)
+                source_ids_list = [s.id for s in sources]
                 price_cents = int(calculated_price * 100)
+                cache_key = ledger.generate_content_cache_key(purchase_request.query, source_ids_list, price_cents)
+                cached = ledger.get_cached_content_id(cache_key)
+                
+                if cached:
+                    # Use cached content_id
+                    content_id = cached["content_id"]
+                    logger.info(f"📝 [PURCHASE] Using cached content_id={content_id}")
+                else:
+                    # Step 2: Register the research report as content in LedeWire
+                    # Clearcite is the seller, we register the report before user can purchase
+                    try:
+                        # Build content stub for LedeWire (reference only, not full content)
+                        report_title = f"Research Report: {purchase_request.query[:100]}"
+                        content_stub = f"# {report_title}\n\nResearch report with {len(sources)} sources.\n\nGenerated by Clearcite."
+                        
+                        # Build metadata
+                        content_metadata = {
+                            "query": purchase_request.query,
+                            "source_count": len(sources),
+                            "generated_at": datetime.now().isoformat(),
+                            "source_ids": source_ids_list[:10]  # First 10 source IDs
+                        }
+                        
+                        # Register with LedeWire (visibility: private for research reports)
+                        registration_result = ledewire.register_content(
+                            title=report_title,
+                            content_body=content_stub,
+                            price_cents=price_cents,
+                            visibility="private",
+                            metadata=content_metadata
+                        )
+                        
+                        content_id = registration_result.get("id")
+                        if not content_id:
+                            logger.error(f"Content registration returned no ID: {registration_result}")
+                            raise HTTPException(status_code=500, detail="Failed to register content with payment provider")
+                        
+                        # Cache the content_id for future lookups (24 hour expiry)
+                        ledger.store_content_id(
+                            cache_key=cache_key,
+                            content_id=content_id,
+                            price_cents=price_cents,
+                            visibility="private",
+                            expires_hours=24
+                        )
+                        
+                        logger.info(f"📝 [PURCHASE] Content registered and cached: content_id={content_id}")
+                        
+                    except Exception as e:
+                        logger.error(f"Content registration failed: {e}")
+                        raise HTTPException(status_code=500, detail=f"Failed to register content: {str(e)}")
+                
+                # Step 3: Process the purchase with the registered content_id
                 payment_result = ledewire.create_purchase(
                     access_token=access_token,
                     content_id=content_id,
@@ -696,7 +546,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             
             message = f"Report generated! ${calculated_price:.2f} for {new_source_count} new source(s)."
         
-        # Record purchase with content_id for permanent tracking
+        # Record purchase
         purchase_id = ledger.record_purchase(
             query=purchase_request.query,
             price=calculated_price,
@@ -704,8 +554,7 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
             transaction_id=transaction_id,
             packet=packet,
             source_ids=[s.id for s in sources],
-            user_id=user_id,
-            content_id=content_id  # Store content_id for future lookups
+            user_id=user_id
         )
         
         response_data = PurchaseResponse(
