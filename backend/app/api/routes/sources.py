@@ -252,7 +252,7 @@ async def summarize_source(
             response_data={}
         )
         
-        # Calculate price (for display purposes - mock purchase)
+        # Calculate price for summarization
         price_cents = calculate_summary_price(summarize_request.license_cost)
         
         # Try to scrape full article, fallback to excerpt if paywalled
