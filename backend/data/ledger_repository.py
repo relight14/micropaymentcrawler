@@ -89,6 +89,14 @@ class ResearchLedger:
                 # Column already exists
                 pass
             
+            # Add content_id column to track LedeWire content IDs in purchases
+            # This enables proper content_id reuse across purchases
+            try:
+                cursor.execute("ALTER TABLE purchases ADD COLUMN content_id TEXT")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
             # Table for caching LedeWire content_id mappings
             # Prevents duplicate content registration for the same report
             cursor.execute("""
@@ -112,7 +120,8 @@ class ResearchLedger:
                        transaction_id: str,
                        packet: ResearchPacket,
                        source_ids: Optional[List[str]] = None,
-                       user_id: Optional[str] = None) -> int:
+                       user_id: Optional[str] = None,
+                       content_id: Optional[str] = None) -> int:
         """Record a successful purchase and research packet delivery."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -122,8 +131,8 @@ class ResearchLedger:
             
             # Note: tier column remains in DB for historical data but always stores "pro"
             cursor.execute("""
-                INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data, source_ids_used, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO purchases (query, tier, price, wallet_id, transaction_id, packet_data, source_ids_used, user_id, content_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 query,
                 "pro",  # All reports are now Pro Package
@@ -132,10 +141,48 @@ class ResearchLedger:
                 transaction_id,
                 json.dumps(packet.model_dump()),
                 source_ids_json,
-                user_id
+                user_id,
+                content_id
             ))
             
             return cursor.lastrowid or 0
+    
+    def get_content_id_from_purchases(self, cache_key: str) -> Optional[str]:
+        """
+        Get content_id from previous purchases by cache_key.
+        This ensures we reuse the same content_id for identical content,
+        enabling proper "already purchased" detection.
+        
+        Returns content_id if found in any previous purchase, None otherwise.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # First, try to get from content_id_cache (faster lookup)
+            cursor.execute("""
+                SELECT content_id FROM content_id_cache
+                WHERE cache_key = ?
+                LIMIT 1
+            """, (cache_key,))
+            
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            
+            # If not in cache, check if we have it in any purchase
+            # This handles cases where cache expired but purchase exists
+            cursor.execute("""
+                SELECT DISTINCT p.content_id
+                FROM purchases p
+                JOIN content_id_cache c ON p.content_id = c.content_id
+                WHERE c.cache_key = ?
+                AND p.content_id IS NOT NULL
+                ORDER BY p.timestamp DESC
+                LIMIT 1
+            """, (cache_key,))
+            
+            result = cursor.fetchone()
+            return result[0] if result else None
     
     def get_previous_purchase_sources(self, user_id: str, query: str) -> Optional[List[str]]:
         """
@@ -390,9 +437,9 @@ class ResearchLedger:
                 }
             return None
     
-    def store_content_id(self, cache_key: str, content_id: str, price_cents: int, visibility: str = "private", expires_hours: int = 24) -> None:
+    def store_content_id(self, cache_key: str, content_id: str, price_cents: int, visibility: str = "private", expires_hours: Optional[int] = None) -> None:
         """
-        Cache a LedeWire content_id for future lookups.
+        Store a LedeWire content_id for future lookups.
         Avoids duplicate content registration for the same report.
         
         Args:
@@ -400,15 +447,26 @@ class ResearchLedger:
             content_id: LedeWire content ID returned from registration
             price_cents: Price in cents
             visibility: "public" or "private"
-            expires_hours: Hours until cache expires (default 24)
+            expires_hours: Hours until cache expires (None = never expires, used for purchases)
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR REPLACE INTO content_id_cache
-                (cache_key, content_id, price_cents, visibility, expires_at)
-                VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' hours'))
-            """, (cache_key, content_id, price_cents, visibility, expires_hours))
+            
+            if expires_hours is None:
+                # Never expires - used for purchase tracking
+                cursor.execute("""
+                    INSERT OR REPLACE INTO content_id_cache
+                    (cache_key, content_id, price_cents, visibility, expires_at)
+                    VALUES (?, ?, ?, ?, NULL)
+                """, (cache_key, content_id, price_cents, visibility))
+            else:
+                # Expires after specified hours - used for temporary caching
+                cursor.execute("""
+                    INSERT OR REPLACE INTO content_id_cache
+                    (cache_key, content_id, price_cents, visibility, expires_at)
+                    VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' hours'))
+                """, (cache_key, content_id, price_cents, visibility, expires_hours))
+            
             conn.commit()
     
     def generate_content_cache_key(self, query: str, source_ids: List[str], price_cents: int) -> str:
