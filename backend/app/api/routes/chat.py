@@ -1,20 +1,15 @@
 """Chat and conversation routes"""
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
-from middleware.auth_dependencies import get_current_token, get_current_user_id
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from pydantic import BaseModel
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from typing import Optional, Dict, Any
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 import time
 import requests
 
 from services.ai.conversational import AIResearchService
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from integrations.ledewire import LedeWireAPI
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from utils.rate_limit import limiter
-from middleware.auth_dependencies import get_current_token, get_current_user_id
+from utils.auth import extract_bearer_token, extract_user_id_from_token
 
 router = APIRouter()
 
@@ -71,20 +66,8 @@ def _cleanup_token_cache():
     _last_cache_cleanup = current_time
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
+# Note: chat.py keeps its own validate_user_token due to special caching logic
+# extract_bearer_token and extract_user_id_from_token now imported from utils.auth
 
 
 def validate_user_token(access_token: str, use_cache: bool = True):

@@ -2,17 +2,14 @@
 
 import logging
 from fastapi import APIRouter, HTTPException, Header, Depends
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from pydantic import BaseModel
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from typing import Dict, Any, Optional
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 import requests  # For handling HTTP exceptions from LedeWire API
 
 from integrations.ledewire import LedeWireAPI
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from schemas.api import LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
-from middleware.auth_dependencies import get_current_token, get_current_user_id
+from middleware.auth_dependencies import get_current_token
+from utils.auth import extract_user_id_from_token
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,20 +18,7 @@ logger = logging.getLogger(__name__)
 ledewire = LedeWireAPI()
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
+# Auth helper functions removed - now using centralized auth_dependencies module
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -57,7 +41,7 @@ async def login(request: LoginRequest, x_previous_user_id: str = Header(None, al
         logger.debug(f"Migration check: x_previous_user_id={x_previous_user_id}, has_access_token={bool(result.get('access_token'))}")
         
         if x_previous_user_id and result.get("access_token"):
-            from app.api.routes.chat import extract_user_id_from_token, ai_service
+            from app.api.routes.chat import ai_service
             
             # Security: Only allow migration of "anonymous" or specific patterns to prevent hijacking
             if x_previous_user_id == "anonymous" or x_previous_user_id.startswith("anon_"):
@@ -170,13 +154,12 @@ async def refresh_token(request: RefreshRequest):
 
 @router.get("/balance", response_model=WalletBalanceResponse)
 # @limiter.limit("10/minute")
-async def get_wallet_balance(authorization: str = Header(None, alias="Authorization")):
+async def get_wallet_balance(token: str = Depends(get_current_token)):
     """Get current wallet balance for authenticated user"""
     try:
-        access_token = extract_bearer_token(authorization)
         
         # Get wallet balance from LedeWire
-        balance_result = ledewire.get_wallet_balance(access_token)
+        balance_result = ledewire.get_wallet_balance(token)
         
         logger.debug(f"LedeWire API balance response: {balance_result}")
         
