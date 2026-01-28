@@ -323,7 +323,7 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     async def fetch_content(self, url: str, license_token: LicenseToken) -> Optional[Dict[str, Any]]:
         """
-        Fetch full article content using Tollbit Content API
+        Fetch full article content using Tollbit publisher subdomain
         
         Returns structured content with:
         - header: Navigation and breadcrumbs
@@ -332,15 +332,29 @@ class TollbitProtocolHandler(ProtocolHandler):
         - metadata: Author, date, description, images
         - rate: Pricing information
         
-        Docs: https://docs.tollbit.com/content/
+        Docs: https://docs.tollbit.com/quickstart/
+        
+        Content is fetched from the publisher's Tollbit subdomain:
+        https://tollbit.<domain>/<path>
         """
         if not self.api_key or not license_token.token:
             logger.warning("Cannot fetch content: missing API key or token")
             return None
         
         try:
-            # Content API endpoint
-            content_endpoint = f"https://gateway.tollbit.com/dev/v2/content/{url}"
+            # Parse URL to construct publisher subdomain endpoint
+            # Example: https://time.com/article/path -> https://tollbit.time.com/article/path
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            path = parsed.path
+            
+            # Construct Tollbit publisher subdomain URL
+            content_endpoint = f"https://tollbit.{domain}{path}"
+            if parsed.query:
+                content_endpoint += f"?{parsed.query}"
+            
+            logger.info(f"Fetching content from Tollbit subdomain: {content_endpoint}")
             
             headers = {
                 'Tollbit-Token': license_token.token,
