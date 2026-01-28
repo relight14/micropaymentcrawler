@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from fastapi.responses import JSONResponse
 from typing import Dict, Any
 import time
@@ -10,10 +10,13 @@ import time
 from schemas.api import PurchaseRequest, PurchaseResponse, CheckoutStateRequest, CheckoutStateResponse
 from schemas.domain import ResearchPacket
 from services.ai.report_generator import ReportGeneratorService
+from services.pricing_service import PricingService
+from services.source_service import SourceService
 from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
-from utils.auth import extract_bearer_token, validate_user_token, extract_user_id_from_token
+from middleware.auth_dependencies import get_current_token, get_authenticated_user_with_id
+from utils.auth import extract_user_id_from_token
 
 router = APIRouter()
 
@@ -22,80 +25,24 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from shared_services import crawler
+
+# Initialize services
 report_generator = ReportGeneratorService()
+pricing_service = PricingService()
+source_service = SourceService()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
 
 
+# Business logic functions moved to services - import them for backwards compatibility
 def extract_sources_from_outline(outline_structure: Dict[str, Any]) -> list:
-    """
-    Extract all unique sources from outline structure.
-    Outline is the single source of truth for what goes in the report.
-    """
-    from schemas.domain import SourceCard
-    
-    if not outline_structure or 'sections' not in outline_structure:
-        return []
-    
-    seen_ids = set()
-    unique_sources = []
-    
-    for section in outline_structure.get('sections', []):
-        for source_wrapper in section.get('sources', []):
-            source_data = source_wrapper.get('source_data', source_wrapper)
-            source_id = source_data.get('id')
-            
-            if source_id and source_id not in seen_ids:
-                seen_ids.add(source_id)
-                # Convert dict to SourceCard instance
-                try:
-                    unique_sources.append(SourceCard(**source_data))
-                except Exception as e:
-                    import logging
-                    logging.getLogger(__name__).warning(f"Failed to parse source from outline: {e}")
-                    continue
-    
-    return unique_sources
+    """DEPRECATED: Use SourceService.extract_sources_from_outline instead"""
+    return source_service.extract_sources_from_outline(outline_structure)
 
 
 def calculate_incremental_pricing(user_id: str, query: str, sources: list, logger) -> dict:
-    """
-    Calculate incremental pricing for a purchase.
-    Returns dict with calculated_price, new_source_count, previous_source_count, total_source_count.
-    
-    previous_source_count = sources in current outline that user already owns (intersection)
-    new_source_count = sources in current outline that are new (set difference)
-    total_source_count = all sources in current outline
-    """
-    previous_source_ids = ledger.get_previous_purchase_sources(user_id, query)
-    current_source_ids = set([s.id for s in sources]) if sources else set()
-    
-    if previous_source_ids:
-        previous_ids_set = set(previous_source_ids)
-        
-        # Intersection: sources in current outline that were previously purchased
-        owned_source_ids = current_source_ids & previous_ids_set
-        previous_count = len(owned_source_ids)
-        
-        # Set difference: sources in current outline that are new
-        new_source_ids = current_source_ids - previous_ids_set
-        new_source_count = len(new_source_ids)
-        
-        logger.info(f"💰 [PRICING] Current outline: {len(current_source_ids)} sources | Already owned: {previous_count} | New: {new_source_count}")
-    else:
-        new_source_count = len(current_source_ids)
-        previous_count = 0
-        logger.info(f"💰 [PRICING] First purchase: {new_source_count} sources")
-    
-    # Simple pricing: $0.05 per new source
-    calculated_price = new_source_count * 0.05
-    
-    return {
-        "calculated_price": calculated_price,
-        "new_source_count": new_source_count,
-        "previous_source_count": previous_count,
-        "total_source_count": len(current_source_ids)
-    }
+    """DEPRECATED: Use PricingService.calculate_incremental_pricing instead"""
+    return pricing_service.calculate_incremental_pricing(user_id, query, sources)
 
 
 @router.post("/checkout-state", response_model=CheckoutStateResponse)
