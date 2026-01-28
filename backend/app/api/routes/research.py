@@ -990,22 +990,25 @@ async def analyze_research_query(
         user_id = user_info.get('user_id', 'anonymous')
         stored_topic = None
         
+        # Topic key includes project_id to scope topics per project
+        topic_key = f"{user_id}:{research_request.project_id}" if research_request.project_id else user_id
+        
         # Handle topic reset (from "Start a New Search" button)
         if research_request.reset_topic:
-            if user_id in conversation_topics:
+            if topic_key in conversation_topics:
                 logger.info(f"🔄 Resetting topic for user {user_id}")
-                del conversation_topics[user_id]
+                del conversation_topics[topic_key]
         
-        # Check if we have a stored topic for this user
-        if user_id in conversation_topics:
-            stored_topic = conversation_topics[user_id].get('topic')
+        # Check if we have a stored topic for this user/project
+        if topic_key in conversation_topics:
+            stored_topic = conversation_topics[topic_key].get('topic')
             logger.info(f"📌 Found stored topic for user: '{stored_topic}'")
             
             # Check if user wants to change topics
             topic_changed = await check_topic_change(base_query, stored_topic)
             if topic_changed:
                 logger.info(f"🔄 Topic change detected - clearing old topic")
-                del conversation_topics[user_id]
+                del conversation_topics[topic_key]
                 stored_topic = None
         
         if research_request.conversation_context and len(research_request.conversation_context) > 0:
@@ -1081,11 +1084,11 @@ async def analyze_research_query(
             if not stored_topic and sources and len(sources) > 0:
                 # Extract topic from first query
                 topic = extract_topic_from_query(base_query, sources)
-                conversation_topics[user_id] = {
+                conversation_topics[topic_key] = {
                     "topic": topic,
                     "first_query": base_query
                 }
-                logger.info(f"💾 Stored topic for user {user_id}: '{topic}'")
+                logger.info(f"💾 Stored topic for project {topic_key}: '{topic}'")
         except Exception as crawler_error:
             print(f"⚠️ Progressive search failed: {crawler_error}")
             # Fallback: return minimal skeleton data to prevent total failure
