@@ -1,6 +1,6 @@
 """Chat and conversation routes"""
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import time
@@ -9,6 +9,8 @@ import requests
 from services.ai.conversational import AIResearchService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
+# Note: chat.py uses local extract_user_id_from_token due to special fallback for anonymous users
+from utils.auth import extract_bearer_token
 
 router = APIRouter()
 
@@ -65,20 +67,9 @@ def _cleanup_token_cache():
     _last_cache_cleanup = current_time
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
+# Note: chat.py keeps its own validate_user_token due to special caching logic
+# Note: chat.py keeps its own extract_user_id_from_token with special fallback for anonymous users
+# extract_bearer_token is imported from utils.auth
 
 
 def validate_user_token(access_token: str, use_cache: bool = True):
@@ -131,8 +122,8 @@ def validate_user_token(access_token: str, use_cache: bool = True):
 
 def extract_user_id_from_token(access_token: str) -> str:
     """
-    Extract user ID from JWT token by decoding the payload.
-    Uses email or sub claim as the unique user identifier.
+    Extract user ID from JWT token for chat (with special anonymous fallback).
+    Note: This is a chat-specific implementation that allows anonymous users.
     """
     try:
         import json

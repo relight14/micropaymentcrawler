@@ -17,23 +17,22 @@ logger = logging.getLogger(__name__)
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import ResearchPacket, SourceCard
 from services.ai.report_generator import ReportGeneratorService
+from services.ai.query_classifier import query_classifier  # Import query classification service
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from config import Config
+from middleware.auth_dependencies import get_current_token, get_authenticated_user
+# Import shared crawler instance without sys.path manipulation
+from shared_services import crawler
 
 router = APIRouter()
 
 # Initialize services
 ledewire = LedeWireAPI()
-
-# Import shared crawler instance - MUST be after router to avoid circular imports
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from shared_services import crawler
-
-# Initialize report generator for AI reports
 report_generator = ReportGeneratorService()
+
+# NOTE: Query classification logic has been moved to services/ai/query_classifier.py
+# The functions below are thin wrappers for backwards compatibility
 
 # Initialize Anthropic client for context-aware query refinement
 claude_client = anthropic.Anthropic(
@@ -61,56 +60,7 @@ class FeedbackRequest(BaseModel):
     mode: str = Field(default="research")
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
-
-
-def validate_user_token(access_token: str):
-    """Validate JWT token with LedeWire API."""
-    try:
-        balance_result = ledewire.get_wallet_balance(access_token)
-        
-        if "error" in balance_result:
-            error_message = ledewire.handle_api_error(balance_result)
-            raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
-        
-        return balance_result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        import requests
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
-            if e.response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid or expired token")
-            elif e.response.status_code in [502, 503, 504]:
-                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
-            else:
-                raise HTTPException(status_code=500, detail="Authentication service error")
-        else:
-            raise HTTPException(status_code=503, detail="Authentication service unavailable")
-
-
-def get_authenticated_user(authorization: str = Header(None)):
-    """Dependency to get authenticated user info."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    access_token = extract_bearer_token(authorization)
-    user_info = validate_user_token(access_token)
-    return user_info
+# Auth helper functions removed - now using centralized auth_dependencies module
 
 
 def validate_query_input(query: str) -> str:
@@ -1253,15 +1203,9 @@ async def analyze_research_query(
         if research_request.project_id:
             try:
                 # Check if project exists and has no query yet
-                project_query = """
-                    SELECT id, research_query FROM projects WHERE id = ? AND user_id = ?
-                """ if not Config.USE_POSTGRES else """
-                    SELECT id, research_query FROM projects WHERE id = %s AND user_id = %s
-                """
+                project_query = normalize_query("""SELECT id, research_query FROM projects WHERE id = ? AND user_id = ?""")
                 
-                from data.db import db as sqlite_db
-                from data.postgres_db import postgres_db
-                db_instance = postgres_db if Config.USE_POSTGRES else sqlite_db
+                from data.db_wrapper import db_instance, normalize_query
                 
                 project_result = db_instance.execute_query(project_query, (research_request.project_id, user_id))
                 
@@ -1270,11 +1214,7 @@ async def analyze_research_query(
                     project = project_result[0]
                     if not project.get('research_query'):
                         # Update query
-                        update_query = """
-                            UPDATE projects SET research_query = ? WHERE id = ?
-                        """ if not Config.USE_POSTGRES else """
-                            UPDATE projects SET research_query = %s WHERE id = %s
-                        """
+                        update_query = normalize_query("""UPDATE projects SET research_query = ? WHERE id = ?""")
                         db_instance.execute_query(update_query, (sanitized_query, research_request.project_id))
                         logger.info(f"💾 Saved first research query to project {research_request.project_id}: '{sanitized_query}'")
             except Exception as e:

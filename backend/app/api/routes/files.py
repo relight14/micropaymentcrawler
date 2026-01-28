@@ -6,12 +6,18 @@ import logging
 import json
 import io
 from typing import Optional
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from datetime import datetime
-from fastapi import APIRouter, Request, HTTPException, Header, UploadFile, File, Form
+from middleware.auth_dependencies import get_current_token, get_current_user_id
+from fastapi import APIRouter, Depends, Request, HTTPException, Header, UploadFile, File, Form
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from pydantic import BaseModel
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 
 from config import Config
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from utils.rate_limit import limiter
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 
 try:
     from docx import Document

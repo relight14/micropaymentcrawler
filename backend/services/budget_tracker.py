@@ -150,10 +150,5 @@ class BudgetTracker:
 
 def get_budget_tracker():
     """Get budget tracker instance with appropriate database connection"""
-    if config.USE_POSTGRES:
-        from data.postgres_db import postgres_db
-        return BudgetTracker(postgres_db)
-    else:
-        # Fallback to SQLite for development
-        from data.db import db
-        return BudgetTracker(db)
+    from data.db_wrapper import db_instance
+    return BudgetTracker(db_instance)

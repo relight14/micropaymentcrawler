@@ -10,13 +10,10 @@ from typing import List, Optional, Dict
 from anthropic import Anthropic
 from schemas.domain import SourceCard
 from config import Config
+# Use centralized database wrapper
+from data.db_wrapper import db_instance as db, normalize_query
 
 logger = logging.getLogger(__name__)
-
-if Config.USE_POSTGRES:
-    from data.postgres_db import postgres_db as db
-else:
-    from data.db import db
 
 # Tool schema for Anthropic structured outputs
 REPORT_EXTRACTION_TOOL = {
@@ -827,11 +824,9 @@ Use the generate_synthesis tool to provide:
     def _get_file_content(self, file_id: int) -> Optional[str]:
         """Fetch full content of an uploaded file from database."""
         try:
-            query = """
+            query = normalize_query("""
                 SELECT content FROM uploaded_files WHERE id = ?
-            """ if not Config.USE_POSTGRES else """
-                SELECT content FROM uploaded_files WHERE id = %s
-            """
+            """)
             result = db.execute_query(query, (file_id,))
             
             if result and 'content' in result:
