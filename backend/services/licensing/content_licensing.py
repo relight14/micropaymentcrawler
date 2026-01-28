@@ -521,19 +521,6 @@ class CloudflareProtocolHandler(ProtocolHandler):
     
     def __init__(self):
         self._client: Optional[httpx.AsyncClient] = None
-        # Known domains using Cloudflare Pay-per-Crawl or likely to adopt it
-        self.known_cloudflare_domains = [
-            'wsj.com',                  # Wall Street Journal
-            'nytimes.com',              # New York Times
-            'economist.com',            # The Economist
-            'reuters.com',              # Reuters
-            'ft.com',                   # Financial Times
-            'financialtimes.com',       # Financial Times alt domain
-            'wired.com',                # Wired (Condé Nast)
-            'theatlantic.com',          # The Atlantic
-            'fortune.com',              # Fortune
-            'time.com'                  # Time Magazine
-        ]
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -541,48 +528,22 @@ class CloudflareProtocolHandler(ProtocolHandler):
             self._client = httpx.AsyncClient(timeout=10.0)
         return self._client
     
-    def _is_known_cloudflare_domain(self, url: str) -> bool:
-        """Check if URL domain is known to use Cloudflare licensing"""
-        try:
-            domain = urlparse(url).netloc.lower()
-            # Remove 'www.' prefix for matching
-            if domain.startswith('www.'):
-                domain = domain[4:]
-            
-            return any(known_domain in domain for known_domain in self.known_cloudflare_domains)
-        except Exception:
-            return False
-    
     async def check_source(self, url: str) -> Optional[LicenseTerms]:
         """
-        Check for Cloudflare licensing using multiple detection methods:
+        Check for Cloudflare licensing via actual protocol signals only.
+        Detection methods:
         1. HTTP headers (cf-license-available, cloudflare-licensing)
-        2. Known domain detection for major publishers
-        3. HTTP 402 Payment Required response
+        2. HTTP 402 Payment Required response
+        
+        If no signal is found, returns None (source is not using Cloudflare licensing).
         """
         try:
-            # First, check if this is a known Cloudflare domain
-            if self._is_known_cloudflare_domain(url):
-                logger.info(f"Cloudflare licensing detected via known domain: {url}")
-                return LicenseTerms(
-                    protocol="cloudflare",
-                    ai_include_price=0.07,      # Typical per-article AI access price
-                    purchase_price=0.25,         # Typical human reader unlock price
-                    currency="USD",
-                    publisher=self._extract_publisher(url),
-                    permits_ai_include=True,
-                    permits_ai_training=False,   # Most publishers prohibit training
-                    permits_search=True
-                )
-            
-            # Fallback: Check for Cloudflare licensing headers
             client = await self._get_client()
             response = await client.head(url, timeout=5.0, follow_redirects=True)
             
-            # Check for Cloudflare licensing signals in headers or 402 status
             if ('cf-license-available' in response.headers or 
                 'cloudflare-licensing' in response.headers or
-                response.status_code == 402):  # HTTP 402 Payment Required
+                response.status_code == 402):
                 
                 logger.info(f"Cloudflare licensing detected via headers/status: {url}")
                 return LicenseTerms(
@@ -598,7 +559,6 @@ class CloudflareProtocolHandler(ProtocolHandler):
             
             return None
         except httpx.HTTPError as e:
-            # If we get 402 Payment Required or similar, it's a licensing signal
             if hasattr(e, 'response') and e.response and e.response.status_code == 402:
                 logger.info(f"Cloudflare 402 Payment Required detected: {url}")
                 return LicenseTerms(
