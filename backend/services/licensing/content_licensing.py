@@ -224,9 +224,8 @@ class TollbitProtocolHandler(ProtocolHandler):
     Uses standardized protocols for pricing discovery and token minting.
     
     Official Documentation: https://www.tollbit.com/
-    API Endpoints:
-    - Rate Discovery: https://api.tollbit.com/dev/v1/rate/{url}
-    - Token Minting: https://api.tollbit.com/v1/mint
+    API Endpoint (v2):
+    - Token/Content: POST https://gateway.tollbit.com/dev/v2/tokens/content
     
     Confirmed publishers: Forbes, TIME, AP News, USA Today, Newsweek, HuffPost, and 1400+ others.
     
@@ -237,10 +236,8 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     def __init__(self):
         self.api_key = os.environ.get('TOLLBIT_API_KEY')
-        self.org_cuid = os.environ.get('TOLLBIT_ORG_CUID')
-        self.agent_id = os.environ.get('TOLLBIT_AGENT_ID', 'ResearchTool-1.0')
-        self.base_url = "https://api.tollbit.com"
-        self.agent_name = "ResearchTool-1.0"
+        self.base_url = "https://gateway.tollbit.com"
+        self.agent_name = "micropaymentcrawler"
         self._client: Optional[httpx.AsyncClient] = None
     
     async def _get_client(self) -> httpx.AsyncClient:
@@ -329,11 +326,8 @@ class TollbitProtocolHandler(ProtocolHandler):
             headers = {
                 'Tollbit-Token': license_token.token,
                 'User-Agent': self.agent_name,
-                'Tollbit-Accept-Content': 'text/markdown'  # Request markdown format
+                'Tollbit-Accept-Content': 'text/markdown'
             }
-            
-            if self.agent_id:
-                headers['X-Tollbit-AgentId'] = self.agent_id
             
             client = await self._get_client()
             response = await client.get(
@@ -356,30 +350,27 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _check_pricing(self, target_url: str) -> Optional[Dict]:
-        """Check real Tollbit pricing using official API endpoint with retry logic"""
+        """Check real Tollbit pricing using v2 API endpoint with retry logic"""
         if not self.api_key:
             return None
             
         try:
-            # Use the correct gateway endpoint for token/pricing discovery
-            token_endpoint = "https://gateway.tollbit.com/tollbit/dev/v1/token"
+            token_endpoint = f"{self.base_url}/dev/v2/tokens/content"
             
             headers = {
+                'TollbitKey': self.api_key,
                 'Content-Type': 'application/json'
             }
             
-            # Extract domain/path from URL (remove https://)
-            clean_url = target_url.replace('https://', '').replace('http://', '')
+            if not target_url.startswith('http'):
+                target_url = f"https://{target_url}"
             
-            # Request body with credentials and parameters
             payload = {
-                'orgCuid': self.org_cuid,
-                'key': self.api_key,
-                'url': clean_url,
+                'url': target_url,
                 'userAgent': self.agent_name,
-                'maxPriceMicros': 1000000,  # $1.00 max
-                'currency': 'USD',
-                'licenseType': 'ON_DEMAND_LICENSE'
+                'licenseType': 'ON_DEMAND_LICENSE',
+                'maxPriceMicros': 1000000,
+                'format': 'html'
             }
             
             try:
@@ -393,60 +384,24 @@ class TollbitProtocolHandler(ProtocolHandler):
                 
                 if response.status_code == 200:
                     data = response.json()
-                    logger.info(f"Real Tollbit pricing discovered for {target_url}: {data}")
-                    
-                    if isinstance(data, list) and len(data) > 0:
-                        ai_include_price = None
-                        purchase_price = None
-                        currency = 'USD'
-                        license_path = None
-                        
-                        for rate_data in data:
-                            price_info = rate_data.get('price', {})
-                            license_info = rate_data.get('license', {})
-                            license_type = license_info.get('licenseType', '')
-                            
-                            price_micros = price_info.get('priceMicros', 0)
-                            price_usd = price_micros / 1000000.0
-                            
-                            if license_type == 'ON_DEMAND_LICENSE':
-                                ai_include_price = price_usd
-                                if not license_path:
-                                    license_path = license_info.get('licensePath')
-                                logger.debug(f"AI Include (ON_DEMAND_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
-                            elif license_type == 'ON_DEMAND_FULL_USE_LICENSE':
-                                purchase_price = price_usd
-                                if not license_path:
-                                    license_path = license_info.get('licensePath')
-                                logger.debug(f"Full Purchase (ON_DEMAND_FULL_USE_LICENSE): {price_micros} micros = ${price_usd:.3f} USD")
-                            
-                            currency = price_info.get('currency', 'USD')
-                        
-                        # PRICING FALLBACK LOGIC:
-                        # Some publishers (e.g., Forbes) only provide ON_DEMAND_LICENSE (AI scraping) 
-                        # without ON_DEMAND_FULL_USE_LICENSE (human reader access).
-                        # When only AI price exists: multiply by 2.4x to estimate fair full-access price
-                        # Example: Forbes $0.015 (AI) → $0.036 ≈ $0.04 (human unlock)
-                        # When only full price exists: divide by 2.4x to estimate AI scraping price
-                        if ai_include_price and not purchase_price:
-                            purchase_price = ai_include_price * 2.4
-                        elif purchase_price and not ai_include_price:
-                            ai_include_price = purchase_price / 2.4
-                        
+                    token = data.get('token')
+                    if token:
+                        logger.info(f"Tollbit token received for {target_url}")
                         return {
-                            'ai_include_price': ai_include_price or 0.05,
-                            'purchase_price': purchase_price or 0.12,
-                            'currency': currency,
-                            'license_path': license_path,
-                            'license_type': 'ON_DEMAND'
+                            'ai_include_price': 0.05,
+                            'purchase_price': 0.12,
+                            'currency': 'USD',
+                            'license_type': 'ON_DEMAND',
+                            'token': token
                         }
                 else:
-                    logger.info(f"Tollbit rate API response: {response.status_code} - {response.text[:200]}")
+                    error_msg = response.text[:200] if response.text else 'Unknown error'
+                    logger.info(f"Tollbit API response: {response.status_code} - {error_msg}")
                     
             except httpx.HTTPError as e:
-                logger.error(f"Tollbit rate API request failed: {e}")
+                logger.error(f"Tollbit API request failed: {e}")
             
-            logger.info(f"Tollbit rate API not accessible for {target_url} - no licensing available")
+            logger.info(f"Tollbit API not accessible for {target_url} - no licensing available")
             return None
                 
         except Exception as e:
@@ -455,30 +410,27 @@ class TollbitProtocolHandler(ProtocolHandler):
 
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _mint_token(self, target_url: str) -> Optional[Dict]:
-        """Mint a Tollbit token using their official API with retry logic"""
+        """Mint a Tollbit token using v2 API with retry logic"""
         if not self.api_key:
             return None
             
         try:
-            # Use the correct gateway endpoint for token generation
-            token_endpoint = "https://gateway.tollbit.com/tollbit/dev/v1/token"
+            token_endpoint = f"{self.base_url}/dev/v2/tokens/content"
             
             headers = {
+                'TollbitKey': self.api_key,
                 'Content-Type': 'application/json'
             }
             
-            # Extract domain/path from URL (remove https://)
-            clean_url = target_url.replace('https://', '').replace('http://', '')
+            if not target_url.startswith('http'):
+                target_url = f"https://{target_url}"
             
-            # Request body with credentials and parameters (for full use license)
             payload = {
-                'orgCuid': self.org_cuid,
-                'key': self.api_key,
-                'url': clean_url,
+                'url': target_url,
                 'userAgent': self.agent_name,
-                'maxPriceMicros': 1200000,  # $1.20 max for full use
-                'currency': 'USD',
-                'licenseType': 'ON_DEMAND_FULL_USE_LICENSE'
+                'licenseType': 'ON_DEMAND_LICENSE',
+                'maxPriceMicros': 1000000,
+                'format': 'html'
             }
             
             try:
@@ -491,9 +443,17 @@ class TollbitProtocolHandler(ProtocolHandler):
                 )
                 
                 if response.status_code == 200:
-                    return response.json()
+                    data = response.json()
+                    token = data.get('token')
+                    if token:
+                        return {
+                            'token': token,
+                            'cost': 0.05,
+                            'expires_in': 300
+                        }
                 else:
-                    logger.info(f"Tollbit API response: {response.status_code} - {response.text[:200]}")
+                    error_msg = response.text[:200] if response.text else 'Unknown error'
+                    logger.info(f"Tollbit API response: {response.status_code} - {error_msg}")
                     
             except httpx.HTTPError as e:
                 logger.error(f"Tollbit API connection failed: {e}")
@@ -568,7 +528,8 @@ class CloudflareProtocolHandler(ProtocolHandler):
             
             return None
         except httpx.HTTPError as e:
-            if hasattr(e, 'response') and e.response and e.response.status_code == 402:
+            response = getattr(e, 'response', None)
+            if response is not None and response.status_code == 402:
                 logger.info(f"Cloudflare 402 Payment Required detected: {url}")
                 return LicenseTerms(
                     protocol="cloudflare",
