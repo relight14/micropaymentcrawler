@@ -280,15 +280,15 @@ export class ChatResearchApp {
                     this.currentReportLoadingMessage = null;
                 }
                 
-                // Validate the report packet exists
-                if (!result || (!result.packet && !result.summary)) {
-                    console.error('❌ Invalid report response:', result);
+                // Validate the report packet exists - report responses should always have 'packet'
+                if (!result || !result.packet) {
+                    console.error('❌ Invalid report response - missing packet:', result);
                     this.toastManager.show('⚠️ Failed to display report - invalid response', 'error');
                     return;
                 }
                 
-                // Display the report - extract packet from purchase response
-                const reportData = result.packet || result;
+                // Display the report using the packet
+                const reportData = result.packet;
                 const message = this.reportBuilder.displayReport(reportData);
                 if (message) {
                     this.addMessage(message.sender, message.content, message.metadata);

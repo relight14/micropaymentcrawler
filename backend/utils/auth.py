@@ -3,9 +3,11 @@
 import json
 import base64
 import hashlib
+import logging
 from fastapi import HTTPException
 from integrations.ledewire import LedeWireAPI
 
+logger = logging.getLogger(__name__)
 ledewire = LedeWireAPI()
 
 
@@ -87,5 +89,6 @@ def extract_user_id_from_token(access_token: str) -> str:
         
     except Exception as e:
         # Fallback: hash the token itself (should rarely happen)
-        print(f"⚠️ Failed to decode JWT, using hash fallback: {e}")
+        # This ensures service continues working even with malformed tokens
+        logger.warning(f"Failed to decode JWT, using hash fallback: {e}")
         return f"user_{hashlib.sha256(access_token.encode()).hexdigest()[:16]}"
