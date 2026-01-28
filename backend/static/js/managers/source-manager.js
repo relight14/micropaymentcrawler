@@ -39,10 +39,9 @@ export class SourceManager extends EventTarget {
             window.open(e.detail.source.url, '_blank');
         });
         
-        document.addEventListener('sourceSummarizeRequested', (e) => {
-            logger.debug('✨ SUMMARIZE: Event received in SourceManager!', e.detail);
-            this.summarizeSource(e.detail.source, e.detail.price, e.detail.buttonElement);
-        });
+        // NOTE: sourceSummarizeRequested and sourceFullAccessRequested are now handled by app.js
+        // with the new PurchaseConfirmationModal component. Removed duplicate listener to prevent
+        // double modals from appearing.
     }
 
     async unlockSource(button, sourceId, price) {
@@ -215,6 +214,11 @@ export class SourceManager extends EventTarget {
         }
     }
 
+    /**
+     * @deprecated This method is no longer called from event listeners.
+     * Summary purchases are now handled by PurchaseConfirmationModal in app.js.
+     * Kept for backwards compatibility but should not be used in new code.
+     */
     async summarizeSource(source, price, buttonElement) {
         logger.debug('✨ SUMMARIZE: summarizeSource() called!', { source, price });
         
