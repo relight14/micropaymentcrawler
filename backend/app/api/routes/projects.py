@@ -228,7 +228,7 @@ async def get_projects(
         
         query = normalize_query("""SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
-            WHERE user_id = ? AND is_active = 1
+            WHERE user_id = ? AND is_active = TRUE
             ORDER BY updated_at DESC""")
         
         results = db.execute_many(query, (user_id,))
