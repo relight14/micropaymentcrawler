@@ -1022,8 +1022,8 @@ class SourceCard {
         console.log('📖 FULL ACCESS: Source found:', source.title);
         
         try {
-            // Calculate price
-            const price = source.purchase_price || source.unlock_price || 0.25;
+            // Use price from backend - if no price, source is free
+            const price = source.purchase_price || source.unlock_price || 0;
             
             // Dispatch event for app to handle
             const event = new CustomEvent('sourceFullAccessRequested', {
