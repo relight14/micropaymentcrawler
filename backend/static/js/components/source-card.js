@@ -13,9 +13,6 @@
  */
 
 class SourceCard {
-    static HUMAN_TIER_PRICE = 0.12;
-    static AI_TIER_PRICE = 0.05;
-    
     constructor(appState, projectStore = null) {
         this.appState = appState;
         this.projectStore = projectStore;
@@ -408,8 +405,9 @@ class SourceCard {
         const fullAccessBtn = cardElement.querySelector('.full-access-icon-btn');
         if (!fullAccessBtn || !freshSource) return;
         
-        const price = freshSource.purchase_price || freshSource.unlock_price || SourceCard.HUMAN_TIER_PRICE;
-        fullAccessBtn.setAttribute('title', `Full article access $${price.toFixed(2)}`);
+        const price = freshSource.purchase_price || freshSource.unlock_price;
+        const priceText = price ? `$${price.toFixed(2)}` : 'Free';
+        fullAccessBtn.setAttribute('title', `Full article access ${priceText}`);
     }
 
     /**
@@ -733,9 +731,10 @@ class SourceCard {
         fullAccessBtn.className = 'icon-action-btn full-access-icon-btn';
         fullAccessBtn.setAttribute('data-action', 'full_access');
         
-        // Use purchase_price if available, otherwise fall back to human tier default
-        const fullAccessPrice = source.purchase_price || source.unlock_price || SourceCard.HUMAN_TIER_PRICE;
-        fullAccessBtn.setAttribute('title', `Full article access $${fullAccessPrice.toFixed(2)}`);
+        // Use purchase_price if available - if no price, source is free
+        const fullAccessPrice = source.purchase_price || source.unlock_price;
+        const priceText = fullAccessPrice ? `$${fullAccessPrice.toFixed(2)}` : 'Free';
+        fullAccessBtn.setAttribute('title', `Full article access ${priceText}`);
         
         // Book/document icon for full access
         fullAccessBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
