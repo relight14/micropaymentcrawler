@@ -13,6 +13,9 @@
  */
 
 class SourceCard {
+    static HUMAN_TIER_PRICE = 0.12;
+    static AI_TIER_PRICE = 0.05;
+    
     constructor(appState, projectStore = null) {
         this.appState = appState;
         this.projectStore = projectStore;
@@ -391,47 +394,22 @@ class SourceCard {
                 }
             }
             
-            // Update unlock/download icon button with fresh state
-            this._updateIconActionButton(cardElement, enrichedSource);
+            // Update full access button with fresh pricing
+            this._updateFullAccessButton(cardElement, enrichedSource);
         });
         
         console.log(`✅ Card updated: ${enrichedSource.title}`);
     }
     
     /**
-     * Update icon action button with fresh state (for compact layout)
+     * Update full access button with fresh pricing
      */
-    _updateIconActionButton(cardElement, freshSource) {
-        const unlockBtn = cardElement.querySelector('.unlock-icon-btn');
-        if (!unlockBtn || !freshSource) return;
+    _updateFullAccessButton(cardElement, freshSource) {
+        const fullAccessBtn = cardElement.querySelector('.full-access-icon-btn');
+        if (!fullAccessBtn || !freshSource) return;
         
-        const cost = freshSource.unlock_price || 0;
-        const isUnlocked = freshSource.is_unlocked || false;
-        
-        // Update data-action attribute
-        unlockBtn.setAttribute('data-action', isUnlocked ? 'download' : 'unlock');
-        
-        // Update icon, tooltip, and visibility
-        if (isUnlocked) {
-            unlockBtn.setAttribute('title', 'Download source');
-            unlockBtn.style.display = '';
-            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>`;
-        } else if (cost > 0) {
-            unlockBtn.setAttribute('title', `Unlock for $${cost.toFixed(2)}`);
-            unlockBtn.style.display = '';
-            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-            </svg>`;
-        } else {
-            // Free source - hide the button
-            unlockBtn.setAttribute('title', 'Free source');
-            unlockBtn.style.display = 'none';
-        }
+        const price = freshSource.purchase_price || freshSource.unlock_price || SourceCard.HUMAN_TIER_PRICE;
+        fullAccessBtn.setAttribute('title', `Full article access $${price.toFixed(2)}`);
     }
 
     /**
@@ -657,48 +635,6 @@ class SourceCard {
     }
 
     /**
-     * Create actions section with buttons and checkbox
-     */
-    _createActions(source, options = {}) {
-        const { showCheckbox = true } = options;
-        
-        const actions = document.createElement('div');
-        actions.className = 'source-actions';
-
-        // Left side: checkbox (if enabled)
-        const leftSide = document.createElement('div');
-        leftSide.className = 'source-actions__left';
-        
-        if (showCheckbox) {
-            const selection = this._createCheckbox(source);
-            leftSide.appendChild(selection);
-        }
-
-        // Right side: action buttons
-        const rightSide = document.createElement('div');
-        rightSide.className = 'source-actions__right';
-
-        // View Source button (always show for publisher traffic)
-        if (source.url) {
-            const viewBtn = this._createViewButton(source);
-            rightSide.appendChild(viewBtn);
-        }
-
-        // Summarize button (for AI summary access)
-        const summarizeBtn = this._createSummarizeButton(source);
-        rightSide.appendChild(summarizeBtn);
-
-        // Full Access button (for human reader access)
-        const fullAccessBtn = this._createFullAccessButton(source);
-        rightSide.appendChild(fullAccessBtn);
-
-        actions.appendChild(leftSide);
-        actions.appendChild(rightSide);
-
-        return actions;
-    }
-
-    /**
      * Create compact checkbox (no label, just checkbox)
      */
     _createCompactCheckbox(source) {
@@ -779,62 +715,26 @@ class SourceCard {
         </svg>`;
         actions.appendChild(outlineBtn);
         
-        // Summarize article icon
-        const addBtn = document.createElement('button');
-        addBtn.className = 'icon-action-btn';
-        addBtn.setAttribute('title', 'Summarize article');
-        addBtn.setAttribute('data-action', 'summarize');
-        addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        // Summarize article icon - AI tier ($0.05) for AI-generated summary
+        const summarizeBtn = document.createElement('button');
+        summarizeBtn.className = 'icon-action-btn summarize-icon-btn';
+        summarizeBtn.setAttribute('title', 'Summarize article');
+        summarizeBtn.setAttribute('data-action', 'summarize');
+        summarizeBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="12" y1="18" x2="12" y2="12"></line>
             <line x1="9" y1="15" x2="15" y2="15"></line>
         </svg>`;
-        actions.appendChild(addBtn);
+        actions.appendChild(summarizeBtn);
         
-        // Unlock/download icon (always render, hide if pending/free)
-        const cost = source.unlock_price || 0;
-        const isUnlocked = source.is_unlocked || false;
-        
-        const unlockBtn = document.createElement('button');
-        unlockBtn.className = 'icon-action-btn unlock-icon-btn';
-        unlockBtn.setAttribute('data-action', isUnlocked ? 'download' : 'unlock');
-        
-        if (isUnlocked) {
-            unlockBtn.setAttribute('title', 'Download source');
-            unlockBtn.style.display = '';
-            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>`;
-        } else if (cost > 0) {
-            unlockBtn.setAttribute('title', `Unlock for $${cost.toFixed(2)}`);
-            unlockBtn.style.display = '';
-            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-            </svg>`;
-        } else {
-            // Pending enrichment or free source - hide but keep in DOM
-            unlockBtn.setAttribute('title', 'Checking pricing...');
-            unlockBtn.style.display = 'none';
-            unlockBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-            </svg>`;
-        }
-        
-        // Always append unlock button (visibility controlled via display style)
-        actions.appendChild(unlockBtn);
-        
-        // Full Access icon button (for human reader access)
+        // Full Access icon button - Human tier ($0.12) for full article reading
         const fullAccessBtn = document.createElement('button');
         fullAccessBtn.className = 'icon-action-btn full-access-icon-btn';
         fullAccessBtn.setAttribute('data-action', 'full_access');
         
-        // Use purchase_price if available, otherwise fall back to unlock_price or default
-        const fullAccessPrice = source.purchase_price || source.unlock_price || 0.25;
+        // Use purchase_price if available, otherwise fall back to human tier default
+        const fullAccessPrice = source.purchase_price || source.unlock_price || SourceCard.HUMAN_TIER_PRICE;
         fullAccessBtn.setAttribute('title', `Full article access $${fullAccessPrice.toFixed(2)}`);
         
         // Book/document icon for full access
@@ -998,126 +898,7 @@ class SourceCard {
     }
 
     /**
-     * Create summarize button
-     */
-    _createSummarizeButton(source) {
-        const button = document.createElement('button');
-        button.className = 'summarize-btn';
-        button.setAttribute('data-action', 'summarize');
-        
-        const licenseCost = source.license_cost || 0;
-        const price = this._calculateSummaryPrice(source);
-        
-        // Check if summary is already cached
-        const hasCachedSummary = this.appState.hasCachedSummary(source.id);
-        
-        // Track pricing analytics (only if not cached)
-        if (!hasCachedSummary && window.analytics && source.url) {
-            try {
-                const domain = new URL(source.url).hostname;
-                const pricingTier = (licenseCost * 1.25 >= 0.02) ? 'markup' : 'minimum';
-                window.analytics.trackSummaryPricing(source.id, domain, licenseCost, price, pricingTier);
-            } catch (e) {
-                // Silently fail if URL parsing fails
-                console.warn('Failed to track summary pricing:', e);
-            }
-        }
-        
-        const icon = document.createElement('span');
-        icon.textContent = '✨';
-        
-        const text = document.createElement('span');
-        // Change button text based on whether summary is cached
-        text.textContent = hasCachedSummary 
-            ? 'Review Summary' 
-            : `Summarize for $${price.toFixed(2)}`;
-        
-        button.appendChild(icon);
-        button.appendChild(text);
-        
-        return button;
-    }
-
-    /**
-     * Create full access button
-     */
-    _createFullAccessButton(source) {
-        const button = document.createElement('button');
-        button.className = 'full-access-btn';
-        button.setAttribute('data-action', 'full_access');
-        
-        // Use purchase_price if available, otherwise fall back to unlock_price or default
-        const price = source.purchase_price || source.unlock_price || 0.25;
-        
-        const icon = document.createElement('span');
-        icon.textContent = '📖';
-        
-        const text = document.createElement('span');
-        text.textContent = `Full Access $${price.toFixed(2)}`;
-        
-        button.appendChild(icon);
-        button.appendChild(text);
-        button.setAttribute('title', 'Get full article access for human reading');
-        
-        return button;
-    }
-
-    /**
-     * Create unlock/download action button with fresh state
-     */
-    _createActionButton(source) {
-        const cost = source.unlock_price || 0;
-        const isUnlocked = source.is_unlocked || false;
-        
-        const button = document.createElement('button');
-        
-        if (isUnlocked) {
-            button.className = 'download-btn unlock-btn';
-            button.setAttribute('data-action', 'download');
-            button.innerHTML = '📄 <span>View Source</span>';
-        } else {
-            button.className = 'unlock-btn';
-            button.setAttribute('data-action', 'unlock');
-            const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
-            button.innerHTML = `🔓 <span>Unlock${costText}</span>`;
-        }
-        
-        return button;
-    }
-    
-    /**
-     * Update action button with fresh state data
-     * Uses event delegation so button can be safely updated without losing listeners
-     */
-    _updateActionButton(cardElement, freshSource) {
-        const actionBtn = cardElement.querySelector('.unlock-btn');
-        if (!actionBtn || !freshSource) return;
-        
-        const cost = freshSource.unlock_price || 0;
-        const isUnlocked = freshSource.is_unlocked || false;
-        
-        // Find the span element (text container)
-        const textSpan = actionBtn.querySelector('span');
-        if (!textSpan) return; // Button structure not as expected
-        
-        if (isUnlocked) {
-            actionBtn.className = 'download-btn unlock-btn';
-            actionBtn.setAttribute('data-action', 'download');
-            // Update only text content, not innerHTML
-            actionBtn.firstChild.textContent = '📄 ';
-            textSpan.textContent = 'View Source';
-        } else {
-            actionBtn.className = 'unlock-btn';
-            actionBtn.setAttribute('data-action', 'unlock');
-            const costText = cost > 0 ? ` $${Number(cost || 0).toFixed(2)}` : '';
-            // Update only text content, not innerHTML
-            actionBtn.firstChild.textContent = '🔓 ';
-            textSpan.textContent = `Unlock${costText}`;
-        }
-    }
-
-    /**
-     * Handle source unlock
+     * Handle source unlock (legacy - kept for backward compatibility)
      */
     async _handleUnlock(sourceId) {
         console.log('🔓 UNLOCK: Button clicked! SourceID:', sourceId);
