@@ -16,9 +16,13 @@ from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from middleware.auth_dependencies import get_current_token, get_authenticated_user_with_id
-from utils.auth import extract_user_id_from_token
+from utils.auth import extract_user_id_from_token, extract_bearer_token
 # Import shared crawler instance without sys.path manipulation
 from shared_services import crawler
+import logging
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

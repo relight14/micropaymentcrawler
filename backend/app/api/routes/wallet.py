@@ -1,13 +1,11 @@
 """Wallet routes for payment and funding operations"""
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 import requests
 
 from integrations.ledewire import LedeWireAPI
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from schemas.api import PaymentSessionRequest, PaymentSessionResponse, PaymentStatusResponse
-from middleware.auth_dependencies import get_current_token, get_current_user_id
+from middleware.auth_dependencies import get_current_token
 
 router = APIRouter()
 
