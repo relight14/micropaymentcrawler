@@ -110,17 +110,8 @@ export class ChatResearchApp {
         // Initialize mobile navigation for responsive mobile experience
         this.mobileNavigation = new MobileNavigation();
         
-        // Setup ReportBuilder event listeners
-        this.reportBuilder.addEventListener('reportGenerated', (e) => {
-            const { reportData, sourceCount } = e.detail;
-            const message = this.reportBuilder.displayReport(reportData);
-            if (message) {
-                this.addMessage(message.sender, message.content, message.metadata);
-                // Auto-scroll to top of the newly generated report
-                this._scrollToLastMessage();
-            }
-            this.toastManager.show(`✅ Report generated successfully from your ${sourceCount} selected sources!`, 'success');
-        });
+        // Setup ReportBuilder event listeners - reportPurchaseCompleted is the primary event
+        // reportGenerated event is not used anymore (only reportPurchaseCompleted)
         
         this.reportBuilder.addEventListener('reportGenerating', (e) => {
             // Show progressive loading message and store reference for cleanup
@@ -289,11 +280,21 @@ export class ChatResearchApp {
                     this.currentReportLoadingMessage = null;
                 }
                 
+                // Validate the report packet exists
+                if (!result || (!result.packet && !result.summary)) {
+                    console.error('❌ Invalid report response:', result);
+                    this.toastManager.show('⚠️ Failed to display report - invalid response', 'error');
+                    return;
+                }
+                
                 // Display the report - extract packet from purchase response
                 const reportData = result.packet || result;
                 const message = this.reportBuilder.displayReport(reportData);
                 if (message) {
                     this.addMessage(message.sender, message.content, message.metadata);
+                } else {
+                    console.error('❌ Failed to display report - displayReport returned no message');
+                    this.toastManager.show('⚠️ Report generated but could not be displayed', 'warning');
                 }
                 
                 // Add success message BEFORE scrolling
