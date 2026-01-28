@@ -362,11 +362,6 @@ export class ChatResearchApp {
         // Make app globally accessible for HTML event handlers (namespaced for safety)
         if (!window.LedeWire) window.LedeWire = {};
         window.LedeWire.researchApp = this;
-        
-        // Legacy global for backward compatibility (TODO: remove in production)
-        if (!window.researchApp) {
-            window.researchApp = this;
-        }
     }
 
     async initializeApp() {
@@ -376,8 +371,7 @@ export class ChatResearchApp {
                 try {
                     logger.debug('🔐 Auth success callback started:', type);
                     
-                    // Close the auth modal
-                    this.modalController.closeAuthModal();
+                    // Note: Auth modal closes itself via inline handlers
                     
                     // Show success toast
                     this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');

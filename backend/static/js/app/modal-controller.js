@@ -464,24 +464,4 @@ export class ModalController {
         // Clear session ID
         this.currentPaymentSessionId = null;
     }
-
-    /**
-     * Close auth modal
-     */
-    closeAuthModal() {
-        const authModal = document.getElementById('authModal');
-        if (authModal) {
-            authModal.remove();
-        }
-    }
-
-    /**
-     * Close funding modal
-     */
-    closeFundingModal() {
-        const fundingModal = document.getElementById('fundingModal');
-        if (fundingModal) {
-            fundingModal.remove();
-        }
-    }
 }
