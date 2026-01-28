@@ -305,6 +305,7 @@ class FullAccessRequest(BaseModel):
 
 
 class FullAccessResponse(BaseModel):
+    success: bool = True
     source_id: str
     content: str
     price_cents: int
