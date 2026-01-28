@@ -917,6 +917,22 @@ class SourceCard {
         // Always append unlock button (visibility controlled via display style)
         actions.appendChild(unlockBtn);
         
+        // Full Access icon button (for human reader access)
+        const fullAccessBtn = document.createElement('button');
+        fullAccessBtn.className = 'icon-action-btn full-access-icon-btn';
+        fullAccessBtn.setAttribute('data-action', 'full_access');
+        
+        // Use purchase_price if available, otherwise fall back to unlock_price or default
+        const fullAccessPrice = source.purchase_price || source.unlock_price || 0.25;
+        fullAccessBtn.setAttribute('title', `Full article access $${fullAccessPrice.toFixed(2)}`);
+        
+        // Book/document icon for full access
+        fullAccessBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>`;
+        actions.appendChild(fullAccessBtn);
+        
         return actions;
     }
     

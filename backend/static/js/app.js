@@ -110,17 +110,8 @@ export class ChatResearchApp {
         // Initialize mobile navigation for responsive mobile experience
         this.mobileNavigation = new MobileNavigation();
         
-        // Setup ReportBuilder event listeners
-        this.reportBuilder.addEventListener('reportGenerated', (e) => {
-            const { reportData, sourceCount } = e.detail;
-            const message = this.reportBuilder.displayReport(reportData);
-            if (message) {
-                this.addMessage(message.sender, message.content, message.metadata);
-                // Auto-scroll to top of the newly generated report
-                this._scrollToLastMessage();
-            }
-            this.toastManager.show(`✅ Report generated successfully from your ${sourceCount} selected sources!`, 'success');
-        });
+        // Setup ReportBuilder event listeners - reportPurchaseCompleted is the primary event
+        // reportGenerated event is not used anymore (only reportPurchaseCompleted)
         
         this.reportBuilder.addEventListener('reportGenerating', (e) => {
             // Show progressive loading message and store reference for cleanup
@@ -289,11 +280,21 @@ export class ChatResearchApp {
                     this.currentReportLoadingMessage = null;
                 }
                 
-                // Display the report - extract packet from purchase response
-                const reportData = result.packet || result;
+                // Validate the report packet exists - report responses should always have 'packet'
+                if (!result || !result.packet) {
+                    console.error('❌ Invalid report response - missing packet:', result);
+                    this.toastManager.show('⚠️ Failed to display report - invalid response', 'error');
+                    return;
+                }
+                
+                // Display the report using the packet
+                const reportData = result.packet;
                 const message = this.reportBuilder.displayReport(reportData);
                 if (message) {
                     this.addMessage(message.sender, message.content, message.metadata);
+                } else {
+                    console.error('❌ Failed to display report - displayReport returned no message');
+                    this.toastManager.show('⚠️ Report generated but could not be displayed', 'warning');
                 }
                 
                 // Add success message BEFORE scrolling
@@ -361,11 +362,6 @@ export class ChatResearchApp {
         // Make app globally accessible for HTML event handlers (namespaced for safety)
         if (!window.LedeWire) window.LedeWire = {};
         window.LedeWire.researchApp = this;
-        
-        // Legacy global for backward compatibility (TODO: remove in production)
-        if (!window.researchApp) {
-            window.researchApp = this;
-        }
     }
 
     async initializeApp() {
@@ -375,8 +371,7 @@ export class ChatResearchApp {
                 try {
                     logger.debug('🔐 Auth success callback started:', type);
                     
-                    // Close the auth modal
-                    this.modalController.closeAuthModal();
+                    // Note: Auth modal closes itself via inline handlers
                     
                     // Show success toast
                     this.toastManager.show(`Welcome! Successfully ${type === 'login' ? 'logged in' : 'signed up'}.`, 'success');

@@ -587,12 +587,6 @@ export class APIService {
         }, 'Report generation failed');
     }
     
-    // Legacy alias for backward compatibility
-    async purchaseTier(tierId, price, query = "Research Query", selectedSources = null, outlineStructure = null) {
-        console.warn('⚠️ purchaseTier() is deprecated - use generateReport() instead');
-        return this.generateReport(query, selectedSources, outlineStructure);
-    }
-    
     // Retry logic with exponential backoff
     async _fetchWithRetry(url, options, errorPrefix = 'Request failed') {
         for (let attempt = 1; attempt <= this.config.RETRY_ATTEMPTS; attempt++) {
