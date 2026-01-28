@@ -14,6 +14,7 @@ from data.ledger_repository import ResearchLedger
 from integrations.ledewire import LedeWireAPI
 from services.ai.conversational import AIResearchService
 from services.ai.outline_suggester import get_outline_suggester
+from services.licensing.content_licensing import ContentLicenseService
 from utils.rate_limit import get_user_or_ip_key, limiter
 from utils.auth import extract_bearer_token, validate_user_token, extract_user_id_from_token
 
@@ -25,6 +26,7 @@ router = APIRouter()
 ledger = ResearchLedger()
 ledewire = LedeWireAPI()
 ai_service = AIResearchService()
+license_service = ContentLicenseService()
 
 
 class SummarizeRequest(BaseModel):
@@ -387,19 +389,42 @@ async def get_full_access(
         price = full_access_request.purchase_price or 0.25
         price_cents = int(price * 100)
         
-        # Scrape full article content
+        # Try Tollbit licensing first (human tier), fall back to direct scraping
+        article_content = None
+        content_source = "scraped"
+        
         try:
-            logger.info(f"Fetching full article: {full_access_request.url}")
-            article_content = await scrape_article_content(full_access_request.url)
-            logger.info(f"Successfully fetched full article content")
-        except HTTPException as e:
-            if e.status_code == 403:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Article is behind a paywall and cannot be accessed directly. Please purchase through the publisher."
-                )
-            else:
-                raise
+            logger.info(f"Attempting Tollbit full-access license for: {full_access_request.url}")
+            licensed_content = await license_service.fetch_licensed_content(
+                full_access_request.url, 
+                license_type="full-access"
+            )
+            
+            if licensed_content and licensed_content.get('content'):
+                content_data = licensed_content['content']
+                if isinstance(content_data, dict):
+                    article_content = content_data.get('body') or content_data.get('content', '')
+                else:
+                    article_content = str(content_data)
+                content_source = "tollbit"
+                logger.info(f"Successfully obtained Tollbit licensed content (human tier)")
+        except Exception as e:
+            logger.warning(f"Tollbit licensing failed, falling back to scraping: {e}")
+        
+        # Fall back to direct scraping if no licensed content
+        if not article_content:
+            try:
+                logger.info(f"Fetching full article via direct scrape: {full_access_request.url}")
+                article_content = await scrape_article_content(full_access_request.url)
+                logger.info(f"Successfully fetched full article content via scraping")
+            except HTTPException as e:
+                if e.status_code == 403:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Article is behind a paywall and cannot be accessed directly. Please purchase through the publisher."
+                    )
+                else:
+                    raise
         
         # Register content with LedeWire (for payment tracking)
         try:

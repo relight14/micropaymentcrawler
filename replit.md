@@ -89,3 +89,26 @@ Clearcite acts as the seller, registering AI-generated research reports with Led
 - **LedeWire Wallet API**: User authentication, wallet management, purchases.
 - **Tollbit API**: Content licensing and dynamic source pricing.
 - **pypdf**: PDF text extraction.
+
+## Tollbit Licensing Integration
+
+Tollbit provides a marketplace for AI content licensing with two tiers:
+
+**License Tiers:**
+- **ON_DEMAND_LICENSE** (AI tier): Used for AI-powered summaries, report generation, and content synthesis
+- **ON_DEMAND_FULL_USE_LICENSE** (Human tier): Used for "Full Access" button that lets users read complete articles
+
+**API Endpoint:**
+- `POST https://gateway.tollbit.com/dev/v2/tokens/content`
+- Header: `TollbitKey: {TOLLBIT_API_KEY}`
+- Body: `{ url, userAgent, licenseType, maxPriceMicros, format }`
+
+**Pricing Model (with 2x markup):**
+- AI tier: $0.05 per source (base cost $0.025 × 2)
+- Human tier: $0.12 per source (AI tier × 2.4)
+
+**Implementation:**
+- `backend/services/licensing/content_licensing.py` - TollbitProtocolHandler
+- `request_license(url, "ai-include")` → ON_DEMAND_LICENSE
+- `request_license(url, "full-access")` → ON_DEMAND_FULL_USE_LICENSE
+- Full Access endpoint tries Tollbit first, falls back to direct scraping

@@ -232,13 +232,24 @@ class TollbitProtocolHandler(ProtocolHandler):
     License types:
     - ON_DEMAND_LICENSE: AI scraping/inference access
     - ON_DEMAND_FULL_USE_LICENSE: Full human reader access
+    
+    Pricing Note (POC):
+    The Tollbit v2 API returns only a JWT token, not explicit pricing.
+    We use fixed base costs with markup until Tollbit provides per-request pricing.
     """
+    
+    TOLLBIT_BASE_COST = 0.025
+    MARKUP_MULTIPLIER = 2.0
+    HUMAN_TIER_MULTIPLIER = 2.4
     
     def __init__(self):
         self.api_key = os.environ.get('TOLLBIT_API_KEY')
         self.base_url = "https://gateway.tollbit.com"
         self.agent_name = "micropaymentcrawler"
         self._client: Optional[httpx.AsyncClient] = None
+        
+        self.ai_tier_price = round(self.TOLLBIT_BASE_COST * self.MARKUP_MULTIPLIER, 2)
+        self.human_tier_price = round(self.ai_tier_price * self.HUMAN_TIER_MULTIPLIER, 2)
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -277,16 +288,24 @@ class TollbitProtocolHandler(ProtocolHandler):
         return None
     
     async def request_license(self, url: str, license_type: str = "ai-include") -> Optional[LicenseToken]:
-        """Request real Tollbit license token"""
+        """
+        Request real Tollbit license token
+        
+        Args:
+            url: The content URL to license
+            license_type: "ai-include" for AI tier, "full-access" for human tier
+        """
         if not self.api_key:
             logger.warning("TOLLBIT_API_KEY not available")
             return None
+        
+        tollbit_license_type = "ON_DEMAND_FULL_USE_LICENSE" if license_type == "full-access" else "ON_DEMAND_LICENSE"
             
         try:
-            token_data = await self._mint_token(url)
+            token_data = await self._mint_token(url, tollbit_license_type)
             if token_data:
                 actual_cost = token_data.get('cost', 0.05)
-                expires_in_seconds = token_data.get('expires_in', 21600)
+                expires_in_seconds = token_data.get('expires_in', 300)
                 
                 return LicenseToken(
                     token=token_data.get('token', ''),
@@ -350,7 +369,13 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _check_pricing(self, target_url: str) -> Optional[Dict]:
-        """Check real Tollbit pricing using v2 API endpoint with retry logic"""
+        """
+        Check Tollbit pricing using v2 API and calculate both tier prices.
+        
+        Pricing model (POC - uses class constants):
+        - AI tier (ON_DEMAND_LICENSE): Base Tollbit price + markup = $0.05
+        - Human tier (ON_DEMAND_FULL_USE_LICENSE): AI tier × 2.4 = $0.12
+        """
         if not self.api_key:
             return None
             
@@ -386,10 +411,10 @@ class TollbitProtocolHandler(ProtocolHandler):
                     data = response.json()
                     token = data.get('token')
                     if token:
-                        logger.info(f"Tollbit token received for {target_url}")
+                        logger.info(f"Tollbit pricing for {target_url}: AI=${self.ai_tier_price}, Human=${self.human_tier_price}")
                         return {
-                            'ai_include_price': 0.05,
-                            'purchase_price': 0.12,
+                            'ai_include_price': self.ai_tier_price,
+                            'purchase_price': self.human_tier_price,
                             'currency': 'USD',
                             'license_type': 'ON_DEMAND',
                             'token': token
@@ -409,10 +434,20 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
 
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
-    async def _mint_token(self, target_url: str) -> Optional[Dict]:
-        """Mint a Tollbit token using v2 API with retry logic"""
+    async def _mint_token(self, target_url: str, tollbit_license_type: str = "ON_DEMAND_LICENSE") -> Optional[Dict]:
+        """
+        Mint a Tollbit token using v2 API with retry logic
+        
+        Args:
+            target_url: The content URL to license
+            tollbit_license_type: "ON_DEMAND_LICENSE" (AI tier) or "ON_DEMAND_FULL_USE_LICENSE" (human tier)
+        """
         if not self.api_key:
             return None
+        
+        is_full_use = tollbit_license_type == "ON_DEMAND_FULL_USE_LICENSE"
+        max_price = 2400000 if is_full_use else 1000000
+        base_cost = self.human_tier_price if is_full_use else self.ai_tier_price
             
         try:
             token_endpoint = f"{self.base_url}/dev/v2/tokens/content"
@@ -428,8 +463,8 @@ class TollbitProtocolHandler(ProtocolHandler):
             payload = {
                 'url': target_url,
                 'userAgent': self.agent_name,
-                'licenseType': 'ON_DEMAND_LICENSE',
-                'maxPriceMicros': 1000000,
+                'licenseType': tollbit_license_type,
+                'maxPriceMicros': max_price,
                 'format': 'html'
             }
             
@@ -446,10 +481,12 @@ class TollbitProtocolHandler(ProtocolHandler):
                     data = response.json()
                     token = data.get('token')
                     if token:
+                        logger.info(f"Tollbit token obtained ({tollbit_license_type}): {target_url}")
                         return {
                             'token': token,
-                            'cost': 0.05,
-                            'expires_in': 300
+                            'cost': base_cost,
+                            'expires_in': 300,
+                            'license_type': tollbit_license_type
                         }
                 else:
                     error_msg = response.text[:200] if response.text else 'Unknown error'
