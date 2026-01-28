@@ -17,14 +17,10 @@ from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from middleware.auth_dependencies import get_current_token, get_authenticated_user_with_id
 from utils.auth import extract_user_id_from_token
+# Import shared crawler instance without sys.path manipulation
+from shared_services import crawler
 
 router = APIRouter()
-
-# Import shared crawler instance after router to avoid circular imports
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from shared_services import crawler
 
 # Initialize services
 report_generator = ReportGeneratorService()

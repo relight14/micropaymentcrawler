@@ -21,19 +21,13 @@ from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from config import Config
 from middleware.auth_dependencies import get_current_token, get_authenticated_user
+# Import shared crawler instance without sys.path manipulation
+from shared_services import crawler
 
 router = APIRouter()
 
 # Initialize services
 ledewire = LedeWireAPI()
-
-# Import shared crawler instance - MUST be after router to avoid circular imports
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from shared_services import crawler
-
-# Initialize report generator for AI reports
 report_generator = ReportGeneratorService()
 
 # Initialize Anthropic client for context-aware query refinement

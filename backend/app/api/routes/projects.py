@@ -13,6 +13,8 @@ from config import Config
 from services.ai.outline_suggester import get_outline_suggester
 from middleware.auth_dependencies import get_current_token, get_current_user_id
 from utils.auth import extract_user_id_from_token
+# Use centralized database wrapper instead of conditional imports
+from data.db_wrapper import db_instance as db
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -29,11 +31,7 @@ except Exception as e:
 
 router = APIRouter()
 
-# Determine which database to use
-if Config.USE_POSTGRES:
-    from data.postgres_db import postgres_db as db
-else:
-    from data.db import db
+# Database is now imported via db_wrapper - no need for conditional logic
 
 
 class OutlineSource(BaseModel):
