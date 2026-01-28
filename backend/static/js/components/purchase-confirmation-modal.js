@@ -118,7 +118,7 @@ export class PurchaseConfirmationModal {
      * @param {Function} onConfirm - Callback after successful purchase
      */
     async showFullAccessConfirmation(source, onConfirm) {
-        const price = source.purchase_price || source.unlock_price || 0.25;
+        const price = source.purchase_price || source.unlock_price || 0;
         const priceCents = Math.round(price * 100);
 
         this.currentPurchase = {
@@ -359,10 +359,11 @@ export class PurchaseConfirmationModal {
                     this.currentPurchase.outlineStructure
                 );
             } else if (this.currentPurchase.type === 'full_access') {
-                // Call full access API (to be implemented)
+                // Call full access API with price
                 result = await this.apiService.getFullAccess(
                     this.currentPurchase.source.id,
-                    this.currentPurchase.source.url
+                    this.currentPurchase.source.url,
+                    this.currentPurchase.priceCents / 100
                 );
             }
 
