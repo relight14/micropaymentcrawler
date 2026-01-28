@@ -361,28 +361,34 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            rate_endpoint = f"{self.base_url}/dev/v1/rate/{target_url}"
+            # Use the correct gateway endpoint for token/pricing discovery
+            token_endpoint = "https://gateway.tollbit.com/tollbit/dev/v1/token"
             
-            # Tollbit uses TollbitKey header, not Bearer token
             headers = {
-                'TollbitKey': self.api_key,
-                'User-Agent': self.agent_name,
                 'Content-Type': 'application/json'
             }
             
-            # Include org CUID if available
-            if self.org_cuid:
-                headers['TollbitOrgCuid'] = self.org_cuid
+            # Extract domain/path from URL (remove https://)
+            clean_url = target_url.replace('https://', '').replace('http://', '')
             
-            if self.agent_id:
-                headers['X-Tollbit-AgentId'] = self.agent_id
+            # Request body with credentials and parameters
+            payload = {
+                'orgCuid': self.org_cuid,
+                'key': self.api_key,
+                'url': clean_url,
+                'userAgent': self.agent_name,
+                'maxPriceMicros': 1000000,  # $1.00 max
+                'currency': 'USD',
+                'licenseType': 'ON_DEMAND_LICENSE'
+            }
             
             try:
                 client = await self._get_client()
-                response = await client.get(
-                    rate_endpoint,
+                response = await client.post(
+                    token_endpoint,
                     headers=headers,
-                    timeout=5.0
+                    json=payload,
+                    timeout=10.0
                 )
                 
                 if response.status_code == 200:
@@ -454,38 +460,31 @@ class TollbitProtocolHandler(ProtocolHandler):
             return None
             
         try:
-            official_endpoint = "https://api.tollbit.com/v1/mint"
+            # Use the correct gateway endpoint for token generation
+            token_endpoint = "https://gateway.tollbit.com/tollbit/dev/v1/token"
             
-            # Tollbit uses TollbitKey header, not Bearer token
             headers = {
-                'TollbitKey': self.api_key,
                 'Content-Type': 'application/json'
             }
             
-            # Include org CUID if available
-            if self.org_cuid:
-                headers['TollbitOrgCuid'] = self.org_cuid
+            # Extract domain/path from URL (remove https://)
+            clean_url = target_url.replace('https://', '').replace('http://', '')
             
-            if self.agent_id:
-                headers['X-Tollbit-AgentId'] = self.agent_id
-            
+            # Request body with credentials and parameters (for full use license)
             payload = {
-                'agent': self.agent_name,
-                'target': target_url,
+                'orgCuid': self.org_cuid,
+                'key': self.api_key,
+                'url': clean_url,
+                'userAgent': self.agent_name,
+                'maxPriceMicros': 1200000,  # $1.20 max for full use
+                'currency': 'USD',
+                'licenseType': 'ON_DEMAND_FULL_USE_LICENSE'
             }
-            
-            if self.org_cuid:
-                payload['orgCuid'] = self.org_cuid
-            if self.agent_id:
-                payload['agentId'] = self.agent_id
-            
-            payload['maxPriceMicros'] = '120000'
-            payload['licenseType'] = 'ON_DEMAND_FULL_USE_LICENSE'
             
             try:
                 client = await self._get_client()
                 response = await client.post(
-                    official_endpoint,
+                    token_endpoint,
                     headers=headers,
                     json=payload,
                     timeout=10.0
@@ -494,7 +493,7 @@ class TollbitProtocolHandler(ProtocolHandler):
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    logger.info(f"Tollbit API response: {response.status_code}")
+                    logger.info(f"Tollbit API response: {response.status_code} - {response.text[:200]}")
                     
             except httpx.HTTPError as e:
                 logger.error(f"Tollbit API connection failed: {e}")
