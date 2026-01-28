@@ -13,5 +13,22 @@ def get_db():
         return db
 
 
+def normalize_query(query: str) -> str:
+    """
+    Normalize SQL query placeholders for current database.
+    Converts ? (SQLite style) to %s (PostgreSQL style) when using PostgreSQL.
+    
+    Args:
+        query: SQL query with ? placeholders
+        
+    Returns:
+        Query with appropriate placeholders for current database
+    """
+    if config.USE_POSTGRES:
+        # Replace ? with %s for PostgreSQL
+        return query.replace('?', '%s')
+    return query
+
+
 # Global database instance
 db_instance = get_db()

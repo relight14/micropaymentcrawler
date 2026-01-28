@@ -1199,15 +1199,9 @@ async def analyze_research_query(
         if research_request.project_id:
             try:
                 # Check if project exists and has no query yet
-                project_query = """
-                    SELECT id, research_query FROM projects WHERE id = ? AND user_id = ?
-                """ if not Config.USE_POSTGRES else """
-                    SELECT id, research_query FROM projects WHERE id = %s AND user_id = %s
-                """
+                project_query = normalize_query("""SELECT id, research_query FROM projects WHERE id = ? AND user_id = ?""")
                 
-                from data.db import db as sqlite_db
-                from data.postgres_db import postgres_db
-                db_instance = postgres_db if Config.USE_POSTGRES else sqlite_db
+                from data.db_wrapper import db_instance, normalize_query
                 
                 project_result = db_instance.execute_query(project_query, (research_request.project_id, user_id))
                 
@@ -1216,11 +1210,7 @@ async def analyze_research_query(
                     project = project_result[0]
                     if not project.get('research_query'):
                         # Update query
-                        update_query = """
-                            UPDATE projects SET research_query = ? WHERE id = ?
-                        """ if not Config.USE_POSTGRES else """
-                            UPDATE projects SET research_query = %s WHERE id = %s
-                        """
+                        update_query = normalize_query("""UPDATE projects SET research_query = ? WHERE id = ?""")
                         db_instance.execute_query(update_query, (sanitized_query, research_request.project_id))
                         logger.info(f"💾 Saved first research query to project {research_request.project_id}: '{sanitized_query}'")
             except Exception as e:

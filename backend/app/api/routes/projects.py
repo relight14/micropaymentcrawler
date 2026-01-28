@@ -14,7 +14,7 @@ from services.ai.outline_suggester import get_outline_suggester
 from middleware.auth_dependencies import get_current_token, get_current_user_id
 from utils.auth import extract_user_id_from_token
 # Use centralized database wrapper instead of conditional imports
-from data.db_wrapper import db_instance as db
+from data.db_wrapper import db_instance as db, normalize_query
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -226,17 +226,10 @@ async def get_projects(
         # Token validated by dependency
         user_id = extract_user_id_from_token(token)
         
-        query = """
-            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
+        query = normalize_query("""SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
             WHERE user_id = ? AND is_active = 1
-            ORDER BY updated_at DESC
-        """ if not Config.USE_POSTGRES else """
-            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
-            FROM projects
-            WHERE user_id = %s AND is_active = TRUE
-            ORDER BY updated_at DESC
-        """
+            ORDER BY updated_at DESC""")
         
         results = db.execute_many(query, (user_id,))
         
@@ -285,15 +278,9 @@ async def get_project_with_outline(
         user_id = extract_user_id_from_token(token)
         
         # Fetch project
-        project_query = """
-            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
+        project_query = normalize_query("""SELECT id, user_id, title, research_query, created_at, updated_at, is_active
             FROM projects
-            WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id, user_id, title, research_query, created_at, updated_at, is_active
-            FROM projects
-            WHERE id = %s AND user_id = %s
-        """
+            WHERE id = ? AND user_id = ?""")
         
         project_result = db.execute_query(project_query, (project_id, user_id))
         
@@ -301,17 +288,10 @@ async def get_project_with_outline(
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Fetch outline sections
-        sections_query = """
-            SELECT id, project_id, title, order_index, created_at
+        sections_query = normalize_query("""SELECT id, project_id, title, order_index, created_at
             FROM outline_sections
             WHERE project_id = ?
-            ORDER BY order_index
-        """ if not Config.USE_POSTGRES else """
-            SELECT id, project_id, title, order_index, created_at
-            FROM outline_sections
-            WHERE project_id = %s
-            ORDER BY order_index
-        """
+            ORDER BY order_index""")
         
         sections_results = db.execute_many(sections_query, (project_id,))
         
@@ -320,17 +300,10 @@ async def get_project_with_outline(
         for section_row in sections_results:
             section_id = section_row['id']
             
-            sources_query = """
-                SELECT id, section_id, source_data_json, order_index
+            sources_query = normalize_query("""SELECT id, section_id, source_data_json, order_index
                 FROM outline_sources
                 WHERE section_id = ?
-                ORDER BY order_index
-            """ if not Config.USE_POSTGRES else """
-                SELECT id, section_id, source_data_json, order_index
-                FROM outline_sources
-                WHERE section_id = %s
-                ORDER BY order_index
-            """
+                ORDER BY order_index""")
             
             sources_results = db.execute_many(sources_query, (section_id,))
             
@@ -382,11 +355,7 @@ async def update_project_outline(
         user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
-        project_query = """
-            SELECT id FROM projects WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id FROM projects WHERE id = %s AND user_id = %s
-        """
+        project_query = normalize_query("""SELECT id FROM projects WHERE id = ? AND user_id = ?""")
         
         project_result = db.execute_query(project_query, (project_id, user_id))
         
@@ -487,11 +456,7 @@ async def get_project_sources(
         user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
-        project_query = """
-            SELECT id FROM projects WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id FROM projects WHERE id = %s AND user_id = %s
-        """
+        project_query = normalize_query("""SELECT id FROM projects WHERE id = ? AND user_id = ?""")
         
         project_result = db.execute_query(project_query, (project_id, user_id))
         
@@ -499,17 +464,10 @@ async def get_project_sources(
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Fetch sources
-        sources_query = """
-            SELECT id, project_id, source_data_json, order_index, created_at
+        sources_query = normalize_query("""SELECT id, project_id, source_data_json, order_index, created_at
             FROM project_sources
             WHERE project_id = ?
-            ORDER BY order_index
-        """ if not Config.USE_POSTGRES else """
-            SELECT id, project_id, source_data_json, order_index, created_at
-            FROM project_sources
-            WHERE project_id = %s
-            ORDER BY order_index
-        """
+            ORDER BY order_index""")
         
         sources_results = db.execute_many(sources_query, (project_id,))
         
@@ -544,11 +502,7 @@ async def update_project_sources(
         user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
-        project_query = """
-            SELECT id FROM projects WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id FROM projects WHERE id = %s AND user_id = %s
-        """
+        project_query = normalize_query("""SELECT id FROM projects WHERE id = ? AND user_id = ?""")
         
         project_result = db.execute_query(project_query, (project_id, user_id))
         
@@ -624,13 +578,8 @@ async def update_project(
         # Token validated by dependency
         user_id = extract_user_id_from_token(token)
         
-        query = """
-            UPDATE projects SET title = ?, updated_at = datetime('now')
-            WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            UPDATE projects SET title = %s, updated_at = NOW()
-            WHERE id = %s AND user_id = %s
-        """
+        query = normalize_query("""UPDATE projects SET title = ?, updated_at = datetime('now')
+            WHERE id = ? AND user_id = ?""")
         
         if Config.USE_POSTGRES:
             with db.get_connection() as conn:
@@ -645,15 +594,9 @@ async def update_project(
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Fetch and return updated project
-        fetch_query = """
-            SELECT id, user_id, title, created_at, updated_at, is_active
+        fetch_query = normalize_query("""SELECT id, user_id, title, created_at, updated_at, is_active
             FROM projects
-            WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id, user_id, title, created_at, updated_at, is_active
-            FROM projects
-            WHERE id = %s AND user_id = %s
-        """
+            WHERE id = ? AND user_id = ?""")
         
         result = db.execute_query(fetch_query, (project_id, user_id))
         
@@ -688,13 +631,8 @@ async def delete_project(
         # Token validated by dependency
         user_id = extract_user_id_from_token(token)
         
-        query = """
-            UPDATE projects SET is_active = 0, updated_at = datetime('now')
-            WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            UPDATE projects SET is_active = FALSE, updated_at = NOW()
-            WHERE id = %s AND user_id = %s
-        """
+        query = normalize_query("""UPDATE projects SET is_active = 0, updated_at = datetime('now')
+            WHERE id = ? AND user_id = ?""")
         
         if Config.USE_POSTGRES:
             with db.get_connection() as conn:
@@ -748,11 +686,7 @@ async def get_project_messages(
         user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
-        project_query = """
-            SELECT id FROM projects WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id FROM projects WHERE id = %s AND user_id = %s
-        """
+        project_query = normalize_query("""SELECT id FROM projects WHERE id = ? AND user_id = ?""")
         
         project_result = db.execute_query(project_query, (project_id, user_id))
         
@@ -760,17 +694,10 @@ async def get_project_messages(
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Fetch messages
-        messages_query = """
-            SELECT id, project_id, user_id, sender, content, message_data, created_at
+        messages_query = normalize_query("""SELECT id, project_id, user_id, sender, content, message_data, created_at
             FROM messages
             WHERE project_id = ?
-            ORDER BY created_at ASC
-        """ if not Config.USE_POSTGRES else """
-            SELECT id, project_id, user_id, sender, content, message_data, created_at
-            FROM messages
-            WHERE project_id = %s
-            ORDER BY created_at ASC
-        """
+            ORDER BY created_at ASC""")
         
         messages_results = db.execute_many(messages_query, (project_id,))
         
@@ -816,11 +743,7 @@ async def create_message(
         user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
-        project_query = """
-            SELECT id FROM projects WHERE id = ? AND user_id = ?
-        """ if not Config.USE_POSTGRES else """
-            SELECT id FROM projects WHERE id = %s AND user_id = %s
-        """
+        project_query = normalize_query("""SELECT id FROM projects WHERE id = ? AND user_id = ?""")
         
         project_result = db.execute_query(project_query, (project_id, user_id))
         
@@ -831,14 +754,8 @@ async def create_message(
         message_data_json = json.dumps(message_request.message_data) if message_request.message_data else None
         
         # Insert message
-        insert_query = """
-            INSERT INTO messages (project_id, user_id, sender, content, message_data)
-            VALUES (?, ?, ?, ?, ?)
-        """ if not Config.USE_POSTGRES else """
-            INSERT INTO messages (project_id, user_id, sender, content, message_data)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id, created_at
-        """
+        insert_query = normalize_query("""INSERT INTO messages (project_id, user_id, sender, content, message_data)
+            VALUES (?, ?, ?, ?, ?)""")
         
         if Config.USE_POSTGRES:
             with db.get_connection() as conn:
