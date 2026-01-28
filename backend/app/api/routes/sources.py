@@ -410,7 +410,7 @@ async def get_full_access(
                 title=content_title,
                 content_body=content_stub,
                 price_cents=price_cents,
-                visibility="private",
+                visibility="unlisted",
                 metadata={
                     "source_id": full_access_request.source_id,
                     "url": full_access_request.url,
