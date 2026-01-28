@@ -268,15 +268,6 @@ class SourceCard {
             return { text: 'RSL', className: 'license-demo' };
         } else if (protocol && protocol.toLowerCase() === 'cloudflare') {
             return { text: 'CLOUDFLARE', className: 'license-demo' };
-        } else if (this._shouldShowTollbitDemo(source)) {
-            // Premium publication - show Tollbit potential even without confirmed pricing
-            return { text: 'TOLLBIT', className: 'license-demo' };
-        } else if (this._shouldShowRSLDemo(source)) {
-            // Academic/research domain - show RSL potential
-            return { text: 'RSL', className: 'license-demo' };
-        } else if (this._shouldShowCloudflareDemo(source)) {
-            // Major publisher - show Cloudflare potential
-            return { text: 'CLOUDFLARE', className: 'license-demo' };
         } else if (cost === 0) {
             // No protocol detected and free - show FREE badge
             return { text: 'FREE', className: 'license-free' };
@@ -574,20 +565,13 @@ class SourceCard {
             badge.classList.add('license-paid');
             badge.textContent = `⚡ TOLLBIT $${Number(cost || 0).toFixed(2)}`;
             
-        } else if ((protocol && protocol.toLowerCase() === 'rsl') || this._shouldShowRSLDemo(source)) {
-            // RSL demo badge for platform potential
+        } else if (protocol && protocol.toLowerCase() === 'rsl') {
             badge.classList.add('license-demo');
             badge.textContent = '🔒 RSL Coming Soon';
             
-        } else if ((protocol && protocol.toLowerCase() === 'cloudflare') || this._shouldShowCloudflareDemo(source)) {
-            // Cloudflare demo badge for platform potential
+        } else if (protocol && protocol.toLowerCase() === 'cloudflare') {
             badge.classList.add('license-demo');
             badge.textContent = '☁️ Cloudflare Coming Soon';
-            
-        } else if (this._shouldShowTollbitDemo(source)) {
-            // Premium publication without confirmed Tollbit pricing yet - show potential
-            badge.classList.add('license-demo');
-            badge.textContent = '⚡ TOLLBIT Coming Soon';
             
         } else if (cost === 0) {
             // Free discovery content (only show if enrichment is complete)
@@ -603,79 +587,6 @@ class SourceCard {
         return badge;
     }
     
-    /**
-     * Determine if source should show RSL demo badge
-     * RSL (Really Simple Licensing) is used by academic/research institutions
-     * See: https://rslstandard.org/rsl
-     */
-    _shouldShowRSLDemo(source) {
-        // Show RSL demo for academic/research domains
-        const domain = (source.domain || '').toLowerCase();
-        const url = (source.url || '').toLowerCase();
-        
-        // Academic institutions and research publishers
-        return domain.endsWith('.edu') || 
-               domain.endsWith('.edu/') ||
-               /\b(research|journal|academic|scholar|arxiv|pubmed|ncbi|ieee)\b/i.test(domain) ||
-               /\b(research|journal|academic|scholar|arxiv|pubmed|ncbi|ieee)\b/i.test(url);
-    }
-    
-    /**
-     * Determine if source should show Cloudflare demo badge  
-     * Cloudflare Pay-per-Crawl is used by major news publishers
-     * See: https://blog.cloudflare.com/introducing-pay-per-crawl/
-     */
-    _shouldShowCloudflareDemo(source) {
-        // Show Cloudflare demo for major publisher domains  
-        const domain = (source.domain || '').toLowerCase();
-        const url = (source.url || '').toLowerCase();
-        
-        // Known Cloudflare Pay-per-Crawl publishers and likely adopters
-        const cloudflarePublishers = [
-            'wsj.com', 'wall street journal',           // WSJ - News Corp property
-            'nytimes.com', 'newyorktimes.com',          // New York Times
-            'economist.com',                             // The Economist
-            'reuters.com',                               // Reuters
-            'ft.com', 'financialtimes.com',             // Financial Times
-            'condenast.com', 'wired.com',               // Condé Nast properties
-            'theatlantic.com',                           // The Atlantic
-            'fortune.com',                               // Fortune
-            'time.com'                                   // Time Magazine
-        ];
-        
-        return cloudflarePublishers.some(pub => 
-            domain.includes(pub) || url.includes(pub)
-        );
-    }
-    
-    /**
-     * Determine if source should show Tollbit demo badge
-     * Tollbit is a content licensing marketplace for AI companies
-     * Confirmed partners: Forbes, AP News, USA Today, Newsweek, HuffPost
-     * See: https://www.tollbit.com/
-     */
-    _shouldShowTollbitDemo(source) {
-        const domain = (source.domain || '').toLowerCase();
-        const url = (source.url || '').toLowerCase();
-        
-        // Known Tollbit partner publications (excluding overlaps with Cloudflare)
-        const tollbitPublications = [
-            'forbes.com',                    // Forbes
-            'apnews.com', 'ap.org',         // Associated Press
-            'usatoday.com',                  // USA Today
-            'newsweek.com',                  // Newsweek
-            'huffpost.com', 'huffingtonpost.com',  // HuffPost
-            'washingtonpost.com', 'wapo.',   // Washington Post
-            'bloomberg.com',                 // Bloomberg
-            'businessinsider.com',           // Business Insider
-            'theinformation.com'             // The Information
-        ];
-        
-        return tollbitPublications.some(pub => 
-            domain.includes(pub) || url.includes(pub)
-        );
-    }
-
 
     /**
      * Create rating display with half-star support
