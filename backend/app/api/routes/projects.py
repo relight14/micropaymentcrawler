@@ -1,6 +1,6 @@
 """Project management and outline builder routes"""
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import logging
@@ -11,6 +11,8 @@ from anthropic import Anthropic
 from utils.rate_limit import limiter
 from config import Config
 from services.ai.outline_suggester import get_outline_suggester
+from middleware.auth_dependencies import get_current_token, get_current_user_id
+from utils.auth import extract_user_id_from_token
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -82,20 +84,7 @@ class UpdateSourcesRequest(BaseModel):
     sources: List[ProjectSource]
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
+# Auth helper functions removed - now using centralized auth_dependencies module
 
 
 def generate_smart_title(research_query: str, fallback_title: str) -> str:
@@ -155,55 +144,7 @@ Title:"""
         return fallback_title
 
 
-def extract_user_id_from_token(access_token: str) -> str:
-    """
-    Extract user ID from JWT token by decoding the payload.
-    Uses email or sub claim as the unique user identifier.
-    """
-    try:
-        import json
-        import base64
-        
-        # JWT format: header.payload.signature
-        parts = access_token.split('.')
-        if len(parts) != 3:
-            raise ValueError("Invalid JWT format")
-        
-        # Decode the payload (middle part)
-        payload = parts[1]
-        # Add padding if needed for base64 decoding
-        padding = 4 - (len(payload) % 4)
-        if padding != 4:
-            payload += '=' * padding
-        
-        decoded_bytes = base64.urlsafe_b64decode(payload)
-        decoded_payload = json.loads(decoded_bytes)
-        
-        # DEBUG: Log what's in the JWT
-        logger.info(f"🔍 JWT payload keys: {list(decoded_payload.keys())}")
-        logger.info(f"🔍 JWT email: {decoded_payload.get('email')}")
-        logger.info(f"🔍 JWT sub: {decoded_payload.get('sub')}")
-        
-        # Extract user identifier from token claims
-        # Prefer email, fall back to sub (subject), then user_id
-        user_identifier = (
-            decoded_payload.get('email') or 
-            decoded_payload.get('sub') or 
-            decoded_payload.get('user_id')
-        )
-        
-        if not user_identifier:
-            raise ValueError("No user identifier found in JWT")
-        
-        final_id = f"user_{user_identifier}"
-        logger.info(f"🔍 Extracted user_id: {final_id}")
-        return final_id
-        
-    except Exception as e:
-        # Fallback: use token hash for projects
-        import hashlib
-        logger.warning(f"Failed to decode JWT for projects, using hash fallback: {e}")
-        return f"user_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
+# extract_user_id_from_token removed - now using utils.auth module
 
 
 @router.post("", response_model=Project)
@@ -211,12 +152,10 @@ def extract_user_id_from_token(access_token: str) -> str:
 async def create_project(
     request: Request,
     project_request: CreateProjectRequest,
-    authorization: str = Header(None, alias="Authorization")
+    user_id: str = Depends(get_current_user_id)
 ):
     """Create a new project with AI-enhanced title generation"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
         
         # Generate smart title if research_query is provided
         final_title = project_request.title
@@ -282,12 +221,12 @@ async def create_project(
 @limiter.limit("30/minute")
 async def get_projects(
     request: Request,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Get all projects for the authenticated user"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         query = """
             SELECT id, user_id, title, research_query, created_at, updated_at, is_active
@@ -340,12 +279,12 @@ async def get_projects(
 async def get_project_with_outline(
     request: Request,
     project_id: int,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Get a specific project with its outline structure"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Fetch project
         project_query = """
@@ -437,12 +376,12 @@ async def update_project_outline(
     request: Request,
     project_id: int,
     outline_request: UpdateOutlineRequest,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Update the outline structure for a project"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
         project_query = """
@@ -542,12 +481,12 @@ async def update_project_outline(
 async def get_project_sources(
     request: Request,
     project_id: int,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Get sources for a project"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
         project_query = """
@@ -599,12 +538,12 @@ async def update_project_sources(
     request: Request,
     project_id: int,
     sources_request: UpdateSourcesRequest,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Update sources for a project"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
         project_query = """
@@ -680,12 +619,12 @@ async def update_project(
     request: Request,
     project_id: int,
     project_request: CreateProjectRequest,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Update a project's title"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         query = """
             UPDATE projects SET title = ?, updated_at = datetime('now')
@@ -744,12 +683,12 @@ async def update_project(
 async def delete_project(
     request: Request,
     project_id: int,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Delete a project (soft delete by setting is_active to false)"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         query = """
             UPDATE projects SET is_active = 0, updated_at = datetime('now')
@@ -803,12 +742,12 @@ class CreateMessageRequest(BaseModel):
 async def get_project_messages(
     request: Request,
     project_id: int,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Get all messages for a project"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
         project_query = """
@@ -871,12 +810,12 @@ async def create_message(
     request: Request,
     project_id: int,
     message_request: CreateMessageRequest,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Create a new message in a project"""
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Verify project ownership
         project_query = """
@@ -973,15 +912,15 @@ class OutlineSuggestionResponse(BaseModel):
 async def suggest_outline(
     request: Request,
     project_id: int,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """
     Generate AI-powered outline suggestions for a project based on its research topic.
     Uses conversation history and project title for context.
     """
     try:
-        access_token = extract_bearer_token(authorization)
-        user_id = extract_user_id_from_token(access_token)
+        # Token validated by dependency
+        user_id = extract_user_id_from_token(token)
         
         # Get project to verify ownership and get research topic
         if Config.USE_POSTGRES:

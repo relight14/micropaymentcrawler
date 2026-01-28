@@ -1,14 +1,20 @@
 """Chat and conversation routes"""
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from pydantic import BaseModel
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from typing import Optional, Dict, Any
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 import time
 import requests
 
 from services.ai.conversational import AIResearchService
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from integrations.ledewire import LedeWireAPI
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from utils.rate_limit import limiter
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 
 router = APIRouter()
 

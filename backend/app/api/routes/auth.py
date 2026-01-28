@@ -2,12 +2,17 @@
 
 import logging
 from fastapi import APIRouter, HTTPException, Header, Depends
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from pydantic import BaseModel
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from typing import Dict, Any, Optional
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 import requests  # For handling HTTP exceptions from LedeWire API
 
 from integrations.ledewire import LedeWireAPI
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from schemas.api import LoginRequest, SignupRequest, AuthResponse, WalletBalanceResponse
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

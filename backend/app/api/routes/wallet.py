@@ -1,10 +1,13 @@
 """Wallet routes for payment and funding operations"""
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 import requests
 
 from integrations.ledewire import LedeWireAPI
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 from schemas.api import PaymentSessionRequest, PaymentSessionResponse, PaymentStatusResponse
+from middleware.auth_dependencies import get_current_token, get_current_user_id
 
 router = APIRouter()
 
@@ -12,34 +15,20 @@ router = APIRouter()
 ledewire = LedeWireAPI()
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
+# Auth helper functions removed - now using centralized auth_dependencies module
 
 
 @router.post("/payment-session", response_model=PaymentSessionResponse)
 async def create_payment_session(
     request: PaymentSessionRequest,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Create a Stripe payment session for wallet funding via LedeWire"""
     try:
-        access_token = extract_bearer_token(authorization)
         
         # Call LedeWire to create payment session
         payment_session = ledewire.create_payment_session(
-            access_token=access_token,
+            access_token=token,
             amount_cents=request.amount_cents,
             currency=request.currency
         )
@@ -69,15 +58,14 @@ async def create_payment_session(
 @router.get("/payment-status/{session_id}", response_model=PaymentStatusResponse)
 async def get_payment_status(
     session_id: str,
-    authorization: str = Header(None, alias="Authorization")
+    token: str = Depends(get_current_token)
 ):
     """Poll for payment completion status after Stripe payment"""
     try:
-        access_token = extract_bearer_token(authorization)
         
         # Call LedeWire to check payment status
         status_result = ledewire.get_payment_status(
-            access_token=access_token,
+            access_token=token,
             session_id=session_id
         )
         

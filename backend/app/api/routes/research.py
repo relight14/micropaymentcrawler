@@ -20,6 +20,7 @@ from services.ai.report_generator import ReportGeneratorService
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from config import Config
+from middleware.auth_dependencies import get_current_token, get_authenticated_user
 
 router = APIRouter()
 
@@ -61,56 +62,7 @@ class FeedbackRequest(BaseModel):
     mode: str = Field(default="research")
 
 
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
-
-
-def validate_user_token(access_token: str):
-    """Validate JWT token with LedeWire API."""
-    try:
-        balance_result = ledewire.get_wallet_balance(access_token)
-        
-        if "error" in balance_result:
-            error_message = ledewire.handle_api_error(balance_result)
-            raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
-        
-        return balance_result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        import requests
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
-            if e.response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid or expired token")
-            elif e.response.status_code in [502, 503, 504]:
-                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
-            else:
-                raise HTTPException(status_code=500, detail="Authentication service error")
-        else:
-            raise HTTPException(status_code=503, detail="Authentication service unavailable")
-
-
-def get_authenticated_user(authorization: str = Header(None)):
-    """Dependency to get authenticated user info."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    access_token = extract_bearer_token(authorization)
-    user_info = validate_user_token(access_token)
-    return user_info
+# Auth helper functions removed - now using centralized auth_dependencies module
 
 
 def validate_query_input(query: str) -> str:
