@@ -363,11 +363,16 @@ class TollbitProtocolHandler(ProtocolHandler):
         try:
             rate_endpoint = f"{self.base_url}/dev/v1/rate/{target_url}"
             
+            # Tollbit uses TollbitKey header, not Bearer token
             headers = {
-                'Authorization': f'Bearer {self.api_key}',
+                'TollbitKey': self.api_key,
                 'User-Agent': self.agent_name,
                 'Content-Type': 'application/json'
             }
+            
+            # Include org CUID if available
+            if self.org_cuid:
+                headers['TollbitOrgCuid'] = self.org_cuid
             
             if self.agent_id:
                 headers['X-Tollbit-AgentId'] = self.agent_id
@@ -451,10 +456,15 @@ class TollbitProtocolHandler(ProtocolHandler):
         try:
             official_endpoint = "https://api.tollbit.com/v1/mint"
             
+            # Tollbit uses TollbitKey header, not Bearer token
             headers = {
-                'Authorization': f'Bearer {self.api_key}',
+                'TollbitKey': self.api_key,
                 'Content-Type': 'application/json'
             }
+            
+            # Include org CUID if available
+            if self.org_cuid:
+                headers['TollbitOrgCuid'] = self.org_cuid
             
             if self.agent_id:
                 headers['X-Tollbit-AgentId'] = self.agent_id
