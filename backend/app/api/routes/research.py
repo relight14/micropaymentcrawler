@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import ResearchPacket, SourceCard
 from services.ai.report_generator import ReportGeneratorService
+from services.ai.query_classifier import query_classifier  # Import query classification service
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from config import Config
@@ -29,6 +30,9 @@ router = APIRouter()
 # Initialize services
 ledewire = LedeWireAPI()
 report_generator = ReportGeneratorService()
+
+# NOTE: Query classification logic has been moved to services/ai/query_classifier.py
+# The functions below are thin wrappers for backwards compatibility
 
 # Initialize Anthropic client for context-aware query refinement
 claude_client = anthropic.Anthropic(
