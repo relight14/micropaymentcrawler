@@ -37,6 +37,30 @@ class SourceCard {
         });
         this.eventListeners.clear();
     }
+    
+    /**
+     * Clean up event listeners for DOM nodes that are no longer in the document
+     * This prevents memory leaks when cards are removed from DOM during project switches
+     */
+    cleanupDetachedListeners() {
+        const toRemove = [];
+        
+        this.eventListeners.forEach((listener, element) => {
+            // Check if element is still in the document
+            if (!document.contains(element)) {
+                // Element has been removed from DOM, clean up its listener
+                element.removeEventListener(listener.type, listener.handler);
+                toRemove.push(element);
+            }
+        });
+        
+        // Remove detached elements from the Map
+        toRemove.forEach(element => this.eventListeners.delete(element));
+        
+        if (toRemove.length > 0) {
+            console.log(`🧹 SourceCard: Cleaned up ${toRemove.length} detached event listeners`);
+        }
+    }
 
     /**
      * Create a source card element with all functionality

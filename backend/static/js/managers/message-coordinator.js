@@ -152,6 +152,10 @@ export class MessageCoordinator {
             return errorDiv;
         }
         
+        // Clean up any stale event listeners from previous project loads
+        // This prevents memory leaks when cards are removed during project switches
+        sourceCardFactory.cleanupDetachedListeners();
+        
         // Create the DOM structure that CSS expects
         const container = document.createElement('div');
         container.className = 'sources-preview-section';
@@ -183,10 +187,10 @@ export class MessageCoordinator {
             container.appendChild(sourceCard);
         });
         
-        // Clear the eventListeners Map to release DOM node references
-        // Event listeners are already attached to DOM nodes and will continue to work
-        // This prevents memory leaks when cards are removed during project/mode switches
-        sourceCardFactory.eventListeners.clear();
+        // FIX: DO NOT clear eventListeners here - this breaks subsequent project loads
+        // Event listeners must persist for the lifetime of the DOM nodes
+        // Cleanup happens when SourceCard.destroy() is called explicitly or on project switch
+        // The singleton pattern means clearing here affects ALL future card creation
         
         // Return the live container with event listeners intact
         // MessageRenderer._createBody() checks instanceof HTMLElement and appends directly
