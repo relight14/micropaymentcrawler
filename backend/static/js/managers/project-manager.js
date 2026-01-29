@@ -580,6 +580,7 @@ export class ProjectManager {
                             query: metadata.query || '',
                             enrichment_status: 'complete'
                         };
+                        logger.info(`📊 [ProjectManager] Found source_cards message with ${metadata.sources.length} sources`);
                     }
                 }
                 

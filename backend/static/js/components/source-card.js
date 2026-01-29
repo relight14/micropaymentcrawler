@@ -37,6 +37,30 @@ class SourceCard {
         });
         this.eventListeners.clear();
     }
+    
+    /**
+     * Clean up event listeners for DOM nodes that are no longer in the document
+     * This prevents memory leaks when cards are removed from DOM during project switches
+     */
+    cleanupDetachedListeners() {
+        const toRemove = [];
+        
+        this.eventListeners.forEach((listener, element) => {
+            // Check if element is still in the document
+            if (!document.contains(element)) {
+                // Element has been removed from DOM, clean up its listener
+                element.removeEventListener(listener.type, listener.handler);
+                toRemove.push(element);
+            }
+        });
+        
+        // Remove detached elements from the Map
+        toRemove.forEach(element => this.eventListeners.delete(element));
+        
+        if (toRemove.length > 0) {
+            console.log(`🧹 SourceCard: Cleaned up ${toRemove.length} detached event listeners`);
+        }
+    }
 
     /**
      * Create a source card element with all functionality
@@ -72,6 +96,10 @@ class SourceCard {
         sourceCard.setAttribute('data-source-id', source.id);
         sourceCard.setAttribute('data-source-type', source.source_type || 'journalism');
         
+        // Store source data as JSON for easy access in event handlers
+        // This makes the card self-contained and independent of global state
+        sourceCard.setAttribute('data-source-json', JSON.stringify(source));
+        
         console.log(`✅ SOURCE CARD: Main container created with class '${className}' and ID '${source.id}'`);
 
         // Compact layout: [Checkbox] Title + Metadata + Actions [Icons]
@@ -99,22 +127,22 @@ class SourceCard {
             
             if (action === 'unlock') {
                 e.preventDefault();
-                this._handleUnlock(sourceId);
+                this._handleUnlock(sourceId, sourceCard);
             } else if (action === 'download') {
                 e.preventDefault();
-                this._handleDownload(sourceId);
+                this._handleDownload(sourceId, sourceCard);
             } else if (action === 'summarize') {
                 e.preventDefault();
-                this._handleSummarize(sourceId, actionBtn);
+                this._handleSummarize(sourceId, actionBtn, sourceCard);
             } else if (action === 'full_access') {
                 e.preventDefault();
-                this._handleFullAccess(sourceId, actionBtn);
+                this._handleFullAccess(sourceId, actionBtn, sourceCard);
             } else if (action === 'dismiss') {
                 e.preventDefault();
                 this._handleDismiss(sourceId, sourceCard);
             } else if (action === 'add-to-outline') {
                 e.preventDefault();
-                this._handleAddToOutline(sourceId, actionBtn);
+                this._handleAddToOutline(sourceId, actionBtn, sourceCard);
             }
             // view-external opens naturally via href, no handler needed
         };
@@ -899,20 +927,38 @@ class SourceCard {
     /**
      * Handle source unlock (legacy - kept for backward compatibility)
      */
-    async _handleUnlock(sourceId) {
+    async _handleUnlock(sourceId, sourceCard = null) {
         console.log('🔓 UNLOCK: Button clicked! SourceID:', sourceId);
         
-        // Lookup source from appState
-        const researchData = this.appState?.getCurrentResearchData();
-        if (!researchData || !researchData.sources) {
-            console.error('🔓 UNLOCK: No research data available');
-            return;
+        let source = null;
+        
+        // PRIORITY 1: Try to get source from the card's data attribute (most reliable)
+        if (sourceCard && sourceCard.hasAttribute('data-source-json')) {
+            try {
+                source = JSON.parse(sourceCard.getAttribute('data-source-json'));
+                console.log('🔓 UNLOCK: Source loaded from card data attribute');
+            } catch (error) {
+                console.warn('🔓 UNLOCK: Failed to parse source JSON from card:', error);
+            }
         }
         
-        const source = researchData.sources.find(s => s.id === sourceId);
+        // PRIORITY 2: Fallback to lookup from appState (for backwards compatibility)
         if (!source) {
-            console.error('🔓 UNLOCK: Source not found for ID:', sourceId);
-            return;
+            const researchData = this.appState?.getCurrentResearchData();
+            if (!researchData || !researchData.sources) {
+                console.error('🔓 UNLOCK: No research data available');
+                console.error('🔓 UNLOCK: appState:', this.appState);
+                console.error('🔓 UNLOCK: researchData:', researchData);
+                return;
+            }
+            
+            source = researchData.sources.find(s => s.id === sourceId);
+            if (!source) {
+                console.error('🔓 UNLOCK: Source not found for ID:', sourceId);
+                console.error('🔓 UNLOCK: Available source IDs:', researchData.sources.map(s => s.id));
+                return;
+            }
+            console.log('🔓 UNLOCK: Source loaded from appState (fallback)');
         }
         
         console.log('🔓 UNLOCK: Source found:', source.title, 'Price:', source.unlock_price);
@@ -934,18 +980,31 @@ class SourceCard {
     /**
      * Handle source download
      */
-    async _handleDownload(sourceId) {
-        // Lookup source from appState
-        const researchData = this.appState?.getCurrentResearchData();
-        if (!researchData || !researchData.sources) {
-            console.error('Download: No research data available');
-            return;
+    async _handleDownload(sourceId, sourceCard = null) {
+        let source = null;
+        
+        // Try to get source from card data attribute first
+        if (sourceCard && sourceCard.hasAttribute('data-source-json')) {
+            try {
+                source = JSON.parse(sourceCard.getAttribute('data-source-json'));
+            } catch (error) {
+                console.warn('Download: Failed to parse source JSON from card:', error);
+            }
         }
         
-        const source = researchData.sources.find(s => s.id === sourceId);
+        // Fallback to appState lookup
         if (!source) {
-            console.error('Download: Source not found for ID:', sourceId);
-            return;
+            const researchData = this.appState?.getCurrentResearchData();
+            if (!researchData || !researchData.sources) {
+                console.error('Download: No research data available');
+                return;
+            }
+            
+            source = researchData.sources.find(s => s.id === sourceId);
+            if (!source) {
+                console.error('Download: Source not found for ID:', sourceId);
+                return;
+            }
         }
         
         try {
@@ -962,20 +1021,34 @@ class SourceCard {
     /**
      * Handle article summarize request
      */
-    async _handleSummarize(sourceId, buttonElement) {
+    async _handleSummarize(sourceId, buttonElement, sourceCard = null) {
         console.log('✨ SUMMARIZE: Button clicked! SourceID:', sourceId);
         
-        // Lookup source from appState
-        const researchData = this.appState?.getCurrentResearchData();
-        if (!researchData || !researchData.sources) {
-            console.error('✨ SUMMARIZE: No research data available');
-            return;
+        let source = null;
+        
+        // Try to get source from card data attribute first
+        if (sourceCard && sourceCard.hasAttribute('data-source-json')) {
+            try {
+                source = JSON.parse(sourceCard.getAttribute('data-source-json'));
+                console.log('✨ SUMMARIZE: Source loaded from card data attribute');
+            } catch (error) {
+                console.warn('✨ SUMMARIZE: Failed to parse source JSON from card:', error);
+            }
         }
         
-        const source = researchData.sources.find(s => s.id === sourceId);
+        // Fallback to appState lookup
         if (!source) {
-            console.error('✨ SUMMARIZE: Source not found for ID:', sourceId);
-            return;
+            const researchData = this.appState?.getCurrentResearchData();
+            if (!researchData || !researchData.sources) {
+                console.error('✨ SUMMARIZE: No research data available');
+                return;
+            }
+            
+            source = researchData.sources.find(s => s.id === sourceId);
+            if (!source) {
+                console.error('✨ SUMMARIZE: Source not found for ID:', sourceId);
+                return;
+            }
         }
         
         console.log('✨ SUMMARIZE: Source found:', source.title);
@@ -1003,20 +1076,34 @@ class SourceCard {
     /**
      * Handle full access request
      */
-    async _handleFullAccess(sourceId, buttonElement) {
+    async _handleFullAccess(sourceId, buttonElement, sourceCard = null) {
         console.log('📖 FULL ACCESS: Button clicked! SourceID:', sourceId);
         
-        // Lookup source from appState
-        const researchData = this.appState?.getCurrentResearchData();
-        if (!researchData || !researchData.sources) {
-            console.error('📖 FULL ACCESS: No research data available');
-            return;
+        let source = null;
+        
+        // Try to get source from card data attribute first
+        if (sourceCard && sourceCard.hasAttribute('data-source-json')) {
+            try {
+                source = JSON.parse(sourceCard.getAttribute('data-source-json'));
+                console.log('📖 FULL ACCESS: Source loaded from card data attribute');
+            } catch (error) {
+                console.warn('📖 FULL ACCESS: Failed to parse source JSON from card:', error);
+            }
         }
         
-        const source = researchData.sources.find(s => s.id === sourceId);
+        // Fallback to appState lookup
         if (!source) {
-            console.error('📖 FULL ACCESS: Source not found for ID:', sourceId);
-            return;
+            const researchData = this.appState?.getCurrentResearchData();
+            if (!researchData || !researchData.sources) {
+                console.error('📖 FULL ACCESS: No research data available');
+                return;
+            }
+            
+            source = researchData.sources.find(s => s.id === sourceId);
+            if (!source) {
+                console.error('📖 FULL ACCESS: Source not found for ID:', sourceId);
+                return;
+            }
         }
         
         console.log('📖 FULL ACCESS: Source found:', source.title);
@@ -1044,9 +1131,9 @@ class SourceCard {
     /**
      * Handle adding source to outline - just click the checkbox
      */
-    _handleAddToOutline(sourceId, buttonElement) {
+    _handleAddToOutline(sourceId, buttonElement, sourceCard = null) {
         // Find the checkbox and click it - let existing logic handle everything
-        const cardElement = buttonElement.closest('[data-source-id]');
+        const cardElement = sourceCard || buttonElement.closest('[data-source-id]');
         if (!cardElement) return;
         
         const checkbox = cardElement.querySelector('.source-selection-checkbox');
