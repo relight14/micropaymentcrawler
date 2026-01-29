@@ -323,7 +323,7 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     async def fetch_content(self, url: str, license_token: LicenseToken) -> Optional[Dict[str, Any]]:
         """
-        Fetch full article content using Tollbit gateway API
+        Fetch full article content using Tollbit publisher subdomain
         
         Returns structured content with:
         - header: Navigation and breadcrumbs
@@ -332,34 +332,32 @@ class TollbitProtocolHandler(ProtocolHandler):
         - metadata: Author, date, description, images
         - rate: Pricing information
         
-        Docs: https://docs.tollbit.com/content/
+        Docs: https://docs.tollbit.com/quickstart/
         
-        Content is fetched from the Tollbit gateway:
-        GET https://gateway.tollbit.com/dev/v2/content/<content_path>
-        Where content_path is: domain/path (e.g., time.com/7335417/article-slug)
+        Content is fetched from the publisher's Tollbit subdomain:
+        GET https://tollbit.<domain>/<path>
         """
         if not self.api_key or not license_token.token:
             logger.warning("Cannot fetch content: missing API key or token")
             return None
         
         try:
-            # Parse URL to construct content path for gateway
-            # Example: https://time.com/7335417/article-slug -> time.com/7335417/article-slug
+            # Parse URL to construct publisher subdomain endpoint
+            # Example: https://time.com/7335417/article-slug -> https://tollbit.time.com/7335417/article-slug
             from urllib.parse import urlparse
             parsed = urlparse(url)
             domain = parsed.netloc
-            path = parsed.path.lstrip('/')  # Remove leading slash
+            path = parsed.path
             
-            # Construct content path: domain/path
-            content_path = f"{domain}/{path}" if path else domain
+            # Construct Tollbit publisher subdomain URL
+            content_endpoint = f"https://tollbit.{domain}{path}"
+            if parsed.query:
+                content_endpoint += f"?{parsed.query}"
             
-            # Construct Tollbit gateway URL
-            content_endpoint = f"{self.base_url}/dev/v2/content/{content_path}"
-            
-            logger.info(f"Fetching content from Tollbit gateway: {content_endpoint}")
+            logger.info(f"Fetching content from Tollbit subdomain: {content_endpoint}")
             
             headers = {
-                'TollbitToken': license_token.token,
+                'Tollbit-Token': license_token.token,
                 'User-Agent': self.agent_name,
                 'Tollbit-Accept-Content': 'text/markdown'
             }
