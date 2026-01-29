@@ -107,6 +107,15 @@ class RSLProtocolHandler(ProtocolHandler):
     
     def __init__(self):
         self._client: Optional[httpx.AsyncClient] = None
+        self._token_manager = None  # Lazy loaded
+        self._license_terms_cache: Dict[str, LicenseTerms] = {}
+    
+    def _get_token_manager(self):
+        """Get or create token manager (lazy loading to avoid circular imports)"""
+        if self._token_manager is None:
+            from .rsl_token_manager import RSLTokenManager
+            self._token_manager = RSLTokenManager()
+        return self._token_manager
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -116,9 +125,13 @@ class RSLProtocolHandler(ProtocolHandler):
     
     async def check_source(self, url: str) -> Optional[LicenseTerms]:
         """Check for RSL licensing at this source"""
+        # Check cache first
+        if url in self._license_terms_cache:
+            return self._license_terms_cache[url]
+        
         try:
             domain = urlparse(url).netloc
-            rsl_paths = ['/rsl.xml', '/.well-known/rsl.xml', '/robots/rsl.xml']
+            rsl_paths = ['/.well-known/rsl.xml', '/rsl.xml', '/robots/rsl.xml']
             
             client = await self._get_client()
             
@@ -127,7 +140,10 @@ class RSLProtocolHandler(ProtocolHandler):
                 try:
                     response = await client.get(rsl_url, timeout=5.0)
                     if response.status_code == 200:
-                        return self._parse_rsl_xml(response.text, rsl_url)
+                        terms = self._parse_rsl_xml(response.text, rsl_url)
+                        if terms:
+                            self._license_terms_cache[url] = terms
+                            return terms
                 except httpx.HTTPError:
                     continue
                     
@@ -157,12 +173,13 @@ class RSLProtocolHandler(ProtocolHandler):
                     permits_ai_training = any(use.strip() in ['all', 'ai-train'] for use in permitted_uses)
                     permits_search = any(use.strip() in ['all', 'search'] for use in permitted_uses)
                 
-                payment = license_elem.find('.//{https://rslstandard.org/rsl}payment')
+                # Parse all payment elements (may have multiple for different types)
+                payments = license_elem.findall('.//{https://rslstandard.org/rsl}payment')
                 ai_include_price = None
                 purchase_price = None
                 currency = "USD"
                 
-                if payment is not None:
+                for payment in payments:
                     amount_elem = payment.find('.//{https://rslstandard.org/rsl}amount')
                     if amount_elem is not None:
                         try:
@@ -176,10 +193,16 @@ class RSLProtocolHandler(ProtocolHandler):
                             payment_type = payment.get('type', 'purchase')
                             if payment_type in ['inference', 'crawl']:
                                 ai_include_price = price
-                            else:
+                            elif payment_type == 'purchase':
                                 purchase_price = price
                         except (ValueError, TypeError):
                             pass
+                
+                # Check for attribution-only (first payment element)
+                first_payment = license_elem.find('.//{https://rslstandard.org/rsl}payment')
+                requires_attribution = False
+                if first_payment is not None:
+                    requires_attribution = first_payment.get('type') == 'attribution'
                 
                 copyright_elem = content.find('.//{https://rslstandard.org/rsl}copyright')
                 publisher = copyright_elem.text if copyright_elem is not None else None
@@ -196,7 +219,7 @@ class RSLProtocolHandler(ProtocolHandler):
                     permits_ai_training=permits_ai_training,
                     permits_ai_include=permits_ai_include,
                     permits_search=permits_search,
-                    requires_attribution=payment.get('type') == 'attribution' if payment is not None else False
+                    requires_attribution=requires_attribution
                 )
                 
             return None
@@ -205,16 +228,157 @@ class RSLProtocolHandler(ProtocolHandler):
             return None
     
     async def request_license(self, url: str, license_type: str = "ai-include") -> Optional[LicenseToken]:
-        """Request RSL license from license server"""
-        return LicenseToken(
-            token=f"rsl_token_{uuid.uuid4().hex[:16]}",
-            protocol="rsl",
-            cost=0.05,
-            currency="USD",
-            expires_at=datetime.now() + timedelta(hours=24),
-            content_url=url,
-            license_type=license_type
-        )
+        """
+        Request RSL license from license server using OAuth 2.0
+        
+        Steps:
+        1. Get license terms from check_source (includes license_server_url)
+        2. Request OAuth token from license server
+        3. Return LicenseToken with OAuth token
+        """
+        try:
+            # Get license terms to find license server
+            terms = await self.check_source(url)
+            if not terms:
+                logger.warning(f"No RSL terms found for {url}")
+                # Return mock token for demo
+                return LicenseToken(
+                    token=f"rsl_mock_token_{uuid.uuid4().hex[:16]}",
+                    protocol="rsl",
+                    cost=0.05,
+                    currency="USD",
+                    expires_at=datetime.now() + timedelta(hours=24),
+                    content_url=url,
+                    license_type=license_type
+                )
+            
+            # Check if license server URL is available
+            if not terms.license_server_url:
+                logger.info(f"No license server URL in RSL for {url} - using demo mode")
+                cost = terms.ai_include_price if license_type == "ai-include" else terms.purchase_price
+                return LicenseToken(
+                    token=f"rsl_demo_token_{uuid.uuid4().hex[:16]}",
+                    protocol="rsl",
+                    cost=cost or 0.05,
+                    currency=terms.currency,
+                    expires_at=datetime.now() + timedelta(hours=24),
+                    content_url=url,
+                    license_type=license_type
+                )
+            
+            # Request real OAuth token from license server
+            token_manager = self._get_token_manager()
+            rsl_token = await token_manager.request_token(
+                license_server_url=terms.license_server_url,
+                content_url=url,
+                license_type=license_type
+            )
+            
+            if not rsl_token:
+                logger.error(f"Failed to obtain OAuth token from {terms.license_server_url}")
+                return None
+            
+            # Convert RSLToken to LicenseToken
+            cost = terms.ai_include_price if license_type == "ai-include" else terms.purchase_price
+            return LicenseToken(
+                token=rsl_token.access_token,
+                protocol="rsl",
+                cost=cost or 0.05,
+                currency=terms.currency,
+                expires_at=rsl_token.expires_at,
+                content_url=url,
+                license_type=license_type
+            )
+            
+        except Exception as e:
+            logger.error(f"Error requesting RSL license for {url}: {e}")
+            return None
+    
+    async def fetch_content(self, url: str, license_token: LicenseToken) -> Optional[Dict[str, Any]]:
+        """
+        Fetch licensed content using OAuth token
+        
+        Makes authorized request to content URL with Bearer token
+        
+        Args:
+            url: Content URL to fetch
+            license_token: License token with access_token
+        
+        Returns:
+            Dict with content, metadata, and attribution info
+        """
+        try:
+            client = await self._get_client()
+            
+            # Make authorized request
+            response = await client.get(
+                url,
+                headers={
+                    'Authorization': f'Bearer {license_token.token}',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent': 'RSL-Research-Crawler/1.0'
+                },
+                timeout=30.0,
+                follow_redirects=True
+            )
+            
+            if response.status_code == 200:
+                # Get license terms for attribution info
+                terms = await self.check_source(url)
+                
+                content_type = response.headers.get('content-type', '')
+                
+                # Parse content based on type
+                if 'html' in content_type:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Extract article content (simplified - would need more sophisticated extraction)
+                    article = soup.find('article') or soup.find('main') or soup
+                    text_content = article.get_text(separator='\n', strip=True)
+                    
+                    # Extract title
+                    title = None
+                    title_tag = soup.find('title')
+                    if title_tag:
+                        title = title_tag.get_text(strip=True)
+                    elif soup.find('h1'):
+                        title = soup.find('h1').get_text(strip=True)
+                    
+                    return {
+                        'body': text_content,
+                        'html': response.text,
+                        'title': title,
+                        'content_type': 'text/html',
+                        'requires_attribution': terms.requires_attribution if terms else False,
+                        'publisher': terms.publisher if terms else None,
+                        'source_url': url
+                    }
+                else:
+                    # Plain text or other format
+                    return {
+                        'body': response.text,
+                        'content_type': content_type,
+                        'requires_attribution': terms.requires_attribution if terms else False,
+                        'publisher': terms.publisher if terms else None,
+                        'source_url': url
+                    }
+            elif response.status_code == 401:
+                logger.error(f"RSL token unauthorized for {url}")
+                return None
+            elif response.status_code == 403:
+                logger.error(f"RSL access forbidden for {url}")
+                return None
+            else:
+                logger.error(f"Failed to fetch RSL content: {response.status_code}")
+                return None
+                
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching RSL content from {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error fetching RSL content from {url}: {e}")
+            return None
 
 class TollbitProtocolHandler(ProtocolHandler):
     """
@@ -770,13 +934,18 @@ class ContentLicenseService:
         
         for source in sources:
             if source.get('license_info'):
-                terms = source['license_info']['terms']
+                license_info = source['license_info']
+                terms = license_info.get('terms')
+                
+                # Handle both dict and LicenseTerms object
                 if isinstance(terms, dict):
-                    protocol = terms.get('protocol')
-                    cost = terms.get('ai_include_price', 0.0)
-                else:
+                    protocol = terms.get('protocol', 'unknown')
+                    cost = terms.get('ai_include_price', 0.0) or 0.0
+                elif hasattr(terms, 'protocol'):
                     protocol = terms.protocol
                     cost = terms.ai_include_price or 0.0
+                else:
+                    continue
                 
                 summary['total_cost'] += cost
                 summary['licensed_count'] += 1
