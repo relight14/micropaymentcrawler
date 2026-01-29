@@ -349,7 +349,8 @@ export class PurchaseConfirmationModal {
                     this.currentPurchase.source.id,
                     this.currentPurchase.source.url,
                     this.currentPurchase.source.title,
-                    this.currentPurchase.source.license_cost || 0
+                    this.currentPurchase.source.excerpt || '',
+                    this.currentPurchase.source.ai_include_price || this.currentPurchase.source.license_cost || 0
                 );
             } else if (this.currentPurchase.type === 'report') {
                 // Call generate report API
@@ -449,8 +450,8 @@ export class PurchaseConfirmationModal {
      * Calculate summary price from source
      */
     _calculateSummaryPrice(source) {
-        // Use ai_include_price if available, otherwise fall back to license_cost
-        return source.ai_include_price || source.license_cost || 0.07;
+        // Use ai_include_price if available, otherwise license_cost, or 0 (free) if no pricing
+        return source.ai_include_price || source.license_cost || 0;
     }
 
     /**

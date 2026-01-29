@@ -541,7 +541,7 @@ export class APIService {
             return {
                 success: false,
                 quote_unavailable: true,
-                calculated_price: 0.50,  // Fallback estimate
+                calculated_price: 0,  // No fallback - price unknown
                 new_source_count: null,
                 previous_source_count: null,
                 total_source_count: null
