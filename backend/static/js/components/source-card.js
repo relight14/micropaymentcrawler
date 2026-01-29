@@ -1043,11 +1043,12 @@ class SourceCard {
                 console.error('✨ SUMMARIZE: No research data available');
                 return;
             }
-        
-        const source = researchData.sources.find(s => s.id === sourceId);
-        if (!source) {
-            console.error('✨ SUMMARIZE: Source not found for ID:', sourceId);
-            return;
+            
+            source = researchData.sources.find(s => s.id === sourceId);
+            if (!source) {
+                console.error('✨ SUMMARIZE: Source not found for ID:', sourceId);
+                return;
+            }
         }
         
         console.log('✨ SUMMARIZE: Source found:', source.title);
