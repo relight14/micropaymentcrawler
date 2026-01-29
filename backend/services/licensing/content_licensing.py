@@ -344,10 +344,15 @@ class TollbitProtocolHandler(ProtocolHandler):
         try:
             # Parse URL to construct publisher subdomain endpoint
             # Example: https://time.com/7335417/article-slug -> https://tollbit.time.com/7335417/article-slug
+            # Example: https://www.forbes.com/article -> https://tollbit.forbes.com/article
             from urllib.parse import urlparse
             parsed = urlparse(url)
             domain = parsed.netloc
             path = parsed.path
+            
+            # Strip www. prefix for Tollbit subdomain (tollbit.www.forbes.com doesn't exist)
+            if domain.startswith('www.'):
+                domain = domain[4:]
             
             # Construct Tollbit publisher subdomain URL
             content_endpoint = f"https://tollbit.{domain}{path}"
