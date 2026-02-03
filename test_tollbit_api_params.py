@@ -16,7 +16,8 @@ async def test_api_parameters():
     print("Tollbit API Parameters Test")
     print("=" * 70)
     
-    # Set a mock API key
+    # Save original API key and set a mock API key
+    original_api_key = os.environ.get('TOLLBIT_API_KEY')
     os.environ['TOLLBIT_API_KEY'] = 'test_key_12345'
     
     handler = TollbitProtocolHandler()
@@ -172,6 +173,12 @@ async def test_api_parameters():
     print(f"✅ Passed: {passed}")
     print(f"❌ Failed: {failed}")
     print(f"{'=' * 70}")
+    
+    # Restore original API key
+    if original_api_key is not None:
+        os.environ['TOLLBIT_API_KEY'] = original_api_key
+    else:
+        os.environ.pop('TOLLBIT_API_KEY', None)
     
     return failed == 0
 

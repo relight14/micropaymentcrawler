@@ -25,7 +25,7 @@ async def test_tollbit_integration():
         print("  python3 test_tollbit_integration.py")
         return False
     
-    print(f"\n✅ TOLLBIT_API_KEY found: {api_key[:10]}...")
+    print(f"\n✅ TOLLBIT_API_KEY found: {'*' * 10}...")
     
     # Initialize handler
     handler = TollbitProtocolHandler()
