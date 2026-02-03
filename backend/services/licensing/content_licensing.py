@@ -737,8 +737,8 @@ class CloudflareProtocolHandler(ProtocolHandler):
                 logger.info(f"Cloudflare licensing detected via headers/status: {url}")
                 return LicenseTerms(
                     protocol="cloudflare",
-                    ai_include_price=0.07,
-                    purchase_price=0.25,
+                    ai_include_price=0.0,
+                    purchase_price=0.0,
                     currency="USD",
                     publisher=self._extract_publisher(url),
                     permits_ai_include=True,
@@ -753,8 +753,8 @@ class CloudflareProtocolHandler(ProtocolHandler):
                 logger.info(f"Cloudflare 402 Payment Required detected: {url}")
                 return LicenseTerms(
                     protocol="cloudflare",
-                    ai_include_price=0.07,
-                    purchase_price=0.25,
+                    ai_include_price=0.0,
+                    purchase_price=0.0,
                     currency="USD",
                     publisher=self._extract_publisher(url),
                     permits_ai_include=True,

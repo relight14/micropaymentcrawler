@@ -385,8 +385,8 @@ async def get_full_access(
             response_data={}
         )
         
-        # Calculate price
-        price = full_access_request.purchase_price or 0.25
+        # Calculate price - use provided price or 0 (free if no pricing available)
+        price = full_access_request.purchase_price or 0
         price_cents = int(price * 100)
         
         # Try Tollbit licensing first (human tier), fall back to direct scraping
