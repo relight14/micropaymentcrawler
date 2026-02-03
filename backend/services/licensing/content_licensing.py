@@ -578,7 +578,7 @@ class TollbitProtocolHandler(ProtocolHandler):
                 'userAgent': self.agent_name,
                 'licenseType': 'ON_DEMAND_LICENSE',
                 'maxPriceMicros': 1000000,
-                'format': 'html'
+                'currency': 'USD'
             }
             
             try:
@@ -648,7 +648,7 @@ class TollbitProtocolHandler(ProtocolHandler):
                 'userAgent': self.agent_name,
                 'licenseType': tollbit_license_type,
                 'maxPriceMicros': max_price,
-                'format': 'html'
+                'currency': 'USD'
             }
             
             try:
