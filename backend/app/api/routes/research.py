@@ -44,6 +44,9 @@ claude_client = anthropic.Anthropic(
 # In-memory storage - cleared on server restart
 conversation_topics: Dict[str, Dict[str, str]] = {}
 
+# Constants
+CONVERSATION_CONTEXT_WINDOW_SIZE = 10  # Number of recent messages to load from database for research context
+
 
 class GenerateReportRequest(BaseModel):
     """Request model for report generation"""
@@ -1011,7 +1014,10 @@ async def analyze_research_query(
         conversation_context = research_request.conversation_context
         if not conversation_context and research_request.project_id:
             logger.info(f"📚 Loading conversation history from database for project {research_request.project_id}")
-            db_history = conversation_manager.get_context_window(research_request.project_id, window_size=10)
+            db_history = conversation_manager.get_context_window(
+                research_request.project_id, 
+                window_size=CONVERSATION_CONTEXT_WINDOW_SIZE
+            )
             # Convert database format to expected format
             conversation_context = [
                 {"sender": msg["sender"], "content": msg["content"]}

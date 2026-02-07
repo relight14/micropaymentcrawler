@@ -3,6 +3,7 @@
  * Extracted from the monolithic ChatResearchApp
  */
 import { generateIdempotencyKey } from '../utils/helpers.js';
+import { projectStore } from '../state/project-store.js';
 
 export class APIService {
     constructor(authService) {
@@ -134,7 +135,6 @@ export class APIService {
         console.log(`📡 [API] Routing to /api/chat (anonymous conversational)`);
         
         // Get project_id from projectStore to maintain conversation context
-        const { projectStore } = await import('../state/project-store.js');
         const requestBody = { message, mode };
         if (projectStore.state.activeProjectId) {
             requestBody.project_id = projectStore.state.activeProjectId;
