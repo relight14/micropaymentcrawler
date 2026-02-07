@@ -23,8 +23,8 @@ from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from config import Config
 from middleware.auth_dependencies import get_current_token, get_authenticated_user
-# Import shared crawler instance without sys.path manipulation
-from shared_services import crawler
+# Import shared crawler getter function
+from shared_services import get_crawler
 
 router = APIRouter()
 
@@ -821,6 +821,11 @@ async def generate_research_report(
         elif report_request.selected_source_ids:
             print(f"📊 Generating report with {len(report_request.selected_source_ids)} selected sources (legacy mode)")
             
+            # Get crawler instance
+            crawler = get_crawler()
+            if not crawler:
+                raise HTTPException(status_code=503, detail="Source search service not available")
+            
             # Legacy fallback: try cache lookup for backward compatibility
             selected_sources = []
             
@@ -867,6 +872,11 @@ async def generate_research_report(
             # No sources selected - generate sources and report (legacy behavior)
             print(f"📊 Generating report without selected sources (legacy mode)")
             
+            # Get crawler instance
+            crawler = get_crawler()
+            if not crawler:
+                raise HTTPException(status_code=503, detail="Source search service not available")
+            
             # Generate sources with fixed limit (unified tier)
             max_sources = 20
             
@@ -911,6 +921,11 @@ async def get_enrichment_status(
 ):
     """Poll for enriched results after skeleton cards are returned"""
     try:
+        # Get crawler instance
+        crawler = get_crawler()
+        if not crawler:
+            raise HTTPException(status_code=503, detail="Source search service not available")
+            
         # Validate cache_key to prevent injection attacks
         if not cache_key or not re.match(r'^[a-zA-Z0-9_:.\-]{8,64}$', cache_key):
             raise HTTPException(status_code=400, detail="Invalid cache key format")
@@ -966,6 +981,11 @@ async def analyze_research_query(
 ):
     """Analyze a research query and return dynamic pricing with source preview."""
     try:
+        # Get crawler instance
+        crawler = get_crawler()
+        if not crawler:
+            raise HTTPException(status_code=503, detail="Source search service not available. Please ensure TAVILY_API_KEY is configured.")
+        
         # Validate and sanitize query input
         sanitized_query = validate_query_input(research_request.query)
         # Generate sources based on query and budget

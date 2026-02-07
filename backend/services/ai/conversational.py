@@ -6,6 +6,7 @@ import os
 import json
 import re
 import time
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import anthropic
@@ -13,18 +14,34 @@ from services.licensing.content_licensing import ContentLicenseService
 from services.research.crawler import ContentCrawlerStub
 # TierType removed - all reports are now Pro Package
 
+logger = logging.getLogger(__name__)
+
 class AIResearchService:
     """Unified AI service for conversational and deep research modes"""
     
     def __init__(self):
+        # Initialize user_conversations FIRST to prevent AttributeError
+        # This ensures the attribute exists even if other initialization steps fail
+        self.user_conversations = {}
+        
+        # Initialize core chat functionality (always required)
         self.client = anthropic.Anthropic(
             api_key=os.environ.get('ANTHROPIC_API_KEY')
         )
-        self.license_service = ContentLicenseService()
-        self.crawler = ContentCrawlerStub()
-        # Legacy in-memory storage for backward compatibility
-        # NOTE: This should be migrated to use database-backed conversation_history
-        self.user_conversations = {}
+        
+        # Initialize optional services with error handling
+        # These are only needed for research/source queries, not basic chat
+        try:
+            self.license_service = ContentLicenseService()
+        except Exception as e:
+            logger.warning(f"Failed to initialize ContentLicenseService: {e}")
+            self.license_service = None
+        
+        try:
+            self.crawler = ContentCrawlerStub()
+        except Exception as e:
+            logger.warning(f"Failed to initialize ContentCrawlerStub (Tavily): {e}")
+            self.crawler = None
     
     async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None, conversation_context: Optional[List[Dict[str, Any]]] = None, enhanced_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
@@ -818,6 +835,17 @@ Be specific and targeted based on our conversation. Don't be generic."""
         """Execute deep research with intelligent source selection"""
         
         try:
+            # Check if crawler is available (requires Tavily API key)
+            if not self.crawler:
+                return {
+                    'response': "Deep research mode requires source search capabilities, but the search service is not available. Please contact support.",
+                    'mode': 'deep_research',
+                    'conversation_length': 0,
+                    'sources': [],
+                    'licensing_summary': None,
+                    'total_cost': 0.0
+                }
+            
             # Generate sources using the refined query
             sources = await self.crawler.generate_sources(refined_query, 15)  # Get more to select from
             
@@ -842,8 +870,18 @@ Be specific and targeted based on our conversation. Don't be generic."""
             # Intelligently select the 10 most relevant sources
             selected_sources = self._select_relevant_sources(sources_dicts, refined_query, 10)
             
-            # Calculate dynamic pricing based on selected sources
-            licensing_summary = self.license_service.get_license_summary(selected_sources)
+            # Calculate dynamic pricing based on selected sources (if license service available)
+            licensing_summary = None
+            if self.license_service:
+                licensing_summary = self.license_service.get_license_summary(selected_sources)
+            else:
+                # Fallback if license service not available
+                licensing_summary = {
+                    'total_cost': 0.0,
+                    'currency': 'USD',
+                    'protocols_used': [],
+                    'source_count': len(selected_sources)
+                }
             
             # Generate AI-powered research outline
             outline = self._generate_research_outline(selected_sources, refined_query)

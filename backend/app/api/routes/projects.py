@@ -754,10 +754,12 @@ async def create_message(
         message_data_json = json.dumps(message_request.message_data) if message_request.message_data else None
         
         # Insert message
-        insert_query = normalize_query("""INSERT INTO messages (project_id, user_id, sender, content, message_data)
-            VALUES (?, ?, ?, ?, ?)""")
-        
         if Config.USE_POSTGRES:
+            # Postgres: Use RETURNING clause to get the created message
+            insert_query = """INSERT INTO messages (project_id, user_id, sender, content, message_data, created_at)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+                RETURNING id, created_at"""
+            
             with db.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(insert_query, (
@@ -783,7 +785,11 @@ async def create_message(
                         }
                     }
         else:
-            message_id = db.execute_insert(insert_query, (
+            # SQLite: Insert and get lastrowid, then fetch the created message
+            insert_query = """INSERT INTO messages (project_id, user_id, sender, content, message_data, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))"""
+            
+            message_id = db.execute_write(insert_query, (
                 project_id,
                 user_id,
                 message_request.sender,
