@@ -240,7 +240,7 @@ async def get_projects(
                     id=row['id'],
                     user_id=row['user_id'],
                     title=row['title'],
-                    research_query=row.get('research_query'),
+                    research_query=row['research_query'] if 'research_query' in row.keys() else None,
                     created_at=row['created_at'],
                     updated_at=row['updated_at'],
                     is_active=row['is_active']
@@ -250,7 +250,7 @@ async def get_projects(
                     id=row['id'],
                     user_id=row['user_id'],
                     title=row['title'],
-                    research_query=row.get('research_query'),
+                    research_query=row['research_query'] if 'research_query' in row.keys() else None,
                     created_at=row['created_at'],
                     updated_at=row['updated_at'],
                     is_active=bool(row['is_active'])
@@ -704,7 +704,7 @@ async def get_project_messages(
         messages = []
         for row in messages_results:
             message_data = None
-            if row.get('message_data'):
+            if row['message_data']:
                 try:
                     message_data = json.loads(row['message_data'])
                 except:

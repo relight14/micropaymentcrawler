@@ -162,7 +162,8 @@ class ConversationManager:
                 'content': row['content'],
                 'timestamp': row['created_at']
             }
-            if row.get('message_data'):
+            # Check if message_data exists and is not None
+            if row['message_data']:
                 try:
                     message['metadata'] = json.loads(row['message_data'])
                 except json.JSONDecodeError:
@@ -239,7 +240,7 @@ class ConversationManager:
             projects.append({
                 'id': row['id'],
                 'title': row['title'],
-                'research_query': row.get('research_query'),
+                'research_query': row['research_query'] if 'research_query' in row.keys() else None,
                 'created_at': row['created_at'],
                 'updated_at': row['updated_at']
             })
