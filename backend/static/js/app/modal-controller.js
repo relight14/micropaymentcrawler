@@ -211,6 +211,9 @@ export class ModalController {
             }
             
             if (result.success) {
+                // Close modal on success
+                document.getElementById('authModal')?.remove();
+                
                 // Trigger success callback
                 if (this.onAuthSuccess) {
                     await this.onAuthSuccess(type);
