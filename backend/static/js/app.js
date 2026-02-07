@@ -445,6 +445,7 @@ export class ChatResearchApp {
             // Setup event router handlers
             this.eventRouter.setHandlers({
                 onSendMessage: () => this.sendMessage(),
+                onNewChat: () => this.startNewChat(),
                 onClearConversation: () => this.interactionHandler.clearConversation(
                     (sender, content) => this.addMessage(sender, content)
                 ),
@@ -763,6 +764,64 @@ export class ChatResearchApp {
     
     hideWelcomeScreen() {
         this.interactionHandler.hideWelcome();
+    }
+
+    /**
+     * Start a new chat by creating a new project
+     * For authenticated users, creates a new project
+     * For unauthenticated users, just clears the conversation
+     */
+    async startNewChat() {
+        // Check if user is authenticated
+        if (!this.authService.isAuthenticated()) {
+            // For anonymous users, just clear the conversation
+            logger.info('📝 Starting new chat for anonymous user - clearing conversation');
+            await this.interactionHandler.clearConversation(
+                (sender, content) => this.addMessage(sender, content),
+                true // Skip confirmation
+            );
+            return;
+        }
+
+        // For authenticated users, create a new project
+        logger.info('📝 Starting new chat for authenticated user - creating new project');
+        
+        try {
+            // Generate a timestamped title for the new chat
+            const timestamp = new Date().toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+            const title = `New Chat - ${timestamp}`;
+            
+            // Reset the auto-created flag so a new project can be created
+            if (this.projectsController?.projectManager) {
+                this.projectsController.projectManager.hasAutoCreatedProject = false;
+            }
+            
+            // Create new project via the project sidebar
+            const newProject = await this.projectsController.projectManager.sidebar.createProject(title);
+            
+            if (newProject) {
+                logger.info(`✅ New chat project created: ${newProject.id}`);
+                this.toastManager.show('New chat started', 'success');
+                
+                // Clear the input and focus it
+                const chatInput = document.getElementById('newChatInput');
+                if (chatInput) {
+                    chatInput.value = '';
+                    chatInput.focus();
+                }
+            } else {
+                logger.warn('⚠️ Failed to create new project');
+                this.toastManager.show('Failed to start new chat', 'error');
+            }
+        } catch (error) {
+            logger.error('Error starting new chat:', error);
+            this.toastManager.show('Failed to start new chat', 'error');
+        }
     }
 
     // Authentication methods
