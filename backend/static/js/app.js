@@ -792,11 +792,13 @@ export class ChatResearchApp {
                 month: 'short', 
                 day: 'numeric',
                 hour: 'numeric',
-                minute: '2-digit'
+                minute: '2-digit',
+                hour12: true
             });
             const title = `New Chat - ${timestamp}`;
             
             // Reset the auto-created flag so a new project can be created
+            // This allows ensureActiveProject to work again if needed
             if (this.projectsController?.projectManager) {
                 this.projectsController.projectManager.hasAutoCreatedProject = false;
             }
