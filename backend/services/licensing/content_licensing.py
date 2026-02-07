@@ -553,11 +553,13 @@ class TollbitProtocolHandler(ProtocolHandler):
     @async_retry(max_attempts=3, base_delay=1.0, max_delay=10.0)
     async def _check_pricing(self, target_url: str) -> Optional[Dict]:
         """
-        Check Tollbit pricing using v2 API and calculate both tier prices.
+        Check Tollbit pricing using v2 API and verify both tier availability.
         
-        Pricing model (POC - uses class constants):
+        Verifies both tiers to ensure full-access is actually available:
         - AI tier (ON_DEMAND_LICENSE): Base Tollbit price + markup = $0.05
         - Human tier (ON_DEMAND_FULL_USE_LICENSE): AI tier × 2.4 = $0.12
+        
+        Returns purchase_price as None if publisher hasn't configured full-access rates.
         """
         if not self.api_key:
             return None
@@ -573,7 +575,10 @@ class TollbitProtocolHandler(ProtocolHandler):
             if not target_url.startswith('http'):
                 target_url = f"https://{target_url}"
             
-            payload = {
+            client = await self._get_client()
+            
+            # Step 1: Check AI tier (ON_DEMAND_LICENSE)
+            ai_payload = {
                 'url': target_url,
                 'userAgent': self.agent_name,
                 'licenseType': 'ON_DEMAND_LICENSE',
@@ -582,35 +587,78 @@ class TollbitProtocolHandler(ProtocolHandler):
             }
             
             try:
-                client = await self._get_client()
-                response = await client.post(
+                ai_response = await client.post(
                     token_endpoint,
                     headers=headers,
-                    json=payload,
+                    json=ai_payload,
                     timeout=10.0
                 )
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    token = data.get('token')
-                    if token:
-                        logger.info(f"Tollbit pricing for {target_url}: AI=${self.ai_tier_price}, Human=${self.human_tier_price}")
-                        return {
-                            'ai_include_price': self.ai_tier_price,
-                            'purchase_price': self.human_tier_price,
-                            'currency': 'USD',
-                            'license_type': 'ON_DEMAND',
-                            'token': token
-                        }
-                else:
-                    error_msg = response.text[:200] if response.text else 'Unknown error'
-                    logger.info(f"Tollbit API response: {response.status_code} - {error_msg}")
+                if ai_response.status_code != 200:
+                    error_msg = ai_response.text[:200] if ai_response.text else 'Unknown error'
+                    logger.info(f"Tollbit AI tier check failed: {ai_response.status_code} - {error_msg}")
+                    return None
+                
+                ai_data = ai_response.json()
+                ai_token = ai_data.get('token')
+                if not ai_token:
+                    logger.info(f"Tollbit AI tier: no token returned for {target_url}")
+                    return None
+                
+                logger.debug(f"Tollbit AI tier available for {target_url}")
                     
             except httpx.HTTPError as e:
                 logger.error(f"Tollbit API request failed: {e}")
+                return None
             
-            logger.info(f"Tollbit API not accessible for {target_url} - no licensing available")
-            return None
+            # Step 2: Check full-access tier (ON_DEMAND_FULL_USE_LICENSE)
+            # This verifies the publisher has configured full-access rates
+            full_payload = {
+                'url': target_url,
+                'userAgent': self.agent_name,
+                'licenseType': 'ON_DEMAND_FULL_USE_LICENSE',
+                'maxPriceMicros': 2400000,
+                'currency': 'USD'
+            }
+            
+            full_access_available = False
+            try:
+                full_response = await client.post(
+                    token_endpoint,
+                    headers=headers,
+                    json=full_payload,
+                    timeout=10.0
+                )
+                
+                if full_response.status_code == 200:
+                    full_data = full_response.json()
+                    full_token = full_data.get('token')
+                    if full_token:
+                        full_access_available = True
+                        logger.debug(f"Tollbit full-access tier available for {target_url}")
+                    else:
+                        logger.info(f"Tollbit full-access tier: no token returned for {target_url}")
+                else:
+                    error_msg = full_response.text[:200] if full_response.text else 'Unknown error'
+                    logger.info(f"Tollbit full-access tier not available: {full_response.status_code} - {error_msg}")
+                    logger.info(f"Publisher may not have configured full-access rates for {target_url}")
+                    
+            except httpx.HTTPError as e:
+                logger.warning(f"Tollbit full-access check failed: {e}")
+            
+            # Return pricing with full-access only if available
+            purchase_price = self.human_tier_price if full_access_available else None
+            
+            full_access_display = f"${purchase_price}" if purchase_price else "not available"
+            logger.info(f"Tollbit pricing for {target_url}: AI=${self.ai_tier_price}, Full-access={full_access_display}")
+            
+            return {
+                'ai_include_price': self.ai_tier_price,
+                'purchase_price': purchase_price,
+                'currency': 'USD',
+                'license_type': 'ON_DEMAND',
+                'token': ai_token
+            }
                 
         except Exception as e:
             logger.error(f"Tollbit pricing discovery error: {e}")
