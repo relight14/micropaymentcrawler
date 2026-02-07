@@ -384,7 +384,7 @@ class SourceCard {
             return;
         }
         
-        console.log(`🔄 Updating card: ${enrichedSource.title} - pricing: ${enrichedSource.unlock_price}, protocol: ${enrichedSource.licensing_protocol}`);
+        console.log(`🔄 Updating card: ${enrichedSource.title} - pricing: ${enrichedSource.unlock_price ?? 'N/A'}, protocol: ${enrichedSource.licensing_protocol ?? 'N/A'}`);
         
         // Batch DOM updates to prevent flickering
         requestAnimationFrame(() => {

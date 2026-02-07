@@ -428,7 +428,6 @@ async def get_full_access(
         
         # Process payment or handle free content
         # Note: LedeWire requires price_cents > 0, so we skip payment processing for free content
-        transaction_id = None
         
         if price_cents > 0:
             # Paid content: Register with LedeWire and process payment
@@ -476,6 +475,11 @@ async def get_full_access(
             # Generate a transaction ID for tracking purposes only
             transaction_id = f"free_access_{hashlib.sha256(full_access_request.idempotency_key.encode()).hexdigest()[:12]}"
             logger.info(f"Free content access granted (scraped fallback) - no payment required")
+        
+        # Validate transaction_id was set
+        if not transaction_id:
+            logger.error("Transaction ID was not set - this should not happen")
+            raise HTTPException(status_code=500, detail="Internal error: failed to generate transaction ID")
         
         # Build response
         response_data = {
