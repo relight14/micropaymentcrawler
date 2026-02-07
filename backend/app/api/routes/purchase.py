@@ -17,8 +17,8 @@ from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from middleware.auth_dependencies import get_current_token, get_authenticated_user_with_id
 from utils.auth import extract_user_id_from_token, extract_bearer_token, validate_user_token
-# Import shared crawler instance without sys.path manipulation
-from shared_services import crawler
+# Import shared crawler getter function
+from shared_services import get_crawler
 import logging
 
 # Setup logger
@@ -289,6 +289,9 @@ async def purchase_research(request: Request, purchase_request: PurchaseRequest,
         if not sources:
             # No sources in outline - this shouldn't happen in normal flow
             logger.warning(f"⚠️ [PURCHASE] No sources in outline - generating default set")
+            crawler = get_crawler()
+            if not crawler:
+                raise HTTPException(status_code=503, detail="Source search service not available")
             sources = await crawler.generate_sources(purchase_request.query, 40)
         
         # Calculate incremental pricing using shared function

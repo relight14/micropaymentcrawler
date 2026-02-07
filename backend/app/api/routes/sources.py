@@ -533,7 +533,11 @@ async def get_system_stats():
 async def get_source_pricing(source_id: str, request: Request):
     """Fetch fresh server-authoritative pricing for a specific source (Layer 3 safety check)"""
     try:
-        from shared_services import crawler
+        from shared_services import get_crawler
+        
+        crawler = get_crawler()
+        if not crawler:
+            raise HTTPException(status_code=503, detail="Source search service not available")
         
         # Search all cached results for the source
         source = None
