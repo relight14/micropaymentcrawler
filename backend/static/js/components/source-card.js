@@ -384,10 +384,14 @@ class SourceCard {
             return;
         }
         
-        console.log(`🔄 Updating card: ${enrichedSource.title}`);
+        console.log(`🔄 Updating card: ${enrichedSource.title} - pricing: ${enrichedSource.unlock_price}, protocol: ${enrichedSource.licensing_protocol}`);
         
         // Batch DOM updates to prevent flickering
         requestAnimationFrame(() => {
+            // Update stored source data with enriched information
+            // This ensures button click handlers have access to latest pricing
+            cardElement.setAttribute('data-source-json', JSON.stringify(enrichedSource));
+            
             // Remove skeleton loading state
             cardElement.classList.remove('skeleton-loading');
             
