@@ -61,3 +61,4 @@ htmlcov/
 *.tmp
 *.temp
 .cache/
+test_bug_fixes.py

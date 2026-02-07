@@ -785,7 +785,7 @@ async def create_message(
                         }
                     }
         else:
-            # SQLite: Use execute_insert and fetch the created message
+            # SQLite: Insert and get lastrowid, then fetch the created message
             insert_query = """INSERT INTO messages (project_id, user_id, sender, content, message_data, created_at)
                 VALUES (?, ?, ?, ?, ?, datetime('now'))"""
             

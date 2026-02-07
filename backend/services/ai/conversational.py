@@ -6,12 +6,15 @@ import os
 import json
 import re
 import time
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import anthropic
 from services.licensing.content_licensing import ContentLicenseService
 from services.research.crawler import ContentCrawlerStub
 # TierType removed - all reports are now Pro Package
+
+logger = logging.getLogger(__name__)
 
 class AIResearchService:
     """Unified AI service for conversational and deep research modes"""
@@ -31,16 +34,12 @@ class AIResearchService:
         try:
             self.license_service = ContentLicenseService()
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Failed to initialize ContentLicenseService: {e}")
             self.license_service = None
         
         try:
             self.crawler = ContentCrawlerStub()
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Failed to initialize ContentCrawlerStub (Tavily): {e}")
             self.crawler = None
     
