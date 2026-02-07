@@ -165,7 +165,8 @@ class ConversationManager:
             if row.get('message_data'):
                 try:
                     message['metadata'] = json.loads(row['message_data'])
-                except:
+                except json.JSONDecodeError:
+                    # Skip invalid metadata
                     pass
             messages.append(message)
         

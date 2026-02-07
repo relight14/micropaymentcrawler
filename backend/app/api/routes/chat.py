@@ -115,16 +115,17 @@ async def chat(request: Request, chat_request: ChatRequest, authorization: str =
         import traceback
         print(f"Chat error: {e}")
         print(traceback.format_exc())
-        # Try to get project_id for error response
-        try:
-            project_id = chat_request.project_id or conversation_manager.get_or_create_default_project(user_id)
-        except:
-            project_id = 1  # Fallback
+        # Generate anonymous user ID for error response
+        import hashlib
+        client_ip = request.client.host if request.client else "unknown"
+        error_user_id = f"anon_{hashlib.sha256(client_ip.encode()).hexdigest()[:12]}"
+        # Get or create project for error response
+        error_project_id = conversation_manager.get_or_create_default_project(error_user_id)
         return ChatResponse(
             response="I'm having trouble right now, but I'm here to help with your research questions!",
             mode=chat_request.mode,
             conversation_length=0,
-            project_id=project_id
+            project_id=error_project_id
         )
 
 
