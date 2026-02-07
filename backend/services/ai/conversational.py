@@ -552,6 +552,46 @@ If needs_sources is true, extract a clear search query from the context. Include
         if users_to_remove:
             print(f"🧹 Cleaned up {len(users_to_remove)} inactive users")
     
+    async def chat_with_context(
+        self, 
+        user_message: str, 
+        mode: str = "conversational", 
+        user_id: str = "anonymous",
+        conversation_history: List[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Main chat interface supporting both conversational and deep research modes.
+        Uses provided conversation history instead of in-memory storage.
+        
+        Args:
+            user_message: The user's message
+            mode: Chat mode ("conversational" or "deep_research")
+            user_id: User identifier
+            conversation_history: List of previous messages from database
+            
+        Returns:
+            Response dictionary with AI response and metadata
+        """
+        # Use provided history or empty list
+        if conversation_history is None:
+            conversation_history = []
+        
+        if mode == "chat" or mode == "conversational":
+            # Detect if user is explicitly requesting sources
+            intent_result = self._detect_source_intent(user_message, user_id)
+            return self._conversational_response_with_context(
+                user_message, 
+                user_id, 
+                conversation_history,
+                intent_result
+            )
+        else:  # research or deep_research
+            return await self._deep_research_response_with_context(
+                user_message, 
+                user_id,
+                conversation_history
+            )
+    
     async def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
         """
         Main chat interface supporting both conversational and deep research modes
@@ -685,12 +725,202 @@ Only mention knowledge limitations if absolutely necessary—focus on capabiliti
             return {
                 "response": f"I'm having trouble connecting right now. Let me help you explore your research interests anyway - what specific aspect of your topic are you most curious about?",
                 "mode": "conversational", 
+                "conversation_length": len(self.user_conversations[user_id]),
                 "suggest_research": False,
                 "source_search_requested": False,
                 "source_query": "",
                 "source_confidence": 0.0,
                 "error": str(e)
             }
+    
+    def _conversational_response_with_context(
+        self, 
+        user_message: str, 
+        user_id: str, 
+        conversation_history: List[Dict[str, Any]],
+        intent_result: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Generate conversational response using provided conversation history"""
+        
+        if intent_result is None:
+            intent_result = {"needs_sources": False, "query": "", "confidence": 0.0}
+        
+        current_date = datetime.now().strftime("%B %d, %Y")
+        
+        system_prompt = f"""You are an expert research guidance assistant helping users refine their research process through thoughtful conversation.
+
+IMPORTANT CONTEXT:
+- Today's date is {current_date}
+- You HAVE ACCESS to current articles and sources through our integrated search system
+- You can search for and access articles from major publications like WSJ, NYT, Forbes, and more
+- Focus on helping users find the information they need rather than discussing limitations
+
+Your role is to guide users toward precise, well-scoped research:
+
+1. **Guide Scope Refinement**: Ask clarifying questions to help users narrow or expand their research focus
+   - Geographic scope: "Are you interested in this globally, or focused on a specific region?"
+   - Temporal scope: "Do you want recent developments, or historical context?"
+   - Source preferences: "Would academic studies be helpful, or are you looking for journalism/policy analysis?"
+
+2. **Identify Constraints**: Help users articulate what they DO and DON'T want
+   - "What specific aspects are most important to you?"
+   - "Is there anything you'd like to exclude from your research?"
+
+3. **Leverage Source Search**: When users ask about specific topics or publications, acknowledge you can search for sources
+   - "I can search for recent articles on that topic from credible sources"
+   - "I can find articles from the Wall Street Journal, NYT, and other major publications on this topic"
+   - "Let me search for authoritative sources on this topic for you"
+
+4. **Emphasize Credibility**: Frame research as finding the most trustworthy sources
+   - "I'll help you find the most credible sources on this topic—whether they're free or paywalled"
+   - "Premium sources from major publications and peer-reviewed journals often provide the most authoritative analysis"
+
+5. **Encourage Specificity**: Ask follow-up questions to understand their real information needs
+   - Do not accept vague queries—help them get specific about what they are trying to learn
+
+Be curious but not overbearing. Guide naturally through conversation, not interrogation.
+When users ask about specific topics or publications, let them know you can search for sources right away.
+Only mention knowledge limitations if absolutely necessary—focus on capabilities, not limitations."""
+        
+        # Convert provided history to Claude message format
+        messages = []
+        for msg in conversation_history[-10:]:  # Last 10 messages for context
+            role = msg.get('sender', 'user')
+            # Claude API expects 'user' or 'assistant', not 'system'
+            if role == 'system':
+                role = 'assistant'
+            messages.append({
+                "role": role,
+                "content": msg['content']
+            })
+        
+        # Add current message
+        messages.append({
+            "role": "user",
+            "content": user_message
+        })
+        
+        try:
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1000,
+                temperature=0.7,
+                system=system_prompt,
+                messages=messages
+            )
+            
+            ai_response = self._extract_response_text(response)
+            
+            # Check if we should suggest switching to research mode
+            # Use conversation history length instead of in-memory
+            should_suggest = len(conversation_history) >= 3 and user_id not in self.suggested_research
+            topic_hint = None
+            
+            result = {
+                "response": ai_response,
+                "mode": "conversational",
+                "conversation_length": len(conversation_history) + 2,  # +2 for current exchange
+                "suggest_research": should_suggest,
+                # Intent detection fields
+                "source_search_requested": intent_result.get("needs_sources", False),
+                "source_query": intent_result.get("query", ""),
+                "source_confidence": intent_result.get("confidence", 0.0)
+            }
+            
+            # Mark that we've suggested for this user
+            if should_suggest:
+                self.suggested_research[user_id] = True
+                print(f"💡 Suggesting research mode switch{f' for topic: {topic_hint}' if topic_hint else ''}")
+                
+                if topic_hint:
+                    result["topic_hint"] = topic_hint
+            
+            return result
+            
+        except Exception as e:
+            return {
+                "response": f"I'm having trouble connecting right now. Let me help you explore your research interests anyway - what specific aspect of your topic are you most curious about?",
+                "mode": "conversational", 
+                "conversation_length": len(conversation_history) + 1,
+                "suggest_research": False,
+                "source_search_requested": False,
+                "source_query": "",
+                "source_confidence": 0.0,
+                "error": str(e)
+            }
+    
+    async def _deep_research_response_with_context(
+        self, 
+        user_message: str, 
+        user_id: str,
+        conversation_history: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Generate deep research with context-aware source selection using provided history"""
+        
+        # Extract research context from provided history
+        conversation_context = self._extract_research_context_from_history(conversation_history)
+        
+        system_prompt = f"""You are an expert research analyst. Based on this conversation history about the user's research interests:
+
+{conversation_context}
+
+The user is now requesting deep research. Your task is to:
+1. Generate a comprehensive research query that captures their specific interests from our conversation
+2. Create relevant search terms that will find the most valuable sources
+3. Focus on finding both free and premium licensed sources that directly address their research goals
+
+Be specific and targeted based on our conversation. Don't be generic."""
+
+        try:
+            # Get research strategy from Claude
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=500,
+                temperature=0.3,
+                system=system_prompt,
+                messages=[{"role": "user", "content": f"Generate a targeted research query for: {user_message}"}]
+            )
+            
+            research_query = self._extract_response_text(response).strip()
+            
+            # Execute deep research with the refined query
+            return await self._execute_deep_research(research_query, user_message, user_id)
+            
+        except Exception as e:
+            print(f"⚠️ Research context extraction failed: {e}")
+            # Fallback: use original user message as query
+            return await self._execute_deep_research(user_message, user_message, user_id)
+    
+    def _extract_research_context_from_history(self, conversation_history: List[Dict[str, Any]]) -> str:
+        """Extract key research themes from provided conversation history"""
+        
+        # Debug logging
+        print(f"🔍 Extracting context from {len(conversation_history)} messages")
+        
+        # Include both user and assistant messages for richer context
+        recent_messages = [
+            msg["content"] for msg in conversation_history[-8:] 
+            if msg.get("sender") in ["user", "assistant"] and len(msg.get("content", "").strip()) > 10
+        ]
+        
+        # Debug: show message preview
+        print(f"📝 Message preview: {[m[:80] + '...' if len(m) > 80 else m for m in recent_messages[:3]]}")
+        
+        # De-duplicate similar messages
+        seen = set()
+        unique_messages = []
+        for msg in recent_messages:
+            # Simple dedup based on first 50 chars
+            msg_key = msg[:50].lower()
+            if msg_key not in seen:
+                seen.add(msg_key)
+                unique_messages.append(msg)
+        
+        if not unique_messages:
+            return "No previous conversation context available."
+        
+        context_summary = "\n".join([f"- {msg}" for msg in unique_messages])
+        return f"Conversation history:\n{context_summary}"
     
     async def _deep_research_response(self, user_message: str, user_id: str) -> Dict[str, Any]:
         """Generate deep research with context-aware source selection"""
