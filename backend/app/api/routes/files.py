@@ -8,16 +8,12 @@ import io
 from typing import Optional
 from middleware.auth_dependencies import get_current_token, get_current_user_id
 from datetime import datetime
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from fastapi import APIRouter, Depends, Request, HTTPException, Header, UploadFile, File, Form
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from pydantic import BaseModel
-from middleware.auth_dependencies import get_current_token, get_current_user_id
+from utils.auth import extract_bearer_token, extract_user_id_from_token
 
 from config import Config
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 from utils.rate_limit import limiter
-from middleware.auth_dependencies import get_current_token, get_current_user_id
 
 try:
     from docx import Document
@@ -39,66 +35,6 @@ else:
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_EXTENSIONS = {'.md', '.doc', '.docx', '.pdf'}
-
-
-def extract_bearer_token(authorization: str) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization must be Bearer token")
-    
-    access_token = authorization.split(" ", 1)[1].strip()
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Bearer token cannot be empty")
-    
-    return access_token
-
-
-def extract_user_id_from_token(access_token: str) -> str:
-    """
-    Extract user ID from JWT token by decoding the payload.
-    Uses email or sub claim as the unique user identifier.
-    """
-    try:
-        import json
-        import base64
-        
-        # JWT format: header.payload.signature
-        parts = access_token.split('.')
-        if len(parts) != 3:
-            raise ValueError("Invalid JWT format")
-        
-        # Decode the payload (middle part)
-        payload = parts[1]
-        # Add padding if needed for base64 decoding
-        padding = 4 - (len(payload) % 4)
-        if padding != 4:
-            payload += '=' * padding
-        
-        decoded_bytes = base64.urlsafe_b64decode(payload)
-        decoded_payload = json.loads(decoded_bytes)
-        
-        # Extract user identifier from token claims
-        # Prefer email, fall back to sub (subject), then user_id
-        user_identifier = (
-            decoded_payload.get('email') or 
-            decoded_payload.get('sub') or 
-            decoded_payload.get('user_id')
-        )
-        
-        if not user_identifier:
-            raise ValueError("No user identifier found in JWT")
-        
-        return f"user_{user_identifier}"
-        
-    except Exception as e:
-        # Fallback: use token hash for file uploads
-        import hashlib
-        logger.warning(f"Failed to decode JWT for files, using hash fallback: {e}")
-        return f"user_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
 
 
 class UploadedFileResponse(BaseModel):

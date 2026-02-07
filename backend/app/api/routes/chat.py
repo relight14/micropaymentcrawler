@@ -10,20 +10,13 @@ from services.ai.conversational import AIResearchService
 from services.conversation_manager import conversation_manager
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
-# Note: chat.py uses local extract_user_id_from_token due to special fallback for anonymous users
-from utils.auth import extract_bearer_token
+from utils.auth import extract_bearer_token, extract_user_id_from_token, validate_user_token
 
 router = APIRouter()
 
 # Initialize services
 ai_service = AIResearchService()
 ledewire = LedeWireAPI()
-
-# Token validation cache with TTL (5 minutes)
-_token_cache: Dict[str, tuple[Any, float]] = {}
-_TOKEN_CACHE_TTL = 300  # 5 minutes
-_last_cache_cleanup = time.time()
-_CACHE_CLEANUP_INTERVAL = 60  # Clean up every minute
 
 
 class ChatRequest(BaseModel):
@@ -49,122 +42,7 @@ class ChatResponse(BaseModel):
     source_confidence: float = 0.0
 
 
-def _cleanup_token_cache():
-    """Periodically clean up expired token cache entries"""
-    global _last_cache_cleanup
-    current_time = time.time()
-    
-    # Only cleanup if interval has passed
-    if current_time - _last_cache_cleanup < _CACHE_CLEANUP_INTERVAL:
-        return
-    
-    # Remove expired entries
-    expired_keys = [
-        token for token, (_, timestamp) in _token_cache.items()
-        if current_time - timestamp >= _TOKEN_CACHE_TTL
-    ]
-    
-    for token in expired_keys:
-        del _token_cache[token]
-    
-    _last_cache_cleanup = current_time
-
-
-# Note: chat.py keeps its own validate_user_token due to special caching logic
-# Note: chat.py keeps its own extract_user_id_from_token with special fallback for anonymous users
-# extract_bearer_token is imported from utils.auth
-
-
-def validate_user_token(access_token: str, use_cache: bool = True):
-    """Validate JWT token with LedeWire API (with caching for performance)."""
-    # Periodic cleanup
-    _cleanup_token_cache()
-    
-    # Check cache first if enabled
-    if use_cache and access_token in _token_cache:
-        cached_result, cached_time = _token_cache[access_token]
-        if time.time() - cached_time < _TOKEN_CACHE_TTL:
-            return cached_result
-        else:
-            # Cache expired, remove it
-            del _token_cache[access_token]
-    
-    try:
-        balance_result = ledewire.get_wallet_balance(access_token)
-        
-        if "error" in balance_result:
-            error_message = ledewire.handle_api_error(balance_result)
-            raise HTTPException(status_code=401, detail=f"Invalid token: {error_message}")
-        
-        # Cache successful validation
-        if use_cache:
-            _token_cache[access_token] = (balance_result, time.time())
-            # Limit cache size to prevent memory bloat
-            if len(_token_cache) > 10000:
-                # Remove oldest 10% of entries
-                sorted_by_time = sorted(_token_cache.items(), key=lambda x: x[1][1])
-                for token, _ in sorted_by_time[:1000]:
-                    if token in _token_cache:
-                        del _token_cache[token]
-        
-        return balance_result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
-            if e.response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid or expired token")
-            elif e.response.status_code in [502, 503, 504]:
-                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
-            else:
-                raise HTTPException(status_code=500, detail="Authentication service error")
-        else:
-            raise HTTPException(status_code=503, detail="Authentication service unavailable")
-
-
-def extract_user_id_from_token(access_token: str) -> str:
-    """
-    Extract user ID from JWT token for chat (with special anonymous fallback).
-    Note: This is a chat-specific implementation that allows anonymous users.
-    """
-    try:
-        import json
-        import base64
-        
-        # JWT format: header.payload.signature
-        parts = access_token.split('.')
-        if len(parts) != 3:
-            raise ValueError("Invalid JWT format")
-        
-        # Decode the payload (middle part)
-        payload = parts[1]
-        # Add padding if needed for base64 decoding
-        padding = 4 - (len(payload) % 4)
-        if padding != 4:
-            payload += '=' * padding
-        
-        decoded_bytes = base64.urlsafe_b64decode(payload)
-        decoded_payload = json.loads(decoded_bytes)
-        
-        # Extract user identifier from token claims
-        # Prefer email, fall back to sub (subject), then user_id
-        user_identifier = (
-            decoded_payload.get('email') or 
-            decoded_payload.get('sub') or 
-            decoded_payload.get('user_id')
-        )
-        
-        if not user_identifier:
-            raise ValueError("No user identifier found in JWT")
-        
-        return f"user_{user_identifier}"
-        
-    except Exception as e:
-        # Fallback for chat: use anonymous user
-        import hashlib  
-        print(f"⚠️ Failed to decode JWT for chat, using anon fallback: {e}")
-        return f"anon_{hashlib.sha256(access_token.encode()).hexdigest()[:12]}"
+# Note: chat.py no longer needs local token validation - using centralized utils.auth
 
 
 @router.post("", response_model=ChatResponse)
