@@ -16,23 +16,12 @@ from services.research.crawler import ContentCrawlerStub
 class AIResearchService:
     """Unified AI service for conversational and deep research modes"""
     
-    # Maximum number of messages to keep per user (prevents memory bloat)
-    MAX_CONVERSATION_HISTORY = 50
-    # Maximum number of active users to track
-    MAX_ACTIVE_USERS = 1000
-    
     def __init__(self):
         self.client = anthropic.Anthropic(
             api_key=os.environ.get('ANTHROPIC_API_KEY')
         )
         self.license_service = ContentLicenseService()
         self.crawler = ContentCrawlerStub()
-        # Store conversations per user to prevent cross-user data leakage
-        self.user_conversations: Dict[str, List[Dict[str, Any]]] = {}
-        # Track whether we've suggested research mode for each user
-        self.suggested_research: Dict[str, bool] = {}
-        # Track last access time for each user (for cleanup)
-        self.user_last_access: Dict[str, float] = {}
     
     async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None, conversation_context: Optional[List[Dict[str, Any]]] = None, enhanced_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
@@ -526,31 +515,6 @@ If needs_sources is true, extract a clear search query from the context. Include
             # Default to no intent detected
             return {"needs_sources": False, "query": user_message, "confidence": 0.0}
         
-    def _cleanup_old_users(self):
-        """Remove inactive users to prevent memory bloat"""
-        # Only cleanup if we have too many users
-        if len(self.user_conversations) <= self.MAX_ACTIVE_USERS:
-            return
-        
-        current_time = time.time()
-        # Remove users inactive for more than 1 hour
-        inactive_threshold = 3600  # 1 hour in seconds
-        
-        users_to_remove = [
-            user_id for user_id, last_access in self.user_last_access.items()
-            if current_time - last_access > inactive_threshold
-        ]
-        
-        for user_id in users_to_remove:
-            if user_id in self.user_conversations:
-                del self.user_conversations[user_id]
-            if user_id in self.suggested_research:
-                del self.suggested_research[user_id]
-            if user_id in self.user_last_access:
-                del self.user_last_access[user_id]
-        
-        if users_to_remove:
-            print(f"🧹 Cleaned up {len(users_to_remove)} inactive users")
     
     async def chat_with_context(
         self, 
@@ -591,147 +555,6 @@ If needs_sources is true, extract a clear search query from the context. Include
                 user_id,
                 conversation_history
             )
-    
-    async def chat(self, user_message: str, mode: str = "conversational", user_id: str = "anonymous") -> Dict[str, Any]:
-        """
-        Main chat interface supporting both conversational and deep research modes
-        """
-        # Update last access time and cleanup old users
-        self.user_last_access[user_id] = time.time()
-        self._cleanup_old_users()
-        
-        # Initialize user conversation if not exists
-        if user_id not in self.user_conversations:
-            self.user_conversations[user_id] = []
-        
-        # Add user message to user-specific conversation history
-        self.user_conversations[user_id].append({
-            "role": "user", 
-            "content": user_message,
-            "timestamp": datetime.now().isoformat(),
-            "mode": mode
-        })
-        
-        # Trim conversation history to prevent unbounded growth
-        if len(self.user_conversations[user_id]) > self.MAX_CONVERSATION_HISTORY:
-            # Keep only the most recent messages
-            self.user_conversations[user_id] = self.user_conversations[user_id][-self.MAX_CONVERSATION_HISTORY:]
-            print(f"📝 Trimmed conversation history for {user_id} to {self.MAX_CONVERSATION_HISTORY} messages")
-        
-        if mode == "chat" or mode == "conversational":
-            # Detect if user is explicitly requesting sources
-            intent_result = self._detect_source_intent(user_message, user_id)
-            return self._conversational_response(user_message, user_id, intent_result)
-        else:  # research or deep_research
-            return await self._deep_research_response(user_message, user_id)
-    
-    def _conversational_response(self, user_message: str, user_id: str, intent_result: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Generate conversational response to help explore research interests"""
-        
-        if intent_result is None:
-            intent_result = {"needs_sources": False, "query": "", "confidence": 0.0}
-        
-        current_date = datetime.now().strftime("%B %d, %Y")
-        
-        system_prompt = f"""You are an expert research guidance assistant helping users refine their research process through thoughtful conversation.
-
-IMPORTANT CONTEXT:
-- Today's date is {current_date}
-- You HAVE ACCESS to current articles and sources through our integrated search system
-- You can search for and access articles from major publications like WSJ, NYT, Forbes, and more
-- Focus on helping users find the information they need rather than discussing limitations
-
-Your role is to guide users toward precise, well-scoped research:
-
-1. **Guide Scope Refinement**: Ask clarifying questions to help users narrow or expand their research focus
-   - Geographic scope: "Are you interested in this globally, or focused on a specific region?"
-   - Temporal scope: "Do you want recent developments, or historical context?"
-   - Source preferences: "Would academic studies be helpful, or are you looking for journalism/policy analysis?"
-
-2. **Identify Constraints**: Help users articulate what they DO and DON'T want
-   - "What specific aspects are most important to you?"
-   - "Is there anything you'd like to exclude from your research?"
-
-3. **Leverage Source Search**: When users ask about specific topics or publications, acknowledge you can search for sources
-   - "I can search for recent articles on that topic from credible sources"
-   - "I can find articles from the Wall Street Journal, NYT, and other major publications on this topic"
-   - "Let me search for authoritative sources on this topic for you"
-
-4. **Emphasize Credibility**: Frame research as finding the most trustworthy sources
-   - "I'll help you find the most credible sources on this topic—whether they're free or paywalled"
-   - "Premium sources from major publications and peer-reviewed journals often provide the most authoritative analysis"
-
-5. **Encourage Specificity**: Ask follow-up questions to understand their real information needs
-   - Do not accept vague queries—help them get specific about what they are trying to learn
-
-Be curious but not overbearing. Guide naturally through conversation, not interrogation.
-When users ask about specific topics or publications, let them know you can search for sources right away.
-Only mention knowledge limitations if absolutely necessary—focus on capabilities, not limitations."""
-        
-        # Create conversation context for Claude using user-specific history
-        user_history = self.user_conversations.get(user_id, [])
-        # Convert to proper message format for Anthropic API
-        from typing import cast
-        messages = cast(list, [
-            {"role": msg["role"], "content": msg["content"]} 
-            for msg in user_history[-10:]  # Last 10 messages for context
-        ])
-        
-        try:
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=1000,
-                temperature=0.7,
-                system=system_prompt,
-                messages=messages
-            )
-            
-            ai_response = self._extract_response_text(response)
-            
-            # Add AI response to user-specific conversation history
-            self.user_conversations[user_id].append({
-                "role": "assistant",
-                "content": ai_response,
-                "timestamp": datetime.now().isoformat(),
-                "mode": "conversational"
-            })
-            
-            # Check if we should suggest switching to research mode
-            should_suggest, topic_hint = self._should_suggest_research(user_id)
-            
-            result = {
-                "response": ai_response,
-                "mode": "conversational",
-                "conversation_length": len(self.user_conversations[user_id]),
-                "suggest_research": should_suggest,
-                # Intent detection fields
-                "source_search_requested": intent_result.get("needs_sources", False),
-                "source_query": intent_result.get("query", ""),
-                "source_confidence": intent_result.get("confidence", 0.0)
-            }
-            
-            # Mark that we've suggested for this user (regardless of topic_hint)
-            if should_suggest:
-                self.suggested_research[user_id] = True
-                print(f"💡 Suggesting research mode switch{f' for topic: {topic_hint}' if topic_hint else ''}")
-                
-                # Add topic hint to result if available
-                if topic_hint:
-                    result["topic_hint"] = topic_hint
-            
-            return result
-            
-        except Exception as e:
-            return {
-                "response": f"I'm having trouble connecting right now. Let me help you explore your research interests anyway - what specific aspect of your topic are you most curious about?",
-                "mode": "conversational", 
-                "conversation_length": len(self.user_conversations[user_id]),
-                "suggest_research": False,
-                "source_search_requested": False,
-                "source_query": "",
-                "source_confidence": 0.0,
-                "error": str(e)
-            }
     
     def _conversational_response_with_context(
         self, 
@@ -1126,32 +949,3 @@ Keep it concise but compelling - make the user excited about what they'll discov
             
         except Exception:
             return "Here are the most relevant sources I found for your research. Each offers unique insights that will help answer your questions."
-    
-    def get_conversation_history(self, user_id: str) -> List[Dict]:
-        """Get the current conversation history for a specific user"""
-        return self.user_conversations.get(user_id, [])
-    
-    def migrate_conversation(self, old_user_id: str, new_user_id: str) -> bool:
-        """Migrate conversation history from old user ID to new user ID during login"""
-        if old_user_id not in self.user_conversations:
-            return False  # No conversation to migrate
-        
-        if old_user_id == new_user_id:
-            return False  # Same user ID, no migration needed
-        
-        # Move conversation history from old to new user ID
-        conversation_history = self.user_conversations[old_user_id]
-        if conversation_history:  # Only migrate if there's actual content
-            self.user_conversations[new_user_id] = conversation_history
-            del self.user_conversations[old_user_id]
-            return True
-        
-        return False
-    
-    def clear_conversation(self, user_id: str) -> None:
-        """Clear conversation history for a specific user"""
-        if user_id in self.user_conversations:
-            self.user_conversations[user_id] = []
-        # Reset research suggestion flag when clearing conversation
-        if user_id in self.suggested_research:
-            self.suggested_research[user_id] = False
