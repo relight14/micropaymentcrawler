@@ -18,6 +18,7 @@ from schemas.api import ResearchRequest, DynamicResearchResponse
 from schemas.domain import ResearchPacket, SourceCard
 from services.ai.report_generator import ReportGeneratorService
 from services.ai.query_classifier import query_classifier  # Import query classification service
+from services.conversation_manager import conversation_manager  # Import conversation manager
 from integrations.ledewire import LedeWireAPI
 from utils.rate_limit import limiter
 from config import Config
@@ -42,6 +43,9 @@ claude_client = anthropic.Anthropic(
 # Conversation state storage: {conversation_id: {"topic": str, "first_query": str}}
 # In-memory storage - cleared on server restart
 conversation_topics: Dict[str, Dict[str, str]] = {}
+
+# Constants
+CONVERSATION_CONTEXT_WINDOW_SIZE = 10  # Number of recent messages to load from database for research context
 
 
 class GenerateReportRequest(BaseModel):
@@ -981,11 +985,6 @@ async def analyze_research_query(
         classification = None
         enhanced_query = base_query
         
-        # DEBUG: Log pipeline start
-        print(f"\n🔍 QUERY PIPELINE DEBUG:")
-        print(f"   Raw base_query: '{base_query}'")
-        print(f"   Conversation context: {len(research_request.conversation_context) if research_request.conversation_context else 0} messages")
-        
         # TOPIC PERSISTENCE: Manage conversation topic
         user_id = user_info.get('user_id', 'anonymous')
         stored_topic = None
@@ -1011,10 +1010,30 @@ async def analyze_research_query(
                 del conversation_topics[topic_key]
                 stored_topic = None
         
-        if research_request.conversation_context and len(research_request.conversation_context) > 0:
+        # Load conversation context from database if not provided in request
+        conversation_context = research_request.conversation_context
+        if not conversation_context and research_request.project_id:
+            logger.info(f"📚 Loading conversation history from database for project {research_request.project_id}")
+            db_history = conversation_manager.get_context_window(
+                research_request.project_id, 
+                window_size=CONVERSATION_CONTEXT_WINDOW_SIZE
+            )
+            # Convert database format to expected format
+            conversation_context = [
+                {"sender": msg["sender"], "content": msg["content"]}
+                for msg in db_history
+            ]
+            logger.info(f"📚 Loaded {len(conversation_context)} messages from database")
+        
+        # DEBUG: Log pipeline start
+        print(f"\n🔍 QUERY PIPELINE DEBUG:")
+        print(f"   Raw base_query: '{base_query}'")
+        print(f"   Conversation context: {len(conversation_context) if conversation_context else 0} messages")
+        
+        if conversation_context and len(conversation_context) > 0:
             # Build research brief from conversation context
             brief = _build_research_brief(
-                research_request.conversation_context,
+                conversation_context,
                 base_query
             )
             
@@ -1030,7 +1049,7 @@ async def analyze_research_query(
             ai_service = AIResearchService()
             enhanced_query = await ai_service.optimize_search_query(
                 raw_query=enhanced_query,
-                conversation_context=research_request.conversation_context,
+                conversation_context=conversation_context,
                 pinned_topic=stored_topic  # Pass stored topic as constraint
             )
             print(f"   After Claude optimization: '{enhanced_query}'")

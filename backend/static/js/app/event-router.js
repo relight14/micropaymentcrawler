@@ -93,8 +93,8 @@ export class EventRouter {
         
         if (newChatBtn) {
             newChatBtn.addEventListener('click', () => {
-                if (this.handlers.onClearConversation) {
-                    this.handlers.onClearConversation();
+                if (this.handlers.onNewChat) {
+                    this.handlers.onNewChat();
                 }
             });
         }

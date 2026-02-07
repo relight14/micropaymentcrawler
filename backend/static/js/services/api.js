@@ -3,6 +3,7 @@
  * Extracted from the monolithic ChatResearchApp
  */
 import { generateIdempotencyKey } from '../utils/helpers.js';
+import { projectStore } from '../state/project-store.js';
 
 export class APIService {
     constructor(authService) {
@@ -132,10 +133,18 @@ export class APIService {
         
         // Use chat endpoint for other modes
         console.log(`📡 [API] Routing to /api/chat (anonymous conversational)`);
+        
+        // Get project_id from projectStore to maintain conversation context
+        const requestBody = { message, mode };
+        if (projectStore.state.activeProjectId) {
+            requestBody.project_id = projectStore.state.activeProjectId;
+            console.log(`💬 [API] Sending project_id ${requestBody.project_id} with chat message`);
+        }
+        
         const response = await fetch(`${this.baseURL}/api/chat`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
-            body: JSON.stringify({ message, mode })
+            body: JSON.stringify(requestBody)
         });
         
         if (!response.ok) {
@@ -148,6 +157,7 @@ export class APIService {
         // Transform chat response to match expected frontend format
         return {
             content: result.response, // Chat endpoint returns 'response', frontend expects 'content'
+            project_id: result.project_id,  // Return project_id for tracking
             metadata: {
                 mode: result.mode,
                 conversation_length: result.conversation_length,
