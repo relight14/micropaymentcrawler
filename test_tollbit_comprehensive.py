@@ -36,7 +36,7 @@ async def test_raw_api_call(api_key: str, url: str):
     print(f"\nEndpoint: {endpoint}")
     print(f"URL: {url}")
     print(f"Payload: {json.dumps(payload, indent=2)}")
-    print(f"API Key: {'*' * 20}...{api_key[-10:]}")
+    print(f"API Key: {'*' * 56}...{api_key[-4:]}")
     
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -255,7 +255,7 @@ async def main():
         print("  python3 test_tollbit_comprehensive.py")
         return False
     
-    print(f"\n✅ API Key found: {'*' * 20}...{api_key[-10:]}")
+    print(f"\n✅ API Key found: {'*' * 56}...{api_key[-4:]}")
     
     # Test URLs - Using real publisher domains from Tollbit network
     test_urls = [

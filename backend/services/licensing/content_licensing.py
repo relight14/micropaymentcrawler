@@ -649,7 +649,8 @@ class TollbitProtocolHandler(ProtocolHandler):
             # Return pricing with full-access only if available
             purchase_price = self.human_tier_price if full_access_available else None
             
-            logger.info(f"Tollbit pricing for {target_url}: AI=${self.ai_tier_price}, Full-access={'$' + str(purchase_price) if purchase_price else 'not available'}")
+            full_access_display = f"${purchase_price}" if purchase_price else "not available"
+            logger.info(f"Tollbit pricing for {target_url}: AI=${self.ai_tier_price}, Full-access={full_access_display}")
             
             return {
                 'ai_include_price': self.ai_tier_price,
