@@ -565,6 +565,12 @@ export class ChatResearchApp {
             const conversationContext = this.appState.getConversationHistory();
             const response = await this.apiService.sendMessage(message, mode, conversationContext);
             
+            // Track project_id from response for subsequent messages
+            if (response.project_id) {
+                console.log(`💬 [App] Tracking project_id ${response.project_id} from chat response`);
+                projectStore.setActiveProject(response.project_id);
+            }
+            
             // Hide typing indicator
             this.uiManager.hideTypingIndicator();
             
