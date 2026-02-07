@@ -42,7 +42,7 @@ def validate_user_token(access_token: str):
         raise
     except Exception as e:
         import requests
-        if isinstance(e, requests.HTTPError) and hasattr(e, 'response'):
+        if isinstance(e, requests.HTTPError) and hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
                 raise HTTPException(status_code=401, detail="Invalid or expired token")
             elif e.response.status_code in [502, 503, 504]:
@@ -50,6 +50,7 @@ def validate_user_token(access_token: str):
             else:
                 raise HTTPException(status_code=500, detail="Authentication service error")
         else:
+            # Network error or service unavailable
             raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 

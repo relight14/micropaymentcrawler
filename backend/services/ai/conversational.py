@@ -22,6 +22,9 @@ class AIResearchService:
         )
         self.license_service = ContentLicenseService()
         self.crawler = ContentCrawlerStub()
+        # Legacy in-memory storage for backward compatibility
+        # NOTE: This should be migrated to use database-backed conversation_history
+        self.user_conversations = {}
     
     async def filter_search_results_by_relevance(self, query: str, results: List[Dict[str, Any]], publication: Optional[str] = None, conversation_context: Optional[List[Dict[str, Any]]] = None, enhanced_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """

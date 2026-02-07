@@ -69,10 +69,27 @@ async def chat(request: Request, chat_request: ChatRequest, authorization: str =
             user_id = f"anon_{hashlib.sha256(client_ip.encode()).hexdigest()[:12]}"
         
         # Get or create project context
+        # If a project_id is provided, validate it exists and belongs to user
         if chat_request.project_id:
-            project_id = chat_request.project_id
+            from data.db_wrapper import db_instance as db, normalize_query
+            
+            # Verify project exists and belongs to user
+            project_query = normalize_query("""
+                SELECT id FROM projects WHERE id = ? AND user_id = ? AND is_active = TRUE
+            """)
+            project_result = db.execute_query(project_query, (chat_request.project_id, user_id))
+            
+            if project_result:
+                # Project exists and belongs to user - use it
+                project_id = chat_request.project_id
+            else:
+                # Project doesn't exist or doesn't belong to user - create/get default
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Invalid project_id {chat_request.project_id} for user {user_id}, using default project")
+                project_id = conversation_manager.get_or_create_default_project(user_id)
         else:
-            # Auto-create or get default project
+            # No project_id provided - auto-create or get default project
             project_id = conversation_manager.get_or_create_default_project(user_id)
         
         # Save user message to database
