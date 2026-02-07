@@ -487,63 +487,91 @@ class TollbitProtocolHandler(ProtocolHandler):
     
     async def fetch_content(self, url: str, license_token: LicenseToken) -> Optional[Dict[str, Any]]:
         """
-        Fetch full article content using Tollbit publisher subdomain
+        Fetch full article content using Tollbit Gateway Content API
         
-        Returns structured content with:
-        - header: Navigation and breadcrumbs
-        - body: Complete article in markdown format
-        - footer: Related links and terms
-        - metadata: Author, date, description, images
-        - rate: Pricing information
+        Per the official Tollbit Python SDK (content_retrieval_api.py):
+        GET https://gateway.tollbit.com/dev/v2/content/<domain>/<path>
+        Headers: Tollbit-Token, User-Agent, Tollbit-Accept-Content
         
-        Docs: https://docs.tollbit.com/quickstart/
+        Some publishers block gateway content delivery (403) even though
+        token minting works. For those, we fall back to the publisher
+        subdomain approach: GET https://tollbit.<domain>/<path>
         
-        Content is fetched from the publisher's Tollbit subdomain:
-        GET https://tollbit.<domain>/<path>
+        Tokens are single-use, so fallback requires minting a fresh token.
+        
+        Docs: https://docs.tollbit.com/content/
         """
         if not self.api_key or not license_token.token:
             logger.warning("Cannot fetch content: missing API key or token")
             return None
         
         try:
-            # Parse URL to construct publisher subdomain endpoint
-            # Example: https://time.com/7335417/article-slug -> https://tollbit.time.com/7335417/article-slug
-            # Example: https://www.forbes.com/article -> https://tollbit.forbes.com/article
             from urllib.parse import urlparse
             parsed = urlparse(url)
             domain = parsed.netloc
             path = parsed.path
             
-            # Strip www. prefix for Tollbit subdomain (tollbit.www.forbes.com doesn't exist)
             if domain.startswith('www.'):
                 domain = domain[4:]
             
-            # Construct Tollbit publisher subdomain URL
-            content_endpoint = f"https://tollbit.{domain}{path}"
+            content_path = f"{domain}{path}"
             if parsed.query:
-                content_endpoint += f"?{parsed.query}"
+                content_path += f"?{parsed.query}"
             
-            logger.info(f"Fetching content from Tollbit subdomain: {content_endpoint}")
+            client = await self._get_client()
             
-            headers = {
+            gateway_endpoint = f"{self.base_url}/dev/v2/content/{content_path}"
+            logger.info(f"Fetching content from Tollbit Gateway: {gateway_endpoint}")
+            
+            gateway_headers = {
                 'Tollbit-Token': license_token.token,
                 'User-Agent': self.agent_name,
                 'Tollbit-Accept-Content': 'text/markdown'
             }
             
-            client = await self._get_client()
             response = await client.get(
-                content_endpoint,
-                headers=headers,
+                gateway_endpoint,
+                headers=gateway_headers,
                 timeout=15.0
             )
             
             if response.status_code == 200:
                 content_data = response.json()
-                logger.info(f"Successfully fetched full article content from Tollbit: {url}")
+                logger.info(f"Successfully fetched content from Tollbit Gateway: {url}")
+                return content_data
+            
+            logger.warning(f"Tollbit Gateway failed ({response.status_code}), trying publisher subdomain fallback")
+            
+            tollbit_license_type = "ON_DEMAND_FULL_USE_LICENSE" if license_token.license_type == "full-access" else "ON_DEMAND_LICENSE"
+            fresh_token_data = await self._mint_token(url, tollbit_license_type)
+            if not fresh_token_data or not fresh_token_data.get('token'):
+                logger.warning(f"Could not mint fresh token for subdomain fallback: {url}")
+                return None
+            
+            subdomain_endpoint = f"https://tollbit.{domain}{path}"
+            if parsed.query:
+                subdomain_endpoint += f"?{parsed.query}"
+            
+            logger.info(f"Fetching content from Tollbit subdomain: {subdomain_endpoint}")
+            
+            subdomain_headers = {
+                'Tollbit-Token': fresh_token_data['token'],
+                'User-Agent': self.agent_name,
+                'Tollbit-Accept-Content': 'text/markdown'
+            }
+            
+            subdomain_response = await client.get(
+                subdomain_endpoint,
+                headers=subdomain_headers,
+                timeout=15.0
+            )
+            
+            if subdomain_response.status_code == 200:
+                content_data = subdomain_response.json()
+                logger.info(f"Successfully fetched content from Tollbit subdomain: {url}")
                 return content_data
             else:
-                logger.warning(f"Tollbit content fetch failed: {response.status_code} - {response.text[:200]}")
+                logger.warning(f"Tollbit subdomain also failed: {subdomain_response.status_code} - {subdomain_response.text[:200]}")
                 return None
                 
         except Exception as e:
