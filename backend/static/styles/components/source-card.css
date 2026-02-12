@@ -357,7 +357,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding-left: 30px; /* Align with content (checkbox width + gap) */
+    /* Align with content area: checkbox 18px + gap 12px = 30px */
+    padding-left: 30px;
     margin-top: 4px;
 }
 
@@ -435,7 +436,8 @@
     color: var(--muted-foreground);
     line-height: 1.5;
     margin-top: 6px;
-    padding-left: 30px; /* Align with content (checkbox width + gap) */
+    /* Align with content area: checkbox 18px + gap 12px = 30px */
+    padding-left: 30px;
     font-size: 13px;
     display: -webkit-box !important;
     -webkit-line-clamp: 2;
