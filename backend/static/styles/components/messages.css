@@ -457,30 +457,31 @@
 
 /* Find Sources Prompt - Authenticated state */
 .find-sources-prompt {
-    margin-top: 1rem;
+    margin-top: 0.75rem;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 .find-sources-button {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: var(--primary-gradient, linear-gradient(135deg, #4A90E2 0%, #357ABD 100%));
-    color: white;
-    border: none;
+    padding: 0.625rem 1.25rem;
+    background: var(--accent);
+    color: var(--accent-foreground);
+    border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 0.5rem;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+    box-shadow: var(--shadow-sm);
 }
 
 .find-sources-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+    filter: brightness(0.95);
 }
 
 .find-sources-button:active {
@@ -488,7 +489,7 @@
 }
 
 .find-sources-button .icon {
-    font-size: 1.125rem;
+    font-size: 1rem;
 }
 
 /* Dark Mode Adjustments */
@@ -503,4 +504,13 @@
 
 .dark .anonymous-chat-prompt .prompt-subtext {
     color: rgba(255, 255, 255, 0.7);
+}
+
+.dark .find-sources-button {
+    background: var(--accent);
+    color: #000;
+}
+
+.dark .find-sources-button:hover {
+    filter: brightness(1.1);
 }

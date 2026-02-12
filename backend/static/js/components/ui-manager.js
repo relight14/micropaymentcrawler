@@ -171,15 +171,15 @@ export class UIManager {
         const container = document.createElement('div');
         container.className = 'sources-preview-section';
         
-        // Create header section
+        // Create compact header
         const header = document.createElement('div');
         header.className = 'preview-header';
         
         const title = document.createElement('h3');
-        title.textContent = 'Sources Found';
+        title.textContent = `📄 ${sources.length} Sources Found`;
         
         const subtitle = document.createElement('p');
-        subtitle.textContent = `Found ${sources.length} sources for your research`;
+        subtitle.textContent = 'Select sources to add to your outline';
         
         header.appendChild(title);
         header.appendChild(subtitle);
