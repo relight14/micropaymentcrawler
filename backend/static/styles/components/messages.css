@@ -34,6 +34,11 @@
     max-width: 70%;
 }
 
+/* Allow source card messages to use more width */
+.message--assistant:has(.sources-preview-section) {
+    max-width: 90%;
+}
+
 .message--system {
     align-self: center;
     margin: 0.75rem auto;

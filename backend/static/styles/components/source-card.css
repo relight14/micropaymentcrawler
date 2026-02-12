@@ -11,12 +11,11 @@
    ============================================================================= */
 
 .sources-preview-section {
-    margin: 1.5rem 0;
+    margin: 0.75rem 0;
     background: var(--card);
     border-radius: var(--radius);
     border: 1px solid var(--border);
     overflow: hidden;
-    box-shadow: var(--shadow-md);
     animation: fadeIn 0.4s ease-out;
 }
 
@@ -55,22 +54,25 @@
 }
 
 .preview-header {
-    background: linear-gradient(135deg, var(--primary), var(--muted-foreground));
-    color: var(--primary-foreground);
-    padding: 1.5rem;
-    text-align: center;
+    background: var(--muted);
+    color: var(--foreground);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
 }
 
 .preview-header h3 {
-    margin: 0 0 0.5rem 0;
-    color: var(--primary-foreground);
-    font-size: 1.25rem;
+    margin: 0;
+    color: var(--foreground);
+    font-size: 0.9rem;
     font-weight: var(--font-weight-medium);
 }
 
 .preview-header p {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 0.95rem;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
     margin: 0;
 }
 
@@ -79,15 +81,16 @@
    ============================================================================= */
 
 .licensing-summary {
-    background: linear-gradient(135deg, #fff7d1 0%, #fff38D 100%);
-    padding: 1.5rem;
+    background: rgba(255, 243, 141, 0.15);
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border);
     text-align: center;
 }
 
 .licensing-summary h4 {
     color: var(--accent-foreground);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
     font-weight: var(--font-weight-medium);
 }
 
@@ -186,15 +189,14 @@
    ============================================================================= */
 
 .source-card {
-    background: var(--card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    padding: 12px 16px !important;
-    margin-bottom: 8px !important;
-    transition: all 0.2s ease !important;
-    position: relative !important;
-    font-family: 'Montserrat', var(--font-sans, sans-serif) !important;
-    min-height: 85px; /* More height to accommodate actions below title */
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    transition: all 0.2s ease;
+    position: relative;
+    font-family: 'Montserrat', var(--font-sans, sans-serif);
 }
 
 .source-card.filtered-hidden {
@@ -206,18 +208,14 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.source-card:hover .source-excerpt {
-    display: block !important;
-}
-
 .source-card:last-child {
     margin-bottom: 0;
 }
 
 /* Selected state */
 .source-card.selected {
-    border-color: var(--primary) !important;
-    background-color: var(--primary-light, #f0f9ff) !important;
+    border-color: var(--primary);
+    background-color: var(--primary-light, #f0f9ff);
 }
 
 /* =============================================================================
@@ -429,21 +427,19 @@
 }
 
 /* =============================================================================
-   SOURCE EXCERPT (Hidden by default, shows on hover)
+   SOURCE EXCERPT (Always visible, truncated to 2 lines)
    ============================================================================= */
 
 .source-excerpt {
     color: var(--muted-foreground);
     line-height: 1.5;
-    margin-top: 8px;
+    margin-top: 6px;
+    padding-left: 30px; /* Align with content (checkbox width + gap) */
     font-size: 13px;
-    display: none !important;
-    animation: fadeInExcerpt 0.2s ease-out;
-}
-
-@keyframes fadeInExcerpt {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 /* =============================================================================

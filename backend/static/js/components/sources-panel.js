@@ -57,8 +57,6 @@ export class SourcesPanel {
      * Matches OutlineBuilder pattern for clean lifecycle management
      */
     async setProject(projectId, projectData) {
-        console.log(`📚 [SourcesPanel] setProject called:`, { projectId, hasData: !!projectData });
-        
         // Cancel any pending saves before project change to avoid race conditions
         this.cancelPendingSave();
         
@@ -66,9 +64,7 @@ export class SourcesPanel {
         
         // If no project (logout scenario), clear sources
         if (!projectId) {
-            logger.debug('📚 [SourcesPanel] No projectId, clearing sources');
             this.sources = [];
-            // Don't write to store - ProjectManager resets store once to prevent loops
             this.render();
             return;
         }
@@ -81,21 +77,12 @@ export class SourcesPanel {
      * Load sources from backend for a project
      */
     async loadSources(projectId) {
-        console.log(`📚 [SourcesPanel] loadSources called:`, {
-            projectId,
-            isAuthenticated: this.authService.isAuthenticated(),
-            willLoad: this.authService.isAuthenticated() && projectId
-        });
-        
         if (!this.authService.isAuthenticated() || !projectId) {
-            logger.debug('❌ [SourcesPanel] Cannot load sources - auth or projectId missing');
             return;
         }
         
         try {
-            console.log(`📡 [SourcesPanel] Fetching sources from /api/projects/${projectId}/sources`);
             const data = await this.apiService.get(`/api/projects/${projectId}/sources`);
-            console.log(`📡 [SourcesPanel] API response:`, data);
             
             this.sources = data.sources || [];
             
@@ -103,7 +90,6 @@ export class SourcesPanel {
             const sourcesData = this.sources.map(s => s.source_data);
             this.projectStore.setSources(sourcesData);
             
-            console.log(`✅ [SourcesPanel] Loaded ${this.sources.length} sources for project ${projectId}`);
             this.render();
             
         } catch (error) {
@@ -119,8 +105,6 @@ export class SourcesPanel {
             return;
         }
         
-        console.log(`📚 [SourcesPanel] Received ${newSources.length} new sources`);
-        
         // Merge with existing sources (avoid duplicates using stable composite key)
         const sourceMap = new Map();
         
@@ -128,7 +112,7 @@ export class SourcesPanel {
         const getSourceKey = (source) => {
             const url = source.url || '';
             const title = source.title || '';
-            const excerpt = (source.excerpt || '').substring(0, 50);  // First 50 chars
+            const excerpt = (source.excerpt || '').substring(0, 50);
             return `${url}|||${title}|||${excerpt}`;
         };
         
@@ -158,12 +142,9 @@ export class SourcesPanel {
         // Save to backend (only if project is active)
         if (this.currentProjectId && this.authService.isAuthenticated()) {
             this.debouncedSave();
-        } else {
-            logger.debug('📚 [SourcesPanel] Sources staged in-memory (no active project yet)');
         }
         
         // Re-render to show sources in panel
-        // Visibility is controlled by render() based on currentProjectId, not source count
         this.render();
     }
     
@@ -171,17 +152,12 @@ export class SourcesPanel {
      * Handle source dismissal
      */
     handleSourceDismissed(sourceId) {
-        console.log(`🗑️ [SourcesPanel] handleSourceDismissed called for:`, sourceId);
-        
         // Remove source from array (normalize ID comparison to handle string vs numeric)
         const initialCount = this.sources.length;
         this.sources = this.sources.filter(s => {
             const id = s.source_data?.id || s.id;
             return String(id) !== String(sourceId);
         });
-        
-        const removed = initialCount - this.sources.length;
-        console.log(`📚 [SourcesPanel] Removed ${removed} source(s). Remaining: ${this.sources.length}`);
         
         // Update ProjectStore
         const sourcesData = this.sources.map(s => s.source_data || s);
@@ -234,34 +210,21 @@ export class SourcesPanel {
      * Save sources to backend
      */
     async saveToBackend(projectId, sources) {
-        console.log(`💾 [SourcesPanel] saveToBackend called:`, {
-            projectId,
-            sourceCount: sources.length,
-            isAuthenticated: this.authService.isAuthenticated(),
-            currentProjectId: this.currentProjectId
-        });
-        
         if (!projectId || !this.authService.isAuthenticated()) {
-            logger.debug('❌ [SourcesPanel] Cannot save - auth or projectId missing');
             return;
         }
         
         // Guard: Abort if project changed since save was scheduled
         if (this.currentProjectId !== projectId) {
-            logger.debug('⚠️ [SourcesPanel] Project changed since save scheduled, aborting save');
             return;
         }
         
         this.isSaving = true;
         
         try {
-            console.log(`📡 [SourcesPanel] Saving ${sources.length} sources to /api/projects/${projectId}/sources`);
             await this.apiService.put(`/api/projects/${projectId}/sources`, {
                 sources: sources
             });
-            
-            console.log(`✅ [SourcesPanel] Saved ${sources.length} sources to database`);
-            
         } catch (error) {
             console.error('❌ [SourcesPanel] Error saving sources:', error);
             if (this.toastManager) {
