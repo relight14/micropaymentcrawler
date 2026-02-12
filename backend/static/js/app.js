@@ -612,13 +612,13 @@ export class ChatResearchApp {
                             });
                         }
                     } else {
-                        // Authenticated users: show "Find Sources" button
+                        // Authenticated users: show "Find Sources" button inline
                         const sourcesPrompt = document.createElement('div');
                         sourcesPrompt.className = 'find-sources-prompt';
                         sourcesPrompt.innerHTML = `
                             <button id="findSourcesButton" class="find-sources-button">
-                                <span class="icon">🔍</span>
-                                Find Authoritative Sources
+                                <span class="icon">📄</span>
+                                Find Sources on This Topic
                             </button>
                         `;
                         lastMsg.appendChild(sourcesPrompt);
@@ -655,17 +655,20 @@ export class ChatResearchApp {
                 // Backend is single source of truth for enrichment status
                 this.appState.setCurrentResearchData(response.research_data);
                 
-                // Route sources to SourcesPanel instead of chat
+                // Route sources to SourcesPanel AND show inline preview in chat
                 if (response.research_data.sources && response.research_data.sources.length > 0) {
-                    const sourceCount = response.research_data.sources.length;
+                    const sources = response.research_data.sources;
                     
                     // Send sources to SourcesPanel
                     if (this.sourcesPanel) {
-                        this.sourcesPanel.handleNewSources(response.research_data.sources);
+                        this.sourcesPanel.handleNewSources(sources);
                     }
                     
-                    // Add simple confirmation message to chat
-                    this.addMessage('assistant', `Found ${sourceCount} sources. Check the Sources panel to review and select sources for your research.`);
+                    // Show interactive source cards inline in chat for seamless experience
+                    this.addMessage('assistant', '', {
+                        type: 'source_cards',
+                        sources: sources
+                    });
                 }
                 
                 // If enrichment is needed, let the progressive system handle updates
@@ -693,9 +696,8 @@ export class ChatResearchApp {
             // Use intent query if provided, otherwise fall back to current query
             const currentQuery = intentQuery || this.appState.getCurrentQuery() || DEFAULT_SOURCE_SEARCH_QUERY;
             
-            // IMPROVEMENT: Show clear "searching" status message instead of generic typing indicator
-            // This gives users clear feedback and prevents confusion
-            const searchingMessage = this.addMessage('assistant', `🔍 Searching for authoritative sources on "${currentQuery}"...`);
+            // Show clear "searching" status message
+            const searchingMessage = this.addMessage('assistant', `📄 Searching for sources on "${currentQuery}"...`);
             
             // Call research endpoint with full conversation context
             const response = await this.apiService.analyzeResearchQuery(currentQuery, conversationContext);
@@ -706,22 +708,23 @@ export class ChatResearchApp {
                 this.appState.removeMessage(searchingMessage.id);
             }
             
-            // Handle research data (send sources to SourcesPanel)
+            // Handle research data (send sources to SourcesPanel AND show inline)
             if (response.research_data) {
                 this.appState.setCurrentResearchData(response.research_data);
                 
-                // Route sources to SourcesPanel instead of chat
                 if (response.research_data.sources && response.research_data.sources.length > 0) {
-                    const sourceCount = response.research_data.sources.length;
+                    const sources = response.research_data.sources;
                     
                     // Send sources to SourcesPanel
                     if (this.sourcesPanel) {
-                        this.sourcesPanel.handleNewSources(response.research_data.sources);
+                        this.sourcesPanel.handleNewSources(sources);
                     }
                     
-                    // IMPROVEMENT: Add clear completion message that doesn't prompt for follow-ups
-                    // This signals to the user that the search is complete and they should review sources
-                    this.addMessage('assistant', `✅ Found ${sourceCount} sources. Review them in the Sources panel and select the ones you want to include in your research.`);
+                    // Show interactive source cards inline in chat for seamless experience
+                    this.addMessage('assistant', '', {
+                        type: 'source_cards',
+                        sources: sources
+                    });
                 }
             }
             

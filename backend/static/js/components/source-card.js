@@ -69,9 +69,6 @@ class SourceCard {
      * @returns {HTMLElement} Complete source card element
      */
     create(source, options = {}) {
-        console.log(`🎨 SOURCE CARD: create() called for source:`, source);
-        console.log(`🎨 SOURCE CARD: options:`, options);
-        
         // Defensive check for missing source.id
         if (!source || !source.id) {
             console.error('❌ SOURCE CARD: Invalid source object - missing ID:', source);
@@ -81,15 +78,12 @@ class SourceCard {
             return errorCard;
         }
         
-        console.log(`✅ SOURCE CARD: Creating card for source ID: ${source.id}`);
-        
         const {
             showCheckbox = true,
             showActions = true,
             className = 'source-card'
         } = options;
 
-        console.log(`🎨 SOURCE CARD: Creating main card container...`);
         // Main card container
         const sourceCard = document.createElement('div');
         sourceCard.className = className;
@@ -99,14 +93,12 @@ class SourceCard {
         // Store source data as JSON for easy access in event handlers
         // This makes the card self-contained and independent of global state
         sourceCard.setAttribute('data-source-json', JSON.stringify(source));
-        
-        console.log(`✅ SOURCE CARD: Main container created with class '${className}' and ID '${source.id}'`);
 
         // Compact layout: [Checkbox] Title + Metadata + Actions [Icons]
         const compactLayout = this._createCompactLayout(source, { showCheckbox, showActions });
         sourceCard.appendChild(compactLayout);
 
-        // Source excerpt (hidden by default, shows on hover)
+        // Source excerpt (always visible, truncated via CSS)
         if (source.excerpt || source.content_preview) {
             const excerpt = this._createExcerpt(source);
             sourceCard.appendChild(excerpt);
@@ -144,12 +136,10 @@ class SourceCard {
                 e.preventDefault();
                 this._handleAddToOutline(sourceId, actionBtn, sourceCard);
             }
-            // view-external opens naturally via href, no handler needed
         };
         
         sourceCard.addEventListener('click', cardClickHandler);
         this.eventListeners.set(sourceCard, { type: 'click', handler: cardClickHandler });
-        console.log('🎯 EVENT DELEGATION: Attached single click handler to card:', source.id);
         
         return sourceCard;
     }
@@ -328,8 +318,6 @@ class SourceCard {
      * Handle progressive enrichment updates
      */
     handleEnrichmentUpdate(event) {
-        console.log('🔍 Enrichment event received:', event);
-        
         if (!event || !event.detail) {
             console.error('❌ No enrichment event detail received');
             return;
@@ -342,8 +330,6 @@ class SourceCard {
             return;
         }
         
-        console.log(`🎨 Updating ${sources.length} cards with enriched content...`);
-        
         // Update appState with enriched source data
         const currentData = this.appState.getCurrentResearchData();
         if (currentData && currentData.sources) {
@@ -354,12 +340,10 @@ class SourceCard {
                 }
             });
             this.appState.setCurrentResearchData(currentData);
-            console.log('✅ AppState updated with enriched pricing data');
         }
         
         // Mark enrichment as complete (Layer 1 & 2 safety)
         this.appState.setEnrichmentStatus('complete');
-        console.log('✅ Enrichment status set to complete');
         
         sources.forEach(enrichedSource => {
             this.updateCard(enrichedSource);
@@ -379,17 +363,11 @@ class SourceCard {
         // Escape source ID to handle potential special characters in CSS selectors
         const escapedId = CSS.escape(enrichedSource.id);
         const cardElement = document.querySelector(`[data-source-id="${escapedId}"]`);
-        if (!cardElement) {
-            console.log(`⚠️ Card not found for source ID: ${enrichedSource.id}`);
-            return;
-        }
-        
-        console.log(`🔄 Updating card: ${enrichedSource.title} - pricing: ${enrichedSource.unlock_price ?? 'N/A'}, protocol: ${enrichedSource.licensing_protocol ?? 'N/A'}`);
+        if (!cardElement) return;
         
         // Batch DOM updates to prevent flickering
         requestAnimationFrame(() => {
             // Update stored source data with enriched information
-            // This ensures button click handlers have access to latest pricing
             cardElement.setAttribute('data-source-json', JSON.stringify(enrichedSource));
             
             // Remove skeleton loading state
@@ -399,35 +377,32 @@ class SourceCard {
             const titleElement = cardElement.querySelector('.source-title');
             if (titleElement && enrichedSource.title && enrichedSource.title !== titleElement.textContent) {
                 titleElement.textContent = enrichedSource.title;
-                titleElement.classList.add('content-updated'); // Visual feedback
+                titleElement.classList.add('content-updated');
             }
             
             // Diff-based excerpt update
             const excerptElement = cardElement.querySelector('.source-excerpt');
             if (excerptElement && enrichedSource.excerpt && enrichedSource.excerpt !== excerptElement.textContent) {
                 excerptElement.textContent = enrichedSource.excerpt;
-                excerptElement.classList.add('content-updated'); // Visual feedback
+                excerptElement.classList.add('content-updated');
             }
             
             // Update metadata line with new licensing information (compact layout)
             const metadataLine = cardElement.querySelector('.source-metadata-line');
             if (metadataLine) {
-                // Update license badge within metadata line
                 const licenseBadge = metadataLine.querySelector('.meta-license');
                 if (licenseBadge) {
                     const newLicenseInfo = this._getLicenseText(enrichedSource);
                     licenseBadge.textContent = newLicenseInfo.text;
                     licenseBadge.className = `meta-license ${newLicenseInfo.className}`;
                     licenseBadge.setAttribute('data-license-type', newLicenseInfo.className);
-                    licenseBadge.classList.add('badge-updated'); // Visual feedback
+                    licenseBadge.classList.add('badge-updated');
                 }
             }
             
             // Update full access button with fresh pricing
             this._updateFullAccessButton(cardElement, enrichedSource);
         });
-        
-        console.log(`✅ Card updated: ${enrichedSource.title}`);
     }
     
     /**

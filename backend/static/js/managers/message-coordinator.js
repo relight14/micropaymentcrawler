@@ -153,22 +153,21 @@ export class MessageCoordinator {
         }
         
         // Clean up any stale event listeners from previous project loads
-        // This prevents memory leaks when cards are removed during project switches
         sourceCardFactory.cleanupDetachedListeners();
         
         // Create the DOM structure that CSS expects
         const container = document.createElement('div');
         container.className = 'sources-preview-section';
         
-        // Create header section
+        // Create compact header
         const header = document.createElement('div');
         header.className = 'preview-header';
         
         const title = document.createElement('h3');
-        title.textContent = 'Sources Found';
+        title.textContent = `📄 ${sources.length} Sources Found`;
         
         const subtitle = document.createElement('p');
-        subtitle.textContent = `Found ${sources.length} sources for your research`;
+        subtitle.textContent = 'Select sources to add to your outline';
         
         header.appendChild(title);
         header.appendChild(subtitle);
@@ -187,13 +186,7 @@ export class MessageCoordinator {
             container.appendChild(sourceCard);
         });
         
-        // FIX: DO NOT clear eventListeners here - this breaks subsequent project loads
-        // Event listeners must persist for the lifetime of the DOM nodes
-        // Cleanup happens when SourceCard.destroy() is called explicitly or on project switch
-        // The singleton pattern means clearing here affects ALL future card creation
-        
         // Return the live container with event listeners intact
-        // MessageRenderer._createBody() checks instanceof HTMLElement and appends directly
         return container;
     }
     
@@ -455,18 +448,10 @@ export class MessageCoordinator {
 
     async submitFeedback(query, sourceIds, rating, mode, feedbackSection) {
         try {
-            console.log('📊 FEEDBACK SUBMISSION START');
-            console.log('  Query:', query);
-            console.log('  Source IDs:', sourceIds);
-            console.log('  Rating:', rating);
-            console.log('  Mode:', mode);
-            console.log('  Feedback section:', feedbackSection);
-            
             // Track feedback
             analytics.trackFeedback(rating, mode);
             
             const token = this.authService.getToken();
-            console.log('  Token available:', !!token);
             
             const headers = {
                 'Content-Type': 'application/json'
@@ -483,27 +468,18 @@ export class MessageCoordinator {
                 mode: mode
             };
             
-            console.log('  Request body:', JSON.stringify(requestBody, null, 2));
-            console.log('  Headers:', headers);
-            
-            console.log('🌐 Sending POST request to /api/research/feedback...');
             const response = await fetch('/api/research/feedback', {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(requestBody)
             });
             
-            console.log('  Response status:', response.status);
-            console.log('  Response ok:', response.ok);
-            
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('  Error response body:', errorText);
                 throw new Error(`Failed to submit feedback: ${response.status} - ${errorText}`);
             }
             
             const result = await response.json();
-            console.log('  Success response:', result);
             
             feedbackSection.dataset.submitted = 'true';
             
@@ -519,13 +495,8 @@ export class MessageCoordinator {
             
             this.toastManager.show('✅ ' + (result.message || 'Feedback submitted!'), 'success', 3000);
             
-            console.log('✅ FEEDBACK SUBMISSION COMPLETE');
-            
         } catch (error) {
-            console.error('❌ FEEDBACK SUBMISSION ERROR:', error);
-            console.error('  Error name:', error.name);
-            console.error('  Error message:', error.message);
-            console.error('  Error stack:', error.stack);
+            console.error('❌ Feedback submission error:', error);
             this.toastManager.show('Failed to submit feedback. Please try again.', 'error', 3000);
         }
     }
