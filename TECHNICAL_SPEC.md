@@ -1105,7 +1105,7 @@ Replace the fragile `content_id_cache` table with a proper `reports` table that 
 CREATE TABLE IF NOT EXISTS reports (
     id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     query           TEXT NOT NULL,
-    query_hash      TEXT NOT NULL,           -- SHA-256 of normalized query
+    query_hash      TEXT NOT NULL,            -- SHA-256 of normalized query
     source_ids      TEXT NOT NULL,            -- JSON array of source IDs
     source_ids_hash TEXT NOT NULL,            -- SHA-256 of sorted source IDs
     report_data     TEXT NOT NULL,            -- JSON blob: {summary, table_data, ...}
