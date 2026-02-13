@@ -838,9 +838,11 @@ Returns content metadata plus access control status (has_purchased, has_sufficie
 
 ### 8.5 Complete Purchase Flow (How It Works End-to-End)
 
+#### Current Flow (Coupled — Steps 4-6 in Single Request)
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    PURCHASE SEQUENCE                                  │
+│                CURRENT PURCHASE SEQUENCE (COUPLED)                    │
 │                                                                      │
 │  1. CHECKOUT STATE                                                   │
 │     POST /checkout-state  { price_cents, content_id }                │
@@ -856,18 +858,45 @@ Returns content metadata plus access control status (has_purchased, has_sufficie
 │     → User completes Stripe payment                                  │
 │     → Poll /v1/wallet/payment-status/{session_id} until succeeded    │
 │                                                                      │
-│  4. SELLER: REGISTER CONTENT                                         │
-│     POST /v1/auth/login/api-key  { key, secret }  → seller_jwt      │
-│     POST /v1/seller/content  { title, content_body, price_cents }    │
-│     → Returns: content_id                                            │
+│  4. GENERATE REPORT + REGISTER + PURCHASE  (all in one request)      │
+│     a. Generate AI report (Claude Sonnet, 10-30s)                    │
+│     b. POST /v1/auth/login/api-key  → seller_jwt                    │
+│     c. POST /v1/seller/content  → content_id                        │
+│     d. POST /v1/purchases  { content_id, price_cents }              │
+│     → Returns: report + purchase confirmation                        │
 │                                                                      │
-│  5. BUYER: PURCHASE                                                  │
-│     POST /v1/purchases  { content_id, price_cents }                  │
-│     Headers: Idempotency-Key: {unique_key}                           │
-│     → Returns: purchase confirmation with transaction_id             │
+│  Problem: If step 4d fails, the expensive report (4a) is lost.       │
+│  Problem: ~15-35 seconds blocking in a single HTTP request.          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Recommended Flow (Decoupled — See Section 11.1 for Details)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              RECOMMENDED PURCHASE SEQUENCE (DECOUPLED)                │
 │                                                                      │
-│  6. DELIVER CONTENT                                                  │
-│     Return the research report to the user                           │
+│  PHASE 1: GENERATE + REGISTER  (user clicks "Generate Report")       │
+│  ─────────────────────────────────────────────────────────────────    │
+│  1a. Generate AI report (Claude Sonnet, 10-30s)                      │
+│  1b. POST /v1/auth/login/api-key  → seller_jwt  (cached)            │
+│  1c. POST /v1/seller/content  → content_id                          │
+│  1d. Store { report_id, content_id, report_data } in reports table   │
+│  → Returns: report preview + report_id + price_cents                 │
+│                                                                      │
+│  PHASE 2: CHECKOUT  (user reviews report, clicks "Buy")              │
+│  ─────────────────────────────────────────────────────────────────    │
+│  2a. CHECKOUT STATE  { price_cents, content_id }                     │
+│      → authenticate | fund_wallet | purchase | none                  │
+│  2b. AUTHENTICATE (if needed)                                        │
+│  2c. FUND WALLET (if needed)                                         │
+│  2d. POST /v1/purchases  { content_id, price_cents }                │
+│      Headers: Idempotency-Key: {unique_key}                          │
+│      → Returns: purchase confirmation                                │
+│                                                                      │
+│  Benefit: Purchase is a single API call (<1s).                       │
+│  Benefit: Report survives purchase failures — user can retry.        │
+│  Benefit: Price changes handled via PATCH /v1/seller/content/{id}.   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1010,41 +1039,342 @@ MAX_API_CALLS_PER_USER_PER_DAY=100
 
 ## 11. Improvement Recommendations
 
-### 11.1 LedeWire Integration — Streamlining Suggestions
+### 11.1 LedeWire Integration — Decoupled Content Registration
 
-The current implementation requires a two-phase flow for every purchase: register content as a seller, then process the purchase as a buyer. This adds latency and complexity.
+#### The Problem
 
-**Problem 1: Seller authentication adds a network round-trip on every purchase.**  
-The seller JWT is cached with a 1-hour expiry and a 5-minute refresh buffer, but the cache is in-memory and lost on restart. Improvement:
+The current purchase handler (`purchase.py`) does everything in a single synchronous HTTP request:
 
-- **Store the seller JWT in Redis or the database** so it survives restarts and is shared across workers.
-- **Increase the refresh buffer to 10 minutes** to avoid token races under load.
+```
+purchase_research()
+  ├─ 1. Calculate pricing
+  ├─ 2. Generate AI report              ← 10-30 seconds (Claude Sonnet)
+  ├─ 3. Authenticate as seller           ← network call
+  ├─ 4. POST /v1/seller/content          ← network call (registration)
+  ├─ 5. POST /v1/purchases               ← network call (payment)
+  └─ 6. Return report
+```
 
-**Problem 2: Content registration happens on every purchase, even for repeat queries.**  
-The current code caches `content_id` for 24 hours, but the cache is SQLite-based and the key is a hash of query + source IDs + price. This works but is fragile.
+Content registration (step 4) is coupled to the purchase transaction (step 5). If registration fails, the whole purchase fails — even though the expensive report has already been generated. If the same user retries, the report is regenerated from scratch.
 
-- **Pre-register content after report generation, not during purchase.** Decouple registration from the purchase transaction. Register the content as soon as the report is generated and store the `content_id` on the report record. The purchase step then only needs to call `POST /v1/purchases`.
-- **Use a dedicated `reports` table** with columns for `content_id`, `query_hash`, `report_markdown`, `price_cents`, and `registered_at`. Look up existing `content_id` before re-registering.
+#### LedeWire API Conformance Check
 
-**Problem 3: The seller/buyer dual-role adds conceptual overhead.**  
-If Clearcite is always the seller and the user is always the buyer, consider asking LedeWire for a simpler "platform purchase" endpoint that doesn't require explicit content registration — or batch-register content asynchronously.
+The decoupled approach uses three LedeWire endpoints. All are tagged `Implemented` in the OpenAPI spec:
 
-**Problem 4: No token refresh flow is implemented.**  
-The `refresh_token` from auth responses is never used. Implement proactive token refresh to avoid 401 errors mid-purchase:
+| Step | Endpoint | When | Purpose |
+|------|----------|------|---------|
+| Register | `POST /v1/seller/content` | After report generation | Create content, get `content_id` |
+| Update | `PATCH /v1/seller/content/{id}` | After report finalization (optional) | Update price or metadata |
+| Purchase | `POST /v1/purchases` | When user clicks "Buy" | Debit wallet, complete transaction |
+
+The spec imposes no ordering constraint between content creation and purchase beyond the obvious: the `content_id` must exist before it can be purchased. There is no time limit between registration and purchase — content lives until explicitly deleted via `DELETE /v1/seller/content/{id}`.
+
+#### The Decoupled Flow
+
+Split the work into two phases: **report generation** (which includes registration) and **purchase** (which is now a single API call).
+
+```
+PHASE 1: GENERATE + REGISTER (happens when the user clicks "Generate Report")
+──────────────────────────────────────────────────────────────────────────────
+  1. Calculate pricing (local)
+  2. Generate AI report (Claude Sonnet, 10-30s)
+  3. Authenticate as seller (cached JWT, ~0ms if warm)
+  4. POST /v1/seller/content → get content_id
+  5. Store { report_id, content_id, report_data, price_cents } in reports table
+  6. Return report + content_id to frontend
+
+PHASE 2: PURCHASE (happens when the user clicks "Buy" — fast, <1s)
+──────────────────────────────────────────────────────────────────────────────
+  1. Look up content_id from reports table (local DB query)
+  2. POST /v1/purchases { content_id, price_cents }
+  3. Record transaction in local ledger
+  4. Return confirmation
+```
+
+**Key differences from the current flow:**
+- Report generation and content registration happen **before** the user commits to purchasing.
+- The purchase endpoint is a single LedeWire API call — no seller auth, no content registration.
+- If the user abandons the purchase, the registered content sits in LedeWire as `unlisted` (invisible to other users, no cost to Clearcite). Stale entries can be cleaned up with a nightly `DELETE` job.
+- If the purchase fails (insufficient funds, network error), the user can retry without re-generating the report — the `content_id` is already stored locally.
+
+#### Database Schema: `reports` Table
+
+Replace the fragile `content_id_cache` table with a proper `reports` table that ties together the report, the LedeWire content record, and the pricing.
+
+```sql
+CREATE TABLE IF NOT EXISTS reports (
+    id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    query           TEXT NOT NULL,
+    query_hash      TEXT NOT NULL,           -- SHA-256 of normalized query
+    source_ids      TEXT NOT NULL,            -- JSON array of source IDs
+    source_ids_hash TEXT NOT NULL,            -- SHA-256 of sorted source IDs
+    report_data     TEXT NOT NULL,            -- JSON blob: {summary, table_data, ...}
+    price_cents     INTEGER NOT NULL,
+    content_id      TEXT,                     -- LedeWire content_id (NULL until registered)
+    registered_at   TIMESTAMP,               -- When content was registered with LedeWire
+    purchased_at    TIMESTAMP,               -- When user completed purchase (NULL until purchased)
+    transaction_id  TEXT,                     -- LedeWire purchase transaction ID
+    user_id         TEXT NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Uniqueness: same user + same query + same sources + same price = same report
+    UNIQUE(user_id, query_hash, source_ids_hash, price_cents)
+);
+
+CREATE INDEX idx_reports_content_id ON reports(content_id);
+CREATE INDEX idx_reports_user_query ON reports(user_id, query_hash);
+```
+
+#### Report Registration Logic
+
+The `content_id` lookup-or-register pattern moves out of the purchase handler and into a standalone function that runs during report generation:
 
 ```python
-async def ensure_valid_token(self, access_token, refresh_token):
-    """Refresh the buyer's access token if it's near expiry."""
-    claims = decode_jwt_claims(access_token)  # decode without verification
-    if claims["exp"] - time.time() < 300:     # less than 5 min left
-        return await self.refresh_token(refresh_token)
+# services/content_registration.py
+
+async def register_report_with_ledewire(
+    report_id: str,
+    query: str,
+    sources: List[SourceCard],
+    price_cents: int,
+    report_data: Dict,
+    user_id: str
+) -> str:
+    """
+    Register a generated report with LedeWire and return the content_id.
+    
+    1. Check if a report with the same fingerprint already has a content_id.
+    2. If yes, return the existing content_id (skip re-registration).
+    3. If no, POST /v1/seller/content and store the returned content_id.
+    
+    If price changed since last registration, PATCH the existing content.
+    
+    Returns: content_id (LedeWire UUID)
+    """
+    db = get_database()
+    source_ids = sorted([s.id for s in sources])
+    query_hash = hashlib.sha256(query.strip().lower().encode()).hexdigest()
+    source_ids_hash = hashlib.sha256(",".join(source_ids).encode()).hexdigest()
+    
+    # Step 1: Check for existing registration
+    existing = db.execute("""
+        SELECT id, content_id, price_cents FROM reports
+        WHERE user_id = ? AND query_hash = ? AND source_ids_hash = ?
+        AND content_id IS NOT NULL
+        ORDER BY created_at DESC LIMIT 1
+    """, (user_id, query_hash, source_ids_hash)).fetchone()
+    
+    if existing and existing["content_id"]:
+        # Same query + same sources — reuse the content_id
+        if existing["price_cents"] != price_cents:
+            # Price changed (e.g., different incremental pricing) — update in LedeWire
+            ledewire.update_content(existing["content_id"], price_cents=price_cents)
+            db.execute("""
+                UPDATE reports SET price_cents = ? WHERE id = ?
+            """, (price_cents, existing["id"]))
+        return existing["content_id"]
+    
+    # Step 2: Register new content with LedeWire
+    report_title = f"Research Report: {query[:100]}"
+    content_stub = f"# {report_title}\n\nResearch report with {len(sources)} sources."
+    
+    registration = ledewire.register_content(
+        title=report_title,
+        content_body=content_stub,
+        price_cents=price_cents,
+        visibility="unlisted",
+        metadata={
+            "query": query,
+            "source_count": len(sources),
+            "generated_at": datetime.now().isoformat(),
+            "report_id": report_id
+        }
+    )
+    
+    content_id = registration["id"]
+    
+    # Step 3: Store in reports table
+    db.execute("""
+        INSERT INTO reports (id, query, query_hash, source_ids, source_ids_hash,
+                            report_data, price_cents, content_id, registered_at, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+        ON CONFLICT (user_id, query_hash, source_ids_hash, price_cents)
+        DO UPDATE SET content_id = ?, registered_at = CURRENT_TIMESTAMP, report_data = ?
+    """, (report_id, query, query_hash, json.dumps(source_ids), source_ids_hash,
+          json.dumps(report_data), price_cents, content_id, user_id,
+          content_id, json.dumps(report_data)))
+    
+    return content_id
+```
+
+#### Simplified Purchase Handler
+
+After decoupling, the purchase endpoint shrinks dramatically:
+
+```python
+# routes/purchase.py — after decoupling
+
+@router.post("", response_model=PurchaseResponse)
+async def purchase_research(request: Request, purchase_request: PurchaseRequest, ...):
+    user_id = extract_user_id_from_token(access_token)
+    
+    # Step 1: Look up the pre-registered content_id
+    report = db.execute("""
+        SELECT id, content_id, price_cents, report_data FROM reports
+        WHERE id = ? AND user_id = ? AND content_id IS NOT NULL
+    """, (purchase_request.report_id, user_id)).fetchone()
+    
+    if not report:
+        raise HTTPException(404, "Report not found or not yet registered")
+    
+    # Step 2: Single LedeWire API call — just the purchase
+    payment_result = ledewire.create_purchase(
+        access_token=access_token,
+        content_id=report["content_id"],
+        price_cents=report["price_cents"],
+        idempotency_key=purchase_request.idempotency_key
+    )
+    
+    if "error" in payment_result:
+        raise HTTPException(402, ledewire.handle_api_error(payment_result))
+    
+    # Step 3: Mark purchased locally
+    db.execute("""
+        UPDATE reports SET purchased_at = CURRENT_TIMESTAMP,
+                          transaction_id = ?
+        WHERE id = ?
+    """, (payment_result.get("id"), report["id"]))
+    
+    # Step 4: Return the report
+    return PurchaseResponse(
+        success=True,
+        message=f"Report purchased for ${report['price_cents']/100:.2f}",
+        packet=json.loads(report["report_data"]),
+        wallet_deduction=report["price_cents"] / 100
+    )
+```
+
+#### Handling Price Changes with `PATCH`
+
+If the user adds/removes sources between report generation and purchase, the price may change. The LedeWire `PATCH /v1/seller/content/{id}` endpoint (tagged `Implemented` in the spec) supports updating `price_cents`:
+
+```python
+# integrations/ledewire.py — new method
+
+def update_content(self, content_id: str, price_cents: int = None,
+                   title: str = None, metadata: Dict = None) -> Dict[str, Any]:
+    """
+    PATCH /v1/seller/content/{id}
+    Update an existing content item. Only sends fields that changed.
+    """
+    seller_token = self.authenticate_as_seller()
+    
+    update_data = {}
+    if price_cents is not None:
+        update_data["price_cents"] = price_cents
+    if title is not None:
+        update_data["title"] = title
+    if metadata is not None:
+        update_data["metadata"] = metadata
+    
+    response = self.session.patch(
+        f"{self.api_base}/seller/content/{content_id}",
+        headers={"Authorization": f"Bearer {seller_token}"},
+        json=update_data,
+        timeout=10
+    )
+    response.raise_for_status()
+    return response.json()
+```
+
+This means if the user modifies their outline after the report is generated:
+1. Recalculate `price_cents` locally.
+2. `PATCH /v1/seller/content/{content_id}` with the new price.
+3. Update the local `reports` row.
+4. The `POST /v1/purchases` call uses the same `content_id` at the updated price.
+
+#### Stale Content Cleanup
+
+Registered-but-never-purchased content accumulates in LedeWire over time. Since all Clearcite content is `visibility: "unlisted"`, it's invisible to other users, but it should still be cleaned up.
+
+```python
+# tasks/cleanup_stale_content.py — run nightly via cron or scheduler
+
+async def cleanup_stale_registrations(max_age_hours: int = 72):
+    """
+    Delete LedeWire content registrations that were never purchased.
+    Safe because visibility=unlisted means no external buyers can access them.
+    """
+    stale_reports = db.execute("""
+        SELECT id, content_id FROM reports
+        WHERE content_id IS NOT NULL
+        AND purchased_at IS NULL
+        AND created_at < datetime('now', '-' || ? || ' hours')
+    """, (max_age_hours,)).fetchall()
+    
+    for report in stale_reports:
+        try:
+            ledewire.delete_content(report["content_id"])  # DELETE /v1/seller/content/{id}
+        except Exception:
+            pass  # Already deleted or network error — skip
+        
+        db.execute("""
+            UPDATE reports SET content_id = NULL, registered_at = NULL
+            WHERE id = ?
+        """, (report["id"],))
+```
+
+#### Seller Token Persistence
+
+The seller JWT (used for `POST /v1/seller/content` and `PATCH`) is currently cached in-memory and lost on restart. Fix:
+
+```python
+# Store in database alongside the reports table
+CREATE TABLE IF NOT EXISTS seller_tokens (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+    token       TEXT NOT NULL,
+    expires_at  TIMESTAMP NOT NULL,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+On startup, load the cached seller token from the database. If expired or missing, re-authenticate via `POST /v1/auth/login/api-key` and store the new token. This saves a network round-trip on the first request after a restart.
+
+#### Buyer Token Refresh
+
+The `refresh_token` from buyer auth responses is currently unused. Implement proactive refresh to avoid 401 errors mid-purchase:
+
+```python
+async def ensure_valid_buyer_token(self, access_token: str, refresh_token: str) -> str:
+    """Refresh the buyer's access token if near expiry."""
+    import jwt  # PyJWT — decode without verification to read exp claim
+    claims = jwt.decode(access_token, options={"verify_signature": False})
+    if claims["exp"] - time.time() < 300:  # less than 5 min remaining
+        result = self.session.post(
+            f"{self.api_base}/auth/token/refresh",
+            json={"refresh_token": refresh_token}
+        )
+        result.raise_for_status()
+        return result.json()["access_token"]
     return access_token
 ```
 
-**Problem 5: Webhook handling for wallet funding is opaque.**  
-The app polls `payment-status/{session_id}` after Stripe payment. This works but is inefficient. Improvement:
+#### Wallet Funding Webhooks
 
-- **Implement a webhook receiver** in your backend that LedeWire can call when the wallet is credited. Update the UI via WebSocket or SSE when the webhook arrives, instead of polling.
+The current app polls `GET /v1/wallet/payment-status/{session_id}` after Stripe payment. Improvement: implement a webhook receiver that LedeWire calls when the wallet is credited:
+
+```python
+# routes/webhooks.py
+
+@router.post("/ledewire/wallet-funded")
+async def wallet_funded_webhook(request: Request):
+    """LedeWire calls this when a wallet payment completes."""
+    body = await request.json()
+    # Verify webhook signature (LedeWire-specific header)
+    # Update local state, notify frontend via WebSocket/SSE
+```
+
+This eliminates polling and gives the user instant feedback when their wallet is funded.
 
 ---
 
@@ -1131,15 +1461,16 @@ If the API times out or returns a 5xx error, the search fails silently and falls
 
 ### 11.7 Cross-Cutting Architecture Improvements
 
-**1. Purchase state machine.** Model the purchase lifecycle explicitly rather than with ad-hoc conditionals:
+**1. Purchase state machine.** With the decoupled flow (Section 11.1), the state machine simplifies because registration happens in Phase 1:
 
 ```
-IDLE → CHECKING_WALLET → INSUFFICIENT_FUNDS → FUNDING → FUNDED
-                       → SUFFICIENT_FUNDS → REGISTERING_CONTENT → PURCHASING → COMPLETE
-                                                                → FAILED → RETRY
+Phase 1 (Generate):  IDLE → GENERATING → REGISTERING → REPORT_READY
+Phase 2 (Purchase):  REPORT_READY → CHECKING_WALLET → INSUFFICIENT_FUNDS → FUNDING → FUNDED
+                                                     → SUFFICIENT_FUNDS → PURCHASING → COMPLETE
+                                                                        → FAILED → RETRY
 ```
 
-This eliminates edge cases around double charges, interrupted flows, and stale UI states.
+`REGISTERING_CONTENT` is no longer in the purchase path — it's part of report generation.
 
 **2. Idempotency.** The current implementation uses SHA-256 of `user_id + query + source_ids` as the idempotency key. This is good but should be extended:
 
